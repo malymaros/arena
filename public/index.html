@@ -1,26 +1,26 @@
-<!doctype html>
-<html lang="sk">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <title>Arena POC</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <!-- Arena background -->
+  <!-- Arena background layers -->
   <div id="arena" class="arena"></div>
 
   <!-- HUD -->
-  <div id="hud-turn" class="hud hud-turn"></div>
-  <div id="hud-hp" class="hud hud-hp"></div>
-  <div id="hud-mana" class="hud hud-mana"></div>
+  <div id="hud-turn" class="hud hud-turn">Kolo 1 — Začína P1</div>
+  <div id="hud-hp"   class="hud hud-hp">HP: 10</div>
+  <div id="hud-mana" class="hud hud-mana">Mana: 0</div>
 
-  <!-- Stage -->
-  <div class="stage">
-    <div class="game">
-      <!-- Board = grid (efekty) + actors (plynulý pohyb) -->
+  <main class="stage">
+    <section class="game">
       <div class="board">
+        <!-- effects/grid -->
         <div id="grid" class="grid"></div>
+        <!-- actors -->
         <div id="actors" class="actors">
           <canvas id="actor-p1" class="sprite-actor" width="224" height="224"></canvas>
           <canvas id="actor-p2" class="sprite-actor" width="224" height="224"></canvas>
@@ -29,32 +29,39 @@
 
       <div class="panel">
         <div id="queue" class="queue"></div>
-        <div class="controls">
-            <div class="move-grid">
-              <button class="btn arrow" data-act="move:up"    title="Move Up">↑</button>
-              <div class="h">
-                <button class="btn arrow" data-act="move:left"  title="Move Left">←</button>
-                <button class="btn arrow" data-act="move:right" title="Move Right">→</button>
-              </div>
-              <button class="btn arrow" data-act="move:down"  title="Move Down">↓</button>
-            </div>
-          
-            <div class="actions">
-              <button class="btn mana"   data-act="recharge" title="+2 mana">Recharge +2 mana</button>
-              <button class="btn attack" data-act="attack"   title="Basic -1 mana">Basic Attack -1 mana</button>
-            </div>
-          
-            <div class="meta">
-              <button id="undo" class="btn secondary">Undo</button>
-              <button id="lock" class="btn btn-lock">LOCK IN</button>
-            </div>
-          </div>
-          
       </div>
+    </section>
+  </main>
+
+  <!-- Controls toolbar -->
+  <div class="controls">
+    <div class="move-grid">
+      <button class="btn arrow" data-act="move:up"    title="Move Up">↑</button>
+      <div class="h">
+        <button class="btn arrow" data-act="move:left"  title="Move Left">←</button>
+        <button class="btn arrow" data-act="move:right" title="Move Right">→</button>
+      </div>
+      <button class="btn arrow" data-act="move:down"  title="Move Down">↓</button>
+    </div>
+
+    <div class="actions">
+      <!-- Recharge (BLUE) — vrátené tlačidlo -->
+      <button class="btn mana" data-act="recharge" title="+2 mana">Recharge (+2💧)</button>
+
+      <!-- Basic (RED) -->
+      <button class="btn attack" data-act="attack" title="Basic Attack (−1 mana, 1 dmg)">Basic (−1💧, 1☠️)</button>
+
+      <!-- Special (PURPLE) — hover náhľad -->
+      <button id="special-btn" class="btn special" data-act="special" title="Special (−5 mana)">Special (−5💧)</button>
+    </div>
+
+    <div class="meta">
+      <button id="undo" class="btn secondary">Undo</button>
+      <button id="lock" class="btn btn-lock">LOCK IN</button>
     </div>
   </div>
 
-  <!-- Výber postavy -->
+  <!-- Character select -->
   <div id="char-select" class="char-select">
     <div class="char-card" data-char="fire">
       <canvas class="char-canvas" width="160" height="160" data-char="fire"></canvas>
@@ -70,15 +77,15 @@
     </div>
   </div>
 
-  <!-- Game Over -->
+  <!-- Game over -->
   <div id="gameover" class="gameover hidden">
     <div class="go-box">
-      <div id="go-text" class="go-text"></div>
+      <div id="go-text" class="go-text">GAME OVER</div>
       <button id="retry" class="retry">Retry</button>
     </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script type="module" src="./client.js"></script>
+  <script src="/client.js" type="module"></script>
 </body>
 </html>

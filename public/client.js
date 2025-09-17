@@ -1,5 +1,4 @@
 // public/client.js
-
 const socket = io();
 
 const gridEl   = document.getElementById("grid");
@@ -26,12 +25,23 @@ const cs = getComputedStyle(document.documentElement);
 const TILE = parseInt(cs.getPropertyValue("--tile")) || 224;
 const GAP  = parseInt(getComputedStyle(gridEl).gap || "10") || 10;
 
-const CHARGE_SCALE = 1; 
-const CHARGE_ANIM = { file: "Charge.png", fps: 12, loop: true };
+// === Timing (2× pomalšie) ===
+const MOVE_MS = 2000;               // bolo 1000
+const ATTACK_SWING_MS = 1600;       // bolo 800
+const HURT_MS = 1600;               // bolo 800
 
-const MOVE_MS = 1000;
-const ATTACK_SWING_MS = 800;
-const HURT_MS = 800;
+// Projektil (vizuálny FPS môžete ponechať; let spomaľuje server)
+const CHARGE_SCALE = 1.0;
+const CHARGE_ANIM  = { file: "Charge.png", fps: 8, loop: true }; // mierne pomalšie
+
+// Special anim (pomalší FPS)
+const SPECIAL_SCALE = 2.4;
+const SPECIAL_FPS   = 6;
+const SPECIAL_ANIMS = {
+  fire:      { file: "Flame_jet.png",    fps: SPECIAL_FPS, loop: true },
+  lightning: { file: "Light_charge.png", fps: SPECIAL_FPS, loop: true },
+  wanderer:  { file: "Magic_sphere.png", fps: SPECIAL_FPS, loop: true },
+};
 
 const CHAR_META = {
   fire:      { name: "Fire Wizard",      dir: "fire" },
@@ -53,11 +63,14 @@ let state = { p1:null, p2:null, arena:null, turn:1, starter:"p1" };
 let myQueue = [];
 let chosenChar = null;
 
+// počas special castu skryjeme bežný actor sprite
+let castingNow = { p1:false, p2:false };
+
 let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
 const SPRITES = {};
 let actorsInitialized = false;
 
-// preview
+// preview loop
 let charPreviewRaf = 0;
 
 /* ---------- sprite helpers ---------- */
@@ -73,7 +86,7 @@ function ensureSpriteMeta(charDir, file) {
       SPRITES[charDir][file] = { img, frames, fw, fh };
       resolve(SPRITES[charDir][file]);
     };
-    img.onerror = (e) => reject(e);
+    img.onerror = reject;
     img.src = `/assets/${charDir}/${file}`;
   });
 }
@@ -136,35 +149,67 @@ function renderHUD() {
   hudMana.textContent = `Mana: ${state[me].mana}`;
 }
 
-/* ---------- Grid (efekty + Charge projektil) ---------- */
+/* ---------- Grid (efekty + anim. objekty) ---------- */
 function renderGrid(s, effects = []) {
   gridEl.style.gridTemplateColumns = `repeat(${board.w}, ${TILE}px)`;
   gridEl.style.gridTemplateRows = `repeat(${board.h}, ${TILE}px)`;
   gridEl.innerHTML = "";
 
+  // reset info o caste
+  castingNow.p1 = false;
+  castingNow.p2 = false;
+
   const recharge = new Set();
-  const charges = []; // [{cell:[x,y], dir:'left'|'right', from:'p1'|'p2'}]
+  const charges  = [];      // {cell:[x,y], dir, from}
+  const specials = [];      // {from}
   let hitTarget = null;
+
+  // pre blikajúci rozsah pri speciale
+  const previewSet = new Set(); // "x,y"
 
   for (const e of effects) {
     if (e?.kind === "recharge") for (const [x,y] of e.cells || []) recharge.add(`${x},${y}`);
-    if (e?.kind === "charge") charges.push(e);
-    if (e?.kind === "hit") hitTarget = e.target;
+    if (e?.kind === "charge")   charges.push(e);
+    if (e?.kind === "special")  specials.push(e);
+    if (e?.kind === "hit")      hitTarget = e.target;
+  }
+
+  // priprav rozsahy pre všetky špeciály v tomto frame
+  for (const sp of specials) {
+    const caster = s?.[sp.from];
+    if (!caster || !caster.char) continue;
+    castingNow[sp.from] = true; // ⬅ skryjeme jeho actor sprite v RAF
+    const cells = cellsForSpecialPreview(caster); // rovnaká logika ako hover
+    cells.forEach(([x,y]) => previewSet.add(`${x},${y}`));
+  }
+
+  // ktorý cell je políčko kúzelníka so special anim?
+  const specialCasterCell = new Map(); // from -> {x,y,file,dir}
+  for (const sp of specials) {
+    const caster = s?.[sp.from];
+    if (!caster || !caster.char) continue;
+    const charKey = caster.char;                       // "fire"|"lightning"|"wanderer"
+    const dirKey  = CHAR_META[charKey].dir;
+    const file    = SPECIAL_ANIMS[charKey].file;
+    specialCasterCell.set(sp.from, { x: caster.x, y: caster.y, file, dir: dirKey });
   }
 
   for (let y = 0; y < board.h; y++) {
     for (let x = 0; x < board.w; x++) {
       const cell = document.createElement("div");
       cell.className = "cell";
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+
       const key = `${x},${y}`;
       if (recharge.has(key)) cell.classList.add("hl-recharge");
+      if (previewSet.has(key)) cell.classList.add("preview-red");
 
-      // animovaný projektil (canvas)
+      // CHARGE projektil v tejto bunke
       const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
       if (chargeHere) {
-        const fromSlot = chargeHere.from;
-        const charKey  = s?.[fromSlot]?.char;
-        const dirKey   = charKey ? CHAR_META[charKey].dir : null;
+        const charKey = s?.[chargeHere.from]?.char;
+        const dirKey  = charKey ? CHAR_META[charKey].dir : null;
         if (dirKey) {
           const cvs = document.createElement("canvas");
           const px  = Math.round(TILE * CHARGE_SCALE);
@@ -174,13 +219,29 @@ function renderGrid(s, effects = []) {
           cvs.style.width  = px + "px";
           cvs.style.height = px + "px";
           cvs.style.transform = (chargeHere.dir === "left")
-              ? "translate(-50%, -50%) scaleX(-1)"
-              : "translate(-50%, -50%)";
+            ? "translate(-50%, -50%) scaleX(-1)"
+            : "translate(-50%, -50%)";
           cell.appendChild(cvs);
         }
       }
 
-      // hit blink
+      // SPECIAL animácia len na políčku kúzelníka
+      for (const [from, info] of specialCasterCell.entries()) {
+        if (info.x === x && info.y === y) {
+          const cvs = document.createElement("canvas");
+          const px  = Math.round(TILE * SPECIAL_SCALE);
+          cvs.width = px; cvs.height = px;
+          cvs.className = "special-canvas";
+          cvs.dataset.dir  = info.dir;
+          cvs.dataset.file = info.file;
+          cvs.style.width  = px + "px";
+          cvs.style.height = px + "px";
+          cvs.style.transform = "translate(-50%, -50%)";
+          cell.appendChild(cvs);
+        }
+      }
+
+      // zásahový blik
       const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
       const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
       if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
@@ -191,10 +252,39 @@ function renderGrid(s, effects = []) {
   }
 }
 
-/* ---------- Actors (plynulý pohyb) ---------- */
-function cellToPx(x, y) {
-  return { left: x * (TILE + GAP), top: y * (TILE + GAP) };
+/* ---------- Special preview (hover) ---------- */
+function cellsForSpecialPreview(meState){
+  if (!meState || !meState.char) return [];
+  const { x, y, char } = meState;
+  const cells = [];
+  if (char === "fire"){
+    for (let cx=0; cx<board.w; cx++) cells.push([cx, y]);
+  } else if (char === "lightning"){
+    for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++){
+      if (!(cx===x && cy===y)) cells.push([cx, cy]);
+    }
+  } else if (char === "wanderer"){
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy])=>{
+      const cx=x+dx, cy=y+dy;
+      if (cx>=0 && cy>=0 && cx<board.w && cy<board.h) cells.push([cx,cy]);
+    });
+  }
+  return cells;
 }
+function showPreviewCells(cells){
+  const kids = gridEl.children;
+  for (let i=0;i<kids.length;i++){
+    const cell = kids[i];
+    const cx = parseInt(cell.dataset.x,10), cy = parseInt(cell.dataset.y,10);
+    if (cells.some(([x,y])=>x===cx && y===cy)) cell.classList.add("preview-red");
+  }
+}
+function clearPreviewCells(){
+  gridEl.querySelectorAll(".preview-red").forEach(el=>el.classList.remove("preview-red"));
+}
+
+/* ---------- Actors (plynulý pohyb) ---------- */
+function cellToPx(x, y) { return { left: x * (TILE + GAP), top: y * (TILE + GAP) }; }
 function computeFacing(p1, p2) {
   if (!p1 || !p2) return { p1: 1, p2: -1 };
   if (p1.x === p2.x && p1.y === p2.y) return { p1: 1, p2: -1 };
@@ -203,12 +293,11 @@ function computeFacing(p1, p2) {
 }
 function positionActors(s, immediate = false) {
   const p1 = s.p1, p2 = s.p2;
-  const same = p1 && p2 && p1.x === p2.x && p1.y === p2.y;
+  const same = p1 && p2 && p1.x === p2.x && p2.y === p2.y;
   const facing = computeFacing(p1, p2);
 
   [["p1", actorP1, p1], ["p2", actorP2, p2]].forEach(([slot, el, data]) => {
     if (!data || !data.char) { el.style.display = "none"; return; }
-
     el.style.display = "block";
     const { left, top } = cellToPx(data.x, data.y);
 
@@ -234,7 +323,7 @@ function positionActors(s, immediate = false) {
   actorsInitialized = true;
 }
 
-/* ---------- Queue UI + LOCK ---------- */
+/* ---------- Queue + Lock ---------- */
 function renderQueue() {
   queueEl.innerHTML = "";
   const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
@@ -242,35 +331,28 @@ function renderQueue() {
   myQueue.forEach(a => {
     const div = document.createElement("div");
     div.className = "q-badge";
-
     if (a.type === "move") {
-      div.classList.add("move");
-      div.textContent = arrow[a.dir] || "?";
+      div.classList.add("move");  div.textContent = arrow[a.dir] || "?";
     } else if (a.type === "recharge") {
-      div.classList.add("mana");
-      div.textContent = "+2 mana";
+      div.classList.add("mana");  div.textContent = "+2 mana";
     } else if (a.type === "attack") {
-      div.classList.add("attack");
-      div.textContent = "Basic -1";
+      div.classList.add("attack"); div.textContent = "Basic";
+    } else if (a.type === "special") {
+      div.classList.add("mana");   div.textContent = "Special";
     } else {
       div.textContent = a.type;
     }
     queueEl.appendChild(div);
   });
-
   updateLockButton();
 }
 function updateLockButton() {
   const locked = !!state?.[me]?.locked;
   if (locked) {
-    lockBtn.classList.add("locked");
-    lockBtn.textContent = "LOCKED";
-    lockBtn.disabled = true;
-    return;
+    lockBtn.classList.add("locked"); lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
+  } else {
+    lockBtn.classList.remove("locked"); lockBtn.textContent = "LOCK IN"; lockBtn.disabled = false;
   }
-  lockBtn.classList.remove("locked");
-  lockBtn.disabled = false;
-  lockBtn.textContent = "LOCK IN";
 }
 
 /* ---------- Winner fallback ---------- */
@@ -288,7 +370,7 @@ function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
 
   const first = timeline[0];
-  state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn;
+  state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = first.starter;
   renderHUD();
   renderGrid(state, first.effects || []);
   positionActors(state, true);
@@ -309,6 +391,10 @@ function schedulePlayTimeline(timeline) {
         return;
       }
 
+      if (state.p1) state.p1.locked = false;
+      if (state.p2) state.p2.locked = false;
+
+      // čistý frame bez efektov obnoví castingNow na false
       renderGrid(state, []);
       renderHUD();
       myQueue = []; renderQueue();
@@ -329,8 +415,9 @@ function schedulePlayTimeline(timeline) {
 
     const shooters = new Set();
     for (const e of frame.effects || []) {
-      if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
+      if ((e.kind === "charge" || e.kind === "attack_swing" || e.kind === "special") && e.from) shooters.add(e.from);
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) setAnim(e.target, "hurt", HURT_MS);
+      if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) setAnim(e.target, "hurt", HURT_MS);
     }
     if (shooters.has("p1")) setAnim("p1", "attack", ATTACK_SWING_MS);
     if (shooters.has("p2")) setAnim("p2", "attack", ATTACK_SWING_MS);
@@ -351,8 +438,7 @@ function clearActors() {
     const ctx = el.getContext("2d");
     ctx.clearRect(0, 0, el.width, el.height);
     el.style.display = "none";
-    el.style.left = "0px";
-    el.style.top  = "0px";
+    el.style.left = "0px"; el.style.top = "0px";
     el.style.transform = "translateX(0) scaleX(1)";
   });
   actorsInitialized = false;
@@ -369,10 +455,7 @@ function drawCharSelectFrame(now) {
     const anim = ANIM_DEF.idle;
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height))
-      .catch((err) => {
-        ctx.clearRect(0, 0, cvs.width, cvs.height);
-        // console.error("Preview draw failed:", `/assets/${dir}/${anim.file}`, err);
-      });
+      .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
   });
   if (!selEl.classList.contains("hidden")) {
     charPreviewRaf = requestAnimationFrame(drawCharSelectFrame);
@@ -389,7 +472,6 @@ function stopCharSelectPreview() {
   charPreviewRaf = 0;
 }
 
-// klik na kartu – overlay NESKRÝVAME, počkáme na state s potvrdením
 selEl.addEventListener("click", (e) => {
   const card = e.target.closest(".char-card");
   if (!card) return;
@@ -405,9 +487,10 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     if (myQueue.length >= 3) return;
 
     const [type, arg] = btn.dataset.act.split(":");
-    if (type === "move") myQueue.push({ type: "move", dir: arg });
-    if (type === "recharge") myQueue.push({ type: "recharge" });
-    if (type === "attack") myQueue.push({ type: "attack" });
+    if (type === "move")      myQueue.push({ type: "move", dir: arg });
+    if (type === "recharge")  myQueue.push({ type: "recharge" });
+    if (type === "attack")    myQueue.push({ type: "attack" });
+    if (type === "special")   myQueue.push({ type: "special" });
     renderQueue();
   });
 });
@@ -430,9 +513,7 @@ lockBtn.addEventListener("click", () => {
 });
 
 /* ---------- Retry ---------- */
-retryBtn.addEventListener("click", () => {
-  socket.emit("retry");
-});
+retryBtn.addEventListener("click", () => { socket.emit("retry"); });
 
 /* ---------- Sockets ---------- */
 socket.on("you_are", (slot) => { me = slot; });
@@ -442,6 +523,7 @@ socket.on("reset", () => {
   chosenChar = null;
   myQueue = []; renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
+  castingNow = { p1:false, p2:false };
   clearActors();
   lockBtn.classList.remove("locked");
   lockBtn.disabled = false;
@@ -455,22 +537,20 @@ socket.on("reset", () => {
 socket.on("state", (s) => {
   state = s; board = s.board || board;
 
-  // aréna
+  // arena
   if (s.arena && s.arena !== arenaEl.dataset.key) {
     arenaEl.dataset.key = s.arena;
     const ARENAS_CLIENT = { bridge: ["sky-bridge.png","clouds.png","clouds-2.png","tower.png","bridge.png"] };
     renderArenaLayers(s.arena, ARENAS_CLIENT[s.arena] || []);
   }
 
-  // výber postavy
+  // char select overlay
   if (!s[me]?.char) {
     selEl.classList.remove("hidden");
     startCharSelectPreview();
-  } else {
-    if (!selEl.classList.contains("hidden")) {
-      selEl.classList.add("hidden");
-      stopCharSelectPreview();
-    }
+  } else if (!selEl.classList.contains("hidden")) {
+    selEl.classList.add("hidden");
+    stopCharSelectPreview();
   }
 
   renderGrid(s);
@@ -482,6 +562,15 @@ socket.on("state", (s) => {
     positionActors(s, true);
     updateLockButton();
   }
+
+  // label special podľa mága
+  const mine = s[me];
+  const dmg = mine?.char ? { fire:4, lightning:2, wanderer:8 }[mine.char] : null;
+  const specialBtn = document.getElementById("special-btn");
+  if (dmg != null && specialBtn) {
+    specialBtn.textContent = `Special (−5, ${dmg} dmg)`;
+    specialBtn.title = specialBtn.textContent;
+  }
 });
 
 socket.on("game_over", ({ winner }) => {
@@ -491,16 +580,23 @@ socket.on("game_over", ({ winner }) => {
   goOverlay.classList.remove("hidden");
 });
 
-/* ---------- RAF: kreslenie postáv + projektilov ---------- */
+/* ---------- RAF: actors + FX ---------- */
 function raf() {
   const now = performance.now();
   const map = { p1: actorP1, p2: actorP2 };
 
-  // 1) herci
+  // actors – skryť, ak práve castia special (pretože special sprite už obsahuje postavu)
   ["p1","p2"].forEach(slot => {
     const cvs = map[slot];
     const st  = state?.[slot];
     const ctx = cvs.getContext("2d");
+
+    // ak caster -> skryť actor sprite
+    if (castingNow[slot]) {
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      cvs.style.display = "none";
+      return;
+    }
 
     if (!st || !st.char) {
       ctx.clearRect(0, 0, cvs.width, cvs.height);
@@ -511,23 +607,31 @@ function raf() {
 
     const dir  = CHAR_META[st.char].dir;
     const anim = currentAnim(slot);
-
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, now, TILE, TILE))
-      .catch(() => {
-        return ensureSpriteMeta(dir, ANIM_DEF.idle.file)
-          .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, TILE, TILE))
-          .catch(() => {});
-      });
+      .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
+        .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, TILE, TILE))
+        .catch(()=>{}));
   });
 
-  // 2) projektily
+  // projectiles
   document.querySelectorAll("canvas.charge-canvas").forEach(cvs => {
     const ctx = cvs.getContext("2d");
-    const dir = cvs.dataset.dir; // "fire" | "lightning" | "wanderer"
+    const dir = cvs.dataset.dir;
     ensureSpriteMeta(dir, CHARGE_ANIM.file)
       .then(meta => drawSprite(ctx, meta, CHARGE_ANIM, now, cvs.width, cvs.height))
       .catch(() => {});
+  });
+
+  // specials (na políčku kúzelníka)
+  document.querySelectorAll("canvas.special-canvas").forEach(cvs=>{
+    const ctx = cvs.getContext("2d");
+    const dir = cvs.dataset.dir;
+    const file = cvs.dataset.file;
+    const anim = { file, fps: SPECIAL_FPS, loop: true };
+    ensureSpriteMeta(dir, file)
+      .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height))
+      .catch(()=>{});
   });
 
   requestAnimationFrame(raf);
@@ -541,5 +645,13 @@ renderGrid({}, []);
 renderHUD();
 renderQueue();
 
-// ak je overlay viditeľný na štarte, spusti náhľady
-if (!selEl.classList.contains("hidden")) startCharSelectPreview();
+// hover preview pre special
+const specialBtn = document.getElementById("special-btn");
+if (specialBtn){
+  specialBtn.addEventListener("mouseenter", ()=>{
+    const mine = state?.[me];
+    if (!mine) return;
+    showPreviewCells(cellsForSpecialPreview(mine));
+  });
+  specialBtn.addEventListener("mouseleave", clearPreviewCells);
+}

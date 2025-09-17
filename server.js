@@ -1,279 +1,274 @@
 import express from "express";
-import http from "http";
+import { createServer } from "http";
 import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-app.use(express.static("public"));
+const httpServer = createServer(app);
+const io = new Server(httpServer);
 
-const GRID_W = 5;
-const GRID_H = 3;
-const MAX_HP = 5;
+app.use(express.static(path.join(__dirname, "public")));
+
+const PORT = process.env.PORT || 3000;
+
+/* -------------------- Game constants -------------------- */
+const BOARD = { w: 5, h: 3 };
+const START_POS = { p1: { x: 0, y: 1 }, p2: { x: 4, y: 1 } };
+const START_HP = 10;
+const START_MANA = 2;
 const MAX_MANA = 10;
 
-// === BASIC ATTACK (nové) ===
-const BASIC_COST = 1;      // 1 mana
-const BASIC_DMG  = 1;      // ⬅️ predpoklad: 1 dmg; zmeňte podľa potreby
+const BASIC_COST = 1;
+const BASIC_DMG  = 1;
 
-const ALLOWED_CHARS = ["fire", "lightning", "wanderer"];
+const SPECIAL_COST = 5;
 
-// arény – vrstvy
-const ARENAS = {
-  bridge: ["sky-bridge.png","clouds.png","clouds-2.png","tower.png","bridge.png"],
-};
+const MOVE_DELAY_MS    = 2000; // ⬅ 2× pomalšie (bolo 1000)
+const SMALL_DELAY_MS   = 600;  // ⬅ 2× pomalšie (bolo 300)
+const SPECIAL_REPEAT   = 3;
+const SPECIAL_BEAT_MS  = 900;  // ⬅ 2× pomalšie (bolo 450)
+const CHARGE_STEP_MS   = 560;  // ⬅ 2× pomalšie (bolo 280)
 
-// tempo timeline (spomalené)
-const MOVE_FRAME_MS = 1000;
-const RECHARGE_FRAME_MS = 600;
-const DELAY_STATE_MS = 650;
-const DELAY_CHARGE_MS = 200;   // rýchlosť letiacich "Charge" frame-ov
+/* -------------------- Game state -------------------- */
+let sockets = { p1: null, p2: null };
+let game = null;
 
-const starterForTurn = (turn) => (turn % 2 === 1 ? "p1" : "p2");
-
-function createInitialState() {
+function newPlayer(slot) {
+  const pos = START_POS[slot];
   return {
-    turn: 1,
-    players: { p1: null, p2: null },
-    board: { w: GRID_W, h: GRID_H },
-    ready: false,
-    arena: null
+    slot,
+    x: pos.x, y: pos.y,
+    hp: START_HP,
+    mana: START_MANA,
+    char: null,      // "fire" | "lightning" | "wanderer"
+    locked: false,
+    queue: []
   };
 }
-let game = createInitialState();
 
-function newPlayerState(id, x, y) {
-  return { id, x, y, hp: MAX_HP, mana: 2, actions: [], locked: false, char: null };
+function newGame() {
+  game = {
+    board: { ...BOARD },
+    players: {
+      p1: newPlayer("p1"),
+      p2: newPlayer("p2")
+    },
+    arena: "bridge",
+    turn: 1,
+    starter: "p1", // odd -> p1, even -> p2
+  };
 }
-const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+newGame();
 
-function applyMove(p, dir) {
-  const dirs = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] };
-  const d = dirs[dir] || [0,0];
-  p.x = clamp(p.x + d[0], 0, GRID_W - 1);
-  p.y = clamp(p.y + d[1], 0, GRID_H - 1);
+/* -------------------- Helpers -------------------- */
+function cloneActor(a) {
+  if (!a) return null;
+  const { slot, x, y, hp, mana, char, locked } = a;
+  return { slot, x, y, hp, mana, char, locked };
+}
+function snapshot() {
+  return {
+    board: { ...game.board },
+    p1: cloneActor(game.players.p1),
+    p2: cloneActor(game.players.p2),
+    arena: game.arena,
+    turn: game.turn,
+    starter: game.starter
+  };
 }
 
-function slimPlayer(p) {
-    if (!p) return null;
-    return { id: p.id, x: p.x, y: p.y, hp: p.hp, mana: p.mana, char: p.char };
-  }
-  function snapshot() {
-    return { turn: game.turn, p1: slimPlayer(game.players.p1), p2: slimPlayer(game.players.p2), arena: game.arena };
-  }
-
-  
-function pushStateFrame(timeline, effects = [], delay = DELAY_STATE_MS) {
-  timeline.push({ ...snapshot(), effects, delayMs: delay });
+function inBounds(x, y, board = game.board) {
+  return x >= 0 && y >= 0 && x < board.w && y < board.h;
 }
 
-// === BASIC ATTACK – výpočet dráhy po riadku ===
-function computeChargePath(attacker, defender) {
-  // smer určujeme podľa relatívnej polohy na osi X (k súperovi)
-  const step = defender.x > attacker.x ? 1 : (defender.x < attacker.x ? -1 : (attacker.id === "p1" ? 1 : -1));
+function pushStateFrame(timeline, effects = [], delayMs = SMALL_DELAY_MS) {
+  const snap = snapshot();
+  timeline.push({ ...snap, effects, delayMs });
+}
 
-  const path = [];
-  let x = attacker.x;
-  const y = attacker.y;
+function pushInvalid(tl, who, ms = SMALL_DELAY_MS) {
+  pushStateFrame(tl, [{ kind: "invalid", target: who }], ms);
+}
 
-  // ak je súper v rovnakom riadku → letíme po ňom a trafíme
-  if (attacker.y === defender.y) {
-    while (true) {
-      x += step;
-      if (x < 0 || x >= GRID_W) break;
-      path.push([x, y]);
-      if (x === defender.x) {
-        return { path, hit: true, dir: step > 0 ? "right" : "left" };
-      }
-    }
-    return { path, hit: false, dir: step > 0 ? "right" : "left" }; // nemalo by nastať, ale fallback
+function other(slot) { return slot === "p1" ? "p2" : "p1"; }
+
+function isDiagAdjacent(a, b) {
+  return Math.abs(a.x - b.x) === 1 && Math.abs(a.y - b.y) === 1;
+}
+function specialDamageAndHit(players, slot) {
+  const me   = players[slot];
+  const foeS = slot === "p1" ? "p2" : "p1";
+  const foe  = players[foeS];
+  if (!me || !foe) return { dmg:0, hit:null };
+
+  switch (me.char) {
+    case "fire":      // celá lajna (riadok)
+      return me.y === foe.y ? { dmg:4, hit:foeS } : { dmg:0, hit:null };
+    case "lightning": // všetko okrem vlastného políčka
+      return (me.x !== foe.x || me.y !== foe.y) ? { dmg:2, hit:foeS } : { dmg:0, hit:null };
+    case "wanderer":  // len diagonála 1
+      return isDiagAdjacent(me, foe) ? { dmg:8, hit:foeS } : { dmg:0, hit:null };
+    default:
+      return { dmg:0, hit:null };
   }
+}
 
-  // nie je v rovnakom riadku → vystreľ až po okraj (miss)
+/* -------------------- Actions -------------------- */
+function doMove(slot, dir, tl) {
+  const a = game.players[slot];
+  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir] || [0,0];
+  const nx = a.x + delta[0], ny = a.y + delta[1];
+  if (!inBounds(nx, ny)) { pushInvalid(tl, slot); return; }
+  a.x = nx; a.y = ny;
+  pushStateFrame(tl, [], MOVE_DELAY_MS);
+}
+
+function doRecharge(slot, tl) {
+  const a = game.players[slot];
+  a.mana = Math.min(MAX_MANA, a.mana + 2); // ⬅ cap na 10
+  pushStateFrame(tl, [{ kind: "recharge", cells: [[a.x, a.y]] }], SMALL_DELAY_MS);
+}
+
+function doBasic(slot, tl) {
+  const me = game.players[slot];
+  const opS = other(slot);
+  const op = game.players[opS];
+
+  if (me.mana < BASIC_COST) { pushInvalid(tl, slot); return; }
+  me.mana -= BASIC_COST;
+
+  // vizuál: strela po riadku (pomalšie kroky)
+  const dir = (op && op.y === me.y && op.x < me.x) ? "left" : "right";
+  const step = dir === "left" ? -1 : 1;
+  let x = me.x;
   while (true) {
     x += step;
-    if (x < 0 || x >= GRID_W) break;
-    path.push([x, y]);
+    if (!inBounds(x, me.y)) break;
+    pushStateFrame(tl, [{ kind: "charge", from: slot, dir, cell: [x, me.y] }], CHARGE_STEP_MS);
   }
-  return { path, hit: false, dir: step > 0 ? "right" : "left" };
-}
 
-function pushChargeFrames(timeline, path, fromSlot, targetSlot, dir, withHit) {
-  for (let i = 0; i < path.length; i++) {
-    const cell = path[i];
-    const isLast = i === path.length - 1;
-    const effects = [{ kind: "charge", from: fromSlot, cell, dir }];
-    if (withHit && isLast) effects.push({ kind: "hit", target: targetSlot });
-    timeline.push({ ...snapshot(), effects, delayMs: DELAY_CHARGE_MS });
+  // damage len ak súper je v rovnakom riadku
+  if (op && op.y === me.y) {
+    op.hp = Math.max(0, op.hp - BASIC_DMG);
+    pushStateFrame(tl, [{ kind: "hit", target: opS }], SMALL_DELAY_MS);
   }
 }
 
-function maybePickArena() {
-  if (game.arena) return;
-  const keys = Object.keys(ARENAS);
-  game.arena = keys[Math.floor(Math.random() * keys.length)] || null;
-}
+function doSpecial(slot, tl) {
+  const actor = game.players[slot];
+  if (!actor) return;
 
-function resolveTurn() {
-  const P = game.players;
-  const timeline = [];
-
-  const starter = starterForTurn(game.turn);
-  const other = starter === "p1" ? "p2" : "p1";
-
-  pushStateFrame(timeline, [], 300);
-  let someoneDead = false;
-
-  const doAction = (actorSlot, action) => {
-    const actor = P[actorSlot];
-    const oppSlot = actorSlot === "p1" ? "p2" : "p1";
-    const opp = P[oppSlot];
-    if (!actor || !opp || someoneDead) return;
-
-    if (action?.type === "move") {
-      applyMove(actor, action.dir);
-      pushStateFrame(timeline, [], MOVE_FRAME_MS);
-      return;
-    }
-
-    if (action?.type === "recharge") {
-      actor.mana = clamp(actor.mana + 2, 0, MAX_MANA);
-      pushStateFrame(timeline, [{ kind: "recharge", actor: actorSlot, cells: [[actor.x, actor.y]] }], RECHARGE_FRAME_MS);
-      return;
-    }
-
-    if (action?.type === "attack") {
-      // BASIC ATTACK – ak nemá manu, nič sa nedeje
-      if (actor.mana < BASIC_COST) { pushStateFrame(timeline); return; }
-      actor.mana -= BASIC_COST;
-
-      // dráha po riadku (hit len ak v rovnakom riadku)
-      const { path, hit, dir } = computeChargePath(actor, opp);
-
-      if (path.length === 0) {
-        // teoreticky pri okraji a rovnakom x – sprav aspoň "swing"
-        pushStateFrame(timeline, [{ kind: "attack_swing", from: actorSlot }], 300);
-        return;
-      }
-
-      pushChargeFrames(timeline, path, actorSlot, oppSlot, dir, hit);
-
-      if (hit) {
-        opp.hp = clamp(opp.hp - BASIC_DMG, 0, MAX_HP);
-        if (P.p1.hp <= 0 || P.p2.hp <= 0) someoneDead = true;
-      }
-      return;
-    }
-
-    pushStateFrame(timeline, [], 200);
-  };
-
-  // 3 kroky; vždy najprv starter, potom other
-  for (let i = 0; i < 3 && !someoneDead; i++) {
-    doAction(starter, P[starter].actions[i]);
-    if (someoneDead) break;
-    doAction(other, P[other].actions[i]);
+  if (actor.mana < SPECIAL_COST) {
+    // vizuálny cast + spätná väzba "invalid"
+    pushStateFrame(tl, [{ kind: "special", from: slot }], SPECIAL_BEAT_MS);
+    pushStateFrame(tl, [{ kind: "invalid", target: slot }], SMALL_DELAY_MS);
+    return;
   }
 
-  // reset na ďalší ťah
-  P.p1.actions = []; P.p2.actions = [];
-  P.p1.locked = false; P.p2.locked = false;
-  game.turn += 1;
+  actor.mana -= SPECIAL_COST;
 
-  return timeline;
-}
+  // 3× "nádych" na políčku kúzelníka (klient bliká rozsah a skryje bežný sprite)
+  for (let r = 0; r < SPECIAL_REPEAT; r++) {
+    pushStateFrame(tl, [{ kind: "special", from: slot }], SPECIAL_BEAT_MS);
+  }
 
-function broadcastState(extra = {}) {
-  io.to("match-1").emit("state", {
-    board: game.board,
-    turn: game.turn,
-    p1: game.players.p1,
-    p2: game.players.p2,
-    ready: game.ready,
-    arena: game.arena,
-    starter: starterForTurn(game.turn),
-    ...extra
-  });
-}
-
-// Reset, ktorý ponechá pripojených hráčov, ale vráti hru do úplného začiatku
-function resetGameKeepConnections() {
-  const hadP1 = !!game.players.p1;
-  const hadP2 = !!game.players.p2;
-  game = createInitialState();
-  if (hadP1) game.players.p1 = newPlayerState("p1", 0, Math.floor(GRID_H/2));
-  if (hadP2) game.players.p2 = newPlayerState("p2", GRID_W - 1, Math.floor(GRID_H/2));
-}
-
-io.on("connection", (socket) => {
-  let mySlot = null;
-  if (!game.players.p1) {
-    mySlot = "p1"; game.players.p1 = newPlayerState("p1", 0, Math.floor(GRID_H/2));
-  } else if (!game.players.p2) {
-    mySlot = "p2"; game.players.p2 = newPlayerState("p2", GRID_W - 1, Math.floor(GRID_H/2));
+  // vyhodnotenie zásahu až po caste
+  const { dmg, hit } = specialDamageAndHit(game.players, slot);
+  if (dmg > 0 && hit) {
+    game.players[hit].hp = Math.max(0, game.players[hit].hp - dmg);
+    pushStateFrame(tl, [{ kind: "hit", target: hit }], SMALL_DELAY_MS);
   } else {
-    socket.emit("error_msg", "Server je plný pre toto POC (2 hráči).");
-    socket.disconnect(true); return;
+    pushStateFrame(tl, [], SMALL_DELAY_MS);
+  }
+}
+
+function doAction(slot, action, tl) {
+  if (!action) return;
+  switch (action.type) {
+    case "move":     return doMove(slot, action.dir, tl);
+    case "recharge": return doRecharge(slot, tl);
+    case "attack":   return doBasic(slot, tl);
+    case "special":  return doSpecial(slot, tl);
+    default: break;
+  }
+}
+
+/* -------------------- Turn resolution -------------------- */
+function resolveTurn() {
+  const tl = [];
+  // first snapshot to avoid first-frame "jump"
+  pushStateFrame(tl, [], 10);
+
+  // action order: interleaved, starter first
+  const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
+
+  for (let i = 0; i < 3; i++) {
+    for (const slot of order) {
+      const act = game.players[slot].queue[i];
+      doAction(slot, act, tl);
+    }
   }
 
-  socket.join("match-1");
-  socket.emit("you_are", mySlot);
-  broadcastState();
+  // advance round
+  game.turn += 1;
+  game.starter = game.turn % 2 === 1 ? "p1" : "p2";
+
+  io.emit("state", { ...snapshot(), timeline: tl });
+
+  // pripraviť ďalšie plánovanie
+  game.players.p1.locked = false;
+  game.players.p2.locked = false;
+  game.players.p1.queue = [];
+  game.players.p2.queue = [];
+}
+
+/* -------------------- IO -------------------- */
+io.on("connection", (socket) => {
+  let slot = null;
+  if (!sockets.p1) { sockets.p1 = socket; slot = "p1"; }
+  else if (!sockets.p2) { sockets.p2 = socket; slot = "p2"; }
+
+  if (slot) socket.emit("you_are", slot);
+  socket.emit("state", snapshot());
 
   socket.on("choose_character", (key) => {
-    if (!ALLOWED_CHARS.includes(key)) { socket.emit("error_msg", "Neplatná postava."); return; }
-    const p = game.players[mySlot]; if (!p) return;
-    p.char = key;
-    if (game.players.p1?.char && game.players.p2?.char) { maybePickArena(); game.ready = true; }
-    broadcastState();
+    if (!slot) return;
+    if (!["fire","lightning","wanderer"].includes(key)) return;
+    const me = game.players[slot];
+    me.char = key;
+    io.emit("state", snapshot());
   });
 
-  socket.on("lock_in", (actions) => {
-    if (!Array.isArray(actions) || actions.length !== 3) {
-      socket.emit("error_msg", "Musíte poslať presne 3 akcie.");
-      return;
-    }
-    const p = game.players[mySlot]; if (!p || p.locked) return;
+  socket.on("lock_in", (queue) => {
+    if (!slot) return;
+    if (!Array.isArray(queue) || queue.length !== 3) return;
+    const me = game.players[slot];
+    me.queue = queue.map(a => ({ ...a }));
+    me.locked = true;
 
-    p.actions = actions.map(a => {
-      if (a?.type === "move" && ["up","down","left","right"].includes(a.dir)) return { type:"move", dir:a.dir };
-      if (a?.type === "recharge") return { type:"recharge" };
-      if (a?.type === "attack") return { type:"attack" };
-      return { type:"recharge" };
-    });
-    p.locked = true;
-
-    broadcastState();
-
-    const bothLocked = game.players.p1?.locked && game.players.p2?.locked;
-    if (bothLocked) {
-      const timeline = resolveTurn();
-      broadcastState({ timeline });
-
-      // oneskorené game_over (po dohraní timeline) – klient má aj fallback
-      const p1dead = game.players.p1.hp <= 0;
-      const p2dead = game.players.p2.hp <= 0;
-      if (p1dead || p2dead) {
-        const winner = p1dead && p2dead ? "draw" : (p1dead ? "p2" : "p1");
-        const totalMs = (timeline || []).reduce((acc, f) => acc + (f.delayMs ?? DELAY_STATE_MS), 0);
-        setTimeout(() => {
-          io.to("match-1").emit("game_over", { winner });
-        }, totalMs + 50);
-      }
+    if (game.players.p1.locked && game.players.p2.locked) {
+      resolveTurn();
+    } else {
+      io.emit("state", snapshot());
     }
   });
 
   socket.on("retry", () => {
-    resetGameKeepConnections();
-    io.to("match-1").emit("reset");
-    broadcastState();
+    newGame();
+    io.emit("reset");
+    io.emit("state", snapshot());
   });
 
   socket.on("disconnect", () => {
-    game = createInitialState();
-    io.to("match-1").emit("state", game);
+    if (sockets.p1 === socket) sockets.p1 = null;
+    if (sockets.p2 === socket) sockets.p2 = null;
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("http://localhost:" + PORT));
+httpServer.listen(PORT, () => {
+  console.log(`http://localhost:${PORT}`);
+});
