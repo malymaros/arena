@@ -2,25 +2,32 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
-body { margin: 0; background: #0e0f12; color: #fff; overflow: hidden;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+body {
+  margin: 0; background: #0e0f12; color: #fff; overflow: hidden;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
 
-/* Arena bg */
+/* ========== Arena bg ========== */
 .arena { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
-.arena .layer { position: absolute; inset: 0; object-fit: cover; width: 100%; height: 100%; pointer-events: none; }
+.arena .layer {
+  position: absolute; inset: 0; object-fit: cover; width: 100%; height: 100%;
+  pointer-events: none;
+}
 
-/* HUD */
-.hud { position: fixed; z-index: 3; padding: 10px 14px; border-radius: 10px;
-  background: rgba(0,0,0,.45); backdrop-filter: blur(4px); font-weight: 700; letter-spacing: .3px; }
+/* ========== HUD ========== */
+.hud {
+  position: fixed; z-index: 3; padding: 10px 14px; border-radius: 10px;
+  background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
+  font-weight: 700; letter-spacing: .3px;
+}
 .hud-turn { top: 14px; left: 50%; transform: translateX(-50%); border: 1px solid #2a2b2e; }
 .hud-hp   { top: 14px; left: 14px;  border: 1px solid #6b1d1d; color: #ff5a5a; }
 .hud-mana { top: 14px; right: 14px; border: 1px solid #15456b; color: #57a9ff; }
 
-/* Stage */
+/* ========== Stage & Board ========== */
 .stage { position: relative; z-index: 1; display: grid; place-items: center; width: 100vw; height: 100vh; padding: 16px; }
-.game { display: grid; gap: 14px; }
+.game  { display: grid; gap: 14px; }
 
-/* Board */
 .board {
   position: relative;
   width: calc(5 * var(--tile) + 4 * var(--gap));
@@ -28,7 +35,7 @@ body { margin: 0; background: #0e0f12; color: #fff; overflow: hidden;
   margin: 0 auto;
 }
 
-/* Grid (len bunky/efekty) */
+/* ========== Grid (bunky/efekty) ========== */
 .grid {
   position: absolute; inset: 0;
   display: grid; gap: var(--gap);
@@ -36,67 +43,144 @@ body { margin: 0; background: #0e0f12; color: #fff; overflow: hidden;
   grid-template-rows: repeat(3, var(--tile));
 }
 
-/* Bunky mriežky – jemné obrysy a priepustné okraje */
+/* Bunky – jemné obrysy a priepustné okraje */
 .cell {
-    position: relative;
-    overflow: visible; /* aby veľký projektil nebol orezaný */
-    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08); /* jemný obrys */
-    background: rgba(255,255,255,0.02);                 /* veľmi ľahké podfarbenie */
-    border-radius: 6px;                                  /* voliteľné */
-  }
-  
-  /* Animovaný projektil (canvas) – centrovaný v bunke */
-  .cell .charge-canvas {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%); /* scaleX(-1) dopĺňame inline podľa smeru */
-    pointer-events: none;
-    image-rendering: pixelated; /* vizuál pixelartu */
-  }
-  
-  
-
-/* Effects */
-.cell.hl-recharge::before {
-  content: ""; position: absolute; inset: 0; border: 2px solid rgba(0, 128, 255, 0.55);
-  background: rgba(0, 128, 255, 0.15); border-radius: 12px; pointer-events: none;
+  position: relative;
+  overflow: visible; /* veľký projektil neorezať */
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  border-radius: 6px;
 }
+
+/* Animovaný projektil (canvas) v bunke */
+.cell .charge-canvas {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%); /* scaleX(-1) nastavuje JS */
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+/* Efekty buniek */
+.cell.hl-recharge::before {
+  content: ""; position: absolute; inset: 0; border: 2px solid rgba(0,128,255,.55);
+  background: rgba(0,128,255,.15); border-radius: 12px; pointer-events: none;
+}
+/* (legacy) červená bodka */
 .cell.hl-projectile::after {
   content: ""; position: absolute; width: 16px; height: 16px; border-radius: 50%;
-  background: rgba(220, 0, 0, 0.95); box-shadow: 0 0 8px rgba(220,0,0,0.8);
+  background: rgba(220,0,0,.95); box-shadow: 0 0 8px rgba(220,0,0,.8);
 }
 @keyframes hit-blink { 0%,100%{background-color:transparent} 25%,75%{background-color:rgba(255,0,0,.35)} }
 .cell.hit-blink { animation: hit-blink 300ms ease-in-out 1; }
 
-/* Actors (plynulý pohyb) */
+/* ========== Actors (plynulý pohyb) ========== */
 .actors { position: absolute; inset: 0; pointer-events: none; }
 .sprite-actor {
-    position: absolute; width: var(--tile); height: var(--tile);
-    image-rendering: pixelated;
-    transition: left 1000ms linear, top 1000ms linear, transform 150ms ease; /* bolo 800ms */
-  }  
-  
-/* Controls */
-.panel { display: grid; gap: 8px; justify-items: center; }
-.queue { display: flex; gap: 8px; min-height: 28px; }
-.queue .item { padding: 2px 6px; border: 1px solid #333; border-radius: 6px; font-size: 12px; background:#0b0b0b88; }
+  position: absolute; width: var(--tile); height: var(--tile);
+  image-rendering: pixelated;
+  transition: left 1000ms linear, top 1000ms linear, transform 150ms ease; /* sync s MOVE_MS */
+}
+
+/* ========== Controls – vodorovný toolbar ========== */
+.controls{
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(0,0,0,.45);
+  border: 1px solid #2a2b2e;
+  z-index: 3;
+  flex-wrap: wrap; /* ak je málo miesta, zalomí sa do 2 riadkov */
+}
+/* pohyby už len v rade */
+.controls .move-grid{ display: flex; gap: 6px; }
+.controls .move-grid .h{ display: contents; }
+.actions, .meta{ display: flex; gap: 8px; align-items: center; }
+
+/* Buttons */
+.btn {
+  appearance: none; border: none; border-radius: 10px;
+  padding: 8px 12px; font-weight: 700; cursor: pointer;
+  color: #fff; background: #555;
+  transition: transform .05s ease, filter .15s ease, background .15s ease;
+}
+.btn:hover { filter: brightness(1.05); }
+.btn:active { transform: translateY(1px); }
+.btn.secondary { background: #424242; }
+.btn.arrow { width: auto; height: auto; font-size: 16px; line-height: 1; background: #616161; }
+
+.btn.mana   { background: #1565c0; }  /* Recharge +2 mana */
+.btn.attack { background: #b71c1c; }  /* Basic -1 mana */
+
+/* LOCK IN: zelený -> zamknutý červený */
+.btn-lock { background: #2e7d32; }
+.btn-lock.locked,
+.btn-lock:disabled { background: #c62828 !important; color: #fff; filter: none; cursor: default; }
+
+/* “Shake” pri lock bez 3 príkazov */
+@keyframes shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)}
+30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
+.btn.shake { animation: shake .35s; }
+
+/* Fallback, ak HTML ešte nepoužíva .btn */
 .controls button { margin: 2px; padding: 8px 10px; border: 1px solid #333; background: #151515; color: #fff; border-radius: 8px; cursor: pointer; }
 .controls button:hover { background: #1e1e1e; }
+.controls button[data-act="recharge"] { background: #1565c0; }
+.controls button[data-act="attack"]   { background: #b71c1c; }
+#lock { background: #2e7d32; font-weight: 800; }
+#lock.locked, #lock:disabled { background: #c62828 !important; }
 
-/* Char select */
-.char-select { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: flex; align-items: center; justify-content: center; gap: 28px; z-index: 9999; }
+/* ========== Queue badges ========== */
+#queue, .queue { display: flex; gap: 6px; min-height: 36px; align-items: center; flex-wrap: wrap; }
+.q-badge {
+  padding: 6px 10px; border-radius: 999px; font-weight: 700; font-size: 14px;
+  background: #333; color: #eee; display: inline-flex; align-items: center; gap: 6px;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.06);
+}
+.q-badge.move   { background: #2f2f2f; }
+.q-badge.mana   { background: #0b4ea2; }
+.q-badge.attack { background: #7f1515; }
+/* (legacy) starý render queue */
+.queue .item { padding: 2px 6px; border: 1px solid #333; border-radius: 6px; font-size: 12px; background:#0b0b0b88; }
+
+/* ========== Char select ========== */
+.char-select {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+  display: flex; align-items: center; justify-content: center; gap: 28px; z-index: 9999;
+}
 .char-select.hidden { display: none; }
-.char-card { width: 220px; height: 240px; padding: 16px; border-radius: 16px; background: #121315; color: #fff; border: 1px solid #2a2b2e; cursor: pointer; text-align: center;
-  display: grid; grid-template-rows: 1fr auto; gap: 10px; transition: transform .15s ease, box-shadow .15s ease; }
+.char-card {
+  width: 220px; height: 240px; padding: 16px; border-radius: 16px;
+  background: #121315; color: #fff; border: 1px solid #2a2b2e; cursor: pointer; text-align: center;
+  display: grid; grid-template-rows: 1fr auto; gap: 10px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
 .char-card:hover { transform: translateY(-4px); box-shadow: 0 8px 28px rgba(0,0,0,.45); }
 .char-canvas { width: 160px; height: 160px; justify-self: center; image-rendering: pixelated; }
 .char-name { font-weight: 700; }
 
-/* Game Over */
+/* ========== Game Over ========== */
 .gameover { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; background: rgba(0,0,0,.6); backdrop-filter: blur(3px); }
 .gameover.hidden { display: none; }
 .go-box { display: grid; gap: 14px; justify-items: center; }
-.go-text { font-size: 42px; font-weight: 900; text-align: center; line-height: 1.3; padding: 16px 26px; border-radius: 14px; background: rgba(0,0,0,.55); border: 1px solid #333; }
+.go-text {
+  font-size: 42px; font-weight: 900; text-align: center; line-height: 1.3;
+  padding: 16px 26px; border-radius: 14px; background: rgba(0,0,0,.55); border: 1px solid #333;
+}
 .retry { padding: 10px 16px; border-radius: 10px; border: 1px solid #2a2b2e; background: #151515; color: #fff; cursor: pointer; }
 .retry:hover { background: #1e1e1e; }
+
+/* ========== Staršie kvôli kompatibilite ========== */
+.panel { display: grid; gap: 8px; justify-items: center; }
+
+/* kompaktnosť na menších šírkach */
+@media (max-width: 1100px){
+  .controls{ gap: 6px; padding: 6px 8px; }
+  .btn{ padding: 7px 10px; }
+}

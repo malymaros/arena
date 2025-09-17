@@ -24,9 +24,10 @@ const retryBtn = document.getElementById("retry");
 
 const cs = getComputedStyle(document.documentElement);
 const TILE = parseInt(cs.getPropertyValue("--tile")) || 224;
-const CHARGE_SCALE = 1.0;       
-const CHARGE_ANIM = { file: "Charge.png", fps: 12, loop: true };
 const GAP  = parseInt(getComputedStyle(gridEl).gap || "10") || 10;
+
+const CHARGE_SCALE = 1; 
+const CHARGE_ANIM = { file: "Charge.png", fps: 12, loop: true };
 
 const MOVE_MS = 1000;
 const ATTACK_SWING_MS = 800;
@@ -72,7 +73,7 @@ function ensureSpriteMeta(charDir, file) {
       SPRITES[charDir][file] = { img, frames, fw, fh };
       resolve(SPRITES[charDir][file]);
     };
-    img.onerror = reject;
+    img.onerror = (e) => reject(e);
     img.src = `/assets/${charDir}/${file}`;
   });
 }
@@ -141,9 +142,8 @@ function renderGrid(s, effects = []) {
   gridEl.style.gridTemplateRows = `repeat(${board.h}, ${TILE}px)`;
   gridEl.innerHTML = "";
 
-  // rozparsuj efekty
   const recharge = new Set();
-  const charges = []; // [{cell:[x,y], dir:'left'|'right'}]
+  const charges = []; // [{cell:[x,y], dir:'left'|'right', from:'p1'|'p2'}]
   let hitTarget = null;
 
   for (const e of effects) {
@@ -159,31 +159,26 @@ function renderGrid(s, effects = []) {
       const key = `${x},${y}`;
       if (recharge.has(key)) cell.classList.add("hl-recharge");
 
-    
-        const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
-        if (chargeHere) {
-        const fromSlot = chargeHere.from;             // "p1" | "p2"
-        const charKey  = s?.[fromSlot]?.char;         // "fire" | "lightning" | "wanderer"
+      // animovaný projektil (canvas)
+      const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
+      if (chargeHere) {
+        const fromSlot = chargeHere.from;
+        const charKey  = s?.[fromSlot]?.char;
         const dirKey   = charKey ? CHAR_META[charKey].dir : null;
         if (dirKey) {
-            const cvs = document.createElement("canvas");
-            const px = Math.round(TILE * CHARGE_SCALE);
-            cvs.width = px; cvs.height = px;
-            cvs.className = "charge-canvas";
-            cvs.dataset.dir = dirKey;                   // kto strieľa (pre výber správneho spritesheetu)
-            cvs.dataset.flip = (chargeHere.dir === "left") ? "left" : "right";
-            // centrovanie + voliteľné zrkadlenie (štýlom, nie cez ctx):
-            cvs.style.width = px + "px";
-            cvs.style.height = px + "px";
-            cvs.style.transform = (chargeHere.dir === "left")
-            ? "translate(-50%, -50%) scaleX(-1)"
-            : "translate(-50%, -50%)";
-            cell.appendChild(cvs);
+          const cvs = document.createElement("canvas");
+          const px  = Math.round(TILE * CHARGE_SCALE);
+          cvs.width = px; cvs.height = px;
+          cvs.className = "charge-canvas";
+          cvs.dataset.dir = dirKey;
+          cvs.style.width  = px + "px";
+          cvs.style.height = px + "px";
+          cvs.style.transform = (chargeHere.dir === "left")
+              ? "translate(-50%, -50%) scaleX(-1)"
+              : "translate(-50%, -50%)";
+          cell.appendChild(cvs);
         }
-        }
-
-
-
+      }
 
       // hit blink
       const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
@@ -222,7 +217,7 @@ function positionActors(s, immediate = false) {
       el.style.left = left + "px";
       el.style.top  = top + "px";
       void el.offsetHeight;
-      el.style.transition = ""; // späť na CSS
+      el.style.transition = "";
     } else {
       el.style.left = left + "px";
       el.style.top  = top + "px";
@@ -239,15 +234,43 @@ function positionActors(s, immediate = false) {
   actorsInitialized = true;
 }
 
-/* ---------- Queue UI ---------- */
+/* ---------- Queue UI + LOCK ---------- */
 function renderQueue() {
   queueEl.innerHTML = "";
+  const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
+
   myQueue.forEach(a => {
     const div = document.createElement("div");
-    div.className = "item";
-    div.textContent = a.type === "move" ? `move:${a.dir}` : a.type;
+    div.className = "q-badge";
+
+    if (a.type === "move") {
+      div.classList.add("move");
+      div.textContent = arrow[a.dir] || "?";
+    } else if (a.type === "recharge") {
+      div.classList.add("mana");
+      div.textContent = "+2 mana";
+    } else if (a.type === "attack") {
+      div.classList.add("attack");
+      div.textContent = "Basic -1";
+    } else {
+      div.textContent = a.type;
+    }
     queueEl.appendChild(div);
   });
+
+  updateLockButton();
+}
+function updateLockButton() {
+  const locked = !!state?.[me]?.locked;
+  if (locked) {
+    lockBtn.classList.add("locked");
+    lockBtn.textContent = "LOCKED";
+    lockBtn.disabled = true;
+    return;
+  }
+  lockBtn.classList.remove("locked");
+  lockBtn.disabled = false;
+  lockBtn.textContent = "LOCK IN";
 }
 
 /* ---------- Winner fallback ---------- */
@@ -280,7 +303,7 @@ function schedulePlayTimeline(timeline) {
         if (goOverlay.classList.contains("hidden")) {
           const loser = winner === "p1" ? "p2" : "p1";
           if (winner !== "draw") { setAnim(winner, "attack2", 0); setAnim(loser, "dead", 1200); }
-          goText.textContent = winner === "draw" ? "GAME OVER — DRAW" : `GAME OVER — ${winner.toUpperCase()} WINNER`;
+          goText.textContent = winner === "draw" ? "GAME OVER — Remíza" : `GAME OVER — ${winner.toUpperCase()} vyhral`;
           goOverlay.classList.remove("hidden");
         }
         return;
@@ -289,7 +312,7 @@ function schedulePlayTimeline(timeline) {
       renderGrid(state, []);
       renderHUD();
       myQueue = []; renderQueue();
-      lockBtn.disabled = false;
+      updateLockButton();
       return;
     }
 
@@ -301,11 +324,9 @@ function schedulePlayTimeline(timeline) {
     state.p1 = frame.p1; state.p2 = frame.p2; state.turn = frame.turn;
     renderHUD();
 
-    // pohyb => bež Run celých MOVE_MS
     if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y)) setAnim("p1", "run", MOVE_MS);
     if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y)) setAnim("p2", "run", MOVE_MS);
 
-    // útoky / zásahy
     const shooters = new Set();
     for (const e of frame.effects || []) {
       if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
@@ -342,13 +363,15 @@ function drawCharSelectFrame(now) {
   const canvases = selEl.querySelectorAll("canvas.char-canvas");
   canvases.forEach((cvs) => {
     const key = cvs.dataset.char;
-    const dir = CHAR_META[key].dir;
+    const dir = CHAR_META[key]?.dir;
+    if (!dir) return;
     const ctx = cvs.getContext("2d");
     const anim = ANIM_DEF.idle;
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height))
-      .catch(() => {
+      .catch((err) => {
         ctx.clearRect(0, 0, cvs.width, cvs.height);
+        // console.error("Preview draw failed:", `/assets/${dir}/${anim.file}`, err);
       });
   });
   if (!selEl.classList.contains("hidden")) {
@@ -378,7 +401,9 @@ selEl.addEventListener("click", (e) => {
 /* ---------- Controls ---------- */
 document.querySelectorAll(".controls button[data-act]").forEach(btn => {
   btn.addEventListener("click", () => {
+    if (state?.[me]?.locked) return;
     if (myQueue.length >= 3) return;
+
     const [type, arg] = btn.dataset.act.split(":");
     if (type === "move") myQueue.push({ type: "move", dir: arg });
     if (type === "recharge") myQueue.push({ type: "recharge" });
@@ -386,10 +411,21 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     renderQueue();
   });
 });
-undoBtn.addEventListener("click", () => { myQueue.pop(); renderQueue(); });
-document.getElementById("lock").addEventListener("click", () => {
-  if (myQueue.length !== 3) return;
+undoBtn.addEventListener("click", () => {
+  if (state?.[me]?.locked) return;
+  myQueue.pop();
+  renderQueue();
+});
+lockBtn.addEventListener("click", () => {
+  if (state?.[me]?.locked) return;
+  if (myQueue.length !== 3) {
+    lockBtn.classList.add("shake");
+    setTimeout(() => lockBtn.classList.remove("shake"), 400);
+    return;
+  }
   socket.emit("lock_in", myQueue);
+  lockBtn.classList.add("locked");
+  lockBtn.textContent = "LOCKED";
   lockBtn.disabled = true;
 });
 
@@ -407,6 +443,9 @@ socket.on("reset", () => {
   myQueue = []; renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
   clearActors();
+  lockBtn.classList.remove("locked");
+  lockBtn.disabled = false;
+  lockBtn.textContent = "LOCK IN";
   selEl.classList.remove("hidden");
   startCharSelectPreview();
   renderGrid({}, []);
@@ -441,7 +480,7 @@ socket.on("state", (s) => {
     schedulePlayTimeline(s.timeline);
   } else {
     positionActors(s, true);
-    lockBtn.disabled = s[me]?.locked ?? false;
+    updateLockButton();
   }
 });
 
@@ -452,51 +491,47 @@ socket.on("game_over", ({ winner }) => {
   goOverlay.classList.remove("hidden");
 });
 
-/* ---------- RAF: kreslenie postáv ---------- */
+/* ---------- RAF: kreslenie postáv + projektilov ---------- */
 function raf() {
-    const now = performance.now();
-    const map = { p1: actorP1, p2: actorP2 };
-  
-    // --- 1) MAGOVIA (actors) ---
-    ["p1","p2"].forEach(slot => {
-      const cvs = map[slot];
-      const st  = state?.[slot];
-      const ctx = cvs.getContext("2d");
-  
-      if (!st || !st.char) {
-        ctx.clearRect(0, 0, cvs.width, cvs.height);
-        cvs.style.display = "none";
-        return;
-      }
-      cvs.style.display = "block";
-  
-      const dir  = CHAR_META[st.char].dir;
-      const anim = currentAnim(slot);
-  
-      ensureSpriteMeta(dir, anim.file)
-        .then(meta => drawSprite(ctx, meta, anim, now, TILE, TILE))
-        .catch(() => {
-          // fallback, ak by chýbal daný sheet
-          return ensureSpriteMeta(dir, ANIM_DEF.idle.file)
-            .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, TILE, TILE))
-            .catch(() => {});
-        });
-    });
-  
-    // --- 2) PROJEKTILY (Charge) ---
-    // Vykresľujeme všetky <canvas class="charge-canvas">, ktoré ste vložili v renderGrid()
-    document.querySelectorAll("canvas.charge-canvas").forEach(cvs => {
-      const ctx = cvs.getContext("2d");
-      const dir = cvs.dataset.dir;   // "fire" | "lightning" | "wanderer"
-      // Flip (ľavý smer) riešite CSS transform-om priamo na canvase, tu už netreba
-      ensureSpriteMeta(dir, CHARGE_ANIM.file)
-        .then(meta => drawSprite(ctx, meta, CHARGE_ANIM, now, cvs.width, cvs.height))
-        .catch(() => {});
-    });
-  
-    requestAnimationFrame(raf);
-  }
-  
+  const now = performance.now();
+  const map = { p1: actorP1, p2: actorP2 };
+
+  // 1) herci
+  ["p1","p2"].forEach(slot => {
+    const cvs = map[slot];
+    const st  = state?.[slot];
+    const ctx = cvs.getContext("2d");
+
+    if (!st || !st.char) {
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      cvs.style.display = "none";
+      return;
+    }
+    cvs.style.display = "block";
+
+    const dir  = CHAR_META[st.char].dir;
+    const anim = currentAnim(slot);
+
+    ensureSpriteMeta(dir, anim.file)
+      .then(meta => drawSprite(ctx, meta, anim, now, TILE, TILE))
+      .catch(() => {
+        return ensureSpriteMeta(dir, ANIM_DEF.idle.file)
+          .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, TILE, TILE))
+          .catch(() => {});
+      });
+  });
+
+  // 2) projektily
+  document.querySelectorAll("canvas.charge-canvas").forEach(cvs => {
+    const ctx = cvs.getContext("2d");
+    const dir = cvs.dataset.dir; // "fire" | "lightning" | "wanderer"
+    ensureSpriteMeta(dir, CHARGE_ANIM.file)
+      .then(meta => drawSprite(ctx, meta, CHARGE_ANIM, now, cvs.width, cvs.height))
+      .catch(() => {});
+  });
+
+  requestAnimationFrame(raf);
+}
 requestAnimationFrame(raf);
 
 /* ---------- Initial ---------- */
@@ -505,3 +540,6 @@ gridEl.style.gridTemplateRows = `repeat(${board.h}, ${TILE}px)`;
 renderGrid({}, []);
 renderHUD();
 renderQueue();
+
+// ak je overlay viditeľný na štarte, spusti náhľady
+if (!selEl.classList.contains("hidden")) startCharSelectPreview();

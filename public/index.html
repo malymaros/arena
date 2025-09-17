@@ -30,15 +30,26 @@
       <div class="panel">
         <div id="queue" class="queue"></div>
         <div class="controls">
-          <button data-act="move:up">↑</button>
-          <button data-act="move:left">←</button>
-          <button data-act="move:right">→</button>
-          <button data-act="move:down">↓</button>
-          <button data-act="recharge">Recharge</button>
-          <button data-act="attack">Attack</button>
-          <button id="undo">Undo</button>
-          <button id="lock">Lock in</button>
-        </div>
+            <div class="move-grid">
+              <button class="btn arrow" data-act="move:up"    title="Move Up">↑</button>
+              <div class="h">
+                <button class="btn arrow" data-act="move:left"  title="Move Left">←</button>
+                <button class="btn arrow" data-act="move:right" title="Move Right">→</button>
+              </div>
+              <button class="btn arrow" data-act="move:down"  title="Move Down">↓</button>
+            </div>
+          
+            <div class="actions">
+              <button class="btn mana"   data-act="recharge" title="+2 mana">Recharge +2 mana</button>
+              <button class="btn attack" data-act="attack"   title="Basic -1 mana">Basic Attack -1 mana</button>
+            </div>
+          
+            <div class="meta">
+              <button id="undo" class="btn secondary">Undo</button>
+              <button id="lock" class="btn btn-lock">LOCK IN</button>
+            </div>
+          </div>
+          
       </div>
     </div>
   </div>
