@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <title>Arena POC</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Arena background -->
+  <div id="arena" class="arena"></div>
+
+  <!-- HUD -->
+  <div id="hud-turn" class="hud hud-turn"></div>
+  <div id="hud-hp" class="hud hud-hp"></div>
+  <div id="hud-mana" class="hud hud-mana"></div>
+
+  <!-- Stage -->
+  <div class="stage">
+    <div class="game">
+      <!-- Board = grid (efekty) + actors (plynulý pohyb) -->
+      <div class="board">
+        <div id="grid" class="grid"></div>
+        <div id="actors" class="actors">
+          <canvas id="actor-p1" class="sprite-actor" width="224" height="224"></canvas>
+          <canvas id="actor-p2" class="sprite-actor" width="224" height="224"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div id="queue" class="queue"></div>
+        <div class="controls">
+          <button data-act="move:up">↑</button>
+          <button data-act="move:left">←</button>
+          <button data-act="move:right">→</button>
+          <button data-act="move:down">↓</button>
+          <button data-act="recharge">Recharge</button>
+          <button data-act="attack">Attack</button>
+          <button id="undo">Undo</button>
+          <button id="lock">Lock in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Výber postavy -->
+  <div id="char-select" class="char-select">
+    <div class="char-card" data-char="fire">
+      <canvas class="char-canvas" width="160" height="160" data-char="fire"></canvas>
+      <div class="char-name">Fire Wizard</div>
+    </div>
+    <div class="char-card" data-char="lightning">
+      <canvas class="char-canvas" width="160" height="160" data-char="lightning"></canvas>
+      <div class="char-name">Lightning Mage</div>
+    </div>
+    <div class="char-card" data-char="wanderer">
+      <canvas class="char-canvas" width="160" height="160" data-char="wanderer"></canvas>
+      <div class="char-name">Wanderer Magician</div>
+    </div>
+  </div>
+
+  <!-- Game Over -->
+  <div id="gameover" class="gameover hidden">
+    <div class="go-box">
+      <div id="go-text" class="go-text"></div>
+      <button id="retry" class="retry">Retry</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="./client.js"></script>
+</body>
+</html>
