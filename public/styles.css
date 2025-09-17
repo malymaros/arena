@@ -177,3 +177,30 @@ body {
   .controls{ gap: 6px; padding: 6px 8px; }
   .btn{ padding: 7px 10px; }
 }
+
+/* special sprite v strede boardu */
+.special-center{
+    position: absolute;
+    width: auto; height: auto;
+    pointer-events: none;
+    image-rendering: pixelated;
+    z-index: 4; /* nad gridom, pod HUD */
+  }
+  
+  /* plávajúci -X HP nad postavou */
+  .dmg-float{
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+    color: #ff5a5a;
+    font-weight: 900;
+    font-size: 24px;
+    text-shadow: 0 2px 0 #000;
+    transform: translateX(-50%);
+    animation: rise-fade 900ms ease-out forwards;
+  }
+  @keyframes rise-fade{
+    0%   { opacity: 1; transform: translate(-50%, -8px); }
+    100% { opacity: 0; transform: translate(-50%, -56px); }
+  }
+  

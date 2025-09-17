@@ -154,7 +154,7 @@ function doBasic(slot, tl) {
   // damage len ak súper je v rovnakom riadku
   if (op && op.y === me.y) {
     op.hp = Math.max(0, op.hp - BASIC_DMG);
-    pushStateFrame(tl, [{ kind: "hit", target: opS }], SMALL_DELAY_MS);
+    pushStateFrame(tl, [{ kind: "hit", target: opS, dmg }], SMALL_DELAY_MS);
   }
 }
 
@@ -180,7 +180,7 @@ function doSpecial(slot, tl) {
   const { dmg, hit } = specialDamageAndHit(game.players, slot);
   if (dmg > 0 && hit) {
     game.players[hit].hp = Math.max(0, game.players[hit].hp - dmg);
-    pushStateFrame(tl, [{ kind: "hit", target: hit }], SMALL_DELAY_MS);
+    pushStateFrame(tl, [{ kind: "hit", target: hit, dmg }], SMALL_DELAY_MS);
   } else {
     pushStateFrame(tl, [], SMALL_DELAY_MS);
   }

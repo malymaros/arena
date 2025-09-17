@@ -128,6 +128,52 @@ function currentAnim(slot) {
   return def;
 }
 
+// special v strede boardu (do .actors)
+function updateSpecialCenter(specials) {
+    // zmaž predchádzajúce
+    actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
+    if (!Array.isArray(specials) || specials.length === 0) return;
+  
+    for (const sp of specials) {
+      const caster = state?.[sp.from];
+      if (!caster || !caster.char) continue;
+      const dirKey = CHAR_META[caster.char].dir;
+      const file   = SPECIAL_ANIMS[caster.char].file;
+  
+      const cvs = document.createElement("canvas");
+      const px  = Math.round(TILE * SPECIAL_SCALE);
+      cvs.width = px; cvs.height = px;
+      cvs.className = "special-center";
+      cvs.dataset.dir  = dirKey;
+      cvs.dataset.file = file;
+  
+      // stred boardu + orientácia podľa slotu (P1→1, P2→-1)
+      const flip = sp.from === "p1" ? 1 : -1;
+      cvs.style.left = "50%";
+      cvs.style.top  = "50%";
+      cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
+  
+      actorsEl.appendChild(cvs);
+    }
+  }
+  
+  // plávajúce -X HP nad cieľom
+  function spawnDamageFloat(slot, dmg) {
+    const target = state?.[slot];
+    if (!target) return;
+    const { left, top } = cellToPx(target.x, target.y);
+  
+    const el = document.createElement("div");
+    el.className = "dmg-float";
+    el.textContent = `-${dmg} HP`;
+    el.style.left = (left + TILE / 2) + "px";
+    el.style.top  = (top + 8) + "px"; // začiatok trochu nad nohami
+  
+    actorsEl.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+  }
+  
+
 /* ---------- arena ---------- */
 function renderArenaLayers(arenaKey, layerFiles) {
   arenaEl.innerHTML = "";
@@ -218,28 +264,13 @@ function renderGrid(s, effects = []) {
           cvs.dataset.dir = dirKey;
           cvs.style.width  = px + "px";
           cvs.style.height = px + "px";
-          cvs.style.transform = (chargeHere.dir === "left")
-            ? "translate(-50%, -50%) scaleX(-1)"
-            : "translate(-50%, -50%)";
+          const flip = face[from] ?? 1; // p1: 1 (pozerá doprava), p2: -1 (pozerá doľava) podľa vzájomnej polohy
+          cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
           cell.appendChild(cvs);
         }
       }
 
-      // SPECIAL animácia len na políčku kúzelníka
-      for (const [from, info] of specialCasterCell.entries()) {
-        if (info.x === x && info.y === y) {
-          const cvs = document.createElement("canvas");
-          const px  = Math.round(TILE * SPECIAL_SCALE);
-          cvs.width = px; cvs.height = px;
-          cvs.className = "special-canvas";
-          cvs.dataset.dir  = info.dir;
-          cvs.dataset.file = info.file;
-          cvs.style.width  = px + "px";
-          cvs.style.height = px + "px";
-          cvs.style.transform = "translate(-50%, -50%)";
-          cell.appendChild(cvs);
-        }
-      }
+      updateSpecialCenter(specials);
 
       // zásahový blik
       const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
@@ -416,7 +447,10 @@ function schedulePlayTimeline(timeline) {
     const shooters = new Set();
     for (const e of frame.effects || []) {
       if ((e.kind === "charge" || e.kind === "attack_swing" || e.kind === "special") && e.from) shooters.add(e.from);
-      if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) setAnim(e.target, "hurt", HURT_MS);
+      if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
+        setAnim(e.target, "hurt", HURT_MS);
+        if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
+    }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) setAnim(e.target, "hurt", HURT_MS);
     }
     if (shooters.has("p1")) setAnim("p1", "attack", ATTACK_SWING_MS);
@@ -568,7 +602,7 @@ socket.on("state", (s) => {
   const dmg = mine?.char ? { fire:4, lightning:2, wanderer:8 }[mine.char] : null;
   const specialBtn = document.getElementById("special-btn");
   if (dmg != null && specialBtn) {
-    specialBtn.textContent = `Special (−5, ${dmg} dmg)`;
+    specialBtn.textContent = `Special (−5💧, ${dmg}☠️)`;
     specialBtn.title = specialBtn.textContent;
   }
 });
@@ -623,14 +657,14 @@ function raf() {
       .catch(() => {});
   });
 
-  // specials (na políčku kúzelníka)
-  document.querySelectorAll("canvas.special-canvas").forEach(cvs=>{
-    const ctx = cvs.getContext("2d");
-    const dir = cvs.dataset.dir;
+  // specials v strede
+  document.querySelectorAll("canvas.special-center").forEach(cvs => {
+    const ctx  = cvs.getContext("2d");
+    const dir  = cvs.dataset.dir;
     const file = cvs.dataset.file;
     const anim = { file, fps: SPECIAL_FPS, loop: true };
     ensureSpriteMeta(dir, file)
-      .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height))
+      .then(meta => drawSprite(ctx, meta, anim, performance.now(), cvs.width, cvs.height))
       .catch(()=>{});
   });
 
