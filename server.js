@@ -1,3 +1,5 @@
+// server.js (ESM)
+
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -5,7 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname  = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
@@ -27,20 +29,11 @@ const BASIC_DMG  = 1;
 
 const SPECIAL_COST = 5;
 
-const MOVE_DELAY_MS    = 2000; // ⬅ 2× pomalšie (bolo 1000)
-const SMALL_DELAY_MS   = 600;  // ⬅ 2× pomalšie (bolo 300)
+const MOVE_DELAY_MS    = 2000; // 2× pomalšie (bolo 1000)
+const SMALL_DELAY_MS   = 600;  // 2× pomalšie (bolo 300)
 const SPECIAL_REPEAT   = 3;
-const SPECIAL_BEAT_MS  = 900;  // ⬅ 2× pomalšie (bolo 450)
-const CHARGE_STEP_MS   = 560;  // ⬅ 2× pomalšie (bolo 280)
-
-function winnerNow() {
-    const p1dead = game.players.p1.hp <= 0;
-    const p2dead = game.players.p2.hp <= 0;
-    if (p1dead && p2dead) return "draw";
-    if (p1dead) return "p2";
-    if (p2dead) return "p1";
-    return null;
-  }  
+const SPECIAL_BEAT_MS  = 900;  // 2× pomalšie (bolo 450)
+const CHARGE_STEP_MS   = 560;  // 2× pomalšie (bolo 280)
 
 /* -------------------- Game state -------------------- */
 let sockets = { p1: null, p2: null };
@@ -126,6 +119,15 @@ function specialDamageAndHit(players, slot) {
   }
 }
 
+function winnerNow() {
+  const p1dead = game.players.p1.hp <= 0;
+  const p2dead = game.players.p2.hp <= 0;
+  if (p1dead && p2dead) return "draw";
+  if (p1dead) return "p2";
+  if (p2dead) return "p1";
+  return null;
+}
+
 /* -------------------- Actions -------------------- */
 function doMove(slot, dir, tl) {
   const a = game.players[slot];
@@ -138,20 +140,35 @@ function doMove(slot, dir, tl) {
 
 function doRecharge(slot, tl) {
   const a = game.players[slot];
-  a.mana = Math.min(MAX_MANA, a.mana + 2); // ⬅ cap na 10
-  pushStateFrame(tl, [{ kind: "recharge", from: slot, cells: [[a.x, a.y]] }], SMALL_DELAY_MS);
+
+  // Na maxime many -> neplatné, žiadna modrá animácia/bublina
+  if (a.mana >= MAX_MANA) { pushInvalid(tl, slot); return; }
+
+  const before = a.mana;
+  a.mana = Math.min(MAX_MANA, a.mana + 2);
+  const gained = a.mana - before; // 1 alebo 2 (ak capne)
+  if (gained > 0) {
+    pushStateFrame(
+      tl,
+      [{ kind: "recharge", from: slot, cells: [[a.x, a.y]], amount: gained }],
+      SMALL_DELAY_MS
+    );
+  } else {
+    // teoreticky by sa sem nemalo dostať, ale keby…
+    pushInvalid(tl, slot);
+  }
 }
 
 function doBasic(slot, tl) {
-  const me = game.players[slot];
+  const me  = game.players[slot];
   const opS = other(slot);
-  const op = game.players[opS];
+  const op  = game.players[opS];
 
   if (me.mana < BASIC_COST) { pushInvalid(tl, slot); return; }
   me.mana -= BASIC_COST;
 
-  // vizuál: strela po riadku (pomalšie kroky)
-  const dir = (op && op.y === me.y && op.x < me.x) ? "left" : "right";
+  // vizuál: strela po riadku
+  const dir  = (op && op.y === me.y && op.x < me.x) ? "left" : "right";
   const step = dir === "left" ? -1 : 1;
   let x = me.x;
   while (true) {
@@ -168,31 +185,31 @@ function doBasic(slot, tl) {
 }
 
 function doSpecial(slot, tl) {
-    const actor = game.players[slot];
-    if (!actor) return;
-  
-    if (actor.mana < SPECIAL_COST) {
-      // iba spätná väzba – žiadny special frame/animácia
-      pushStateFrame(tl, [{ kind: "invalid", target: slot }], SMALL_DELAY_MS);
-      return;
-    }
-  
-    actor.mana -= SPECIAL_COST;
-  
-    // 3× „nádych“ (caster animuje špeciál; klient bliká rozsah)
-    for (let r = 0; r < SPECIAL_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "special", from: slot }], SPECIAL_BEAT_MS);
-    }
-  
-    // vyhodnotenie zásahu
-    const { dmg, hit } = specialDamageAndHit(game.players, slot);
-    if (dmg > 0 && hit) {
-      game.players[hit].hp = Math.max(0, game.players[hit].hp - dmg);
-      pushStateFrame(tl, [{ kind: "hit", target: hit, dmg }], SMALL_DELAY_MS);
-    } else {
-      pushStateFrame(tl, [], SMALL_DELAY_MS);
-    }
+  const actor = game.players[slot];
+  if (!actor) return;
+
+  // Bez many -> len spätná väzba (Hurt na klientovi), žiadna special animácia
+  if (actor.mana < SPECIAL_COST) {
+    pushStateFrame(tl, [{ kind: "invalid", target: slot }], SMALL_DELAY_MS);
+    return;
   }
+
+  actor.mana -= SPECIAL_COST;
+
+  // 3× „nádych“ (caster animuje špeciál; klient bliká rozsah)
+  for (let r = 0; r < SPECIAL_REPEAT; r++) {
+    pushStateFrame(tl, [{ kind: "special", from: slot }], SPECIAL_BEAT_MS);
+  }
+
+  // vyhodnotenie zásahu
+  const { dmg, hit } = specialDamageAndHit(game.players, slot);
+  if (dmg > 0 && hit) {
+    game.players[hit].hp = Math.max(0, game.players[hit].hp - dmg);
+    pushStateFrame(tl, [{ kind: "hit", target: hit, dmg }], SMALL_DELAY_MS);
+  } else {
+    pushStateFrame(tl, [], SMALL_DELAY_MS);
+  }
+}
 
 function doAction(slot, action, tl) {
   if (!action) return;
@@ -207,43 +224,47 @@ function doAction(slot, action, tl) {
 
 /* -------------------- Turn resolution -------------------- */
 function resolveTurn() {
-    const tl = [];
-    // prvý „nulový“ frame pre hladký začiatok
-    pushStateFrame(tl, [], 10);
-  
-    const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
-    let ended = false;
-  
-    outer:
-    for (let i = 0; i < 3; i++) {
-      for (const slot of order) {
-        const act = game.players[slot].queue[i];
-        doAction(slot, act, tl);
-  
-        // po každej akcii skontroluj lethal
-        const w = winnerNow();
-        if (w) { ended = true; break outer; }
-      }
+  const tl = [];
+  // prvý „nulový“ frame pre hladký začiatok
+  pushStateFrame(tl, [], 10);
+
+  const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
+  let ended = false;
+
+  outer:
+  for (let i = 0; i < 3; i++) {
+    for (const slot of order) {
+      const act = game.players[slot].queue[i];
+      doAction(slot, act, tl);
+
+      // po každej akcii skontroluj lethal
+      const w = winnerNow();
+      if (w) { ended = true; break outer; }
     }
-  
-    if (!ended) {
-      // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)
-      const nextTurn    = game.turn + 1;
-      const nextStarter = nextTurn % 2 === 1 ? "p1" : "p2";
-      tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: [], delayMs: 10 });
-      game.turn    = nextTurn;
-      game.starter = nextStarter;
-    }
-    // keď ended=true, NEmeníme turn/starter – zostane finálny stav v snímkach
-  
-    io.emit("state", { ...snapshot(), timeline: tl });
-  
-    // príprava na ďalšie plánovanie (ak neskončila hra, klient odomkne UI sám)
-    game.players.p1.locked = false;
-    game.players.p2.locked = false;
-    game.players.p1.queue = [];
-    game.players.p2.queue = [];
   }
+
+  if (!ended) {
+    // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)
+    const nextTurn    = game.turn + 1;
+    const nextStarter = nextTurn % 2 === 1 ? "p1" : "p2";
+    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: [], delayMs: 10 });
+    game.turn    = nextTurn;
+    game.starter = nextStarter;
+  }
+
+  io.emit("state", { ...snapshot(), timeline: tl });
+
+  if (ended) {
+    const w = winnerNow(); // "p1" | "p2" | "draw"
+    io.emit("game_over", { winner: w });
+  }
+
+  // príprava na ďalšie plánovanie
+  game.players.p1.locked = false;
+  game.players.p2.locked = false;
+  game.players.p1.queue = [];
+  game.players.p2.queue = [];
+}
 
 /* -------------------- IO -------------------- */
 io.on("connection", (socket) => {

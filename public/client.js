@@ -30,15 +30,15 @@ const TILE = parseInt(cs.getPropertyValue("--tile")) || 224;
 const GAP  = parseInt(getComputedStyle(gridEl).gap || "10") || 10;
 
 // === Timing (2× pomalšie) ===
-const MOVE_MS = 2000;               // bolo 1000
-const ATTACK_SWING_MS = 1600;       // bolo 800
-const HURT_MS = 1600;               // bolo 800
+const MOVE_MS = 2000;
+const ATTACK_SWING_MS = 1600;
+const HURT_MS = 1600;
 
-// Projektil (vizuálny FPS môžete ponechať; let spomaľuje server)
+// Projektil
 const CHARGE_SCALE = 1.0;
-const CHARGE_ANIM  = { file: "Charge.png", fps: 8, loop: true }; // mierne pomalšie
+const CHARGE_ANIM  = { file: "Charge.png", fps: 8, loop: true };
 
-// Special anim (pomalší FPS)
+// Special anim
 const SPECIAL_SCALE = 2.4;
 const SPECIAL_FPS   = 6;
 const SPECIAL_ANIMS = {
@@ -73,6 +73,11 @@ let castingNow = { p1:false, p2:false };
 let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
 const SPRITES = {};
 let actorsInitialized = false;
+
+// --- nový game-over manažment na klientovi
+let serverWinner = null;          // koho ohlásil server
+let gameOverShown = false;        // či už bolo zobrazené GO
+let lastAttackEndAt = { p1:0, p2:0 }; // kedy (v čase performance.now) dobehne posledná animácia útoku
 
 // preview loop
 let charPreviewRaf = 0;
@@ -132,66 +137,62 @@ function currentAnim(slot) {
   return def;
 }
 
-// special v strede boardu (do .actors)
+/* ---------- specials v strede boardu ---------- */
 function updateSpecialCenter(specials) {
-    // zmaž predchádzajúce
-    actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
-    if (!Array.isArray(specials) || specials.length === 0) return;
-  
-    for (const sp of specials) {
-      const caster = state?.[sp.from];
-      if (!caster || !caster.char) continue;
-      const dirKey = CHAR_META[caster.char].dir;
-      const file   = SPECIAL_ANIMS[caster.char].file;
-  
-      const cvs = document.createElement("canvas");
-      const px  = Math.round(TILE * SPECIAL_SCALE);
-      cvs.width = px; cvs.height = px;
-      cvs.className = "special-center";
-      cvs.dataset.dir  = dirKey;
-      cvs.dataset.file = file;
-  
-      // stred boardu + orientácia podľa slotu (P1→1, P2→-1)
-      const flip = sp.from === "p1" ? 1 : -1;
-      cvs.style.left = "50%";
-      cvs.style.top  = "50%";
-      cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
-  
-      actorsEl.appendChild(cvs);
-    }
-  }
-  
-  // plávajúce -X HP nad cieľom
-  function spawnDamageFloat(slot, dmg) {
-    const target = state?.[slot];
-    if (!target) return;
-    const { left, top } = cellToPx(target.x, target.y);
-  
-    const el = document.createElement("div");
-    el.className = "dmg-float";
-    el.textContent = `-${dmg} HP`;
-    el.style.left = (left + TILE / 2) + "px";
-    el.style.top  = (top + 8) + "px"; // začiatok trochu nad nohami
-  
-    actorsEl.appendChild(el);
-    setTimeout(() => el.remove(), 1000);
-  }
+  actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
+  if (!Array.isArray(specials) || specials.length === 0) return;
 
-  function spawnManaFloat(slot, amount = 2) {
-    const target = state?.[slot];
-    if (!target) return;
-    const { left, top } = cellToPx(target.x, target.y);
-  
-    const el = document.createElement("div");
-    el.className = "mana-float";
-    el.textContent = `+${amount} MANA`;
-    el.style.left = (left + TILE / 2) + "px";
-    el.style.top  = (top + 8) + "px";
-  
-    actorsEl.appendChild(el);
-    setTimeout(() => el.remove(), 1000);
+  for (const sp of specials) {
+    const caster = state?.[sp.from];
+    if (!caster || !caster.char) continue;
+    const dirKey = CHAR_META[caster.char].dir;
+    const file   = SPECIAL_ANIMS[caster.char].file;
+
+    const cvs = document.createElement("canvas");
+    const px  = Math.round(TILE * SPECIAL_SCALE);
+    cvs.width = px; cvs.height = px;
+    cvs.className = "special-center";
+    cvs.dataset.dir  = dirKey;
+    cvs.dataset.file = file;
+
+    const flip = sp.from === "p1" ? 1 : -1;
+    cvs.style.left = "50%";
+    cvs.style.top  = "50%";
+    cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
+
+    actorsEl.appendChild(cvs);
   }
-  
+}
+
+/* ---------- bubliny -X HP / +Y MANA ---------- */
+function cellToPx(x, y) { return { left: x * (TILE + GAP), top: y * (TILE + GAP) }; }
+
+function spawnDamageFloat(slot, dmg) {
+  const target = state?.[slot];
+  if (!target) return;
+  const { left, top } = cellToPx(target.x, target.y);
+
+  const el = document.createElement("div");
+  el.className = "dmg-float";
+  el.textContent = `-${dmg} HP`;
+  el.style.left = (left + TILE / 2) + "px";
+  el.style.top  = (top + 8) + "px";
+  actorsEl.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+function spawnManaFloat(slot, amount = 2) {
+  const target = state?.[slot];
+  if (!target) return;
+  const { left, top } = cellToPx(target.x, target.y);
+
+  const el = document.createElement("div");
+  el.className = "mana-float";
+  el.textContent = `+${amount} MANA`;
+  el.style.left = (left + TILE / 2) + "px";
+  el.style.top  = (top + 8) + "px";
+  actorsEl.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
 
 /* ---------- arena ---------- */
 function renderArenaLayers(arenaKey, layerFiles) {
@@ -208,113 +209,101 @@ function renderArenaLayers(arenaKey, layerFiles) {
 
 /* ---------- HUD ---------- */
 function renderHUD() {
-    // stred
-    if (hudTurn) {
-      hudTurn.textContent = `Kolo ${state.turn} — Začína ${state.starter?.toUpperCase?.() || "-"}`;
-    }
-  
-    // hodnoty P1
-    if (state?.p1) {
-      hudP1Hp.textContent   = state.p1.hp ?? "-";
-      hudP1Mana.textContent = state.p1.mana ?? "-";
-    } else {
-      hudP1Hp.textContent = hudP1Mana.textContent = "-";
-    }
-  
-    // hodnoty P2
-    if (state?.p2) {
-      hudP2Hp.textContent   = state.p2.hp ?? "-";
-      hudP2Mana.textContent = state.p2.mana ?? "-";
-    } else {
-      hudP2Hp.textContent = hudP2Mana.textContent = "-";
-    }
-  
-    // zvýraznenie aktívneho hráča
-    const starter = state?.starter;
-    hudBoxP1.classList.toggle("me", me === "p1");
-    hudBoxP2.classList.toggle("me", me === "p2");
+  if (hudTurn) {
+    hudTurn.textContent = `Kolo ${state.turn} — Začína ${state.starter?.toUpperCase?.() || "-"}`;
   }
-  
-  
-  
+  // P1
+  if (state?.p1) {
+    hudP1Hp.textContent   = state.p1.hp ?? "-";
+    hudP1Mana.textContent = state.p1.mana ?? "-";
+  } else {
+    hudP1Hp.textContent = hudP1Mana.textContent = "-";
+  }
+  // P2
+  if (state?.p2) {
+    hudP2Hp.textContent   = state.p2.hp ?? "-";
+    hudP2Mana.textContent = state.p2.mana ?? "-";
+  } else {
+    hudP2Hp.textContent = hudP2Mana.textContent = "-";
+  }
+
+  hudBoxP1.classList.toggle("me", me === "p1");
+  hudBoxP2.classList.toggle("me", me === "p2");
+}
 
 /* ---------- Grid (efekty + anim. objekty) ---------- */
 function renderGrid(s, effects = []) {
-    gridEl.style.gridTemplateColumns = `repeat(${board.w}, ${TILE}px)`;
-    gridEl.style.gridTemplateRows    = `repeat(${board.h}, ${TILE}px)`;
-    gridEl.innerHTML = "";
-  
-    // reset info o caste
-    castingNow.p1 = false;
-    castingNow.p2 = false;
-  
-    const recharge = new Set();
-    const charges  = [];      // {cell:[x,y], dir:'left'|'right', from:'p1'|'p2'}
-    const specials = [];      // {from}
-    let hitTarget  = null;
-  
-    // pre blikajúci rozsah pri speciale
-    const previewSet = new Set(); // "x,y"
-  
-    for (const e of effects) {
-      if (e?.kind === "recharge") for (const [x,y] of e.cells || []) recharge.add(`${x},${y}`);
-      if (e?.kind === "charge")   charges.push(e);
-      if (e?.kind === "special")  specials.push(e);
-      if (e?.kind === "hit")      hitTarget = e.target;
-    }
-  
-    // rozsahy pre všetky špeciály v tomto frame + flag pre casterov
-    for (const sp of specials) {
-      const caster = s?.[sp.from];
-      if (!caster || !caster.char) continue;
-      castingNow[sp.from] = true;
-      const cells = cellsForSpecialPreview(caster);
-      cells.forEach(([x,y]) => previewSet.add(`${x},${y}`));
-    }
-  
-    for (let y = 0; y < board.h; y++) {
-      for (let x = 0; x < board.w; x++) {
-        const cell = document.createElement("div");
-        cell.className = "cell";
-        cell.dataset.x = x;
-        cell.dataset.y = y;
-  
-        const key = `${x},${y}`;
-        if (recharge.has(key))  cell.classList.add("hl-recharge");
-        if (previewSet.has(key)) cell.classList.add("preview-red");
-  
-        // Projektil basic útoku v tejto bunke
-        const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
-        if (chargeHere) {
-          const charKey = s?.[chargeHere.from]?.char;
-          const dirKey  = charKey ? CHAR_META[charKey].dir : null;
-          if (dirKey) {
-            const cvs = document.createElement("canvas");
-            const px  = Math.round(TILE * CHARGE_SCALE);
-            cvs.width = px; cvs.height = px;
-            cvs.className = "charge-canvas";
-            cvs.dataset.dir = dirKey;
-            cvs.style.width  = px + "px";
-            cvs.style.height = px + "px";
-            const flip = (chargeHere.dir === "left") ? -1 : 1; // ⬅️ flip podľa smeru strely
-            cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
-            cell.appendChild(cvs);
-          }
-        }
-  
-        // zásahový blik
-        const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
-        const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
-        if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
-        if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
-  
-        gridEl.appendChild(cell);
-      }
-    }
-  
-    updateSpecialCenter(specials);
+  gridEl.style.gridTemplateColumns = `repeat(${board.w}, ${TILE}px)`;
+  gridEl.style.gridTemplateRows    = `repeat(${board.h}, ${TILE}px)`;
+  gridEl.innerHTML = "";
+
+  castingNow.p1 = false;
+  castingNow.p2 = false;
+
+  const recharge = new Set();
+  const charges  = [];
+  const specials = [];
+  let hitTarget  = null;
+
+  const previewSet = new Set();
+
+  for (const e of effects) {
+    if (e?.kind === "recharge") for (const [x,y] of e.cells || []) recharge.add(`${x},${y}`);
+    if (e?.kind === "charge")   charges.push(e);
+    if (e?.kind === "special")  specials.push(e);
+    if (e?.kind === "hit")      hitTarget = e.target;
   }
-  
+
+  for (const sp of specials) {
+    const caster = s?.[sp.from];
+    if (!caster || !caster.char) continue;
+    castingNow[sp.from] = true;
+    const cells = cellsForSpecialPreview(caster);
+    cells.forEach(([x,y]) => previewSet.add(`${x},${y}`));
+  }
+
+  for (let y = 0; y < board.h; y++) {
+    for (let x = 0; x < board.w; x++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+
+      const key = `${x},${y}`;
+      if (recharge.has(key))   cell.classList.add("hl-recharge");
+      if (previewSet.has(key)) cell.classList.add("preview-red");
+
+      // projektil basic útoku v tejto bunke
+      const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
+      if (chargeHere) {
+        const charKey = s?.[chargeHere.from]?.char;
+        const dirKey  = charKey ? CHAR_META[charKey].dir : null;
+        if (dirKey) {
+          const cvs = document.createElement("canvas");
+          const px  = Math.round(TILE * CHARGE_SCALE);
+          cvs.width = px; cvs.height = px;
+          cvs.className = "charge-canvas";
+          cvs.dataset.dir = dirKey;
+          cvs.style.width  = px + "px";
+          cvs.style.height = px + "px";
+          const flip = (chargeHere.dir === "left") ? -1 : 1;
+          cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
+          cell.appendChild(cvs);
+        }
+      }
+
+      // zásahový blik
+      const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
+      const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
+      if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
+      if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
+
+      gridEl.appendChild(cell);
+    }
+  }
+
+  updateSpecialCenter(specials);
+}
 
 /* ---------- Special preview (hover) ---------- */
 function cellsForSpecialPreview(meState){
@@ -347,8 +336,7 @@ function clearPreviewCells(){
   gridEl.querySelectorAll(".preview-red").forEach(el=>el.classList.remove("preview-red"));
 }
 
-/* ---------- Actors (plynulý pohyb) ---------- */
-function cellToPx(x, y) { return { left: x * (TILE + GAP), top: y * (TILE + GAP) }; }
+/* ---------- Facing + umiestnenie ---------- */
 function computeFacing(p1, p2) {
   if (!p1 || !p2) return { p1: 1, p2: -1 };
   if (p1.x === p2.x && p1.y === p2.y) return { p1: 1, p2: -1 };
@@ -419,7 +407,7 @@ function updateLockButton() {
   }
 }
 
-/* ---------- Winner fallback ---------- */
+/* ---------- Winner helper ---------- */
 function computeWinnerFromState(s) {
   const dead1 = !s?.p1 || s.p1.hp <= 0;
   const dead2 = !s?.p2 || s.p2.hp <= 0;
@@ -427,6 +415,34 @@ function computeWinnerFromState(s) {
   if (dead1) return "p2";
   if (dead2) return "p1";
   return null;
+}
+
+/* ---------- GameOver sekvencia ---------- */
+function showGameOverSequence(winner) {
+  if (gameOverShown) return;
+  gameOverShown = true;
+
+  const loser = winner === "p1" ? "p2" : (winner === "p2" ? "p1" : null);
+
+  // počkaj, kým dobehne posledná animácia útoku (ak nejaká beží)
+  const now = performance.now();
+  const lastEnd = Math.max(lastAttackEndAt.p1, lastAttackEndAt.p2);
+  const waitAttack = Math.max(0, lastEnd - now);
+
+  setTimeout(() => {
+    // potom spusti animáciu smrti porazeného (ak nie je remíza)
+    let afterDeathWait = 300;
+    if (winner !== "draw" && loser) {
+      setAnim(loser, "dead", 1200);
+      afterDeathWait = 1300; // trvanie death + malý buffer
+    }
+
+    setTimeout(() => {
+      goText.textContent = winner === "draw" ? "GAME OVER — TIE"
+                                             : `GAME OVER — ${winner.toUpperCase()} WINNER`;
+      goOverlay.classList.remove("hidden");
+    }, afterDeathWait);
+  }, waitAttack);
 }
 
 /* ---------- Timeline prehrávanie ---------- */
@@ -446,21 +462,27 @@ function schedulePlayTimeline(timeline) {
 
   const step = () => {
     if (i >= timeline.length) {
-        // Po dohraní animácie prepneme HUD na nasledujúce kolo
-        state.turn = NEXT_TURN;
-        state.starter = NEXT_STARTER;
-        renderHUD();
-
-        if (state.p1) state.p1.locked = false;
-        if (state.p2) state.p2.locked = false;
-      
-        // bežné čistenie UI po kole
-        renderGrid(state, []);
-        myQueue = []; renderQueue();
-        lockBtn.disabled = false;
-        updateLockButton();
+      // ak server zahlásil výhru alebo stav hovorí o výhre -> spusti GO sekvenciu (po animáciách)
+      const winner = serverWinner || computeWinnerFromState(state);
+      if (winner) {
+        showGameOverSequence(winner);
         return;
       }
+
+      // inak bežný koniec kola
+      state.turn = NEXT_TURN;
+      state.starter = NEXT_STARTER;
+      renderHUD();
+
+      if (state.p1) state.p1.locked = false;
+      if (state.p2) state.p2.locked = false;
+
+      renderGrid(state, []);
+      myQueue = []; renderQueue();
+      lockBtn.disabled = false;
+      updateLockButton();
+      return;
+    }
 
     const frame = timeline[i++];
 
@@ -468,9 +490,9 @@ function schedulePlayTimeline(timeline) {
     const beforeP2 = prev?.p2 || state.p2;
 
     state.p1 = frame.p1; state.p2 = frame.p2;
-    if (frame.starter !== undefined) {                 
-        state.starter = frame.starter;
-      }
+    if (frame.starter !== undefined) {
+      state.starter = frame.starter;
+    }
     renderHUD();
 
     if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y)) setAnim("p1", "run", MOVE_MS);
@@ -482,15 +504,17 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", HURT_MS);
         if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
+      }
+      if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
+        setAnim(e.target, "hurt", HURT_MS);
+      }
+      if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
+        const amt = (typeof e.amount === "number" ? e.amount : 2);
+        spawnManaFloat(e.from, amt);
+      }
     }
-      if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) setAnim(e.target, "hurt", HURT_MS);
-      // Recharge: ukáž +2 MANA nad casterom (server posiela e.from)
-        if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
-            spawnManaFloat(e.from, 2);
-        }
-    }
-    if (shooters.has("p1")) setAnim("p1", "attack", ATTACK_SWING_MS);
-    if (shooters.has("p2")) setAnim("p2", "attack", ATTACK_SWING_MS);
+    if (shooters.has("p1")) { setAnim("p1", "attack", ATTACK_SWING_MS); lastAttackEndAt.p1 = performance.now() + ATTACK_SWING_MS; }
+    if (shooters.has("p2")) { setAnim("p2", "attack", ATTACK_SWING_MS); lastAttackEndAt.p2 = performance.now() + ATTACK_SWING_MS; }
 
     renderGrid(state, frame.effects || []);
     positionActors(state);
@@ -602,6 +626,11 @@ socket.on("reset", () => {
   startCharSelectPreview();
   renderGrid({}, []);
   renderHUD();
+
+  // reset game-over stavov
+  serverWinner = null;
+  gameOverShown = false;
+  lastAttackEndAt = { p1:0, p2:0 };
 });
 
 socket.on("state", (s) => {
@@ -643,11 +672,10 @@ socket.on("state", (s) => {
   }
 });
 
+// Server stále posiela "game_over" – len si zapamätáme, nezobrazíme hneď overlay.
+// Overlay zobrazíme až po dobehnutí útoku a animácii smrti.
 socket.on("game_over", ({ winner }) => {
-  const loser = winner === "p1" ? "p2" : "p1";
-  if (winner !== "draw") { setAnim(winner, "attack2", 0); setAnim(loser, "dead", 1200); }
-  goText.textContent = winner === "draw" ? "GAME OVER — Remíza" : `GAME OVER — ${winner.toUpperCase()} vyhral`;
-  goOverlay.classList.remove("hidden");
+  serverWinner = winner;
 });
 
 /* ---------- RAF: actors + FX ---------- */
@@ -655,7 +683,6 @@ function raf() {
   const now = performance.now();
   const map = { p1: actorP1, p2: actorP2 };
 
-  // actors – skryť, ak práve castia special (pretože special sprite už obsahuje postavu)
   ["p1","p2"].forEach(slot => {
     const cvs = map[slot];
     const st  = state?.[slot];
