@@ -14,8 +14,12 @@ const selEl    = document.getElementById("char-select");
 const arenaEl  = document.getElementById("arena");
 
 const hudTurn  = document.getElementById("hud-turn");
-const hudHp    = document.getElementById("hud-hp");
-const hudMana  = document.getElementById("hud-mana");
+const hudBoxP1 = document.getElementById("hud-p1");
+const hudBoxP2 = document.getElementById("hud-p2");
+const hudP1Hp   = document.getElementById("p1-hp");
+const hudP1Mana = document.getElementById("p1-mana");
+const hudP2Hp   = document.getElementById("p2-hp");
+const hudP2Mana = document.getElementById("p2-mana");
 
 const goOverlay= document.getElementById("gameover");
 const goText   = document.getElementById("go-text");
@@ -172,6 +176,21 @@ function updateSpecialCenter(specials) {
     actorsEl.appendChild(el);
     setTimeout(() => el.remove(), 1000);
   }
+
+  function spawnManaFloat(slot, amount = 2) {
+    const target = state?.[slot];
+    if (!target) return;
+    const { left, top } = cellToPx(target.x, target.y);
+  
+    const el = document.createElement("div");
+    el.className = "mana-float";
+    el.textContent = `+${amount} MANA`;
+    el.style.left = (left + TILE / 2) + "px";
+    el.style.top  = (top + 8) + "px";
+  
+    actorsEl.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+  }
   
 
 /* ---------- arena ---------- */
@@ -189,11 +208,35 @@ function renderArenaLayers(arenaKey, layerFiles) {
 
 /* ---------- HUD ---------- */
 function renderHUD() {
-  hudTurn.textContent = `Kolo ${state.turn} — Začína ${state.starter?.toUpperCase?.() || "-"}`;
-  if (!me || !state[me]) { hudHp.textContent = ""; hudMana.textContent = ""; return; }
-  hudHp.textContent = `HP: ${state[me].hp}`;
-  hudMana.textContent = `Mana: ${state[me].mana}`;
-}
+    // stred
+    if (hudTurn) {
+      hudTurn.textContent = `Kolo ${state.turn} — Začína ${state.starter?.toUpperCase?.() || "-"}`;
+    }
+  
+    // hodnoty P1
+    if (state?.p1) {
+      hudP1Hp.textContent   = state.p1.hp ?? "-";
+      hudP1Mana.textContent = state.p1.mana ?? "-";
+    } else {
+      hudP1Hp.textContent = hudP1Mana.textContent = "-";
+    }
+  
+    // hodnoty P2
+    if (state?.p2) {
+      hudP2Hp.textContent   = state.p2.hp ?? "-";
+      hudP2Mana.textContent = state.p2.mana ?? "-";
+    } else {
+      hudP2Hp.textContent = hudP2Mana.textContent = "-";
+    }
+  
+    // zvýraznenie aktívneho hráča
+    const starter = state?.starter;
+    hudBoxP1.classList.toggle("me", me === "p1");
+    hudBoxP2.classList.toggle("me", me === "p2");
+  }
+  
+  
+  
 
 /* ---------- Grid (efekty + anim. objekty) ---------- */
 function renderGrid(s, effects = []) {
@@ -269,7 +312,6 @@ function renderGrid(s, effects = []) {
       }
     }
   
-    // ⬅️ DÔLEŽITÉ: center-special generujte IBA RAZ, nie v cykle vyššie
     updateSpecialCenter(specials);
   }
   
@@ -392,8 +434,10 @@ function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
 
   const first = timeline[0];
-  state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = first.starter;
+  state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
   renderHUD();
+  const NEXT_TURN = (first.turn ?? state.turn) + 1;
+  const NEXT_STARTER = (NEXT_TURN % 2 === 1) ? "p1" : "p2";
   renderGrid(state, first.effects || []);
   positionActors(state, true);
 
@@ -402,34 +446,31 @@ function schedulePlayTimeline(timeline) {
 
   const step = () => {
     if (i >= timeline.length) {
-      const winner = computeWinnerFromState(state);
-      if (winner) {
-        if (goOverlay.classList.contains("hidden")) {
-          const loser = winner === "p1" ? "p2" : "p1";
-          if (winner !== "draw") { setAnim(winner, "attack2", 0); setAnim(loser, "dead", 1200); }
-          goText.textContent = winner === "draw" ? "GAME OVER — Remíza" : `GAME OVER — ${winner.toUpperCase()} vyhral`;
-          goOverlay.classList.remove("hidden");
-        }
+        // Po dohraní animácie prepneme HUD na nasledujúce kolo
+        state.turn = NEXT_TURN;
+        state.starter = NEXT_STARTER;
+        renderHUD();
+
+        if (state.p1) state.p1.locked = false;
+        if (state.p2) state.p2.locked = false;
+      
+        // bežné čistenie UI po kole
+        renderGrid(state, []);
+        myQueue = []; renderQueue();
+        lockBtn.disabled = false;
+        updateLockButton();
         return;
       }
-
-      if (state.p1) state.p1.locked = false;
-      if (state.p2) state.p2.locked = false;
-
-      // čistý frame bez efektov obnoví castingNow na false
-      renderGrid(state, []);
-      renderHUD();
-      myQueue = []; renderQueue();
-      updateLockButton();
-      return;
-    }
 
     const frame = timeline[i++];
 
     const beforeP1 = prev?.p1 || state.p1;
     const beforeP2 = prev?.p2 || state.p2;
 
-    state.p1 = frame.p1; state.p2 = frame.p2; state.turn = frame.turn;
+    state.p1 = frame.p1; state.p2 = frame.p2;
+    if (frame.starter !== undefined) {                 
+        state.starter = frame.starter;
+      }
     renderHUD();
 
     if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y)) setAnim("p1", "run", MOVE_MS);
@@ -443,6 +484,10 @@ function schedulePlayTimeline(timeline) {
         if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
     }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) setAnim(e.target, "hurt", HURT_MS);
+      // Recharge: ukáž +2 MANA nad casterom (server posiela e.from)
+        if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
+            spawnManaFloat(e.from, 2);
+        }
     }
     if (shooters.has("p1")) setAnim("p1", "attack", ATTACK_SWING_MS);
     if (shooters.has("p2")) setAnim("p2", "attack", ATTACK_SWING_MS);

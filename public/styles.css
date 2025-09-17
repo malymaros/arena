@@ -203,4 +203,65 @@ body {
     0%   { opacity: 1; transform: translate(-50%, -8px); }
     100% { opacity: 0; transform: translate(-50%, -56px); }
   }
+
+/* ---- HUD turn uprostred (ponechať) ---- */
+.hud { position: fixed; z-index: 3; padding: 10px 14px; border-radius: 10px;
+    background: rgba(0,0,0,.45); backdrop-filter: blur(4px); font-weight: 700; letter-spacing: .3px; }
+  .hud-turn { top: 14px; left: 50%; transform: translateX(-50%); border: 1px solid #2a2b2e; }
+  
+  /* ---- HUD boxy P1/P2 (rovnaké zarovnanie doľava) ---- */
+  .hud-box{
+    top: 14px;
+    z-index: 3;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(0,0,0,.45);
+    border: 1px solid #2a2b2e;
+    backdrop-filter: blur(4px);
+    font-weight: 700;
+    min-width: 140px;
+  }
+  .hud-p1{ position: fixed; left: 14px; }
+  .hud-p2{ position: fixed; right: 14px; } /* bez text-align:right; nechá default (doľava) */
+  
+  .hud-title{
+    font-size: 12px;
+    opacity: .85;
+    margin-bottom: 4px;
+    letter-spacing: .35px;
+  }
+  .hud-line{
+    font-size: 14px;
+    margin: 2px 0;
+    padding-left: 6px;
+    border-left: 4px solid transparent;
+  }
+  .hud-line.hp{   color:#ff5a5a; border-left-color:#6b1d1d; }
+  .hud-line.mana{ color:#57a9ff; border-left-color:#15456b; }
+  
+  /* zlatý RÁMIK pre box aktuálneho klienta (bez výplne) */
+  .hud-box.me {
+    border-color: #d6b36a;                 /* jemná zlatá */
+    box-shadow:
+      0 0 0 2px rgba(214,179,106,0.55),    /* „druhá“ línia na oko širší rámik */
+      inset 0 0 16px rgba(214,179,106,0.12);
+  }
+  
+  /* ---- plávajúce bubliny nad postavou ---- */
+  @keyframes floatUp {
+    from { transform: translate(-50%, -6px); opacity: 0; }
+    30%  { opacity: 1; }
+    to   { transform: translate(-50%, -48px); opacity: 0; }
+  }
+  .dmg-float, .mana-float{
+    position: absolute;
+    z-index: 5;
+    font-weight: 900;
+    font-size: 18px;
+    text-shadow: 0 2px 0 rgba(0,0,0,.45);
+    pointer-events: none;
+    animation: floatUp .9s ease-out forwards;
+  }
+  .dmg-float {  color: #ff5a5a; }
+  .mana-float { color: #57a9ff; }
   
