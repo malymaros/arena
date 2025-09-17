@@ -9,30 +9,25 @@ app.use(express.static("public"));
 
 const GRID_W = 5;
 const GRID_H = 3;
-const MAX_HP = 10;
+const MAX_HP = 5;
 const MAX_MANA = 10;
-const ATTACK_COST = 2;
+
+// === BASIC ATTACK (nové) ===
+const BASIC_COST = 1;      // 1 mana
+const BASIC_DMG  = 1;      // ⬅️ predpoklad: 1 dmg; zmeňte podľa potreby
 
 const ALLOWED_CHARS = ["fire", "lightning", "wanderer"];
 
-
-// arény – vrstvy od pozadia po popredie
+// arény – vrstvy
 const ARENAS = {
   bridge: ["sky-bridge.png","clouds.png","clouds-2.png","tower.png","bridge.png"],
 };
 
-const MOVE_FRAME_MS = 1000;        // dĺžka jedného kroku (chôdza)
-const RECHARGE_FRAME_MS = 600;    // nabíjanie many
-const DELAY_STATE_MS = 650;       // generické (ak nie je špecifikované)
-const DELAY_PROJECTILE_MS = 200;  // rýchlosť „projektilu“ po bunkách
-
-
-function damageByRookDistance(dist, targetMaxHp) {
-  if (dist === 0) return Infinity;
-  if (dist === 1) return Math.max(1, Math.floor(targetMaxHp / 2));
-  if (dist === 2) return Math.max(1, Math.floor(targetMaxHp / 4));
-  return Math.max(1, Math.floor(targetMaxHp / 8));
-}
+// tempo timeline (spomalené)
+const MOVE_FRAME_MS = 1000;
+const RECHARGE_FRAME_MS = 600;
+const DELAY_STATE_MS = 650;
+const DELAY_CHARGE_MS = 200;   // rýchlosť letiacich "Charge" frame-ov
 
 const starterForTurn = (turn) => (turn % 2 === 1 ? "p1" : "p2");
 
@@ -59,73 +54,57 @@ function applyMove(p, dir) {
   p.y = clamp(p.y + d[1], 0, GRID_H - 1);
 }
 
-function rookDistance(a, b) {
-  if (a.x === b.x) return Math.abs(a.y - b.y);
-  if (a.y === b.y) return Math.abs(a.x - b.x);
-  return null;
-}
-
-// vrátane cieľa; pri dist 0 -> [štart]
-function lineCells(ax, ay, bx, by) {
-  if (ax === bx && ay === by) return [[ax, ay]];
-  const cells = [];
-  if (ax === bx) {
-    const step = ay < by ? 1 : -1;
-    for (let y = ay + step; y !== by + step; y += step) cells.push([ax, y]);
-  } else if (ay === by) {
-    const step = ax < bx ? 1 : -1;
-    for (let x = ax + step; x !== by + step; x += step) cells.push([x, ay]);
+function slimPlayer(p) {
+    if (!p) return null;
+    return { id: p.id, x: p.x, y: p.y, hp: p.hp, mana: p.mana, char: p.char };
   }
-  return cells;
-}
-
-const applyRecharge = (p) => (p.mana = clamp(p.mana + 2, 0, MAX_MANA));
-
-/**
- * Útok:
- * - ak útočník nemá manu → nič sa nedeje (attempted=false)
- * - ak má manu → MANA SA VŽDY ODPÍŠE (attempted=true)
- *   - mimo „veže“ (dist=null) → miss: žiadny projektil, len animácia (attack_swing)
- *   - v dosahu → dmg podľa vzdialenosti + projektil línia
- */
-function applyAttack(attacker, defender) {
-  if (attacker.mana < ATTACK_COST) {
-    return { attempted: false, hit: false, dmg: 0, path: [] };
-  }
-  attacker.mana -= ATTACK_COST;
-
-  const dist = rookDistance(attacker, defender);
-  if (dist === null) {
-    return { attempted: true, hit: false, dmg: 0, path: [] }; // miss, len swing
+  function snapshot() {
+    return { turn: game.turn, p1: slimPlayer(game.players.p1), p2: slimPlayer(game.players.p2), arena: game.arena };
   }
 
-  const dmg = damageByRookDistance(dist, MAX_HP);
-  const realDmg = dmg === Infinity ? defender.hp : dmg;
-  defender.hp = clamp(defender.hp - realDmg, 0, MAX_HP);
-
-  const path = lineCells(attacker.x, attacker.y, defender.x, defender.y);
-  return { attempted: true, hit: true, dmg: realDmg, path, targetDead: defender.hp === 0 };
-}
-
-function snapshot() {
-  return JSON.parse(JSON.stringify({
-    turn: game.turn,
-    p1: game.players.p1,
-    p2: game.players.p2,
-    arena: game.arena
-  }));
-}
-
+  
 function pushStateFrame(timeline, effects = [], delay = DELAY_STATE_MS) {
   timeline.push({ ...snapshot(), effects, delayMs: delay });
 }
-function pushProjectileFrames(timeline, path, fromSlot, targetSlot) {
+
+// === BASIC ATTACK – výpočet dráhy po riadku ===
+function computeChargePath(attacker, defender) {
+  // smer určujeme podľa relatívnej polohy na osi X (k súperovi)
+  const step = defender.x > attacker.x ? 1 : (defender.x < attacker.x ? -1 : (attacker.id === "p1" ? 1 : -1));
+
+  const path = [];
+  let x = attacker.x;
+  const y = attacker.y;
+
+  // ak je súper v rovnakom riadku → letíme po ňom a trafíme
+  if (attacker.y === defender.y) {
+    while (true) {
+      x += step;
+      if (x < 0 || x >= GRID_W) break;
+      path.push([x, y]);
+      if (x === defender.x) {
+        return { path, hit: true, dir: step > 0 ? "right" : "left" };
+      }
+    }
+    return { path, hit: false, dir: step > 0 ? "right" : "left" }; // nemalo by nastať, ale fallback
+  }
+
+  // nie je v rovnakom riadku → vystreľ až po okraj (miss)
+  while (true) {
+    x += step;
+    if (x < 0 || x >= GRID_W) break;
+    path.push([x, y]);
+  }
+  return { path, hit: false, dir: step > 0 ? "right" : "left" };
+}
+
+function pushChargeFrames(timeline, path, fromSlot, targetSlot, dir, withHit) {
   for (let i = 0; i < path.length; i++) {
     const cell = path[i];
     const isLast = i === path.length - 1;
-    const effects = [{ kind: "projectile", from: fromSlot, cell }];
-    if (isLast) effects.push({ kind: "hit", target: targetSlot });
-    timeline.push({ ...snapshot(), effects, delayMs: DELAY_PROJECTILE_MS });
+    const effects = [{ kind: "charge", from: fromSlot, cell, dir }];
+    if (withHit && isLast) effects.push({ kind: "hit", target: targetSlot });
+    timeline.push({ ...snapshot(), effects, delayMs: DELAY_CHARGE_MS });
   }
 }
 
@@ -150,43 +129,44 @@ function resolveTurn() {
     const oppSlot = actorSlot === "p1" ? "p2" : "p1";
     const opp = P[oppSlot];
     if (!actor || !opp || someoneDead) return;
-  
+
     if (action?.type === "move") {
       applyMove(actor, action.dir);
       pushStateFrame(timeline, [], MOVE_FRAME_MS);
       return;
     }
-  
+
     if (action?.type === "recharge") {
-      applyRecharge(actor);
-      // ⬇️ tu bol preklep: slot -> actorSlot
-      pushStateFrame(
-        timeline,
-        [{ kind: "recharge", actor: actorSlot, cells: [[actor.x, actor.y]] }],
-        RECHARGE_FRAME_MS
-      );
+      actor.mana = clamp(actor.mana + 2, 0, MAX_MANA);
+      pushStateFrame(timeline, [{ kind: "recharge", actor: actorSlot, cells: [[actor.x, actor.y]] }], RECHARGE_FRAME_MS);
       return;
     }
-  
+
     if (action?.type === "attack") {
-      const res = applyAttack(actor, opp);
-      if (!res.attempted) {          // nemá manu → bez zmeny stavu
-        pushStateFrame(timeline);
+      // BASIC ATTACK – ak nemá manu, nič sa nedeje
+      if (actor.mana < BASIC_COST) { pushStateFrame(timeline); return; }
+      actor.mana -= BASIC_COST;
+
+      // dráha po riadku (hit len ak v rovnakom riadku)
+      const { path, hit, dir } = computeChargePath(actor, opp);
+
+      if (path.length === 0) {
+        // teoreticky pri okraji a rovnakom x – sprav aspoň "swing"
+        pushStateFrame(timeline, [{ kind: "attack_swing", from: actorSlot }], 300);
         return;
       }
-      if (res.hit) {
-        pushProjectileFrames(timeline, res.path, actorSlot, oppSlot);
+
+      pushChargeFrames(timeline, path, actorSlot, oppSlot, dir, hit);
+
+      if (hit) {
+        opp.hp = clamp(opp.hp - BASIC_DMG, 0, MAX_HP);
         if (P.p1.hp <= 0 || P.p2.hp <= 0) someoneDead = true;
-      } else {
-        // miss: len animácia útoku
-        pushStateFrame(timeline, [{ kind: "attack_swing", from: actorSlot }], 300);
       }
       return;
     }
-  
+
     pushStateFrame(timeline, [], 200);
   };
-  
 
   // 3 kroky; vždy najprv starter, potom other
   for (let i = 0; i < 3 && !someoneDead; i++) {
@@ -220,7 +200,7 @@ function broadcastState(extra = {}) {
 function resetGameKeepConnections() {
   const hadP1 = !!game.players.p1;
   const hadP2 = !!game.players.p2;
-  game = createInitialState(); // turn=1, arena=null, ready=false
+  game = createInitialState();
   if (hadP1) game.players.p1 = newPlayerState("p1", 0, Math.floor(GRID_H/2));
   if (hadP2) game.players.p2 = newPlayerState("p2", GRID_W - 1, Math.floor(GRID_H/2));
 }
@@ -269,29 +249,24 @@ io.on("connection", (socket) => {
     if (bothLocked) {
       const timeline = resolveTurn();
       broadcastState({ timeline });
-      const bothLocked = game.players.p1?.locked && game.players.p2?.locked;
-      if (bothLocked) {
-        const timeline = resolveTurn();
-        broadcastState({ timeline });
 
-        const p1dead = game.players.p1.hp <= 0;
-        const p2dead = game.players.p2.hp <= 0;
-        if (p1dead || p2dead) {
-            const winner = p1dead && p2dead ? "draw" : (p1dead ? "p2" : "p1");
-            const totalMs = (timeline || []).reduce((acc, f) => acc + (f.delayMs ?? DELAY_STATE_MS), 0);
-            setTimeout(() => {
-            io.to("match-1").emit("game_over", { winner });
-            }, totalMs + 50); // malé buffer oneskorenie
-        }
+      // oneskorené game_over (po dohraní timeline) – klient má aj fallback
+      const p1dead = game.players.p1.hp <= 0;
+      const p2dead = game.players.p2.hp <= 0;
+      if (p1dead || p2dead) {
+        const winner = p1dead && p2dead ? "draw" : (p1dead ? "p2" : "p1");
+        const totalMs = (timeline || []).reduce((acc, f) => acc + (f.delayMs ?? DELAY_STATE_MS), 0);
+        setTimeout(() => {
+          io.to("match-1").emit("game_over", { winner });
+        }, totalMs + 50);
       }
     }
   });
 
-  // Retry
   socket.on("retry", () => {
     resetGameKeepConnections();
-    io.to("match-1").emit("reset");  // klienti si vyčistia lokálne premenné/UI
-    broadcastState();                // pošleme čistý stav (turn=1, aréna=null, char=null)
+    io.to("match-1").emit("reset");
+    broadcastState();
   });
 
   socket.on("disconnect", () => {

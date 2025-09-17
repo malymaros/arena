@@ -24,9 +24,11 @@ const retryBtn = document.getElementById("retry");
 
 const cs = getComputedStyle(document.documentElement);
 const TILE = parseInt(cs.getPropertyValue("--tile")) || 224;
+const CHARGE_SCALE = 1.0;       
+const CHARGE_ANIM = { file: "Charge.png", fps: 12, loop: true };
 const GAP  = parseInt(getComputedStyle(gridEl).gap || "10") || 10;
 
-const MOVE_MS = 1000;          // musí ladiť so serverom (MOVE_FRAME_MS)
+const MOVE_MS = 1000;
 const ATTACK_SWING_MS = 800;
 const HURT_MS = 800;
 
@@ -54,9 +56,8 @@ let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
 const SPRITES = {};
 let actorsInitialized = false;
 
-// --- char-select preview helpers ---
+// preview
 let charPreviewRaf = 0;
-const CHAR_KEYS = Object.keys(CHAR_META);
 
 /* ---------- sprite helpers ---------- */
 function ensureSpriteMeta(charDir, file) {
@@ -91,8 +92,6 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE, dstH=TILE) {
 function setAnim(slot, key, durationMs = 0) {
   const def = ANIM_DEF[key] ?? ANIM_DEF.idle;
   animState[slot].key = key;
-
-  // aj pre loop animácie vieme nastaviť "časovač" (napr. run)
   if (durationMs && durationMs > 0) {
     animState[slot].until = performance.now() + durationMs;
   } else if (!def.loop) {
@@ -136,19 +135,20 @@ function renderHUD() {
   hudMana.textContent = `Mana: ${state[me].mana}`;
 }
 
-/* ---------- Grid (efekty) ---------- */
+/* ---------- Grid (efekty + Charge projektil) ---------- */
 function renderGrid(s, effects = []) {
   gridEl.style.gridTemplateColumns = `repeat(${board.w}, ${TILE}px)`;
   gridEl.style.gridTemplateRows = `repeat(${board.h}, ${TILE}px)`;
   gridEl.innerHTML = "";
 
-  const blue = new Set();
-  const proj = new Map();
+  // rozparsuj efekty
+  const recharge = new Set();
+  const charges = []; // [{cell:[x,y], dir:'left'|'right'}]
   let hitTarget = null;
 
   for (const e of effects) {
-    if (e?.kind === "recharge") for (const [x,y] of e.cells || []) blue.add(`${x},${y}`);
-    if (e?.kind === "projectile") proj.set(`${e.cell[0]},${e.cell[1]}`, e.from);
+    if (e?.kind === "recharge") for (const [x,y] of e.cells || []) recharge.add(`${x},${y}`);
+    if (e?.kind === "charge") charges.push(e);
     if (e?.kind === "hit") hitTarget = e.target;
   }
 
@@ -157,9 +157,35 @@ function renderGrid(s, effects = []) {
       const cell = document.createElement("div");
       cell.className = "cell";
       const key = `${x},${y}`;
-      if (blue.has(key)) cell.classList.add("hl-recharge");
-      if (proj.has(key)) cell.classList.add("hl-projectile");
+      if (recharge.has(key)) cell.classList.add("hl-recharge");
 
+    
+        const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
+        if (chargeHere) {
+        const fromSlot = chargeHere.from;             // "p1" | "p2"
+        const charKey  = s?.[fromSlot]?.char;         // "fire" | "lightning" | "wanderer"
+        const dirKey   = charKey ? CHAR_META[charKey].dir : null;
+        if (dirKey) {
+            const cvs = document.createElement("canvas");
+            const px = Math.round(TILE * CHARGE_SCALE);
+            cvs.width = px; cvs.height = px;
+            cvs.className = "charge-canvas";
+            cvs.dataset.dir = dirKey;                   // kto strieľa (pre výber správneho spritesheetu)
+            cvs.dataset.flip = (chargeHere.dir === "left") ? "left" : "right";
+            // centrovanie + voliteľné zrkadlenie (štýlom, nie cez ctx):
+            cvs.style.width = px + "px";
+            cvs.style.height = px + "px";
+            cvs.style.transform = (chargeHere.dir === "left")
+            ? "translate(-50%, -50%) scaleX(-1)"
+            : "translate(-50%, -50%)";
+            cell.appendChild(cvs);
+        }
+        }
+
+
+
+
+      // hit blink
       const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
       const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
       if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
@@ -238,7 +264,6 @@ function computeWinnerFromState(s) {
 function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
 
-  // prvý frame bez prechodu
   const first = timeline[0];
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn;
   renderHUD();
@@ -255,10 +280,10 @@ function schedulePlayTimeline(timeline) {
         if (goOverlay.classList.contains("hidden")) {
           const loser = winner === "p1" ? "p2" : "p1";
           if (winner !== "draw") { setAnim(winner, "attack2", 0); setAnim(loser, "dead", 1200); }
-          goText.textContent = winner === "draw" ? "GAME OVER — Remíza" : `GAME OVER — ${winner.toUpperCase()} vyhral`;
+          goText.textContent = winner === "draw" ? "GAME OVER — DRAW" : `GAME OVER — ${winner.toUpperCase()} WINNER`;
           goOverlay.classList.remove("hidden");
         }
-        return; // nenechávame odomknuté UI
+        return;
       }
 
       renderGrid(state, []);
@@ -283,14 +308,14 @@ function schedulePlayTimeline(timeline) {
     // útoky / zásahy
     const shooters = new Set();
     for (const e of frame.effects || []) {
-      if ((e.kind === "projectile" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
+      if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) setAnim(e.target, "hurt", HURT_MS);
     }
     if (shooters.has("p1")) setAnim("p1", "attack", ATTACK_SWING_MS);
     if (shooters.has("p2")) setAnim("p2", "attack", ATTACK_SWING_MS);
 
     renderGrid(state, frame.effects || []);
-    positionActors(state); // plynulý presun cez CSS transition
+    positionActors(state);
 
     prev = frame;
     setTimeout(step, frame.delayMs ?? 600);
@@ -341,7 +366,7 @@ function stopCharSelectPreview() {
   charPreviewRaf = 0;
 }
 
-// klik na kartu – NESKRÝVAME overlay, počkáme na potvrdenie od servera (state s char)
+// klik na kartu – overlay NESKRÝVAME, počkáme na state s potvrdením
 selEl.addEventListener("click", (e) => {
   const card = e.target.closest(".char-card");
   if (!card) return;
@@ -398,7 +423,7 @@ socket.on("state", (s) => {
     renderArenaLayers(s.arena, ARENAS_CLIENT[s.arena] || []);
   }
 
-  // výber postavy (zobraziť/ skryť overlay podľa potvrdenia zo servera)
+  // výber postavy
   if (!s[me]?.char) {
     selEl.classList.remove("hidden");
     startCharSelectPreview();
@@ -415,7 +440,7 @@ socket.on("state", (s) => {
   if (s.timeline) {
     schedulePlayTimeline(s.timeline);
   } else {
-    positionActors(s, true);       // dôležité pre prvé vykreslenie po výbere/po retry
+    positionActors(s, true);
     lockBtn.disabled = s[me]?.locked ?? false;
   }
 });
@@ -429,36 +454,49 @@ socket.on("game_over", ({ winner }) => {
 
 /* ---------- RAF: kreslenie postáv ---------- */
 function raf() {
-  const now = performance.now();
-  const map = { p1: actorP1, p2: actorP2 };
-
-  ["p1","p2"].forEach(slot => {
-    const cvs = map[slot];
-    const st = state?.[slot];
-    const ctx = cvs.getContext("2d");
-
-    if (!st || !st.char) {
-      ctx.clearRect(0, 0, cvs.width, cvs.height);
-      cvs.style.display = "none";
-      return;
-    }
-    cvs.style.display = "block";
-
-    const dir = CHAR_META[st.char].dir;
-    const anim = currentAnim(slot);
-
-    ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, now, TILE, TILE))
-      .catch(() => {
-        const idle = ANIM_DEF.idle;
-        return ensureSpriteMeta(dir, idle.file)
-          .then(metaIdle => drawSprite(ctx, metaIdle, idle, now, TILE, TILE))
-          .catch(() => {});
-      });
-  });
-
-  requestAnimationFrame(raf);
-}
+    const now = performance.now();
+    const map = { p1: actorP1, p2: actorP2 };
+  
+    // --- 1) MAGOVIA (actors) ---
+    ["p1","p2"].forEach(slot => {
+      const cvs = map[slot];
+      const st  = state?.[slot];
+      const ctx = cvs.getContext("2d");
+  
+      if (!st || !st.char) {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        cvs.style.display = "none";
+        return;
+      }
+      cvs.style.display = "block";
+  
+      const dir  = CHAR_META[st.char].dir;
+      const anim = currentAnim(slot);
+  
+      ensureSpriteMeta(dir, anim.file)
+        .then(meta => drawSprite(ctx, meta, anim, now, TILE, TILE))
+        .catch(() => {
+          // fallback, ak by chýbal daný sheet
+          return ensureSpriteMeta(dir, ANIM_DEF.idle.file)
+            .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, TILE, TILE))
+            .catch(() => {});
+        });
+    });
+  
+    // --- 2) PROJEKTILY (Charge) ---
+    // Vykresľujeme všetky <canvas class="charge-canvas">, ktoré ste vložili v renderGrid()
+    document.querySelectorAll("canvas.charge-canvas").forEach(cvs => {
+      const ctx = cvs.getContext("2d");
+      const dir = cvs.dataset.dir;   // "fire" | "lightning" | "wanderer"
+      // Flip (ľavý smer) riešite CSS transform-om priamo na canvase, tu už netreba
+      ensureSpriteMeta(dir, CHARGE_ANIM.file)
+        .then(meta => drawSprite(ctx, meta, CHARGE_ANIM, now, cvs.width, cvs.height))
+        .catch(() => {});
+    });
+  
+    requestAnimationFrame(raf);
+  }
+  
 requestAnimationFrame(raf);
 
 /* ---------- Initial ---------- */

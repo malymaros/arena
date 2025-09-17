@@ -35,11 +35,27 @@ body { margin: 0; background: #0e0f12; color: #fff; overflow: hidden;
   grid-template-columns: repeat(5, var(--tile));
   grid-template-rows: repeat(3, var(--tile));
 }
+
+/* Bunky mriežky – jemné obrysy a priepustné okraje */
 .cell {
-  position: relative; width: var(--tile); height: var(--tile);
-  border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;
-  background: rgba(255,255,255,0.03);
-}
+    position: relative;
+    overflow: visible; /* aby veľký projektil nebol orezaný */
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08); /* jemný obrys */
+    background: rgba(255,255,255,0.02);                 /* veľmi ľahké podfarbenie */
+    border-radius: 6px;                                  /* voliteľné */
+  }
+  
+  /* Animovaný projektil (canvas) – centrovaný v bunke */
+  .cell .charge-canvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%); /* scaleX(-1) dopĺňame inline podľa smeru */
+    pointer-events: none;
+    image-rendering: pixelated; /* vizuál pixelartu */
+  }
+  
+  
 
 /* Effects */
 .cell.hl-recharge::before {
