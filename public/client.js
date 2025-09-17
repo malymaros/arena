@@ -197,91 +197,82 @@ function renderHUD() {
 
 /* ---------- Grid (efekty + anim. objekty) ---------- */
 function renderGrid(s, effects = []) {
-  gridEl.style.gridTemplateColumns = `repeat(${board.w}, ${TILE}px)`;
-  gridEl.style.gridTemplateRows = `repeat(${board.h}, ${TILE}px)`;
-  gridEl.innerHTML = "";
-
-  // reset info o caste
-  castingNow.p1 = false;
-  castingNow.p2 = false;
-
-  const recharge = new Set();
-  const charges  = [];      // {cell:[x,y], dir, from}
-  const specials = [];      // {from}
-  let hitTarget = null;
-
-  // pre blikajúci rozsah pri speciale
-  const previewSet = new Set(); // "x,y"
-
-  for (const e of effects) {
-    if (e?.kind === "recharge") for (const [x,y] of e.cells || []) recharge.add(`${x},${y}`);
-    if (e?.kind === "charge")   charges.push(e);
-    if (e?.kind === "special")  specials.push(e);
-    if (e?.kind === "hit")      hitTarget = e.target;
-  }
-
-  // priprav rozsahy pre všetky špeciály v tomto frame
-  for (const sp of specials) {
-    const caster = s?.[sp.from];
-    if (!caster || !caster.char) continue;
-    castingNow[sp.from] = true; // ⬅ skryjeme jeho actor sprite v RAF
-    const cells = cellsForSpecialPreview(caster); // rovnaká logika ako hover
-    cells.forEach(([x,y]) => previewSet.add(`${x},${y}`));
-  }
-
-  // ktorý cell je políčko kúzelníka so special anim?
-  const specialCasterCell = new Map(); // from -> {x,y,file,dir}
-  for (const sp of specials) {
-    const caster = s?.[sp.from];
-    if (!caster || !caster.char) continue;
-    const charKey = caster.char;                       // "fire"|"lightning"|"wanderer"
-    const dirKey  = CHAR_META[charKey].dir;
-    const file    = SPECIAL_ANIMS[charKey].file;
-    specialCasterCell.set(sp.from, { x: caster.x, y: caster.y, file, dir: dirKey });
-  }
-
-  for (let y = 0; y < board.h; y++) {
-    for (let x = 0; x < board.w; x++) {
-      const cell = document.createElement("div");
-      cell.className = "cell";
-      cell.dataset.x = x;
-      cell.dataset.y = y;
-
-      const key = `${x},${y}`;
-      if (recharge.has(key)) cell.classList.add("hl-recharge");
-      if (previewSet.has(key)) cell.classList.add("preview-red");
-
-      // CHARGE projektil v tejto bunke
-      const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
-      if (chargeHere) {
-        const charKey = s?.[chargeHere.from]?.char;
-        const dirKey  = charKey ? CHAR_META[charKey].dir : null;
-        if (dirKey) {
-          const cvs = document.createElement("canvas");
-          const px  = Math.round(TILE * CHARGE_SCALE);
-          cvs.width = px; cvs.height = px;
-          cvs.className = "charge-canvas";
-          cvs.dataset.dir = dirKey;
-          cvs.style.width  = px + "px";
-          cvs.style.height = px + "px";
-          const flip = face[from] ?? 1; // p1: 1 (pozerá doprava), p2: -1 (pozerá doľava) podľa vzájomnej polohy
-          cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
-          cell.appendChild(cvs);
-        }
-      }
-
-      updateSpecialCenter(specials);
-
-      // zásahový blik
-      const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
-      const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
-      if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
-      if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
-
-      gridEl.appendChild(cell);
+    gridEl.style.gridTemplateColumns = `repeat(${board.w}, ${TILE}px)`;
+    gridEl.style.gridTemplateRows    = `repeat(${board.h}, ${TILE}px)`;
+    gridEl.innerHTML = "";
+  
+    // reset info o caste
+    castingNow.p1 = false;
+    castingNow.p2 = false;
+  
+    const recharge = new Set();
+    const charges  = [];      // {cell:[x,y], dir:'left'|'right', from:'p1'|'p2'}
+    const specials = [];      // {from}
+    let hitTarget  = null;
+  
+    // pre blikajúci rozsah pri speciale
+    const previewSet = new Set(); // "x,y"
+  
+    for (const e of effects) {
+      if (e?.kind === "recharge") for (const [x,y] of e.cells || []) recharge.add(`${x},${y}`);
+      if (e?.kind === "charge")   charges.push(e);
+      if (e?.kind === "special")  specials.push(e);
+      if (e?.kind === "hit")      hitTarget = e.target;
     }
+  
+    // rozsahy pre všetky špeciály v tomto frame + flag pre casterov
+    for (const sp of specials) {
+      const caster = s?.[sp.from];
+      if (!caster || !caster.char) continue;
+      castingNow[sp.from] = true;
+      const cells = cellsForSpecialPreview(caster);
+      cells.forEach(([x,y]) => previewSet.add(`${x},${y}`));
+    }
+  
+    for (let y = 0; y < board.h; y++) {
+      for (let x = 0; x < board.w; x++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.x = x;
+        cell.dataset.y = y;
+  
+        const key = `${x},${y}`;
+        if (recharge.has(key))  cell.classList.add("hl-recharge");
+        if (previewSet.has(key)) cell.classList.add("preview-red");
+  
+        // Projektil basic útoku v tejto bunke
+        const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
+        if (chargeHere) {
+          const charKey = s?.[chargeHere.from]?.char;
+          const dirKey  = charKey ? CHAR_META[charKey].dir : null;
+          if (dirKey) {
+            const cvs = document.createElement("canvas");
+            const px  = Math.round(TILE * CHARGE_SCALE);
+            cvs.width = px; cvs.height = px;
+            cvs.className = "charge-canvas";
+            cvs.dataset.dir = dirKey;
+            cvs.style.width  = px + "px";
+            cvs.style.height = px + "px";
+            const flip = (chargeHere.dir === "left") ? -1 : 1; // ⬅️ flip podľa smeru strely
+            cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
+            cell.appendChild(cvs);
+          }
+        }
+  
+        // zásahový blik
+        const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
+        const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
+        if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
+        if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
+  
+        gridEl.appendChild(cell);
+      }
+    }
+  
+    // ⬅️ DÔLEŽITÉ: center-special generujte IBA RAZ, nie v cykle vyššie
+    updateSpecialCenter(specials);
   }
-}
+  
 
 /* ---------- Special preview (hover) ---------- */
 function cellsForSpecialPreview(meState){
@@ -324,7 +315,7 @@ function computeFacing(p1, p2) {
 }
 function positionActors(s, immediate = false) {
   const p1 = s.p1, p2 = s.p2;
-  const same = p1 && p2 && p1.x === p2.x && p2.y === p2.y;
+  const same = p1 && p2 && p1.x === p2.x && p1.y === p2.y;
   const facing = computeFacing(p1, p2);
 
   [["p1", actorP1, p1], ["p2", actorP2, p2]].forEach(([slot, el, data]) => {
@@ -624,13 +615,6 @@ function raf() {
     const cvs = map[slot];
     const st  = state?.[slot];
     const ctx = cvs.getContext("2d");
-
-    // ak caster -> skryť actor sprite
-    if (castingNow[slot]) {
-      ctx.clearRect(0, 0, cvs.width, cvs.height);
-      cvs.style.display = "none";
-      return;
-    }
 
     if (!st || !st.char) {
       ctx.clearRect(0, 0, cvs.width, cvs.height);
