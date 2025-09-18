@@ -16,6 +16,7 @@ const io = new Server(httpServer);
 app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 3000;
+const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
 
 /* -------------------- Game constants -------------------- */
 const BOARD = { w: 5, h: 3 };
@@ -128,6 +129,20 @@ function winnerNow() {
   return null;
 }
 
+/* ---- Admin helpers ---- */
+function okAdmin(keyFromClient) {
+  return !ADMIN_KEY || ADMIN_KEY === keyFromClient;
+}
+function forceResetAll() {
+  try { if (sockets.p1) sockets.p1.disconnect(true); } catch {}
+  try { if (sockets.p2) sockets.p2.disconnect(true); } catch {}
+  sockets.p1 = null;
+  sockets.p2 = null;
+  newGame();
+  io.emit("reset");
+  io.emit("state", snapshot());
+}
+
 /* -------------------- Actions -------------------- */
 function doMove(slot, dir, tl) {
   const a = game.players[slot];
@@ -154,7 +169,6 @@ function doRecharge(slot, tl) {
       SMALL_DELAY_MS
     );
   } else {
-    // teoreticky by sa sem nemalo dostať, ale keby…
     pushInvalid(tl, slot);
   }
 }
@@ -266,6 +280,13 @@ function resolveTurn() {
   game.players.p2.queue = [];
 }
 
+/* -------------------- Admin endpoint -------------------- */
+app.get("/admin/reset-all", (req, res) => {
+  if (!okAdmin(req.query.key)) return res.status(403).send("forbidden");
+  forceResetAll();
+  res.send("ok");
+});
+
 /* -------------------- IO -------------------- */
 io.on("connection", (socket) => {
   let slot = null;
@@ -301,6 +322,12 @@ io.on("connection", (socket) => {
     newGame();
     io.emit("reset");
     io.emit("state", snapshot());
+  });
+
+  // --- admin reset cez socket (napr. z klienta s ?admin=1)
+  socket.on("admin_reset_all", (key) => {
+    if (!okAdmin(key)) return;
+    forceResetAll();
   });
 
   socket.on("disconnect", () => {
