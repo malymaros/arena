@@ -10,21 +10,41 @@
   <!-- Arena background layers -->
   <div id="arena" class="arena"></div>
 
-    <!-- Stred: kolo a začínajúci hráč -->
-    <div class="hud hud-turn" id="hud-turn"></div>
+    <!-- Stred: kolo -->
+    <div class="hud-turn" id="hud-turn"></div>
 
-    <!-- Vľavo hore: P1 -->
+    <!-- Vľavo: P1 -->
     <div class="hud hud-box hud-p1" id="hud-p1">
-    <div class="hud-title">P1</div>
-    <div class="hud-line hp">HP: <span id="p1-hp">-</span></div>
-    <div class="hud-line mana">Mana: <span id="p1-mana">-</span></div>
+      <span class="starter-flag" id="flag-p1" title="Starts this round">⚑</span>
+      <canvas class="hud-char" id="hud-char-p1" width="160" height="160"></canvas>
+      <div class="hud-stats">
+        <div class="hud-stat">
+          <span class="bar-label" title="HP">❤️</span>
+          <div class="bar hp-bar" id="p1-hp"></div>
+        </div>
+        <div class="hud-stat">
+          <span class="bar-label" title="Mana">💧</span>
+          <div class="bar mana-bar" id="p1-mana"></div>
+        </div>
+      </div>
+      <div class="action-log" id="log-p1"></div>
     </div>
 
-    <!-- Vpravo hore: P2 -->
+    <!-- Vpravo: P2 -->
     <div class="hud hud-box hud-p2" id="hud-p2">
-    <div class="hud-title">P2</div>
-    <div class="hud-line hp">HP: <span id="p2-hp">-</span></div>
-    <div class="hud-line mana">Mana: <span id="p2-mana">-</span></div>
+      <span class="starter-flag" id="flag-p2" title="Starts this round">⚑</span>
+      <canvas class="hud-char" id="hud-char-p2" width="160" height="160"></canvas>
+      <div class="hud-stats">
+        <div class="hud-stat">
+          <span class="bar-label" title="HP">❤️</span>
+          <div class="bar hp-bar" id="p2-hp"></div>
+        </div>
+        <div class="hud-stat">
+          <span class="bar-label" title="Mana">💧</span>
+          <div class="bar mana-bar" id="p2-mana"></div>
+        </div>
+      </div>
+      <div class="action-log" id="log-p2"></div>
     </div>
 
   <main class="stage">
@@ -47,28 +67,28 @@
 
   <!-- Controls toolbar -->
   <div class="controls">
-    <div class="move-grid">
-      <button class="btn arrow" data-act="move:up"    title="Move Up">↑</button>
-      <div class="h">
-        <button class="btn arrow" data-act="move:left"  title="Move Left">←</button>
-        <button class="btn arrow" data-act="move:right" title="Move Right">→</button>
-      </div>
-      <button class="btn arrow" data-act="move:down"  title="Move Down">↓</button>
-    </div>
-
     <div class="actions">
-      <!-- Recharge (BLUE) — vrátené tlačidlo -->
-      <button class="btn mana" data-act="recharge" title="+2 mana">Recharge (+2💧)</button>
+      <!-- Move — otvorí výber smeru -->
+      <div class="move-wrap">
+        <button id="move-btn" class="btn act move" title="Move — choose a direction">🚶</button>
+        <div id="dir-picker" class="dir-picker hidden">
+          <button class="btn arrow up"    data-act="move:up"    title="Move Up">↑</button>
+          <button class="btn arrow left"  data-act="move:left"  title="Move Left">←</button>
+          <button class="btn arrow right" data-act="move:right" title="Move Right">→</button>
+          <button class="btn arrow down"  data-act="move:down"  title="Move Down">↓</button>
+        </div>
+      </div>
 
-      <!-- Basic (RED) -->
-      <button class="btn attack" data-act="attack" title="Basic Attack (−1 mana, 1 dmg)">Basic (−1💧, 1☠️)</button>
-
-      <!-- Special (PURPLE) — hover náhľad -->
-      <button id="special-btn" class="btn special" data-act="special" title="Special (−5 mana)">Special (−5💧)</button>
+      <button class="btn act mana" data-act="recharge" title="Recharge (+4 mana)">🙏<span class="cost">+4💧</span></button>
+      <button class="btn act shield" data-act="shield" title="Shield (−2 mana, blocks the opponent's next action)">🛡️<span class="cost">−2💧</span></button>
+      <button class="btn act attack" data-act="attack" title="Basic Attack (−1 mana, damage by distance: 4/3/2/1)">⚔️<span class="cost">−1💧 ?☠️</span></button>
+      <button id="special-btn" class="btn act special" data-act="special" title="Special (−5 mana)">✨<span class="cost">−5💧</span></button>
     </div>
+
+    <div class="divider"></div>
 
     <div class="meta">
-      <button id="undo" class="btn secondary">Undo</button>
+      <button id="undo" class="btn secondary" title="Undo — removes the last queued action">↩</button>
       <button id="lock" class="btn btn-lock">LOCK IN</button>
     </div>
   </div>
