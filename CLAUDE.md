@@ -49,7 +49,7 @@ HP and mana both cap at 10 and are rendered in the HUD as 10-segment bars (`rend
 
 ### Sprites and assets
 
-Sprite sheets are horizontal strips in `public/assets/<char>/`; frame count is inferred from `width / height` (frames must be square). Animation definitions (file, fps, loop) live in `ANIM_DEF` / `SPECIAL_ANIMS` in `client.js`. Arena background layers are listed in the client-side `ARENAS_CLIENT` map and loaded from `public/arenas/<key>/`.
+Sprite sheets are horizontal strips in `public/assets/<char>/`; frame count is inferred from `width / height` (frames must be square). Animation definitions (file, fps, loop) live in `ANIM_DEF` / `SPECIAL_ANIMS` in `client.js`. Arena background layers are listed in the client-side `ARENAS_CLIENT` map and loaded from `public/arenas/<key>/`. Background layers render into low-res canvases (`ARENA_RES`, upscaled with `image-rendering: pixelated`).
 
 ### Admin reset
 

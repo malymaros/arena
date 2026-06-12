@@ -252,16 +252,85 @@ function spawnManaFloat(slot, amount = 4) {
 }
 
 /* ---------- arena ---------- */
+// interné rozlíšenie pozadia — vrstvy sa zmenšia sem a CSS ich roztiahne s pixelated,
+// čím vzniknú skutočné veľké pixely (menšie čísla = hrubší pixel art)
+const ARENA_RES = { w: 320, h: 180 };
 function renderArenaLayers(arenaKey, layerFiles) {
   arenaEl.innerHTML = "";
   if (!arenaKey || !Array.isArray(layerFiles) || !layerFiles.length) return;
   layerFiles.forEach((file, i) => {
-    const img = document.createElement("img");
-    img.className = "layer";
-    img.style.zIndex = String(i);
+    const cvs = document.createElement("canvas");
+    cvs.className = "layer";
+    cvs.width = ARENA_RES.w; cvs.height = ARENA_RES.h;
+    cvs.style.zIndex = String(i);
+    const img = new Image();
+    img.onload = () => {
+      const ctx = cvs.getContext("2d");
+      // cover: vyplň celý canvas, prebytok orež — rovnaká logika ako object-fit: cover
+      const s  = Math.max(ARENA_RES.w / img.width, ARENA_RES.h / img.height);
+      const dw = img.width * s, dh = img.height * s;
+      ctx.drawImage(img, (ARENA_RES.w - dw) / 2, (ARENA_RES.h - dh) / 2, dw, dh);
+    };
     img.src = `/arenas/${arenaKey}/${file}`;
-    arenaEl.appendChild(img);
+    arenaEl.appendChild(cvs);
   });
+}
+
+/* ---------- pixel-art ikony špeciálnych políčok ---------- */
+// 8×8 mriežka, znak = farba z palety, bodka = priehľadné; kreslí sa ako SVG rect-y (crispEdges)
+const TILE_PIX = {
+  dmg: { pal: { a: "#ff7043", b: "#ffd54f" }, rows: [
+    "....a...",
+    "...aa...",
+    "..aaaa..",
+    "..aaaa..",
+    ".aabbaa.",
+    ".abbbba.",
+    ".abbbba.",
+    "..aaaa..",
+  ]},
+  heal: { pal: { a: "#e53935", b: "#ff8a80" }, rows: [
+    ".aa..aa.",
+    "abaaaaaa",
+    "aaaaaaaa",
+    "aaaaaaaa",
+    ".aaaaaa.",
+    "..aaaa..",
+    "...aa...",
+    "........",
+  ]},
+  mana: { pal: { a: "#1e88e5", b: "#82c4ff" }, rows: [
+    "...a....",
+    "...aa...",
+    "..aaaa..",
+    "..aaaa..",
+    ".aaaaaa.",
+    ".baaaaa.",
+    ".baaaaa.",
+    "..aaaa..",
+  ]},
+  ik: { pal: { a: "#e8e8e8", b: "#1a1a1a" }, rows: [
+    "..aaaa..",
+    ".aaaaaa.",
+    ".abaaba.",
+    ".abaaba.",
+    ".aaaaaa.",
+    "..abba..",
+    "..aaaa..",
+    "..a..a..",
+  ]},
+};
+function tileSvg(type) {
+  const def = TILE_PIX[type];
+  if (!def) return "";
+  let rects = "";
+  def.rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const c = def.pal[row[x]];
+      if (c) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
+    }
+  });
+  return `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
 }
 
 /* ---------- HUD ---------- */
@@ -437,7 +506,6 @@ function renderGrid(s, effects = []) {
   // špeciálne políčka (dmg/heal/mana + IK overlay)
   const tileMap = new Map();
   (s?.tiles || []).forEach(t => tileMap.set(`${t.x},${t.y}`, t.type));
-  const TILE_ICON = { dmg: "🔥", heal: "❤️", mana: "💧" };
 
   const previewSet = new Set();
 
@@ -486,7 +554,7 @@ function renderGrid(s, effects = []) {
       if (isIK || tileType) {
         const m = document.createElement("span");
         m.className = "tile-marker";
-        m.textContent = isIK ? "☠️" : TILE_ICON[tileType];
+        m.innerHTML = tileSvg(isIK ? "ik" : tileType);
         cell.appendChild(m);
       }
 
@@ -691,7 +759,7 @@ function renderQueue() {
     const g = document.createElement("div");
     g.className = "q-badge golden";
     g.innerHTML = '<span class="g-ico">🛡️</span>';
-    g.title = "Golden Shield — resolves before the round starts";
+    g.title = "Golden Shield - resolves before the round starts";
     queueEl.appendChild(g);
   } else {
     addSlot('<span class="g-ico dim">🛡️</span>', "Golden Shield slot");
@@ -758,7 +826,7 @@ function renderQueue() {
     const g = document.createElement("div");
     g.className = "q-badge golden";
     g.innerHTML = '<span class="g-ico">🙏</span>';
-    g.title = "Golden Mana Refill — resolves after the round ends";
+    g.title = "Golden Mana Refill - resolves after the round ends";
     queueEl.appendChild(g);
   } else {
     addSlot('<span class="g-ico dim">🙏</span>', "Golden Mana slot");

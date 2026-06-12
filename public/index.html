@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <title>Arena</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -20,20 +23,17 @@
       <span class="starter-flag" id="flag-p1" title="Starts this round">
         <span class="flag-label">1<sup>st</sup></span>
         <svg viewBox="0 0 100 110" shape-rendering="crispEdges" aria-hidden="true">
-          <defs>
-            <linearGradient id="flag-cloth" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#66bb6a"/>
-              <stop offset="1" stop-color="#2e7d32"/>
-            </linearGradient>
-          </defs>
           <!-- zlatý hrot žrde -->
           <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
           <!-- žrď -->
           <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
-          <!-- látka — zúbkovaná pixel zástava so swallowtail zárezom -->
-          <polygon fill="url(#flag-cloth)" stroke="#1b5e20" stroke-width="3" points="
+          <!-- látka — plochá zelená so zúbkovaným swallowtail zárezom -->
+          <polygon fill="#2e7d32" stroke="#1b5e20" stroke-width="3" points="
             16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
             78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
+          <!-- pixel shading: svetlý pás hore, tmavý dole -->
+          <rect x="18" y="12" width="74" height="4" fill="#66bb6a"/>
+          <rect x="18" y="44" width="74" height="4" fill="#1b5e20"/>
         </svg>
       </span>
       <canvas class="hud-char" id="hud-char-p1" width="160" height="160"></canvas>
@@ -59,10 +59,13 @@
           <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
           <!-- žrď -->
           <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
-          <!-- látka — zúbkovaná pixel zástava so swallowtail zárezom -->
-          <polygon fill="url(#flag-cloth)" stroke="#1b5e20" stroke-width="3" points="
+          <!-- látka — plochá zelená so zúbkovaným swallowtail zárezom -->
+          <polygon fill="#2e7d32" stroke="#1b5e20" stroke-width="3" points="
             16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
             78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
+          <!-- pixel shading: svetlý pás hore, tmavý dole -->
+          <rect x="18" y="12" width="74" height="4" fill="#66bb6a"/>
+          <rect x="18" y="44" width="74" height="4" fill="#1b5e20"/>
         </svg>
       </span>
       <canvas class="hud-char" id="hud-char-p2" width="160" height="160"></canvas>
@@ -100,7 +103,7 @@
   <!-- Controls toolbar -->
   <div class="controls-row">
     <!-- Golden Shield — samostatné tlačidlo naľavo od panela, len pre hráča, ktorý v kole nezačína -->
-    <button id="golden-btn" class="btn act golden hidden" title="Golden Shield (−3 mana) — extra action resolved before the round starts. Available only when you go second."><span class="g-ico">🛡️</span><span class="cost">−3💧</span></button>
+    <button id="golden-btn" class="btn act golden hidden" title="Golden Shield (−3 mana) - extra action resolved before the round starts. Available only when you go second."><span class="g-ico">🛡️</span><span class="cost">−3💧</span></button>
 
   <div class="controls">
     <div class="actions">
@@ -108,7 +111,7 @@
       <div class="act-group" data-label="MOVE">
         <!-- Move — otvorí výber smeru -->
         <div class="move-wrap">
-          <button id="move-btn" class="btn act move" title="Move — choose a direction">🚶</button>
+          <button id="move-btn" class="btn act move" title="Move - choose a direction">🚶</button>
           <div id="dir-picker" class="dir-picker hidden">
             <button class="btn arrow up"    data-act="move:up"    title="Move Up">↑</button>
             <button class="btn arrow left"  data-act="move:left"  title="Move Left">←</button>
@@ -119,7 +122,7 @@
 
         <!-- Dash — presun až o 2 políčka zvoleným smerom -->
         <div class="move-wrap">
-          <button id="dash-btn" class="btn act dash" title="Dash — move up to 2 cells in a direction (−4 mana)">🏃<span class="cost">−4💧</span></button>
+          <button id="dash-btn" class="btn act dash" title="Dash - move up to 2 cells in a direction (−4 mana)">🏃<span class="cost">−4💧</span></button>
           <div id="dash-picker" class="dir-picker hidden">
             <button class="btn arrow up"    data-act="dash:up"    title="Dash Up">↑</button>
             <button class="btn arrow left"  data-act="dash:left"  title="Dash Left">←</button>
@@ -132,7 +135,7 @@
       <div class="act-group" data-label="ATTACK">
         <!-- Attack — otvorí výber smeru streľby -->
         <div class="move-wrap">
-          <button id="attack-btn" class="btn act attack" title="Range Attack — choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)">🏹<span class="cost">−1💧 ?☠️</span></button>
+          <button id="attack-btn" class="btn act attack" title="Range Attack - choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)">🏹<span class="cost">−1💧 ?☠️</span></button>
           <div id="aim-picker" class="dir-picker hidden">
             <button class="btn arrow up"    data-act="attack:up"    title="Shoot Up">↑</button>
             <button class="btn arrow left"  data-act="attack:left"  title="Shoot Left">←</button>
@@ -157,13 +160,13 @@
     <div class="divider"></div>
 
     <div class="meta">
-      <button id="undo" class="btn secondary" title="Undo — removes the last queued action">↩</button>
+      <button id="undo" class="btn secondary" title="Undo - removes the last queued action">↩</button>
       <button id="lock" class="btn btn-lock">LOCK IN</button>
     </div>
   </div>
 
     <!-- Golden Mana Refill — samostatné tlačidlo napravo od panela, vykoná sa ako úplne posledná udalosť kola -->
-    <button id="golden-mana-btn" class="btn act golden hidden" title="Golden Mana Refill (+6 mana for HP, cost grows each use) — extra action resolved after the round ends."><span class="g-ico">🙏</span><span class="cost" id="gm-cost">−1❤️ +6💧</span></button>
+    <button id="golden-mana-btn" class="btn act golden hidden" title="Golden Mana Refill (+6 mana for HP, cost grows each use) - extra action resolved after the round ends."><span class="g-ico">🙏</span><span class="cost" id="gm-cost">−1❤️ +6💧</span></button>
   </div>
 
   <!-- Character select -->
@@ -183,7 +186,7 @@
   </div>
 
   <!-- Tretí a ďalší pripojený hráč — hra je plná, len informačná hláška -->
-  <div id="spectator" class="spectator hidden">Momentálne prebieha hra…</div>
+  <div id="spectator" class="spectator hidden">Game in progress…</div>
 
   <!-- Game over — verdikt sa píše do hud-turn, tu je len Play again v strede -->
   <div id="gameover" class="gameover hidden">
