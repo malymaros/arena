@@ -265,19 +265,29 @@ function renderArenaLayers(arenaKey, layerFiles) {
 }
 
 /* ---------- HUD ---------- */
-// 10-dielikový bar (plné/prázdne dieliky)
+// spojitý bar s 10 zárezmi: hlavná výplň + biely „trail", ktorý sa pri strate stiahne s oneskorením
 function renderBar(el, value) {
   if (!el) return;
-  if (el.children.length !== 10) {
-    el.innerHTML = "";
-    for (let i = 0; i < 10; i++) {
-      const seg = document.createElement("div");
-      seg.className = "seg";
-      el.appendChild(seg);
-    }
+  if (!el.querySelector(".fill")) {
+    el.innerHTML = '<div class="fill-trail"></div><div class="fill"></div>';
   }
   const v = Math.max(0, Math.min(10, Number(value) || 0));
-  for (let i = 0; i < 10; i++) el.children[i].classList.toggle("on", i < v);
+  const prev = el.dataset.prev === undefined ? v : Number(el.dataset.prev);
+  el.dataset.prev = String(v);
+
+  const fill  = el.querySelector(".fill");
+  const trail = el.querySelector(".fill-trail");
+  fill.style.height  = (v * 10) + "%";
+  trail.style.height = (v * 10) + "%"; // trail má oneskorený transition — pri strate sa stiahne neskôr
+
+  // pri zisku výplň blikne do jasu
+  if (v > prev) {
+    fill.classList.remove("gain");
+    void fill.offsetWidth; // reflow = reštart animácie
+    fill.classList.add("gain");
+    fill.addEventListener("animationend", () => fill.classList.remove("gain"), { once: true });
+  }
+
   // presná hodnota pod barom — bez počítania dielikov
   const num = el.closest(".hud-stat")?.querySelector(".bar-num");
   if (num) num.textContent = String(v);
