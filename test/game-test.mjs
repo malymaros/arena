@@ -264,7 +264,7 @@ async function main() {
   check(gBlocks.length === 1 && gHits.length === 0, "T10: golden shield zablokoval prvý úder startera",
     `blocks=${gBlocks.length}, hits=${JSON.stringify(gHits)}`);
   const t10last = tl[tl.length - 1];
-  check(t10last.p2.mana === 7, "T10: P2 mana sedí (8−3+4−2=7)", `mana=${t10last.p2.mana}`);
+  check(t10last.p2.mana === 5, "T10: P2 mana sedí (6−3+4−2=5)", `mana=${t10last.p2.mana}`);
   invariantCheck(tl, "T10");
 
   /* ---------- Test 11: speciály — fire 5 dmg na riadku, lightning 3 dmg na opačnej parite ---------- */
@@ -292,7 +292,7 @@ async function main() {
   const t12last = tl[tl.length - 1];
   check(whiffSwing.length === 3, "T12: melee švih aj pri minutí (3 beaty)", `swing=${whiffSwing.length}`);
   check(whiffDmg.length === 0, "T12: melee mimo políčka nedáva dmg", `hits=${JSON.stringify(whiffDmg)}`);
-  check(t12last.p1.mana === 6, "T12: melee spálil 4 many aj pri minutí (8+4cap10−4=6)", `mana=${t12last.p1.mana}`);
+  check(t12last.p1.mana === 6, "T12: melee spálil 4 many aj pri minutí (6+4−4=6)", `mana=${t12last.p1.mana}`);
   invariantCheck(tl, "T12");
 
   /* ---------- Test 13: golden mana refill — +6 many, HP cena rastie (1, 2, …) ---------- */
@@ -300,8 +300,8 @@ async function main() {
   let t13a = null, t13b = null;
   for (let attempt = 0; attempt < 3 && !(t13a && t13b); attempt++) {
     await freshGame(c1, c2);
-    // attack namiesto move — pri štarte 8 treba minúť aspoň 4 many, aby refill dal plných +6
-    const tla = await playRound(c1, c2, [A("up"), S, MI, GM], [R, S, M("up")]);
+    // queue musí minúť aspoň 2 many (refill potrebuje priestor na plných +6) a zmestiť sa do štartu 6
+    const tla = await playRound(c1, c2, [A("up"), S, M("up"), GM], [R, S, M("up")]);
     const fx1 = tla.flatMap(f => f.effects || []).filter(e => e.kind === "golden_mana" && e.from === "p1");
     if (fx1.length !== 1) continue;
     const tlb = await playRound(c1, c2, [R, S, MI, GM], [R, S, M("down")]);

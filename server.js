@@ -22,7 +22,7 @@ const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admi
 const BOARD = { w: 4, h: 3 };
 const START_POS = { p1: { x: 0, y: 1 }, p2: { x: BOARD.w - 1, y: 1 } };
 const START_HP = 10;
-const START_MANA = 8; // vyšší štart = mind games od 1. kola (special hrozba vs golden shield counter)
+const START_MANA = 6; // vyšší štart = mind games od 1. kola (special hrozba vs golden shield counter)
 const MAX_MANA = 10;
 
 const BASIC_COST    = 1;
