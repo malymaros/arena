@@ -111,7 +111,7 @@ const A = (dir) => ({ type: "attack", dir });
 const D = (dir) => ({ type: "dash", dir });
 const R = { type: "recharge" };
 const S = { type: "shield" };
-const B = { type: "block" };
+const MI = { type: "mirror" };
 const ML = { type: "melee" };
 const G = { type: "golden_shield" };
 const GM = { type: "golden_mana" };
@@ -172,7 +172,7 @@ async function main() {
   }
 
   /* ---------- Test 5: fuzz — 60 náhodných kôl, invarianty ---------- */
-  const TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "block"];
+  const TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "mirror"];
   const DIRS = ["up", "down", "left", "right"];
   let rounds = 0;
   for (let g = 0; g < 12; g++) {
@@ -231,13 +231,17 @@ async function main() {
   check(!!vHit, "T8: vertikálny basic dist=1 dáva 3 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
   invariantCheck(tl, "T8");
 
-  /* ---------- Test 9: block zníži dmg o 1 ---------- */
+  /* ---------- Test 9: mirror odrazí celý dmg do útočníka ---------- */
   await freshGame(c1, c2);
-  // kolo 1: P1 → (1,1), P2 → (2,1); kolo 2 (začína P2): P2 block, P1 basic dist=1 → 3−1=2
+  // kolo 1: P1 → (1,1), P2 → (2,1); kolo 2 (začína P2): P2 mirror, P1 basic dist=1 → 3 dmg sa odrazí do P1
   tl = await playRound(c1, c2, [M("right"), R, S], [M("left"), R, S]);
-  tl = await playRound(c1, c2, [A("right"), R, M("up")], [B, R, S]);
-  const chipHit = sumEffects(tl).hits.find(h => h.target === "p2" && h.dmg === 2);
-  check(!!chipHit && chipHit.chipped === 1, "T9: block znížil basic 3 → 2 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  tl = await playRound(c1, c2, [A("right"), R, M("up")], [MI, R, S]);
+  const mirrorFx  = tl.flatMap(f => f.effects || []).filter(e => e.kind === "mirror" && e.target === "p2");
+  const reflected = sumEffects(tl).hits.find(h => h.target === "p1" && h.dmg === 3);
+  const p2basic   = sumEffects(tl).hits.find(h => h.target === "p2" && h.dmg === 3);
+  check(mirrorFx.length === 1, "T9: mirror efekt v timeline", `fx=${mirrorFx.length}`);
+  check(!!reflected, "T9: odrazený basic dáva 3 dmg útočníkovi", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(!p2basic, "T9: obranca s mirrorom nedostal dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
   invariantCheck(tl, "T9");
 
   /* ---------- Test 10: golden shield — extra akcia druhého hráča pred kolom ---------- */
@@ -260,7 +264,7 @@ async function main() {
   check(gBlocks.length === 1 && gHits.length === 0, "T10: golden shield zablokoval prvý úder startera",
     `blocks=${gBlocks.length}, hits=${JSON.stringify(gHits)}`);
   const t10last = tl[tl.length - 1];
-  check(t10last.p2.mana === 3, "T10: P2 mana sedí (4−3+4−2=3)", `mana=${t10last.p2.mana}`);
+  check(t10last.p2.mana === 7, "T10: P2 mana sedí (8−3+4−2=7)", `mana=${t10last.p2.mana}`);
   invariantCheck(tl, "T10");
 
   /* ---------- Test 11: speciály — fire 5 dmg na riadku, lightning 3 dmg na opačnej parite ---------- */
@@ -275,7 +279,7 @@ async function main() {
 
   // rovnaká parita → lightning minie: P1 sa presunie na (0,0) (parita 0 ako P2 na (3,1))
   await freshGame(c1, c2);
-  tl = await playRound(c1, c2, [M("up"), R, B], [R, SP, M("up")]);
+  tl = await playRound(c1, c2, [M("up"), R, S], [R, SP, M("up")]);
   const boltMiss = sumEffects(tl).hits.filter(h => h.target === "p1");
   check(boltMiss.length === 0, "T11: lightning special na rovnakej parite minie", `hits=${JSON.stringify(boltMiss)}`);
   invariantCheck(tl, "T11b");
@@ -288,7 +292,7 @@ async function main() {
   const t12last = tl[tl.length - 1];
   check(whiffSwing.length === 3, "T12: melee švih aj pri minutí (3 beaty)", `swing=${whiffSwing.length}`);
   check(whiffDmg.length === 0, "T12: melee mimo políčka nedáva dmg", `hits=${JSON.stringify(whiffDmg)}`);
-  check(t12last.p1.mana === 4, "T12: melee spálil 4 many aj pri minutí (4+4−4=4)", `mana=${t12last.p1.mana}`);
+  check(t12last.p1.mana === 6, "T12: melee spálil 4 many aj pri minutí (8+4cap10−4=6)", `mana=${t12last.p1.mana}`);
   invariantCheck(tl, "T12");
 
   /* ---------- Test 13: golden mana refill — +6 many, HP cena rastie (1, 2, …) ---------- */
@@ -296,10 +300,11 @@ async function main() {
   let t13a = null, t13b = null;
   for (let attempt = 0; attempt < 3 && !(t13a && t13b); attempt++) {
     await freshGame(c1, c2);
-    const tla = await playRound(c1, c2, [M("up"), S, B, GM], [R, S, M("up")]);
+    // attack namiesto move — pri štarte 8 treba minúť aspoň 4 many, aby refill dal plných +6
+    const tla = await playRound(c1, c2, [A("up"), S, MI, GM], [R, S, M("up")]);
     const fx1 = tla.flatMap(f => f.effects || []).filter(e => e.kind === "golden_mana" && e.from === "p1");
     if (fx1.length !== 1) continue;
-    const tlb = await playRound(c1, c2, [R, S, B, GM], [R, S, M("down")]);
+    const tlb = await playRound(c1, c2, [R, S, MI, GM], [R, S, M("down")]);
     const fx2 = tlb.flatMap(f => f.effects || []).filter(e => e.kind === "golden_mana" && e.from === "p1");
     if (fx2.length !== 1) continue;
     t13a = { tl: tla, fx: fx1[0] };

@@ -294,7 +294,7 @@ body {
 .btn.attack  { background: #b71c1c; } /* Basic (−2, smerová strela) — červená */
 .btn.melee   { background: #7f0000; } /* Melee (−8, 8 dmg) — tmavá krvavá, najťažší úder */
 .btn.shield  { background: #0097a7; } /* Shield (−2, blokuje celý dmg) — cyan ako prstenec */
-.btn.block   { background: #00838f; } /* Block (−1, znižuje dmg o 1) — tmavší cyan, slabšia obrana */
+.btn.mirror  { background: #00838f; } /* Mirror (−4, odrazí celý dmg) — cyan po predchodcovi blocku */
 .btn.special { background: #7b1fa2; } /* Special (−5) — purpurová mágia */
 /* zlaté extra akcie — ozdobný rám: gradient + svetlý vnútorný a tmavý vonkajší prstenec */
 .btn.golden{
@@ -384,7 +384,7 @@ body {
 .q-badge.attack  { background: #7f1515; }
 .q-badge.melee   { background: #5c0000; }
 .q-badge.shield  { background: #00606b; }
-.q-badge.block   { background: #00525b; }
+.q-badge.mirror  { background: #00525b; }
 .q-badge.special { background: #5e1387; }
 .q-badge.golden  { background: #8a6d00; box-shadow: inset 0 0 0 2px rgba(255,213,79,.55); }
 
@@ -496,7 +496,7 @@ body {
 
 /* ---- HUD pásy P1/P2 — vertikálne ---- */
   .hud-box{
-    top: 14px;
+    top: 28px;
     z-index: 3;
     padding: 4px 10px 10px;
     border-radius: 14px;
@@ -513,12 +513,23 @@ body {
   .hud-p2{ position: fixed; right: 14px; }
   
   .hud-char{
-    width: 160px; height: 160px;
+    width: 180px; height: 180px;
+    /* orez prázdneho vzduchu nad postavou — vizuálna veľkosť postavy ostáva, widget je nižší */
+    margin-top: -60px;
+    clip-path: inset(60px 0 0 0);
     image-rendering: pixelated;
     flex: none;
     transition: filter .5s ease;
   }
   .hud-p2 .hud-char{ transform: scaleX(-1); } /* P2 pozerá doľava */
+
+  /* palette swap P2 pri zhodnej postave — vyblednutý „albino" variant (do biela) */
+  .sprite-actor.alt-color,
+  .special-center.alt-color,
+  .charge-canvas.alt-color{ filter: saturate(.22) brightness(1.4); }
+  .sprite-ghost.alt-color{ filter: grayscale(35%) saturate(.22) brightness(1.4); }
+  /* HUD portrét — len v zdravom stave; wounded/critical/dead degradácia má prednosť */
+  .hud-char.alt-color:not(.wounded):not(.critical):not(.dead){ filter: saturate(.22) brightness(1.4); }
 
   /* degradácia portrétu podľa HP (Doom-style) */
   .hud-char.wounded{
@@ -543,20 +554,43 @@ body {
     animation: none;
   }
 
-  /* zelená vlajka — kto začína kolo (centrovaná nad hlavou postavy) */
+  /* zelená pixel-art SVG vlajka — kto začína kolo (maxi, pod widgetom) */
   .starter-flag{
     position: absolute;
-    top: 32px; left: 50%;
+    top: 100%; left: 50%;
     transform: translateX(-50%);
-    color: #4caf50;
-    font-size: 34px;
-    line-height: 1;
+    margin-top: 40px;
+    width: 280px; height: 308px; /* pomer viewBoxu 100:110 */
     opacity: 0;
     transition: opacity .2s ease;
-    text-shadow: 0 2px 6px rgba(0,0,0,.7);
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,.55));
+    z-index: 1;
+    pointer-events: none;
+  }
+  .starter-flag svg{ display: block; width: 100%; height: 100%; }
+  /* hráč napravo má vlajku zrkadlovo (žrď z vonkajšej strany); label sa neotáča, ostáva čitateľný */
+  .hud-p2 .starter-flag svg{ transform: scaleX(-1); }
+  .starter-flag.on{ opacity: 1; }
+  /* nápis na látke vlajky — element, aby "st" mohlo byť horným indexom */
+  .starter-flag .flag-label{
+    position: absolute;
+    top: 27%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: Impact, "Arial Black", "Segoe UI Black", sans-serif;
+    font-size: 44px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: #eaffea;
+    -webkit-text-stroke: 1px #1b5e20;
+    text-shadow: 0 2px 4px rgba(0,0,0,.55);
+    white-space: nowrap;
     z-index: 1;
   }
-  .starter-flag.on{ opacity: 1; }
+  .starter-flag .flag-label sup{
+    font-size: 60%;
+    vertical-align: super;
+    letter-spacing: 1px;
+  }
 
   /* dva stĺpce: ❤️ a 💧, pod ikonou vertikálny bar */
   /* stĺpce HP/MP si rozdelia celú šírku widgetu — bary ju proporčne vyplnia */
@@ -601,7 +635,7 @@ body {
   .a-badge.attack   { background: #7f1515; }
   .a-badge.melee    { background: #5c0000; }
   .a-badge.shield   { background: #00606b; }
-  .a-badge.block    { background: #00525b; }
+  .a-badge.mirror   { background: #00525b; }
   .a-badge.special  { background: #5e1387; }
   .a-badge.golden_shield { background: #8a6d00; }
   .a-badge.golden_mana   { background: #8a6d00; }
@@ -632,7 +666,7 @@ body {
   .bar-num.mana-num{ color: #57a9ff; }
   .bar{ display: flex; flex-direction: column-reverse; gap: 3px; width: 100%; }
   .bar .seg{
-    width: 100%; height: 12px;
+    width: 100%; height: 9px;
     border-radius: 3px;
     background: rgba(255,255,255,.12);
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
@@ -641,15 +675,43 @@ body {
   .mana-bar .seg.on{ background: #57a9ff; }
   
   /* zlaté zvýraznenie boxu aktuálneho klienta — hrubý rámik + jemná zlatá výplň */
+  /* widget vlastného hráča — plný zlatý look ako armed golden button + YOU štítok */
   .hud-box.me {
-    border: 2px solid #e8c878;
-    background:
-      linear-gradient(180deg, rgba(214,179,106,0.32), rgba(214,179,106,0.14)),
-      rgba(0,0,0,.45);
+    border: 2px solid #ffe082;
+    background: linear-gradient(180deg, #d4a017 0%, #b8860b 45%, #8a6d00 100%);
     box-shadow:
-      0 0 0 3px rgba(214,179,106,0.6),
-      0 0 22px rgba(214,179,106,0.35),
-      inset 0 0 24px rgba(214,179,106,0.18);
+      0 0 0 2px rgba(110,85,0,.95),
+      0 0 22px rgba(255,200,60,.65),
+      inset 0 0 0 1px rgba(255,236,170,.7),
+      inset 0 2px 5px rgba(255,255,255,.25),
+      inset 0 -3px 6px rgba(0,0,0,.25);
+  }
+  /* na zlatom podklade svetlé farby čísel splývajú — tmavé odtiene so svetlým tieňom */
+  .hud-box.me .bar-num.mana-num{ color: #0d47a1; text-shadow: 0 1px 2px rgba(255,236,170,.55); }
+  .hud-box.me .bar-num.hp-num  { color: #8e0000; text-shadow: 0 1px 2px rgba(255,236,170,.55); }
+  .hud-box.me::before,
+  .hud-box.foe::before{
+    position: absolute;
+    top: -14px; left: 50%; transform: translateX(-50%);
+    padding: 2px 16px;
+    border-radius: 8px;
+    font-weight: 900;
+    font-size: 14px;
+    letter-spacing: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    z-index: 2;
+  }
+  .hud-box.me::before{
+    content: "YOU";
+    background: linear-gradient(180deg, #ffd54f, #b8860b);
+    color: #3a2c00;
+    border: 1px solid #ffe082;
+  }
+  .hud-box.foe::before{
+    content: "OPPONENT";
+    background: linear-gradient(180deg, #4a4d55, #26282d);
+    color: #cfd4dc;
+    border: 1px solid #5c606a;
   }
   
   /* ---- plávajúce bubliny nad postavou ---- */
@@ -673,7 +735,7 @@ body {
 
   /* štítové a heal bubliny */
   .heal-float{ color: #5eff8a; }
-  .shield-float, .block-float, .heal-float{
+  .shield-float, .block-float, .mirror-float, .heal-float{
     position: absolute;
     z-index: 5;
     font-weight: 900;
@@ -685,6 +747,7 @@ body {
   }
   .shield-float { color: #4dd0e1; }
   .block-float  { color: #4dd0e1; }
+  .mirror-float { color: #ce93d8; }
   .golden-float {
     position: absolute;
     z-index: 5;
@@ -733,11 +796,11 @@ body {
     box-shadow: 0 0 18px rgba(255,200,60,.5), inset 0 0 14px rgba(255,200,60,.3);
   }
 
-  /* prstenec aktívneho blocku — čiarkovaný, tlmenejší než shield */
-  .cell.cell-blocked::before{
+  /* prstenec aktívneho mirroru — čiarkovaný, fialkastý odlesk */
+  .cell.cell-mirrored::before{
     content: "";
     position: absolute; inset: 9px;
-    border: 3px dashed rgba(176,190,197,.85);
+    border: 3px dashed rgba(206,147,216,.9);
     border-radius: 12px;
     pointer-events: none;
     animation: shield-glow 1s ease-in-out infinite;

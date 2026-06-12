@@ -22,10 +22,10 @@ const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admi
 const BOARD = { w: 4, h: 3 };
 const START_POS = { p1: { x: 0, y: 1 }, p2: { x: BOARD.w - 1, y: 1 } };
 const START_HP = 10;
-const START_MANA = 4;
+const START_MANA = 8; // vyšší štart = mind games od 1. kola (special hrozba vs golden shield counter)
 const MAX_MANA = 10;
 
-const BASIC_COST    = 2;
+const BASIC_COST    = 1;
 const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: vedľa 3, ďalej 2, najďalej 1 (vlastné políčko basic nezasahuje)
 
 const MELEE_COST = 4;
@@ -35,12 +35,12 @@ const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECI
 const SPECIAL_COST = 5;
 const RECHARGE_GAIN = 4;
 const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
-const BLOCK_COST  = 1; // zníži dmg najbližšej súperovej akcie o 1
+const MIRROR_COST = 4; // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
 const GOLDEN_COST = 3; // extra akcia hráča, ktorý je v kole druhý — štít vyhodnotený pred prvou akciou startera
 const DASH_COST   = 4; // presun až o 2 políčka jedným smerom
 const GOLDEN_MANA_GAIN = 6; // golden mana refill: +6 many za HP; cena v HP rastie s každým použitím (1, 2, 3…)
 
-const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "block", "dash"]);
+const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash"]);
 const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 
 const MOVE_DELAY_MS    = 800;  // posun postavy trvá 700 ms + malý buffer
@@ -63,7 +63,7 @@ function newPlayer(slot) {
     char: null,        // "fire" | "lightning" | "wanderer"
     shield: false,     // zruší celý dmg najbližšej súperovej akcie
     shieldGold: false, // aktívny shield pochádza z golden shieldu (zlaté vizuály)
-    block: false,      // zníži dmg najbližšej súperovej akcie o 1
+    mirror: false,     // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
     golden: false,     // objednaný golden shield (extra akcia pred začiatkom kola)
     goldenMana: false, // objednaný golden mana refill (extra akcia po konci kola)
     manaRefills: 0,    // koľkokrát už hráč refill použil — určuje rastúcu HP cenu
@@ -91,8 +91,8 @@ newGame();
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, shield, shieldGold, block, manaRefills, locked } = a;
-  return { slot, x, y, hp, mana, char, shield, shieldGold, block, manaRefills, locked };
+  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, manaRefills, locked } = a;
+  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, manaRefills, locked };
 }
 function snapshot() {
   return {
@@ -275,26 +275,25 @@ function doMelee(slot, tl) {
   }
 }
 
-// aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, block znižuje o 1)
+// aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, mirror ho odrazí do útočníka)
 function applyHit(targetSlot, rawDmg, tl) {
   const t = game.players[targetSlot];
   if (t.shield) {
     pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
     return;
   }
-  let dmg = rawDmg, chipped = 0;
-  if (t.block) {
-    chipped = Math.min(1, rawDmg);
-    dmg = Math.max(0, rawDmg - 1);
-    if (dmg === 0) {
-      pushStateFrame(tl, [{ kind: "block", target: targetSlot, partial: true }], SMALL_DELAY_MS);
-      return;
-    }
+  if (t.mirror) {
+    // odrazený dmg ide „surovo" — neaplikuje sa cez útočníkove obrany a nedá sa znova odraziť
+    // poradie: najprv mirror frame (HP ešte nezmenené), až potom hit frame s poklesom HP útočníka
+    const atkSlot = other(targetSlot);
+    const atk = game.players[atkSlot];
+    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot }], SMALL_DELAY_MS);
+    atk.hp = Math.max(0, atk.hp - rawDmg);
+    pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: rawDmg }], SMALL_DELAY_MS);
+    return;
   }
-  t.hp = Math.max(0, t.hp - dmg);
-  const fx = { kind: "hit", target: targetSlot, dmg };
-  if (chipped) fx.chipped = chipped;
-  pushStateFrame(tl, [fx], SMALL_DELAY_MS);
+  t.hp = Math.max(0, t.hp - rawDmg);
+  pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: rawDmg }], SMALL_DELAY_MS);
 }
 
 function doShield(slot, tl) {
@@ -306,12 +305,12 @@ function doShield(slot, tl) {
   pushStateFrame(tl, [{ kind: "shield", from: slot }], SMALL_DELAY_MS);
 }
 
-function doBlock(slot, tl) {
+function doMirror(slot, tl) {
   const a = game.players[slot];
-  if (a.mana < BLOCK_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
-  a.mana -= BLOCK_COST;
-  a.block = true;
-  pushStateFrame(tl, [{ kind: "block_on", from: slot }], SMALL_DELAY_MS);
+  if (a.mana < MIRROR_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  a.mana -= MIRROR_COST;
+  a.mirror = true;
+  pushStateFrame(tl, [{ kind: "mirror_on", from: slot }], SMALL_DELAY_MS);
 }
 
 function doSpecial(slot, tl) {
@@ -350,7 +349,7 @@ function doAction(slot, action, tl) {
     case "melee":    return doMelee(slot, tl);
     case "special":  return doSpecial(slot, tl);
     case "shield":   return doShield(slot, tl);
-    case "block":    return doBlock(slot, tl);
+    case "mirror":   return doMirror(slot, tl);
     default: break;
   }
 }
@@ -478,13 +477,13 @@ function resolveTurn() {
       const foe = other(slot);
       // obrany kryjú práve túto (najbližšiu) súperovu akciu — spotrebujú sa ňou aj bez zásahu
       const foeShieldArmed = game.players[foe].shield;
-      const foeBlockArmed  = game.players[foe].block;
+      const foeMirrorArmed = game.players[foe].mirror;
       const act = game.players[slot].queue[i];
       // ohlás akciu klientovi (záznam kola pod HUD widgetom)
       if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null } }], 250);
       doAction(slot, act, tl);
       if (foeShieldArmed) { game.players[foe].shield = false; game.players[foe].shieldGold = false; }
-      if (foeBlockArmed)  game.players[foe].block  = false;
+      if (foeMirrorArmed) game.players[foe].mirror = false;
 
       // po každej akcii skontroluj lethal
       const w = winnerNow();
@@ -501,8 +500,8 @@ function resolveTurn() {
   game.players.p2.shield = false;
   game.players.p1.shieldGold = false;
   game.players.p2.shieldGold = false;
-  game.players.p1.block  = false;
-  game.players.p2.block  = false;
+  game.players.p1.mirror = false;
+  game.players.p2.mirror = false;
 
   if (!ended) {
     // koniec kola — presun IK a spawn nového tile (vidno ich vo finálnom frame)

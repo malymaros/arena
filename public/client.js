@@ -183,6 +183,7 @@ function updateSpecialCenter(casts) {
     const px  = Math.round(TILE_H * SPECIAL_SCALE);
     cvs.width = px; cvs.height = px;
     cvs.className = "special-center";
+    if (sp.from === "p2" && sameCharNow()) cvs.classList.add("alt-color");
     cvs.dataset.dir  = dirKey;
     cvs.dataset.file = file;
     if (sp.fps) cvs.dataset.fps = sp.fps;
@@ -282,6 +283,11 @@ function renderBar(el, value) {
   if (num) num.textContent = String(v);
 }
 
+// obaja hráči majú rovnakého mága → P2 dostane farebný posun (palette swap cez CSS hue-rotate)
+function sameCharNow() {
+  return !!(state?.p1?.char && state.p1.char === state?.p2?.char);
+}
+
 // banner pod ROUND textom: ja som locknutý a čaká sa na súpera / súper je locknutý a rad je na mne
 const turnStatusEl = document.getElementById("turn-status");
 function updateTurnStatus() {
@@ -318,6 +324,14 @@ function renderHUD() {
 
   hudBoxP1.classList.toggle("me", me === "p1");
   hudBoxP2.classList.toggle("me", me === "p2");
+  hudBoxP1.classList.toggle("foe", me === "p2");
+  hudBoxP2.classList.toggle("foe", me === "p1");
+
+  // rovnaká postava u oboch → P2 v alternatívnej farbe (postava na boarde, portrét aj ghost)
+  const same = sameCharNow();
+  actorP2.classList.toggle("alt-color", same);
+  hudCharP2.classList.toggle("alt-color", same);
+  actorGhost.classList.toggle("alt-color", same && me === "p2");
   updateGoldenButton();
 }
 
@@ -331,7 +345,7 @@ function actionIcon(action) {
     case "attack":   return `🏹${arrow[action.dir] || ""}`;
     case "melee":    return "🗡️";
     case "shield":   return "🛡️";
-    case "block":    return "🧱";
+    case "mirror":   return "🪞";
     case "golden_shield": return "🛡️";
     case "special":  return "✨";
     default:         return "?";
@@ -481,6 +495,7 @@ function renderGrid(s, effects = []) {
           const px  = Math.round(TILE_H * CHARGE_SCALE);
           cvs.width = px; cvs.height = px;
           cvs.className = "charge-canvas";
+          if (chargeHere.from === "p2" && sameCharNow()) cvs.classList.add("alt-color");
           cvs.dataset.dir = dirKey;
           cvs.style.width  = px + "px";
           cvs.style.height = px + "px";
@@ -497,12 +512,12 @@ function renderGrid(s, effects = []) {
       if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
       if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
 
-      // aktívne obrany — prstenec na bunke hráča (shield plný, golden zlatý, block čiarkovaný)
+      // aktívne obrany — prstenec na bunke hráča (shield plný, golden zlatý, mirror čiarkovaný)
       if ((isP1 && s?.p1?.shield) || (isP2 && s?.p2?.shield)) {
         cell.classList.add("cell-shielded");
         if ((isP1 && s?.p1?.shieldGold) || (isP2 && s?.p2?.shieldGold)) cell.classList.add("gold");
       }
-      if ((isP1 && s?.p1?.block)  || (isP2 && s?.p2?.block))  cell.classList.add("cell-blocked");
+      if ((isP1 && s?.p1?.mirror) || (isP2 && s?.p2?.mirror)) cell.classList.add("cell-mirrored");
 
       gridEl.appendChild(cell);
     }
@@ -694,8 +709,8 @@ function renderQueue() {
       div.classList.add("special"); div.textContent = "✨";
     } else if (a.type === "shield") {
       div.classList.add("shield"); div.textContent = "🛡️";
-    } else if (a.type === "block") {
-      div.classList.add("block"); div.textContent = "🧱";
+    } else if (a.type === "mirror") {
+      div.classList.add("mirror"); div.textContent = "🪞";
     } else {
       div.textContent = a.type;
     }
@@ -912,7 +927,6 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", HURT_MS);
         if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
-        if (e.chipped) spawnFloat(e.target, "🧱 −1", "block-float");
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", HURT_MS);
@@ -935,8 +949,11 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🛡️ SHIELD", "shield-float");
       }
-      if (e.kind === "block_on" && (e.from === "p1" || e.from === "p2")) {
-        spawnFloat(e.from, "🧱 BLOCK", "shield-float");
+      if (e.kind === "mirror_on" && (e.from === "p1" || e.from === "p2")) {
+        spawnFloat(e.from, "🪞 MIRROR", "shield-float");
+      }
+      if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
+        spawnFloat(e.target, "🪞 REFLECTED!", "mirror-float");
       }
       if (e.kind === "golden_shield" && (e.from === "p1" || e.from === "p2")) {
         // navonok je to SHIELD, len zlatý — "golden shield" je interné pomenovanie
@@ -952,7 +969,7 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
         // zlatý text, ak blokoval golden shield
         if (e.gold) spawnFloat(e.target, "🛡️ BLOCKED", "golden-float");
-        else spawnFloat(e.target, e.partial ? "🧱 BLOCKED" : "🛡️ BLOCKED", "block-float");
+        else spawnFloat(e.target, "🛡️ BLOCKED", "block-float");
       }
       if (e.kind === "heal" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
@@ -1156,7 +1173,7 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     if (type === "melee")     myQueue.push({ type: "melee" });
     if (type === "special")   myQueue.push({ type: "special" });
     if (type === "shield")    myQueue.push({ type: "shield" });
-    if (type === "block")     myQueue.push({ type: "block" });
+    if (type === "mirror")    myQueue.push({ type: "mirror" });
 
     if (isPickerArrow) closePickers();
     renderQueue();

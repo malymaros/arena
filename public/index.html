@@ -17,7 +17,25 @@
 
     <!-- Vľavo: P1 -->
     <div class="hud hud-box hud-p1" id="hud-p1">
-      <span class="starter-flag" id="flag-p1" title="Starts this round">⚑</span>
+      <span class="starter-flag" id="flag-p1" title="Starts this round">
+        <span class="flag-label">1<sup>st</sup></span>
+        <svg viewBox="0 0 100 110" shape-rendering="crispEdges" aria-hidden="true">
+          <defs>
+            <linearGradient id="flag-cloth" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#66bb6a"/>
+              <stop offset="1" stop-color="#2e7d32"/>
+            </linearGradient>
+          </defs>
+          <!-- zlatý hrot žrde -->
+          <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
+          <!-- žrď -->
+          <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
+          <!-- látka — zúbkovaná pixel zástava so swallowtail zárezom -->
+          <polygon fill="url(#flag-cloth)" stroke="#1b5e20" stroke-width="3" points="
+            16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
+            78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
+        </svg>
+      </span>
       <canvas class="hud-char" id="hud-char-p1" width="160" height="160"></canvas>
       <div class="hud-stats">
         <div class="hud-stat">
@@ -34,7 +52,19 @@
 
     <!-- Vpravo: P2 -->
     <div class="hud hud-box hud-p2" id="hud-p2">
-      <span class="starter-flag" id="flag-p2" title="Starts this round">⚑</span>
+      <span class="starter-flag" id="flag-p2" title="Starts this round">
+        <span class="flag-label">1<sup>st</sup></span>
+        <svg viewBox="0 0 100 110" shape-rendering="crispEdges" aria-hidden="true">
+          <!-- zlatý hrot žrde -->
+          <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
+          <!-- žrď -->
+          <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
+          <!-- látka — zúbkovaná pixel zástava so swallowtail zárezom -->
+          <polygon fill="url(#flag-cloth)" stroke="#1b5e20" stroke-width="3" points="
+            16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
+            78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
+        </svg>
+      </span>
       <canvas class="hud-char" id="hud-char-p2" width="160" height="160"></canvas>
       <div class="hud-stats">
         <div class="hud-stat">
@@ -102,7 +132,7 @@
       <div class="act-group" data-label="ATTACK">
         <!-- Attack — otvorí výber smeru streľby -->
         <div class="move-wrap">
-          <button id="attack-btn" class="btn act attack" title="Range Attack — choose a direction (−2 mana, damage by distance: 3/2/1, can't hit your own cell)">🏹<span class="cost">−2💧 ?☠️</span></button>
+          <button id="attack-btn" class="btn act attack" title="Range Attack — choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)">🏹<span class="cost">−1💧 ?☠️</span></button>
           <div id="aim-picker" class="dir-picker hidden">
             <button class="btn arrow up"    data-act="attack:up"    title="Shoot Up">↑</button>
             <button class="btn arrow left"  data-act="attack:left"  title="Shoot Left">←</button>
@@ -116,7 +146,7 @@
 
       <div class="act-group" data-label="DEFEND">
         <button class="btn act shield" data-act="shield" title="Shield (−2 mana, blocks all damage of the opponent's next action)">🛡️<span class="cost">−2💧</span></button>
-        <button class="btn act block" data-act="block" title="Block (−1 mana, reduces the opponent's next action damage by 1)">🧱<span class="cost">−1💧</span></button>
+        <button class="btn act mirror" data-act="mirror" title="Mirror (−4 mana, reflects all damage of the opponent's next action back at them)">🪞<span class="cost">−4💧</span></button>
       </div>
 
       <div class="act-group" data-label="MANA">
