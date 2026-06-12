@@ -45,6 +45,15 @@ const ACTOR_H = Math.round(TILE_H * ACTOR_SCALE);
   c.style.width = ACTOR_W + "px"; c.style.height = ACTOR_H + "px";
 });
 
+// ghost — poloprehľadný náhľad vlastnej pozície po naplánovaných movoch vo fronte
+const actorGhost = document.createElement("canvas");
+actorGhost.id = "actor-ghost";
+actorGhost.className = "sprite-actor sprite-ghost";
+actorGhost.width = ACTOR_W; actorGhost.height = ACTOR_H;
+actorGhost.style.width = ACTOR_W + "px"; actorGhost.style.height = ACTOR_H + "px";
+actorGhost.style.display = "none";
+actorsEl.appendChild(actorGhost);
+
 // === Timing ===
 const MOVE_MS = 700; // musí sedieť s CSS transition left/top na .sprite-actor
 const ATTACK_SWING_MS = 1600;
@@ -81,6 +90,8 @@ let me = null;
 let board = { w: 4, h: 3 };
 let state = { p1:null, p2:null, arena:null, turn:1, starter:"p1" };
 let myQueue = [];
+let goldenArmed = false;     // objednaný golden shield (extra akcia pred kolom, len keď som druhý)
+let goldenManaArmed = false; // objednaný golden mana refill (extra akcia po konci kola)
 let chosenChar = null;
 
 // počas special castu skryjeme bežný actor sprite
@@ -183,6 +194,16 @@ function updateSpecialCenter(specials) {
 /* ---------- bubliny -X HP / +Y MANA ---------- */
 function cellToPx(x, y) { return { left: x * (TILE_W + GAP), top: y * (TILE_H + GAP) }; }
 
+// súbežné bubliny nad tým istým hráčom sa stackujú nad seba, aby sa neprekrývali
+let floatTimes = { p1: [], p2: [] };
+function floatOffsetFor(slot) {
+  const now = performance.now();
+  floatTimes[slot] = floatTimes[slot].filter(t => now - t < 1000); // životnosť floatu
+  const off = floatTimes[slot].length * 26;
+  floatTimes[slot].push(now);
+  return off;
+}
+
 function spawnDamageFloat(slot, dmg) {
   const target = state?.[slot];
   if (!target) return;
@@ -192,7 +213,7 @@ function spawnDamageFloat(slot, dmg) {
   el.className = "dmg-float";
   el.textContent = `-${dmg} HP`;
   el.style.left = (left + TILE_W / 2) + "px";
-  el.style.top  = (top + 8) + "px";
+  el.style.top  = (top + 8 - floatOffsetFor(slot)) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
 }
@@ -205,7 +226,7 @@ function spawnFloat(slot, text, className) {
   el.className = className;
   el.textContent = text;
   el.style.left = (left + TILE_W / 2) + "px";
-  el.style.top  = (top + 8) + "px";
+  el.style.top  = (top + 8 - floatOffsetFor(slot)) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
 }
@@ -219,7 +240,7 @@ function spawnManaFloat(slot, amount = 4) {
   el.className = "mana-float";
   el.textContent = `+${amount} MANA`;
   el.style.left = (left + TILE_W / 2) + "px";
-  el.style.top  = (top + 8) + "px";
+  el.style.top  = (top + 8 - floatOffsetFor(slot)) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
 }
@@ -268,6 +289,7 @@ function renderHUD() {
 
   hudBoxP1.classList.toggle("me", me === "p1");
   hudBoxP2.classList.toggle("me", me === "p2");
+  updateGoldenButton();
 }
 
 /* ---------- záznam akcií kola pod widgetom ---------- */
@@ -275,24 +297,69 @@ function actionIcon(action) {
   const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
   switch (action?.type) {
     case "move":     return `🚶${arrow[action.dir] || ""}`;
+    case "dash":     return `🏃${arrow[action.dir] || ""}`;
     case "recharge": return "🙏";
-    case "attack":   return "⚔️";
+    case "attack":   return `⚔️${arrow[action.dir] || ""}`;
+    case "melee":    return "🗡️";
     case "shield":   return "🛡️";
+    case "block":    return "🧱";
+    case "golden_shield": return "🛡️";
     case "special":  return "✨";
     default:         return "?";
   }
 }
+// skeleton záznamu kola — rovnaká fixná štruktúra ako fronta: [🛡️] | [1][2][3] | [🙏]
+function buildActionLogSkeleton(log) {
+  log.innerHTML = "";
+  const mkSlot = (cls, inner) => {
+    const el = document.createElement("span");
+    el.className = `a-badge a-slot ${cls}`;
+    el.innerHTML = inner;
+    log.appendChild(el);
+  };
+  const mkDivider = () => {
+    const d = document.createElement("span");
+    d.className = "log-divider";
+    log.appendChild(d);
+  };
+  mkSlot("slot-pre", '<span class="g-ico dim">🛡️</span>');
+  mkDivider();
+  for (let i = 0; i < 3; i++) mkSlot("slot-act", String(i + 1));
+  mkDivider();
+  mkSlot("slot-post", '<span class="g-ico dim">🙏</span>');
+}
+
+// akcie postupne vypĺňajú placeholder sloty (golden pre/post, bežné zľava doprava)
 function appendActionLog(slot, action) {
   const log = slot === "p1" ? logP1 : logP2;
   if (!log) return;
-  const el = document.createElement("span");
-  el.className = `a-badge ${action?.type || ""}`;
-  el.textContent = actionIcon(action);
-  log.appendChild(el);
+  if (!log.children.length) buildActionLogSkeleton(log);
+
+  if (action?.type === "golden_shield") {
+    const el = log.querySelector(".a-slot.slot-pre");
+    if (el) {
+      el.className = "a-badge golden_shield";
+      el.innerHTML = '<span class="g-ico">🛡️</span>';
+    }
+    return;
+  }
+  if (action?.type === "golden_mana") {
+    const el = log.querySelector(".a-slot.slot-post");
+    if (el) {
+      el.className = "a-badge golden_mana";
+      el.innerHTML = '<span class="g-ico">🙏</span>';
+    }
+    return;
+  }
+  const el = log.querySelector(".a-slot.slot-act");
+  if (el) {
+    el.className = `a-badge ${action?.type || ""}`;
+    el.textContent = actionIcon(action);
+  }
 }
 function clearActionLogs() {
-  if (logP1) logP1.innerHTML = "";
-  if (logP2) logP2.innerHTML = "";
+  if (logP1) buildActionLogSkeleton(logP1);
+  if (logP2) buildActionLogSkeleton(logP2);
 }
 
 /* ---------- Grid (efekty + anim. objekty) ---------- */
@@ -326,6 +393,11 @@ function renderGrid(s, effects = []) {
     if (e?.kind === "special")   specials.push(e);
     if (e?.kind === "hit")       hitTarget = e.target;
     if (e?.kind === "tile_proc") procs.push(e);
+    // melee úder — zvýrazni zasahovanú bunku (bunku útočníka)
+    if (e?.kind === "melee") {
+      const caster = s?.[e.from];
+      if (caster) previewSet.add(`${caster.x},${caster.y}`);
+    }
   }
 
   for (const sp of specials) {
@@ -380,8 +452,9 @@ function renderGrid(s, effects = []) {
           cvs.dataset.dir = dirKey;
           cvs.style.width  = px + "px";
           cvs.style.height = px + "px";
-          const flip = (chargeHere.dir === "left") ? -1 : 1;
-          cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
+          // sprite projektilu smeruje doprava — ostatné smery flip/rotácia
+          const orient = { left: "scaleX(-1)", up: "rotate(-90deg)", down: "rotate(90deg)" }[chargeHere.dir] || "";
+          cvs.style.transform = `translate(-50%, -50%) ${orient}`.trim();
           cell.appendChild(cvs);
         }
       }
@@ -392,8 +465,12 @@ function renderGrid(s, effects = []) {
       if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
       if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
 
-      // aktívny štít — prstenec na bunke hráča
-      if ((isP1 && s?.p1?.shield) || (isP2 && s?.p2?.shield)) cell.classList.add("cell-shielded");
+      // aktívne obrany — prstenec na bunke hráča (shield plný, golden zlatý, block čiarkovaný)
+      if ((isP1 && s?.p1?.shield) || (isP2 && s?.p2?.shield)) {
+        cell.classList.add("cell-shielded");
+        if ((isP1 && s?.p1?.shieldGold) || (isP2 && s?.p2?.shieldGold)) cell.classList.add("gold");
+      }
+      if ((isP1 && s?.p1?.block)  || (isP2 && s?.p2?.block))  cell.classList.add("cell-blocked");
 
       gridEl.appendChild(cell);
     }
@@ -410,14 +487,64 @@ function cellsForSpecialPreview(meState){
   if (char === "fire"){
     for (let cx=0; cx<board.w; cx++) cells.push([cx, y]);
   } else if (char === "lightning"){
+    // všetky políčka opačnej "šachovej" farby než na ktorej stojí
+    const par = (x + y) % 2;
     for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++){
-      if (!(cx===x && cy===y)) cells.push([cx, cy]);
+      if ((cx + cy) % 2 !== par) cells.push([cx, cy]);
     }
   } else if (char === "wanderer"){
     [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy])=>{
       const cx=x+dx, cy=y+dy;
       if (cx>=0 && cy>=0 && cx<board.w && cy<board.h) cells.push([cx,cy]);
     });
+  }
+  return cells;
+}
+/* ---------- Ghost — simulácia vlastnej pozície počas naplánovaného kola ---------- */
+// pozícia po každej akcii vo fronte; movy mimo board pozíciu nemenia (zrkadlí server)
+function simulatedPositions(){
+  const mine = state?.[me];
+  if (!mine) return [];
+  let x = mine.x, y = mine.y;
+  const out = [];
+  for (const a of myQueue){
+    const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
+    if (a.type === "move" && d){
+      const nx = x + d[0], ny = y + d[1];
+      if (nx >= 0 && ny >= 0 && nx < board.w && ny < board.h){ x = nx; y = ny; }
+    }
+    if (a.type === "dash" && d){
+      // až 2 políčka, na okraji sa skráti (zrkadlí server)
+      for (let s = 0; s < 2; s++){
+        const nx = x + d[0], ny = y + d[1];
+        if (nx >= 0 && ny >= 0 && nx < board.w && ny < board.h){ x = nx; y = ny; }
+      }
+    }
+    out.push({ x, y });
+  }
+  return out;
+}
+// pozícia, z ktorej sa vykoná akcia s indexom idx (= po akciách 0..idx-1);
+// bez argumentu pozícia po celej fronte — odtiaľ sa vykoná novo pridávaná akcia
+function ghostPos(idx = myQueue.length){
+  const mine = state?.[me];
+  if (!mine) return null;
+  if (idx <= 0) return { x: mine.x, y: mine.y };
+  const sims = simulatedPositions();
+  if (!sims.length) return { x: mine.x, y: mine.y };
+  return sims[Math.min(idx, sims.length) - 1];
+}
+
+// dráha basic útoku zvoleným smerom z danej pozície (po okraj boardu)
+function cellsForAimPreview(meState, dir){
+  if (!meState) return [];
+  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
+  if (!delta) return [];
+  const cells = [];
+  let x = meState.x + delta[0], y = meState.y + delta[1];
+  while (x >= 0 && y >= 0 && x < board.w && y < board.h){
+    cells.push([x, y]);
+    x += delta[0]; y += delta[1];
   }
   return cells;
 }
@@ -439,6 +566,13 @@ function computeFacing(p1, p2) {
   if (p1.x === p2.x && p1.y === p2.y) return { p1: 1, p2: -1 };
   if (p1.x <= p2.x) return { p1: 1, p2: -1 };
   return { p1: -1, p2: 1 };
+}
+// pri horizontálnom útoku sa mág otočí v smere streľby, aj keď súper stojí inde
+let facingOverride = { p1: { sx: 0, until: 0 }, p2: { sx: 0, until: 0 } };
+function currentFacing(slot, facing) {
+  const ov = facingOverride[slot];
+  if (ov && ov.sx && performance.now() < ov.until) return ov.sx;
+  return facing[slot];
 }
 function positionActors(s, immediate = false) {
   const p1 = s.p1, p2 = s.p2;
@@ -465,7 +599,7 @@ function positionActors(s, immediate = false) {
     }
 
     const shift = same ? (slot === "p1" ? -22 : 22) : 0;
-    const scale = facing[slot];
+    const scale = currentFacing(slot, facing);
     el.style.transform = `translateX(${shift}px) scaleX(${scale})`;
 
     el.dataset.slot = slot;
@@ -480,24 +614,99 @@ function renderQueue() {
   queueEl.innerHTML = "";
   const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
 
-  myQueue.forEach(a => {
+  // fixná štruktúra fronty: [golden shield][|][akcia 1][akcia 2][akcia 3][|][golden mana]
+  // prázdne pozície sú placeholder sloty — šírka sa pridávaním akcií nemení
+  const addDivider = () => {
+    const d = document.createElement("div");
+    d.className = "q-divider";
+    queueEl.appendChild(d);
+  };
+  const addSlot = (innerHTML, title) => {
+    const ph = document.createElement("div");
+    ph.className = "q-badge q-slot";
+    ph.innerHTML = innerHTML;
+    if (title) ph.title = title;
+    queueEl.appendChild(ph);
+  };
+
+  // pre-slot: golden shield (vyhodnotí sa pred kolom)
+  if (goldenArmed) {
+    const g = document.createElement("div");
+    g.className = "q-badge golden";
+    g.innerHTML = '<span class="g-ico">🛡️</span>';
+    g.title = "Golden Shield — resolves before the round starts";
+    queueEl.appendChild(g);
+  } else {
+    addSlot('<span class="g-ico dim">🛡️</span>', "Golden Shield slot");
+  }
+  addDivider();
+
+  // 3 sloty bežných akcií — nevyplnené ukazujú poradové číslo
+  for (let i = 0; i < 3; i++) {
+    const a = myQueue[i];
+    if (!a) { addSlot(String(i + 1), "Action slot"); continue; }
+
     const div = document.createElement("div");
     div.className = "q-badge";
     if (a.type === "move") {
       div.classList.add("move");  div.textContent = `🚶${arrow[a.dir] || "?"}`;
+    } else if (a.type === "dash") {
+      div.classList.add("dash");  div.textContent = `🏃${arrow[a.dir] || "?"}`;
     } else if (a.type === "recharge") {
       div.classList.add("mana");  div.textContent = "🙏";
     } else if (a.type === "attack") {
-      div.classList.add("attack"); div.textContent = "⚔️";
+      div.classList.add("attack"); div.textContent = `⚔️${arrow[a.dir] || ""}`;
+    } else if (a.type === "melee") {
+      div.classList.add("melee"); div.textContent = "🗡️";
     } else if (a.type === "special") {
       div.classList.add("special"); div.textContent = "✨";
     } else if (a.type === "shield") {
       div.classList.add("shield"); div.textContent = "🛡️";
+    } else if (a.type === "block") {
+      div.classList.add("block"); div.textContent = "🧱";
     } else {
       div.textContent = a.type;
     }
+
+    // hover nad badge útoku/specialu ukáže zásah z pozície platnej v tom kroku (ghost)
+    if (a.type === "attack") {
+      div.addEventListener("mouseenter", () => {
+        const p = ghostPos(i);
+        if (p) showPreviewCells(cellsForAimPreview(p, a.dir));
+      });
+      div.addEventListener("mouseleave", clearPreviewCells);
+    }
+    if (a.type === "special") {
+      div.addEventListener("mouseenter", () => {
+        const mine = state?.[me];
+        const p = ghostPos(i);
+        if (mine?.char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: mine.char }));
+      });
+      div.addEventListener("mouseleave", clearPreviewCells);
+    }
+    if (a.type === "melee") {
+      div.addEventListener("mouseenter", () => {
+        const p = ghostPos(i);
+        if (p) showPreviewCells([[p.x, p.y]]);
+      });
+      div.addEventListener("mouseleave", clearPreviewCells);
+    }
+
     queueEl.appendChild(div);
-  });
+  }
+
+  addDivider();
+  // post-slot: golden mana refill (vyhodnotí sa po konci kola)
+  if (goldenManaArmed) {
+    const g = document.createElement("div");
+    g.className = "q-badge golden";
+    g.innerHTML = '<span class="g-ico">🙏</span>';
+    g.title = "Golden Mana Refill — resolves after the round ends";
+    queueEl.appendChild(g);
+  } else {
+    addSlot('<span class="g-ico dim">🙏</span>', "Golden Mana slot");
+  }
+
   updateActionButtons();
   updateLockButton();
 }
@@ -510,6 +719,12 @@ function updateActionButtons() {
   const moveUsed = myQueue.some(a => a.type === "move");
   moveBtn.disabled = moveUsed;
   if (moveUsed) dirPicker.classList.add("hidden");
+  const attackUsed = myQueue.some(a => a.type === "attack");
+  attackBtn.disabled = attackUsed;
+  if (attackUsed) aimPicker.classList.add("hidden");
+  const dashUsed = myQueue.some(a => a.type === "dash");
+  dashBtn.disabled = dashUsed;
+  if (dashUsed) dashPicker.classList.add("hidden");
 }
 function updateLockButton() {
   const locked = !!state?.[me]?.locked;
@@ -522,10 +737,12 @@ function updateLockButton() {
   if (playing && !locked) {
     lockBtn.disabled = true;
     lockBtn.classList.remove("ready");
+    updateUiLocks();
     return;
   }
   // pulzuj, keď je queue plná a čaká sa už len na potvrdenie
   lockBtn.classList.toggle("ready", !locked && myQueue.length === 3);
+  updateUiLocks();
 }
 
 /* ---------- Winner helper ---------- */
@@ -579,6 +796,7 @@ function schedulePlayTimeline(timeline) {
 
   const gen = ++playGen;
   playing = true;
+  updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
 
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
 
@@ -616,7 +834,13 @@ function schedulePlayTimeline(timeline) {
       if (state.p2) state.p2.locked = false;
 
       renderGrid(state, []);
-      myQueue = []; renderQueue();
+      myQueue = [];
+      goldenArmed = false;
+      goldenManaArmed = false;
+      lockedIn = false; // kolo dobehlo — odomkni ovládanie
+      document.getElementById("golden-btn")?.classList.remove("armed");
+      document.getElementById("golden-mana-btn")?.classList.remove("armed");
+      renderQueue();
       lockBtn.disabled = false;
       updateLockButton();
       return;
@@ -640,6 +864,10 @@ function schedulePlayTimeline(timeline) {
     const shooters = new Set();
     for (const e of frame.effects || []) {
       if ((e.kind === "charge" || e.kind === "attack_swing" || e.kind === "special") && e.from) shooters.add(e.from);
+      // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení)
+      if (e.kind === "charge" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
+        facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + ATTACK_SWING_MS };
+      }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "attack2", ATTACK_SWING_MS);
         lastAttackEndAt[e.from] = performance.now() + ATTACK_SWING_MS;
@@ -647,9 +875,21 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", HURT_MS);
         if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
+        if (e.chipped) spawnFloat(e.target, "🧱 −1", "block-float");
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", HURT_MS);
+        // nedostatok many — výrazná výstraha: float + bliknutie mana baru v HUD
+        if (e.reason === "mana") {
+          spawnFloat(e.target, "⚠️ LOW MANA", "lowmana-float");
+          const bar = e.target === "p1" ? hudP1Mana : hudP2Mana;
+          if (bar) {
+            bar.classList.remove("low-warn");
+            void bar.offsetWidth; // restart animácie pri opakovanej výstrahe
+            bar.classList.add("low-warn");
+            setTimeout(() => bar.classList.remove("low-warn"), 1000);
+          }
+        }
       }
       if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
         const amt = (typeof e.amount === "number" ? e.amount : 4);
@@ -658,11 +898,24 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🛡️ SHIELD", "shield-float");
       }
+      if (e.kind === "block_on" && (e.from === "p1" || e.from === "p2")) {
+        spawnFloat(e.from, "🧱 BLOCK", "shield-float");
+      }
+      if (e.kind === "golden_shield" && (e.from === "p1" || e.from === "p2")) {
+        // navonok je to SHIELD, len zlatý — "golden shield" je interné pomenovanie
+        spawnFloat(e.from, "🛡️ SHIELD", "golden-float");
+      }
+      if (e.kind === "golden_mana" && (e.from === "p1" || e.from === "p2")) {
+        spawnFloat(e.from, `🙏 +${e.gained ?? 6} MANA`, "golden-float");
+        if (e.hpCost) spawnDamageFloat(e.from, e.hpCost);
+      }
       if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) {
         appendActionLog(e.from, e.action);
       }
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
-        spawnFloat(e.target, "🛡️ BLOCKED", "block-float");
+        // zlatý text, ak blokoval golden shield
+        if (e.gold) spawnFloat(e.target, "🛡️ BLOCKED", "golden-float");
+        else spawnFloat(e.target, e.partial ? "🧱 BLOCKED" : "🛡️ BLOCKED", "block-float");
       }
       if (e.kind === "heal" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
@@ -730,59 +983,167 @@ selEl.addEventListener("click", (e) => {
 });
 
 /* ---------- Controls ---------- */
-const moveBtn   = document.getElementById("move-btn");
-const dirPicker = document.getElementById("dir-picker");
+const moveBtn    = document.getElementById("move-btn");
+const dirPicker  = document.getElementById("dir-picker");
+const attackBtn  = document.getElementById("attack-btn");
+const aimPicker  = document.getElementById("aim-picker");
+const dashBtn    = document.getElementById("dash-btn");
+const dashPicker = document.getElementById("dash-picker");
 
-// Move: najprv výber smeru v mini-popupe
-moveBtn.addEventListener("click", () => {
-  if (state?.[me]?.locked) return;
-  if (myQueue.length >= 3 || myQueue.some(a => a.type === "move")) {
-    moveBtn.classList.add("shake");
-    setTimeout(() => moveBtn.classList.remove("shake"), 400);
+function shakeBtn(btn) {
+  btn.classList.add("shake");
+  setTimeout(() => btn.classList.remove("shake"), 400);
+}
+
+// otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
+// odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
+let openPicker = null; // null | "move" | "attack" | "dash"
+const PICKERS = { move: dirPicker, attack: aimPicker, dash: dashPicker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, dash: dashBtn };
+
+// po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
+let lockedIn = false;
+function uiLocked() {
+  return lockedIn || playing || !!state?.[me]?.locked;
+}
+
+// vizuálne zámky: otvorený picker zamyká ostatné akčné tlačidlá, LOCK IN zamyká všetky
+function actionButtonsAll() {
+  const generic = [...document.querySelectorAll(".controls .actions button[data-act]")]
+    .filter(b => !b.closest(".dir-picker"));
+  return [
+    moveBtn, attackBtn, dashBtn,
+    document.getElementById("golden-btn"),
+    document.getElementById("golden-mana-btn"),
+    ...generic
+  ].filter(Boolean);
+}
+function updateUiLocks() {
+  const openBtn = openPicker ? PICKER_BTNS[openPicker] : null;
+  const locked = uiLocked();
+  actionButtonsAll().forEach(b => {
+    b.classList.toggle("locked-ui", locked || (!!openPicker && b !== openBtn));
+  });
+  undoBtn.classList.toggle("locked-ui", locked);
+}
+
+function closePickers() {
+  Object.values(PICKERS).forEach(p => p.classList.add("hidden"));
+  openPicker = null;
+  clearPreviewCells();
+  updateUiLocks();
+}
+function togglePicker(kind, btn, usedType) {
+  if (uiLocked()) return;
+  if (openPicker === kind) { closePickers(); return; } // opätovný klik = zavrieť
+  if (openPicker) { shakeBtn(btn); return; }           // iný picker je otvorený -> blokované
+  if (myQueue.length >= 3 || myQueue.some(a => a.type === usedType)) {
+    shakeBtn(btn);
     return;
   }
-  dirPicker.classList.toggle("hidden");
+  PICKERS[kind].classList.remove("hidden");
+  openPicker = kind;
+  updateUiLocks();
+}
+
+// Move / Attack / Dash: najprv výber smeru v mini-popupe
+moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"));
+attackBtn.addEventListener("click", () => togglePicker("attack", attackBtn, "attack"));
+dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
+
+// Golden Shield: extra akcia pred kolom — toggle; starterovi sa zobrazuje zamknutý (vizuálny zámok)
+const goldenBtn = document.getElementById("golden-btn");
+goldenBtn.addEventListener("click", () => {
+  if (uiLocked()) return;
+  if (openPicker) { shakeBtn(goldenBtn); return; }
+  if (!me || state?.starter === me) { shakeBtn(goldenBtn); return; }
+  goldenArmed = !goldenArmed;
+  goldenBtn.classList.toggle("armed", goldenArmed);
+  renderQueue();
 });
+
+// Golden Mana Refill: extra akcia po konci kola — toggle, dostupný obom hráčom
+const goldenManaBtn = document.getElementById("golden-mana-btn");
+const gmCostEl = document.getElementById("gm-cost");
+goldenManaBtn.addEventListener("click", () => {
+  if (uiLocked()) return;
+  if (openPicker) { shakeBtn(goldenManaBtn); return; }
+  if (!me || !state?.[me]?.char) return;
+  goldenManaArmed = !goldenManaArmed;
+  goldenManaBtn.classList.toggle("armed", goldenManaArmed);
+  renderQueue();
+});
+
+function updateGoldenButton() {
+  if (goldenBtn) {
+    // viditeľný obom hráčom; starterovi zamknutý (zámok + neaktívny vzhľad)
+    const inGame = !!me && !!state?.[me]?.char;
+    goldenBtn.classList.toggle("hidden", !inGame);
+    const isStarter = !!me && state?.starter === me;
+    goldenBtn.classList.toggle("locked-perm", isStarter);
+    if (isStarter && goldenArmed) {
+      goldenArmed = false;
+      goldenBtn.classList.remove("armed");
+    }
+  }
+  if (goldenManaBtn) {
+    const available = !!me && !!state?.[me]?.char;
+    goldenManaBtn.classList.toggle("hidden", !available);
+    // cena v HP rastie s každým použitím (1, 2, 3…)
+    const cost = (state?.[me]?.manaRefills ?? 0) + 1;
+    if (gmCostEl) gmCostEl.textContent = `−${cost}❤️ +6💧`;
+  }
+}
 
 document.querySelectorAll(".controls button[data-act]").forEach(btn => {
   btn.addEventListener("click", () => {
-    if (state?.[me]?.locked) return;
+    if (uiLocked()) return;
     if (myQueue.length >= 3) return;
+
+    // pri otvorenom pickeri sú klikateľné len jeho šípky — ostatné tlačidlá sú blokované
+    const isPickerArrow = !!btn.closest(".dir-picker");
+    if (openPicker && !isPickerArrow) { shakeBtn(btn); return; }
 
     const [type, arg] = btn.dataset.act.split(":");
 
     // každá akcia max 1× za kolo
     if (myQueue.some(a => a.type === type)) {
-      btn.classList.add("shake");
-      setTimeout(() => btn.classList.remove("shake"), 400);
+      shakeBtn(btn);
       return;
     }
 
     if (type === "move")      myQueue.push({ type: "move", dir: arg });
+    if (type === "dash")      myQueue.push({ type: "dash", dir: arg });
     if (type === "recharge")  myQueue.push({ type: "recharge" });
-    if (type === "attack")    myQueue.push({ type: "attack" });
+    if (type === "attack")    myQueue.push({ type: "attack", dir: arg });
+    if (type === "melee")     myQueue.push({ type: "melee" });
     if (type === "special")   myQueue.push({ type: "special" });
     if (type === "shield")    myQueue.push({ type: "shield" });
+    if (type === "block")     myQueue.push({ type: "block" });
 
-    if (type === "move") dirPicker.classList.add("hidden");
+    if (isPickerArrow) closePickers();
     renderQueue();
   });
 });
 undoBtn.addEventListener("click", () => {
-  if (state?.[me]?.locked) return;
+  if (uiLocked()) return;
   myQueue.pop();
   renderQueue();
 });
 lockBtn.addEventListener("click", () => {
   if (playing) return; // počas prehrávania kola nelockuj
-  if (state?.[me]?.locked) return;
+  if (uiLocked()) return;
   if (myQueue.length !== 3) {
     lockBtn.classList.add("shake");
     setTimeout(() => lockBtn.classList.remove("shake"), 400);
     return;
   }
-  socket.emit("lock_in", myQueue);
-  dirPicker.classList.add("hidden");
+  const payload = [...myQueue];
+  if (goldenArmed) payload.unshift({ type: "golden_shield" });
+  if (goldenManaArmed) payload.push({ type: "golden_mana" });
+  socket.emit("lock_in", payload);
+  lockedIn = true; // všetky tlačidlá idú do locked stavu až do konca kola
+  closePickers();
   lockBtn.classList.add("locked");
   lockBtn.classList.remove("ready");
   lockBtn.textContent = "LOCKED";
@@ -801,10 +1162,19 @@ socket.on("reset", () => {
   goOverlay.classList.add("hidden");
   chosenChar = null;
   dirPicker.classList.add("hidden");
+  aimPicker.classList.add("hidden");
   clearActionLogs();
-  myQueue = []; renderQueue();
+  myQueue = [];
+  goldenArmed = false;
+  goldenManaArmed = false;
+  lockedIn = false;
+  document.getElementById("golden-btn")?.classList.remove("armed");
+  document.getElementById("golden-mana-btn")?.classList.remove("armed");
+  closePickers();
+  renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
   castingNow = { p1:false, p2:false };
+  facingOverride = { p1: { sx: 0, until: 0 }, p2: { sx: 0, until: 0 } };
   clearActors();
   lockBtn.classList.remove("locked");
   lockBtn.disabled = false;
@@ -852,7 +1222,7 @@ socket.on("state", (s) => {
 
   // label special podľa mága (len cost badge + tooltip, ikonu nechaj)
   const mine = s[me];
-  const dmg = mine?.char ? { fire:4, lightning:2, wanderer:8 }[mine.char] : null;
+  const dmg = mine?.char ? { fire:5, lightning:3, wanderer:8 }[mine.char] : null;
   const specialBtn = document.getElementById("special-btn");
   if (dmg != null && specialBtn) {
     specialBtn.title = `Special (−5 mana, ${dmg} dmg)`;
@@ -892,6 +1262,31 @@ function raf() {
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
   });
+
+  // ghost vlastnej pozície po naplánovaných movoch (len počas plánovania)
+  {
+    const ctx = actorGhost.getContext("2d");
+    const mine = state?.[me];
+    const gp = ghostPos();
+    const show = mine && mine.char && !mine.locked && !playing && gp &&
+                 myQueue.some(a => a.type === "move" || a.type === "dash") &&
+                 (gp.x !== mine.x || gp.y !== mine.y);
+    if (!show) {
+      ctx.clearRect(0, 0, actorGhost.width, actorGhost.height);
+      actorGhost.style.display = "none";
+    } else {
+      actorGhost.style.display = "block";
+      const { left, top } = cellToPx(gp.x, gp.y);
+      actorGhost.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
+      actorGhost.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
+      // rovnaký flip ako hráčov sprite — postava je vo frame mimo stredu, bez flipu vyzerá posunutá
+      actorGhost.style.transform = `scaleX(${computeFacing(state.p1, state.p2)[me]})`;
+      const dir = CHAR_META[mine.char].dir;
+      ensureSpriteMeta(dir, ANIM_DEF.idle.file)
+        .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
+        .catch(() => {});
+    }
+  }
 
   // HUD náhľady vybraných postáv + degradácia portrétu podľa HP (Doom-style)
   [["p1", hudCharP1], ["p2", hudCharP2]].forEach(([slot, cvs]) => {
@@ -943,17 +1338,41 @@ gridEl.style.gridTemplateRows = `repeat(${board.h}, ${TILE_H}px)`;
 renderGrid({}, []);
 renderHUD();
 renderQueue();
+clearActionLogs(); // skeleton placeholderov v zázname kola od začiatku
 
 // hover preview pre special
 const specialBtn = document.getElementById("special-btn");
 if (specialBtn){
+  // preview z ghost pozície — special by sa vykonal po už naplánovaných akciách
   specialBtn.addEventListener("mouseenter", ()=>{
     const mine = state?.[me];
-    if (!mine) return;
-    showPreviewCells(cellsForSpecialPreview(mine));
+    const p = ghostPos();
+    if (!mine?.char || !p) return;
+    showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: mine.char }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
 }
+
+// hover preview zásahovej bunky melee — vlastná bunka z ghost pozície po naplánovaných akciách
+const meleeBtn = document.querySelector('.controls button[data-act="melee"]');
+if (meleeBtn) {
+  meleeBtn.addEventListener("mouseenter", () => {
+    const p = ghostPos();
+    if (p) showPreviewCells([[p.x, p.y]]);
+  });
+  meleeBtn.addEventListener("mouseleave", clearPreviewCells);
+}
+
+// hover preview dráhy strely na šípkach aim pickeru — z ghost pozície po naplánovaných akciách
+aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
+  const dir = btn.dataset.act.split(":")[1];
+  btn.addEventListener("mouseenter", () => {
+    const p = ghostPos();
+    if (!p) return;
+    showPreviewCells(cellsForAimPreview(p, dir));
+  });
+  btn.addEventListener("mouseleave", clearPreviewCells);
+});
 
 /* ---------- Admin reset button (zobraz len s ?admin=1) ---------- */
 (function mountAdminReset(){

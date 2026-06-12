@@ -25,14 +25,21 @@ const START_HP = 10;
 const START_MANA = 4;
 const MAX_MANA = 10;
 
-const BASIC_COST    = 1;
-const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: rovnaké políčko 4, vedľa 3, ďalej 2, najďalej 1
+const BASIC_COST    = 2;
+const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: vedľa 3, ďalej 2, najďalej 1 (vlastné políčko basic nezasahuje)
+
+const MELEE_COST = 8;
+const MELEE_DMG  = 8;  // úder zblízka — zasiahne len súpera na rovnakom políčku
 
 const SPECIAL_COST = 5;
 const RECHARGE_GAIN = 4;
 const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
+const BLOCK_COST  = 1; // zníži dmg najbližšej súperovej akcie o 1
+const GOLDEN_COST = 3; // extra akcia hráča, ktorý je v kole druhý — štít vyhodnotený pred prvou akciou startera
+const DASH_COST   = 2; // presun až o 2 políčka jedným smerom
+const GOLDEN_MANA_GAIN = 6; // golden mana refill: +6 many za HP; cena v HP rastie s každým použitím (1, 2, 3…)
 
-const ACTION_TYPES = new Set(["move", "recharge", "attack", "special", "shield"]);
+const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "block", "dash"]);
 const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 
 const MOVE_DELAY_MS    = 800;  // posun postavy trvá 700 ms + malý buffer
@@ -52,8 +59,13 @@ function newPlayer(slot) {
     x: pos.x, y: pos.y,
     hp: START_HP,
     mana: START_MANA,
-    char: null,      // "fire" | "lightning" | "wanderer"
-    shield: false,   // kryje najbližšiu súperovu akciu
+    char: null,        // "fire" | "lightning" | "wanderer"
+    shield: false,     // zruší celý dmg najbližšej súperovej akcie
+    shieldGold: false, // aktívny shield pochádza z golden shieldu (zlaté vizuály)
+    block: false,      // zníži dmg najbližšej súperovej akcie o 1
+    golden: false,     // objednaný golden shield (extra akcia pred začiatkom kola)
+    goldenMana: false, // objednaný golden mana refill (extra akcia po konci kola)
+    manaRefills: 0,    // koľkokrát už hráč refill použil — určuje rastúcu HP cenu
     locked: false,
     queue: []
   };
@@ -78,8 +90,8 @@ newGame();
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, shield, locked } = a;
-  return { slot, x, y, hp, mana, char, shield, locked };
+  const { slot, x, y, hp, mana, char, shield, shieldGold, block, manaRefills, locked } = a;
+  return { slot, x, y, hp, mana, char, shield, shieldGold, block, manaRefills, locked };
 }
 function snapshot() {
   return {
@@ -103,8 +115,8 @@ function pushStateFrame(timeline, effects = [], delayMs = SMALL_DELAY_MS) {
   timeline.push({ ...snap, effects, delayMs });
 }
 
-function pushInvalid(tl, who, ms = SMALL_DELAY_MS) {
-  pushStateFrame(tl, [{ kind: "invalid", target: who }], ms);
+function pushInvalid(tl, who, ms = SMALL_DELAY_MS, reason = null) {
+  pushStateFrame(tl, [{ kind: "invalid", target: who, reason }], ms);
 }
 
 function other(slot) { return slot === "p1" ? "p2" : "p1"; }
@@ -120,9 +132,9 @@ function specialDamageAndHit(players, slot) {
 
   switch (me.char) {
     case "fire":      // celá lajna (riadok)
-      return me.y === foe.y ? { dmg:4, hit:foeS } : { dmg:0, hit:null };
-    case "lightning": // všetko okrem vlastného políčka
-      return (me.x !== foe.x || me.y !== foe.y) ? { dmg:2, hit:foeS } : { dmg:0, hit:null };
+      return me.y === foe.y ? { dmg:5, hit:foeS } : { dmg:0, hit:null };
+    case "lightning": // všetky políčka opačnej "šachovej" farby než na ktorej stojí
+      return ((me.x + me.y) % 2) !== ((foe.x + foe.y) % 2) ? { dmg:3, hit:foeS } : { dmg:0, hit:null };
     case "wanderer":  // len diagonála 1
       return isDiagAdjacent(me, foe) ? { dmg:8, hit:foeS } : { dmg:0, hit:null };
     default:
@@ -130,13 +142,23 @@ function specialDamageAndHit(players, slot) {
   }
 }
 
-// 3 akcie, každý typ max 1× za kolo, len známe typy a smery
-function validQueue(queue) {
-  if (!Array.isArray(queue) || queue.length !== 3) return false;
-  const types = queue.map(a => a && a.type);
+// 3 akcie, každý typ max 1× za kolo, len známe typy a smery (move, attack aj dash nesú dir)
+// voliteľný prefix golden_shield (len hráč, ktorý v kole NEzačína) a sufix golden_mana (ktokoľvek)
+function validQueue(queue, slot) {
+  if (!Array.isArray(queue)) return false;
+  let q = queue;
+  if (q[0] && q[0].type === "golden_shield") {
+    if (slot === game.starter) return false;
+    q = q.slice(1);
+  }
+  if (q.length && q[q.length - 1] && q[q.length - 1].type === "golden_mana") {
+    q = q.slice(0, -1);
+  }
+  if (q.length !== 3) return false;
+  const types = q.map(a => a && a.type);
   if (types.some(t => !ACTION_TYPES.has(t))) return false;
   if (new Set(types).size !== 3) return false;
-  return queue.every(a => a.type !== "move" || MOVE_DIRS.has(a.dir));
+  return q.every(a => (a.type !== "move" && a.type !== "attack" && a.type !== "dash") || MOVE_DIRS.has(a.dir));
 }
 
 function winnerNow() {
@@ -172,6 +194,24 @@ function doMove(slot, dir, tl) {
   pushStateFrame(tl, [], MOVE_DELAY_MS);
 }
 
+function doDash(slot, dir, tl) {
+  const a = game.players[slot];
+  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
+  if (!delta) { pushInvalid(tl, slot); return; }
+  if (a.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+
+  // posun až o 2 políčka zvoleným smerom; na okraji sa skráti na 1, bez možného pohybu je neplatný
+  let nx = a.x, ny = a.y, steps = 0;
+  for (let s = 0; s < 2; s++) {
+    if (inBounds(nx + delta[0], ny + delta[1])) { nx += delta[0]; ny += delta[1]; steps++; }
+  }
+  if (!steps) { pushInvalid(tl, slot); return; }
+
+  a.mana -= DASH_COST;
+  a.x = nx; a.y = ny;
+  pushStateFrame(tl, [], MOVE_DELAY_MS);
+}
+
 function doRecharge(slot, tl) {
   const a = game.players[slot];
 
@@ -192,67 +232,91 @@ function doRecharge(slot, tl) {
   }
 }
 
-function doBasic(slot, tl) {
+function doBasic(slot, dir, tl) {
   const me  = game.players[slot];
   const opS = other(slot);
   const op  = game.players[opS];
 
-  if (me.mana < BASIC_COST) { pushInvalid(tl, slot); return; }
+  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
+  if (!delta) { pushInvalid(tl, slot); return; }
+  if (me.mana < BASIC_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= BASIC_COST;
 
-  const sameCell = op && op.x === me.x && op.y === me.y;
-
-  // vizuál: strela letí smerom k súperovi; ak je v rovnakom riadku, zastaví na jeho políčku
-  // (pri zásahu z rovnakého políčka projektil nelieta — úder zblízka s vlastnou animáciou)
-  if (sameCell) {
-    pushStateFrame(tl, [{ kind: "melee", from: slot }], SMALL_DELAY_MS);
-  }
-  if (!sameCell) {
-    const dir  = (op && op.x < me.x) ? "left" : "right";
-    const step = dir === "left" ? -1 : 1;
-    let x = me.x;
-    while (true) {
-      x += step;
-      if (!inBounds(x, me.y)) break;
-      pushStateFrame(tl, [{ kind: "charge", from: slot, dir, cell: [x, me.y] }], CHARGE_STEP_MS);
-      if (op && op.y === me.y && x === op.x) break;
+  // strela letí zvoleným smerom; zastaví sa na prvom súperovi v dráhe alebo na okraji boardu
+  // dmg klesá so vzdialenosťou (3/2/1); vlastné políčko nezasahuje (na to je melee)
+  let x = me.x, y = me.y, dist = 0;
+  while (true) {
+    x += delta[0]; y += delta[1]; dist++;
+    if (!inBounds(x, y)) break;
+    pushStateFrame(tl, [{ kind: "charge", from: slot, dir, cell: [x, y] }], CHARGE_STEP_MS);
+    if (op && op.x === x && op.y === y) {
+      applyHit(opS, Math.max(1, BASIC_DMG_MAX - dist), tl);
+      break;
     }
-  }
-
-  // damage len ak súper je v rovnakom riadku; klesá so vzdialenosťou (4/3/2/1)
-  if (op && op.y === me.y) {
-    const dist = Math.abs(op.x - me.x);
-    const dmg  = Math.max(1, BASIC_DMG_MAX - dist);
-    applyHit(opS, dmg, tl);
   }
 }
 
-// aplikuje zásah cez prípadný štít obrancu (štít blokuje celý dmg)
+function doMelee(slot, tl) {
+  const me  = game.players[slot];
+  const opS = other(slot);
+  const op  = game.players[opS];
+
+  if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  me.mana -= MELEE_COST;
+
+  // úder sa švihne vždy (mana je preč aj pri minutí), zasiahne len súpera na rovnakom políčku
+  pushStateFrame(tl, [{ kind: "melee", from: slot }], SMALL_DELAY_MS);
+  if (op && op.x === me.x && op.y === me.y) {
+    applyHit(opS, MELEE_DMG, tl);
+  }
+}
+
+// aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, block znižuje o 1)
 function applyHit(targetSlot, rawDmg, tl) {
   const t = game.players[targetSlot];
   if (t.shield) {
-    pushStateFrame(tl, [{ kind: "block", target: targetSlot }], SMALL_DELAY_MS);
+    pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
     return;
   }
-  t.hp = Math.max(0, t.hp - rawDmg);
-  pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: rawDmg }], SMALL_DELAY_MS);
+  let dmg = rawDmg, chipped = 0;
+  if (t.block) {
+    chipped = Math.min(1, rawDmg);
+    dmg = Math.max(0, rawDmg - 1);
+    if (dmg === 0) {
+      pushStateFrame(tl, [{ kind: "block", target: targetSlot, partial: true }], SMALL_DELAY_MS);
+      return;
+    }
+  }
+  t.hp = Math.max(0, t.hp - dmg);
+  const fx = { kind: "hit", target: targetSlot, dmg };
+  if (chipped) fx.chipped = chipped;
+  pushStateFrame(tl, [fx], SMALL_DELAY_MS);
 }
 
 function doShield(slot, tl) {
   const a = game.players[slot];
-  if (a.mana < SHIELD_COST) { pushInvalid(tl, slot); return; }
+  if (a.mana < SHIELD_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   a.mana -= SHIELD_COST;
   a.shield = true;
+  a.shieldGold = false;
   pushStateFrame(tl, [{ kind: "shield", from: slot }], SMALL_DELAY_MS);
+}
+
+function doBlock(slot, tl) {
+  const a = game.players[slot];
+  if (a.mana < BLOCK_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  a.mana -= BLOCK_COST;
+  a.block = true;
+  pushStateFrame(tl, [{ kind: "block_on", from: slot }], SMALL_DELAY_MS);
 }
 
 function doSpecial(slot, tl) {
   const actor = game.players[slot];
   if (!actor) return;
 
-  // Bez many -> len spätná väzba (Hurt na klientovi), žiadna special animácia
+  // Bez many -> len spätná väzba (Hurt na klientovi + low mana výstraha), žiadna special animácia
   if (actor.mana < SPECIAL_COST) {
-    pushStateFrame(tl, [{ kind: "invalid", target: slot }], SMALL_DELAY_MS);
+    pushInvalid(tl, slot, SMALL_DELAY_MS, "mana");
     return;
   }
 
@@ -276,10 +340,13 @@ function doAction(slot, action, tl) {
   if (!action) return;
   switch (action.type) {
     case "move":     return doMove(slot, action.dir, tl);
+    case "dash":     return doDash(slot, action.dir, tl);
     case "recharge": return doRecharge(slot, tl);
-    case "attack":   return doBasic(slot, tl);
+    case "attack":   return doBasic(slot, action.dir, tl);
+    case "melee":    return doMelee(slot, tl);
     case "special":  return doSpecial(slot, tl);
     case "shield":   return doShield(slot, tl);
+    case "block":    return doBlock(slot, tl);
     default: break;
   }
 }
@@ -316,8 +383,13 @@ function endOfStepTileEffects(tl) {
     pushStateFrame(tl, [{ kind: "tile_proc", tile: tile.type, cell: [p.x, p.y] }], 600);
     game.tiles.splice(idx, 1); // jediné spotrebovateľné políčka
     if (tile.type === "heal") {
-      p.hp = Math.min(START_HP, p.hp + 1);
-      pushStateFrame(tl, [{ kind: "heal", target: slot, amount: 1 }], SMALL_DELAY_MS);
+      const healed = Math.min(START_HP, p.hp + 1) - p.hp;
+      p.hp += healed;
+      if (healed > 0) {
+        pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed }], SMALL_DELAY_MS);
+      } else {
+        pushStateFrame(tl, [], SMALL_DELAY_MS); // pri plnom HP sa spotrebuje naprázdno
+      }
     } else {
       const gained = MAX_MANA - p.mana;
       p.mana = MAX_MANA;
@@ -341,6 +413,8 @@ function endOfStepTileEffects(tl) {
       pushStateFrame(tl, [{ kind: "tile_proc", tile: tileType, cell: [p.x, p.y] }], 600);
       p.hp = Math.max(0, p.hp - dmg);
       pushStateFrame(tl, [{ kind: "hit", target: slot, dmg }], SMALL_DELAY_MS);
+      // prvý mŕtvy okamžite ukončuje hru — druhý tile zásah sa už nevyhodnotí (remíza nemôže nastať)
+      if (winnerNow()) return;
     }
   }
 }
@@ -378,16 +452,35 @@ function resolveTurn() {
   const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
   let ended = false;
 
+  // golden shield — extra akcia hráča, ktorý je v kole druhý, vyhodnotená pred prvou akciou startera
+  const second = order[1];
+  if (game.players[second].golden) {
+    const gp = game.players[second];
+    pushStateFrame(tl, [{ kind: "action", from: second, action: { type: "golden_shield", dir: null } }], 250);
+    if (gp.mana >= GOLDEN_COST) {
+      gp.mana -= GOLDEN_COST;
+      gp.shield = true;
+      gp.shieldGold = true;
+      pushStateFrame(tl, [{ kind: "golden_shield", from: second }], SMALL_DELAY_MS);
+    } else {
+      pushInvalid(tl, second, SMALL_DELAY_MS, "mana");
+    }
+    gp.golden = false;
+  }
+
   outer:
   for (let i = 0; i < 3; i++) {
     for (const slot of order) {
       const foe = other(slot);
-      const foeShieldArmed = game.players[foe].shield; // štít kryje práve túto (najbližšiu) súperovu akciu
+      // obrany kryjú práve túto (najbližšiu) súperovu akciu — spotrebujú sa ňou aj bez zásahu
+      const foeShieldArmed = game.players[foe].shield;
+      const foeBlockArmed  = game.players[foe].block;
       const act = game.players[slot].queue[i];
       // ohlás akciu klientovi (záznam kola pod HUD widgetom)
       if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null } }], 250);
       doAction(slot, act, tl);
-      if (foeShieldArmed) game.players[foe].shield = false; // spotrebovaný touto akciou (aj keď nepadol zásah)
+      if (foeShieldArmed) { game.players[foe].shield = false; game.players[foe].shieldGold = false; }
+      if (foeBlockArmed)  game.players[foe].block  = false;
 
       // po každej akcii skontroluj lethal
       const w = winnerNow();
@@ -399,13 +492,36 @@ function resolveTurn() {
     if (winnerNow()) { ended = true; break outer; }
   }
 
-  // nevyužité štíty zanikajú s koncom kola
+  // nevyužité obrany zanikajú s koncom kola
   game.players.p1.shield = false;
   game.players.p2.shield = false;
+  game.players.p1.shieldGold = false;
+  game.players.p2.shieldGold = false;
+  game.players.p1.block  = false;
+  game.players.p2.block  = false;
 
   if (!ended) {
     // koniec kola — presun IK a spawn nového tile (vidno ich vo finálnom frame)
     endOfRoundTiles();
+
+    // golden mana refill — úplne posledná udalosť kola (+6 many za HP, cena rastie s každým použitím)
+    for (const slot of order) {
+      const p = game.players[slot];
+      if (!p.goldenMana) continue;
+      p.goldenMana = false;
+      const cost = p.manaRefills + 1;
+      pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "golden_mana", dir: null } }], 250);
+      // refill nesmie hráča zabiť a pri plnej mane je naprázdno -> neplatný
+      if (p.hp > cost && p.mana < MAX_MANA) {
+        p.hp -= cost;
+        const gained = Math.min(GOLDEN_MANA_GAIN, MAX_MANA - p.mana);
+        p.mana += gained;
+        p.manaRefills++;
+        pushStateFrame(tl, [{ kind: "golden_mana", from: slot, hpCost: cost, gained }], SMALL_DELAY_MS);
+      } else {
+        pushInvalid(tl, slot);
+      }
+    }
 
     // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)
     const nextTurn    = game.turn + 1;
@@ -427,6 +543,8 @@ function resolveTurn() {
   game.players.p2.locked = false;
   game.players.p1.queue = [];
   game.players.p2.queue = [];
+  game.players.p1.goldenMana = false; // nevyhodnotený refill (ukončené kolo) prepadá
+  game.players.p2.goldenMana = false;
 }
 
 /* -------------------- Admin endpoint -------------------- */
@@ -455,9 +573,14 @@ io.on("connection", (socket) => {
 
   socket.on("lock_in", (queue) => {
     if (!slot) return;
-    if (!validQueue(queue)) return;
+    if (!validQueue(queue, slot)) return;
     const me = game.players[slot];
-    me.queue = queue.map(a => ({ ...a }));
+    let q = queue;
+    me.golden = q[0]?.type === "golden_shield";
+    if (me.golden) q = q.slice(1);
+    me.goldenMana = q[q.length - 1]?.type === "golden_mana";
+    if (me.goldenMana) q = q.slice(0, -1);
+    me.queue = q.map(a => ({ ...a }));
     me.locked = true;
 
     if (game.players.p1.locked && game.players.p2.locked) {
