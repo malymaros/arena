@@ -166,7 +166,7 @@ async function main() {
   if (t4tl) {
     const melee = t4tl.flatMap(f => f.effects || []).filter(e => e.kind === "melee");
     const meleeHit = sumEffects(t4tl).hits.find(h => h.target === "p2" && h.dmg === 8);
-    check(melee.length === 1, "T4: melee animácia", `melee=${melee.length}`);
+    check(melee.length === 3, "T4: melee animácia (3 beaty ako special)", `melee=${melee.length}`);
     check(!!meleeHit, "T4: melee na rovnakom políčku dáva 8 dmg", `hits=${JSON.stringify(sumEffects(t4tl).hits)}`);
     invariantCheck(t4tl, "T4");
   }
@@ -286,9 +286,9 @@ async function main() {
   const whiffSwing = tl.flatMap(f => f.effects || []).filter(e => e.kind === "melee" && e.from === "p1");
   const whiffDmg = sumEffects(tl).hits.filter(h => h.target === "p2");
   const t12last = tl[tl.length - 1];
-  check(whiffSwing.length === 1, "T12: melee švih aj pri minutí", `swing=${whiffSwing.length}`);
+  check(whiffSwing.length === 3, "T12: melee švih aj pri minutí (3 beaty)", `swing=${whiffSwing.length}`);
   check(whiffDmg.length === 0, "T12: melee mimo políčka nedáva dmg", `hits=${JSON.stringify(whiffDmg)}`);
-  check(t12last.p1.mana === 0, "T12: melee spálil 8 many aj pri minutí (4+4−8=0)", `mana=${t12last.p1.mana}`);
+  check(t12last.p1.mana === 4, "T12: melee spálil 4 many aj pri minutí (4+4−4=4)", `mana=${t12last.p1.mana}`);
   invariantCheck(tl, "T12");
 
   /* ---------- Test 13: golden mana refill — +6 many, HP cena rastie (1, 2, …) ---------- */
@@ -318,7 +318,8 @@ async function main() {
   check(t14last.p1.x === 2 && t14last.p1.y === 1, "T14: dash doprava presunie o 2 políčka",
     `pos=${t14last.p1.x},${t14last.p1.y}`);
   invariantCheck(tl, "T14");
-  tl = await playRound(c1, c2, [D("up"), R, S], [R, S, M("down")]);
+  // R pred dashom — po zdražení dashu na 4 many by inak v druhom kole mana nestačila
+  tl = await playRound(c1, c2, [R, D("up"), S], [R, S, M("down")]);
   t14last = tl[tl.length - 1];
   check(t14last.p1.y === 0, "T14: dash hore zo stredného radu presunie o 1 (clamp)",
     `pos=${t14last.p1.x},${t14last.p1.y}`);

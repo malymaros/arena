@@ -12,6 +12,8 @@
 
     <!-- Stred: kolo -->
     <div class="hud-turn" id="hud-turn"></div>
+    <!-- Indikácia čakania na ťah — kto je locknutý a na koho sa čaká -->
+    <div id="turn-status" class="turn-status hidden"></div>
 
     <!-- Vľavo: P1 -->
     <div class="hud hud-box hud-p1" id="hud-p1">
@@ -19,11 +21,11 @@
       <canvas class="hud-char" id="hud-char-p1" width="160" height="160"></canvas>
       <div class="hud-stats">
         <div class="hud-stat">
-          <span class="bar-label" title="HP">❤️</span>
+          <span class="bar-label" title="HP">❤️<span class="bar-num hp-num">–</span></span>
           <div class="bar hp-bar" id="p1-hp"></div>
         </div>
         <div class="hud-stat">
-          <span class="bar-label" title="Mana">💧</span>
+          <span class="bar-label" title="Mana">💧<span class="bar-num mana-num">–</span></span>
           <div class="bar mana-bar" id="p1-mana"></div>
         </div>
       </div>
@@ -36,11 +38,11 @@
       <canvas class="hud-char" id="hud-char-p2" width="160" height="160"></canvas>
       <div class="hud-stats">
         <div class="hud-stat">
-          <span class="bar-label" title="HP">❤️</span>
+          <span class="bar-label" title="HP">❤️<span class="bar-num hp-num">–</span></span>
           <div class="bar hp-bar" id="p2-hp"></div>
         </div>
         <div class="hud-stat">
-          <span class="bar-label" title="Mana">💧</span>
+          <span class="bar-label" title="Mana">💧<span class="bar-num mana-num">–</span></span>
           <div class="bar mana-bar" id="p2-mana"></div>
         </div>
       </div>
@@ -72,43 +74,54 @@
 
   <div class="controls">
     <div class="actions">
-      <!-- Move — otvorí výber smeru -->
-      <div class="move-wrap">
-        <button id="move-btn" class="btn act move" title="Move — choose a direction">🚶</button>
-        <div id="dir-picker" class="dir-picker hidden">
-          <button class="btn arrow up"    data-act="move:up"    title="Move Up">↑</button>
-          <button class="btn arrow left"  data-act="move:left"  title="Move Left">←</button>
-          <button class="btn arrow right" data-act="move:right" title="Move Right">→</button>
-          <button class="btn arrow down"  data-act="move:down"  title="Move Down">↓</button>
+      <!-- skupiny akcií — label so „zátvorkou" nad sekciou -->
+      <div class="act-group" data-label="MOVE">
+        <!-- Move — otvorí výber smeru -->
+        <div class="move-wrap">
+          <button id="move-btn" class="btn act move" title="Move — choose a direction">🚶</button>
+          <div id="dir-picker" class="dir-picker hidden">
+            <button class="btn arrow up"    data-act="move:up"    title="Move Up">↑</button>
+            <button class="btn arrow left"  data-act="move:left"  title="Move Left">←</button>
+            <button class="btn arrow right" data-act="move:right" title="Move Right">→</button>
+            <button class="btn arrow down"  data-act="move:down"  title="Move Down">↓</button>
+          </div>
+        </div>
+
+        <!-- Dash — presun až o 2 políčka zvoleným smerom -->
+        <div class="move-wrap">
+          <button id="dash-btn" class="btn act dash" title="Dash — move up to 2 cells in a direction (−4 mana)">🏃<span class="cost">−4💧</span></button>
+          <div id="dash-picker" class="dir-picker hidden">
+            <button class="btn arrow up"    data-act="dash:up"    title="Dash Up">↑</button>
+            <button class="btn arrow left"  data-act="dash:left"  title="Dash Left">←</button>
+            <button class="btn arrow right" data-act="dash:right" title="Dash Right">→</button>
+            <button class="btn arrow down"  data-act="dash:down"  title="Dash Down">↓</button>
+          </div>
         </div>
       </div>
 
-      <!-- Dash — presun až o 2 políčka zvoleným smerom -->
-      <div class="move-wrap">
-        <button id="dash-btn" class="btn act dash" title="Dash — move up to 2 cells in a direction (−2 mana)">🏃<span class="cost">−2💧</span></button>
-        <div id="dash-picker" class="dir-picker hidden">
-          <button class="btn arrow up"    data-act="dash:up"    title="Dash Up">↑</button>
-          <button class="btn arrow left"  data-act="dash:left"  title="Dash Left">←</button>
-          <button class="btn arrow right" data-act="dash:right" title="Dash Right">→</button>
-          <button class="btn arrow down"  data-act="dash:down"  title="Dash Down">↓</button>
+      <div class="act-group" data-label="ATTACK">
+        <!-- Attack — otvorí výber smeru streľby -->
+        <div class="move-wrap">
+          <button id="attack-btn" class="btn act attack" title="Range Attack — choose a direction (−2 mana, damage by distance: 3/2/1, can't hit your own cell)">🏹<span class="cost">−2💧 ?☠️</span></button>
+          <div id="aim-picker" class="dir-picker hidden">
+            <button class="btn arrow up"    data-act="attack:up"    title="Shoot Up">↑</button>
+            <button class="btn arrow left"  data-act="attack:left"  title="Shoot Left">←</button>
+            <button class="btn arrow right" data-act="attack:right" title="Shoot Right">→</button>
+            <button class="btn arrow down"  data-act="attack:down"  title="Shoot Down">↓</button>
+          </div>
         </div>
+        <button class="btn act melee" data-act="melee" title="Melee (−4 mana, 8 dmg, hits only an opponent on your cell)">🗡️<span class="cost">−4💧 8☠️</span></button>
+        <button id="special-btn" class="btn act special" data-act="special" title="Special (−5 mana)">✨<span class="cost">−5💧</span></button>
       </div>
 
-      <button class="btn act mana" data-act="recharge" title="Recharge (+4 mana)">🙏<span class="cost">+4💧</span></button>
-      <button class="btn act shield" data-act="shield" title="Shield (−2 mana, blocks all damage of the opponent's next action)">🛡️<span class="cost">−2💧</span></button>
-      <button class="btn act block" data-act="block" title="Block (−1 mana, reduces the opponent's next action damage by 1)">🧱<span class="cost">−1💧</span></button>
-      <!-- Attack — otvorí výber smeru streľby -->
-      <div class="move-wrap">
-        <button id="attack-btn" class="btn act attack" title="Basic Attack — choose a direction (−2 mana, damage by distance: 3/2/1, can't hit your own cell)">⚔️<span class="cost">−2💧 ?☠️</span></button>
-        <div id="aim-picker" class="dir-picker hidden">
-          <button class="btn arrow up"    data-act="attack:up"    title="Shoot Up">↑</button>
-          <button class="btn arrow left"  data-act="attack:left"  title="Shoot Left">←</button>
-          <button class="btn arrow right" data-act="attack:right" title="Shoot Right">→</button>
-          <button class="btn arrow down"  data-act="attack:down"  title="Shoot Down">↓</button>
-        </div>
+      <div class="act-group" data-label="DEFEND">
+        <button class="btn act shield" data-act="shield" title="Shield (−2 mana, blocks all damage of the opponent's next action)">🛡️<span class="cost">−2💧</span></button>
+        <button class="btn act block" data-act="block" title="Block (−1 mana, reduces the opponent's next action damage by 1)">🧱<span class="cost">−1💧</span></button>
       </div>
-      <button class="btn act melee" data-act="melee" title="Melee (−8 mana, 8 dmg, hits only an opponent on your cell)">🗡️<span class="cost">−8💧 8☠️</span></button>
-      <button id="special-btn" class="btn act special" data-act="special" title="Special (−5 mana)">✨<span class="cost">−5💧</span></button>
+
+      <div class="act-group" data-label="MANA">
+        <button class="btn act mana" data-act="recharge" title="Recharge (+4 mana)">🙏<span class="cost">+4💧</span></button>
+      </div>
     </div>
 
     <div class="divider"></div>
@@ -139,12 +152,12 @@
     </div>
   </div>
 
-  <!-- Game over -->
+  <!-- Tretí a ďalší pripojený hráč — hra je plná, len informačná hláška -->
+  <div id="spectator" class="spectator hidden">Momentálne prebieha hra…</div>
+
+  <!-- Game over — verdikt sa píše do hud-turn, tu je len Play again v strede -->
   <div id="gameover" class="gameover hidden">
-    <div class="go-box">
-      <div id="go-text" class="go-text">GAME OVER</div>
-      <button id="retry" class="retry">Retry</button>
-    </div>
+    <button id="retry" class="retry">Play again?</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

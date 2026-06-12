@@ -28,15 +28,16 @@ const MAX_MANA = 10;
 const BASIC_COST    = 2;
 const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: vedľa 3, ďalej 2, najďalej 1 (vlastné políčko basic nezasahuje)
 
-const MELEE_COST = 8;
+const MELEE_COST = 4;
 const MELEE_DMG  = 8;  // úder zblízka — zasiahne len súpera na rovnakom políčku
+const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECIAL_BEAT_MS)
 
 const SPECIAL_COST = 5;
 const RECHARGE_GAIN = 4;
 const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
 const BLOCK_COST  = 1; // zníži dmg najbližšej súperovej akcie o 1
 const GOLDEN_COST = 3; // extra akcia hráča, ktorý je v kole druhý — štít vyhodnotený pred prvou akciou startera
-const DASH_COST   = 2; // presun až o 2 políčka jedným smerom
+const DASH_COST   = 4; // presun až o 2 políčka jedným smerom
 const GOLDEN_MANA_GAIN = 6; // golden mana refill: +6 many za HP; cena v HP rastie s každým použitím (1, 2, 3…)
 
 const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "block", "dash"]);
@@ -265,7 +266,10 @@ function doMelee(slot, tl) {
   me.mana -= MELEE_COST;
 
   // úder sa švihne vždy (mana je preč aj pri minutí), zasiahne len súpera na rovnakom políčku
-  pushStateFrame(tl, [{ kind: "melee", from: slot }], SMALL_DELAY_MS);
+  // rovnaká dramaturgia ako special: opakované švihy v beatoch, dmg padne až po nich
+  for (let r = 0; r < MELEE_REPEAT; r++) {
+    pushStateFrame(tl, [{ kind: "melee", from: slot }], SPECIAL_BEAT_MS);
+  }
   if (op && op.x === me.x && op.y === me.y) {
     applyHit(opS, MELEE_DMG, tl);
   }
@@ -561,6 +565,7 @@ io.on("connection", (socket) => {
   else if (!sockets.p2) { sockets.p2 = socket; slot = "p2"; }
 
   if (slot) socket.emit("you_are", slot);
+  else socket.emit("spectator"); // oba sloty obsadené — tretí a ďalší len dostanú info, že hra beží
   socket.emit("state", snapshot());
 
   socket.on("choose_character", (key) => {

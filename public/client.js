@@ -28,7 +28,6 @@ const logP1     = document.getElementById("log-p1");
 const logP2     = document.getElementById("log-p2");
 
 const goOverlay= document.getElementById("gameover");
-const goText   = document.getElementById("go-text");
 const retryBtn = document.getElementById("retry");
 
 const cs = getComputedStyle(document.documentElement);
@@ -83,7 +82,8 @@ const ANIM_DEF = {
   attack:  { file: "Attack_1.png", fps: 10, loop: false },
   attack2: { file: "Attack_2.png", fps: 10, loop: false },
   hurt:    { file: "Hurt.png",     fps: 10, loop: false },
-  dead:    { file: "Dead.png",     fps: 7,  loop: false }
+  dead:    { file: "Dead.png",     fps: 7,  loop: false },
+  victory: { file: "Idle.png", fps: 6, loop: true } // placeholder — raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
 };
 
 let me = null;
@@ -108,6 +108,9 @@ let lastAttackEndAt = { p1:0, p2:0 }; // kedy (v čase performance.now) dobehne 
 
 // preview loop
 let charPreviewRaf = 0;
+
+// od kedy je postava v HUD widgete mŕtva — Dead anim sa prehrá raz od tohto času
+let hudDeadSince = { p1: 0, p2: 0 };
 
 /* ---------- sprite helpers ---------- */
 function ensureSpriteMeta(charDir, file) {
@@ -164,16 +167,17 @@ function currentAnim(slot) {
   return def;
 }
 
-/* ---------- specials v strede boardu ---------- */
-function updateSpecialCenter(specials) {
+/* ---------- specials/melee v strede boardu ---------- */
+// veľký centrálny overlay — pre special efektový sprite mága, pre melee zväčšená postava so sekaním
+function updateSpecialCenter(casts) {
   actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
-  if (!Array.isArray(specials) || specials.length === 0) return;
+  if (!Array.isArray(casts) || casts.length === 0) return;
 
-  for (const sp of specials) {
+  for (const sp of casts) {
     const caster = state?.[sp.from];
     if (!caster || !caster.char) continue;
     const dirKey = CHAR_META[caster.char].dir;
-    const file   = SPECIAL_ANIMS[caster.char].file;
+    const file   = sp.file || SPECIAL_ANIMS[caster.char].file;
 
     const cvs = document.createElement("canvas");
     const px  = Math.round(TILE_H * SPECIAL_SCALE);
@@ -181,6 +185,7 @@ function updateSpecialCenter(specials) {
     cvs.className = "special-center";
     cvs.dataset.dir  = dirKey;
     cvs.dataset.file = file;
+    if (sp.fps) cvs.dataset.fps = sp.fps;
 
     const flip = sp.from === "p1" ? 1 : -1;
     cvs.style.left = "50%";
@@ -272,12 +277,36 @@ function renderBar(el, value) {
   }
   const v = Math.max(0, Math.min(10, Number(value) || 0));
   for (let i = 0; i < 10; i++) el.children[i].classList.toggle("on", i < v);
+  // presná hodnota pod barom — bez počítania dielikov
+  const num = el.closest(".hud-stat")?.querySelector(".bar-num");
+  if (num) num.textContent = String(v);
+}
+
+// banner pod ROUND textom: ja som locknutý a čaká sa na súpera / súper je locknutý a rad je na mne
+const turnStatusEl = document.getElementById("turn-status");
+function updateTurnStatus() {
+  if (!turnStatusEl) return;
+  const opSlot = me === "p1" ? "p2" : me === "p2" ? "p1" : null;
+  const mine = me ? state?.[me] : null;
+  const opp  = opSlot ? state?.[opSlot] : null;
+
+  let txt = null, cls = null;
+  if (!playing && !gameOverShown && mine?.char && opp?.char) {
+    if (mine.locked && !opp.locked)      { txt = "✔ LOCKED - WAITING FOR OPPONENT…"; cls = "waiting"; }
+    else if (!mine.locked && opp.locked) { txt = "⚠️ OPPONENT IS READY - YOUR MOVE! ⚠️"; cls = "your-move"; }
+  }
+
+  if (!txt) { turnStatusEl.classList.add("hidden"); return; }
+  turnStatusEl.textContent = txt;
+  turnStatusEl.classList.remove("hidden", "waiting", "your-move");
+  turnStatusEl.classList.add(cls);
 }
 
 function renderHUD() {
-  if (hudTurn) {
+  if (hudTurn && !gameOverShown) {
     hudTurn.textContent = `ROUND ${state.turn}`;
   }
+  updateTurnStatus();
   renderBar(hudP1Hp,   state?.p1?.hp);
   renderBar(hudP1Mana, state?.p1?.mana);
   renderBar(hudP2Hp,   state?.p2?.hp);
@@ -299,7 +328,7 @@ function actionIcon(action) {
     case "move":     return `🚶${arrow[action.dir] || ""}`;
     case "dash":     return `🏃${arrow[action.dir] || ""}`;
     case "recharge": return "🙏";
-    case "attack":   return `⚔️${arrow[action.dir] || ""}`;
+    case "attack":   return `🏹${arrow[action.dir] || ""}`;
     case "melee":    return "🗡️";
     case "shield":   return "🛡️";
     case "block":    return "🧱";
@@ -377,6 +406,7 @@ function renderGrid(s, effects = []) {
   const recharge = new Set();
   const charges  = [];
   const specials = [];
+  const meleeCasts = [];
   const procs    = [];
   let hitTarget  = null;
 
@@ -394,9 +424,11 @@ function renderGrid(s, effects = []) {
     if (e?.kind === "hit")       hitTarget = e.target;
     if (e?.kind === "tile_proc") procs.push(e);
     // melee úder — zvýrazni zasahovanú bunku (bunku útočníka)
+    // + zväčšená postava v strede so sekacou animáciou (analógia special overlay)
     if (e?.kind === "melee") {
       const caster = s?.[e.from];
       if (caster) previewSet.add(`${caster.x},${caster.y}`);
+      meleeCasts.push({ from: e.from, file: ANIM_DEF.attack2.file, fps: ANIM_DEF.attack2.fps });
     }
   }
 
@@ -476,7 +508,7 @@ function renderGrid(s, effects = []) {
     }
   }
 
-  updateSpecialCenter(specials);
+  updateSpecialCenter(specials.concat(meleeCasts));
 }
 
 /* ---------- Special preview (hover) ---------- */
@@ -655,7 +687,7 @@ function renderQueue() {
     } else if (a.type === "recharge") {
       div.classList.add("mana");  div.textContent = "🙏";
     } else if (a.type === "attack") {
-      div.classList.add("attack"); div.textContent = `⚔️${arrow[a.dir] || ""}`;
+      div.classList.add("attack"); div.textContent = `🏹${arrow[a.dir] || ""}`;
     } else if (a.type === "melee") {
       div.classList.add("melee"); div.textContent = "🗡️";
     } else if (a.type === "special") {
@@ -776,12 +808,17 @@ function showGameOverSequence(winner) {
     }
 
     setTimeout(() => {
-      let html;
-      if (winner === "draw")      html = "GAME OVER<br>TIE";
-      else if (me && winner === me) html = "GAME OVER<br>YOU ARE THE WINNER!";
-      else if (me)                  html = "GAME OVER<br>LOSER!";
-      else                          html = `GAME OVER<br>${winner.toUpperCase()} WINS`; // divák
-      goText.innerHTML = html;
+      // verdikt namiesto ROUND n v hud-turn — hlavné okno nič neprekrýva
+      let verdict, cls;
+      if (winner === "draw")        { verdict = "TIE"; cls = "tie"; }
+      else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
+      else if (me)                  { verdict = "LOSER!"; cls = "lose"; }
+      else                          { verdict = `${winner.toUpperCase()} WINS`; cls = "tie"; } // divák
+      if (hudTurn) hudTurn.innerHTML = `GAME OVER<span class="go-verdict ${cls}">${verdict}</span>`;
+      // uprac overlay z poslednej akcie (special/melee cast) — po game over ho už renderGrid neuprace
+      actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
+      // víťazova postavička spamuje cast animáciu priamo na svojom políčku (žiadny extra sprite)
+      if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
       goOverlay.classList.remove("hidden");
     }, afterDeathWait);
   }, waitAttack);
@@ -1156,9 +1193,26 @@ retryBtn.addEventListener("click", () => { socket.emit("retry"); });
 /* ---------- Sockets ---------- */
 socket.on("you_are", (slot) => { me = slot; });
 
+// hra je plná — divák hru sleduje, ale nemá výber postavy ani ovládanie (box s hláškou dole)
+let isSpectator = false;
+socket.on("spectator", () => {
+  isSpectator = true;
+  document.getElementById("spectator")?.classList.remove("hidden");
+  selEl.classList.add("hidden");
+  stopCharSelectPreview();
+  const controls = document.querySelector(".controls-row");
+  if (controls) controls.style.display = "none";
+});
+
 socket.on("reset", () => {
   playGen++;        // zruš prípadné bežiace prehrávanie
   playing = false;
+
+  // reset game-over stavov ešte pred renderHUD — inak by guard nechal visieť GAME OVER text
+  serverWinner = null;
+  gameOverShown = false;
+  lastAttackEndAt = { p1:0, p2:0 };
+
   goOverlay.classList.add("hidden");
   chosenChar = null;
   dirPicker.classList.add("hidden");
@@ -1179,15 +1233,12 @@ socket.on("reset", () => {
   lockBtn.classList.remove("locked");
   lockBtn.disabled = false;
   lockBtn.textContent = "LOCK IN";
-  selEl.classList.remove("hidden");
-  startCharSelectPreview();
+  if (!isSpectator) {
+    selEl.classList.remove("hidden");
+    startCharSelectPreview();
+  }
   renderGrid({}, []);
   renderHUD();
-
-  // reset game-over stavov
-  serverWinner = null;
-  gameOverShown = false;
-  lastAttackEndAt = { p1:0, p2:0 };
 });
 
 socket.on("state", (s) => {
@@ -1200,8 +1251,8 @@ socket.on("state", (s) => {
     renderArenaLayers(s.arena, ARENAS_CLIENT[s.arena] || []);
   }
 
-  // char select overlay
-  if (!s[me]?.char) {
+  // char select overlay (divák bez slotu výber nikdy nevidí)
+  if (!isSpectator && !s[me]?.char) {
     selEl.classList.remove("hidden");
     startCharSelectPreview();
   } else if (!selEl.classList.contains("hidden")) {
@@ -1242,6 +1293,16 @@ function raf() {
   const now = performance.now();
   const map = { p1: actorP1, p2: actorP2 };
 
+  // po vypršaní facing override (streľba do strany) otoč postavu späť k súperovi —
+  // positionActors sa inak volá len pri timeline frame-och, takže posledná akcia kola by ostala "visieť"
+  for (const slot of ["p1", "p2"]) {
+    const ov = facingOverride[slot];
+    if (ov.sx && now >= ov.until) {
+      ov.sx = 0;
+      if (state?.p1 && state?.p2) positionActors(state);
+    }
+  }
+
   ["p1","p2"].forEach(slot => {
     const cvs = map[slot];
     const st  = state?.[slot];
@@ -1255,7 +1316,10 @@ function raf() {
     cvs.style.display = "block";
 
     const dir  = CHAR_META[st.char].dir;
-    const anim = currentAnim(slot);
+    // victory = slučka special efektu daného mága (nie melee švih) priamo na actor canvase
+    const anim = animState[slot].key === "victory"
+      ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
+      : currentAnim(slot);
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, now, ACTOR_W, ACTOR_H))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
@@ -1302,9 +1366,18 @@ function raf() {
     cvs.classList.toggle("critical", hp > 0 && hp <= 3);
     cvs.classList.toggle("dead",     hp <= 0);
 
+    // mŕtvy: prehraj Dead raz od momentu úmrtia a zamrzni na poslednom frame
     const dir = CHAR_META[st.char].dir;
-    ensureSpriteMeta(dir, ANIM_DEF.idle.file)
-      .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, cvs.width, cvs.height))
+    let anim = ANIM_DEF.idle, t = now;
+    if (hp <= 0) {
+      if (!hudDeadSince[slot]) hudDeadSince[slot] = now;
+      anim = ANIM_DEF.dead;
+      t = now - hudDeadSince[slot];
+    } else {
+      hudDeadSince[slot] = 0;
+    }
+    ensureSpriteMeta(dir, anim.file)
+      .then(meta => drawSprite(ctx, meta, anim, t, cvs.width, cvs.height))
       .catch(() => {});
   });
 
@@ -1322,7 +1395,7 @@ function raf() {
     const ctx  = cvs.getContext("2d");
     const dir  = cvs.dataset.dir;
     const file = cvs.dataset.file;
-    const anim = { file, fps: SPECIAL_FPS, loop: true };
+    const anim = { file, fps: Number(cvs.dataset.fps) || SPECIAL_FPS, loop: true };
     ensureSpriteMeta(dir, file)
       .then(meta => drawSprite(ctx, meta, anim, performance.now(), cvs.width, cvs.height))
       .catch(()=>{});

@@ -38,6 +38,36 @@ body {
     0 0 28px rgba(255,140,0,.4);
 }
 
+/* indikácia ťahu pod ROUND textom — "čakám na súpera" / "súper čaká na teba" */
+.turn-status{
+  position: fixed;
+  top: 96px; left: 50%; transform: translateX(-50%);
+  z-index: 3;
+  padding: 6px 18px;
+  border-radius: 10px;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.22);
+  font-size: 15px; font-weight: 800; letter-spacing: 1px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.turn-status.hidden{ display: none; }
+.turn-status.waiting{
+  color: #6fdc6f;
+  border-color: rgba(110,220,110,.6);
+  animation: lock-pulse 1.1s ease-out infinite; /* rovnaký zelený pulz ako pripravený LOCK IN */
+}
+.turn-status.your-move{
+  color: #ffd54f;
+  border-color: rgba(255,213,79,.65);
+  animation: warn-pulse 1.1s ease-out infinite;
+}
+@keyframes warn-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255,213,79,.7); }
+  70%  { box-shadow: 0 0 0 14px rgba(255,213,79,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,213,79,0); }
+}
+
 /* ========== Stage & Board ========== */
 .stage { position: relative; z-index: 1; display: grid; place-items: center; width: 100vw; height: 100vh; padding: 16px; }
 .game  { display: grid; gap: 14px; }
@@ -174,6 +204,36 @@ body {
   white-space: nowrap;
 }
 .actions, .meta{ display: flex; gap: 8px; align-items: center; }
+
+/* skupina akcií — label + „zátvorka" ⌐‾‾¬ nad tlačidlami sekcie */
+.act-group{
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 20px;
+}
+.act-group::after{
+  content: attr(data-label);
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  color: rgba(255,255,255,.65);
+  pointer-events: none;
+}
+.act-group::before{
+  content: "";
+  position: absolute;
+  top: 13px; left: 2px; right: 2px;
+  height: 6px;
+  border: 1px solid rgba(255,255,255,.28);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  pointer-events: none;
+}
 
 /* vizuálny predel medzi akciami a undo/lock */
 .controls .divider{
@@ -360,15 +420,45 @@ body {
 .char-name { font-weight: 700; }
 
 /* Game Over */
-.gameover { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; background: rgba(0,0,0,.6); backdrop-filter: blur(3px); }
-.gameover.hidden { display: none; }
-.go-box { display: grid; gap: 14px; justify-items: center; }
-.go-text {
-  font-size: 42px; font-weight: 900; text-align: center; line-height: 1.3;
-  padding: 16px 26px; border-radius: 14px; background: rgba(0,0,0,.55); border: 1px solid #333;
+/* hláška pre tretieho a ďalších pripojených — semi-transparentný box, hru vidí a môže sledovať */
+.spectator{
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+  z-index: 10;
+  padding: 12px 26px;
+  border-radius: 12px;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.25);
+  box-shadow: 0 4px 18px rgba(0,0,0,.35);
+  font-size: 20px; font-weight: 800; letter-spacing: 1px;
+  text-align: center;
+  pointer-events: none;
 }
-.retry { padding: 10px 16px; border-radius: 10px; border: 1px solid #2a2b2e; background: #151515; color: #fff; cursor: pointer; }
-.retry:hover { background: #1e1e1e; }
+.spectator.hidden{ display: none; }
+
+/* game over neprekrýva plochu — len semi-transparentné tlačidlo v strede, verdikt ide do .hud-turn */
+.gameover { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
+.gameover.hidden { display: none; }
+.retry {
+  pointer-events: auto;
+  padding: 14px 30px;
+  border-radius: 12px;
+  border: 1px solid rgba(76,175,80,.85);
+  background: rgba(46,125,50,.55);
+  color: #eaffea;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  box-shadow: 0 4px 18px rgba(0,0,0,.35);
+}
+.retry:hover { background: rgba(56,142,60,.8); }
+
+/* verdikt pod GAME OVER v hud-turn */
+.hud-turn .go-verdict { display: block; text-align: center; font-size: 34px; letter-spacing: 4px; }
+.hud-turn .go-verdict.win  { color: #6fdc6f; -webkit-text-stroke: 1px #0a3d0a; text-shadow: 0 2px 0 #0a3d0a, 0 0 24px rgba(80,220,80,.45); }
+.hud-turn .go-verdict.lose { color: #ff6b6b; -webkit-text-stroke: 1px #4d0a0a; text-shadow: 0 2px 0 #4d0a0a, 0 0 24px rgba(255,80,80,.4); }
+.hud-turn .go-verdict.tie  { color: #ddd; -webkit-text-stroke: 1px #333; }
 
 .panel { display: grid; gap: 8px; justify-items: center; }
 
@@ -530,6 +620,16 @@ body {
   }
   /* HP/MP bary — 10 dielikov, vertikálne (plnia sa zdola) */
   .bar-label{ font-size: 18px; }
+  /* presná hodnota hneď vedľa ikony — farba podľa baru */
+  .bar-num{
+    margin-left: 4px;
+    font-size: 16px;
+    font-weight: 800;
+    vertical-align: middle;
+    text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  }
+  .bar-num.hp-num  { color: #ff5a5a; }
+  .bar-num.mana-num{ color: #57a9ff; }
   .bar{ display: flex; flex-direction: column-reverse; gap: 3px; width: 100%; }
   .bar .seg{
     width: 100%; height: 12px;
