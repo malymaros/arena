@@ -276,10 +276,10 @@ function renderArenaLayers(arenaKey, layerFiles) {
   });
 }
 
-/* ---------- pixel-art ikony špeciálnych políčok ---------- */
+/* ---------- pixel-art ikony (tiles, tlačidlá, HUD) ---------- */
 // 8×8 mriežka, znak = farba z palety, bodka = priehľadné; kreslí sa ako SVG rect-y (crispEdges)
-const TILE_PIX = {
-  dmg: { pal: { a: "#ff7043", b: "#ffd54f" }, rows: [
+const PIX = {
+  flame: { pal: { a: "#ff7043", b: "#ffd54f" }, rows: [
     "....a...",
     "...aa...",
     "..aaaa..",
@@ -289,7 +289,8 @@ const TILE_PIX = {
     ".abbbba.",
     "..aaaa..",
   ]},
-  heal: { pal: { a: "#e53935", b: "#ff8a80" }, rows: [
+  heart: { pal: { a: "#e53935", b: "#ff8a80" }, rows: [
+    "........",
     ".aa..aa.",
     "abaaaaaa",
     "aaaaaaaa",
@@ -297,9 +298,8 @@ const TILE_PIX = {
     ".aaaaaa.",
     "..aaaa..",
     "...aa...",
-    "........",
   ]},
-  mana: { pal: { a: "#1e88e5", b: "#82c4ff" }, rows: [
+  drop: { pal: { a: "#1e88e5", b: "#82c4ff" }, rows: [
     "...a....",
     "...aa...",
     "..aaaa..",
@@ -309,7 +309,7 @@ const TILE_PIX = {
     ".baaaaa.",
     "..aaaa..",
   ]},
-  ik: { pal: { a: "#e8e8e8", b: "#1a1a1a" }, rows: [
+  skull: { pal: { a: "#e8e8e8", b: "#1a1a1a" }, rows: [
     "..aaaa..",
     ".aaaaaa.",
     ".abaaba.",
@@ -319,9 +319,89 @@ const TILE_PIX = {
     "..aaaa..",
     "..a..a..",
   ]},
+  boot: { pal: { a: "#e0e0e0", b: "#8d6e63" }, rows: [
+    "..aaa...",
+    "..aaa...",
+    "..aaa...",
+    "..aaa...",
+    "..aaaa..",
+    "..aaaaa.",
+    ".bbbbbb.",
+    "........",
+  ]},
+  chevrons: { pal: { a: "#ffffff" }, rows: [
+    "aa..aa..",
+    ".aa..aa.",
+    "..aa..aa",
+    ".aa..aa.",
+    "aa..aa..",
+    "........",
+    "........",
+    "........",
+  ]},
+  plus: { pal: { a: "#82c4ff" }, rows: [
+    "...aa...",
+    "...aa...",
+    ".aaaaaa.",
+    ".aaaaaa.",
+    "...aa...",
+    "...aa...",
+    "........",
+    "........",
+  ]},
+  shield: { pal: { a: "#00363d", b: "#b2ebf2" }, rows: [
+    ".aaaaaa.",
+    ".abbbba.",
+    ".abbbba.",
+    ".abbbba.",
+    "..abba..",
+    "..abba..",
+    "...aa...",
+    "........",
+  ]},
+  mirror: { pal: { a: "#d4a017", b: "#b2ebf2", c: "#ffffff" }, rows: [
+    ".aaaaaa.",
+    ".abbbba.",
+    ".abbcba.",
+    ".abcbba.",
+    ".acbbba.",
+    ".abbbba.",
+    ".aaaaaa.",
+    "........",
+  ]},
+  arrow: { pal: { a: "#fff3c4" }, rows: [
+    "........",
+    ".....a..",
+    "......a.",
+    "aaaaaaaa",
+    "......a.",
+    ".....a..",
+    "........",
+    "........",
+  ]},
+  sword: { pal: { a: "#e0e0e0", c: "#6d4c41", d: "#d4a017" }, rows: [
+    "...aa...",
+    "...aa...",
+    "...aa...",
+    "...aa...",
+    ".dddddd.",
+    "...cc...",
+    "...cc...",
+    "........",
+  ]},
+  star: { pal: { a: "#e1bee7", b: "#ffffff" }, rows: [
+    "...aa...",
+    "..aaaa..",
+    ".aabbaa.",
+    "aabbbbaa",
+    ".aabbaa.",
+    "..aaaa..",
+    "...aa...",
+    "........",
+  ]},
 };
-function tileSvg(type) {
-  const def = TILE_PIX[type];
+function pixSvg(name) {
+  const def = PIX[name];
   if (!def) return "";
   let rects = "";
   def.rows.forEach((row, y) => {
@@ -331,6 +411,29 @@ function tileSvg(type) {
     }
   });
   return `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+}
+// malá inline ikonka do cost riadkov — pixelizované emoji, hydratuje hydratePix()
+const miniPix = (emoji) => `<span class="pix-ico mini" data-emoji="${emoji}"></span>`;
+// špeciálne políčka mapujú na ikony knižnice
+const TILE_TO_PIX = { dmg: "flame", heal: "heart", mana: "drop", ik: "skull" };
+function tileSvg(type) { return pixSvg(TILE_TO_PIX[type] || type); }
+
+// jemná pixelizácia emoji: nakreslí sa do malého canvasu a CSS ho roztiahne s pixelated
+function hydratePix(root = document) {
+  root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => {
+    if (el.dataset.done) return;
+    el.dataset.done = "1";
+    el.innerHTML = "";
+    const res = el.classList.contains("mini") ? 10 : 20;
+    const cvs = document.createElement("canvas");
+    cvs.width = res; cvs.height = res;
+    const ctx = cvs.getContext("2d");
+    ctx.font = `${res - 3}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(el.dataset.emoji, res / 2, res / 2 + 1);
+    el.appendChild(cvs);
+  });
 }
 
 /* ---------- HUD ---------- */
@@ -1223,7 +1326,7 @@ function updateGoldenButton() {
     goldenManaBtn.classList.toggle("hidden", !available);
     // cena v HP rastie s každým použitím (1, 2, 3…)
     const cost = (state?.[me]?.manaRefills ?? 0) + 1;
-    if (gmCostEl) gmCostEl.textContent = `−${cost}❤️ +6💧`;
+    if (gmCostEl) { gmCostEl.innerHTML = `−${cost}${miniPix("❤️")} +6${miniPix("💧")}`; hydratePix(gmCostEl); }
   }
 }
 
@@ -1373,7 +1476,7 @@ socket.on("state", (s) => {
   if (dmg != null && specialBtn) {
     specialBtn.title = `Special (−5 mana, ${dmg} dmg)`;
     const cost = specialBtn.querySelector(".cost");
-    if (cost) cost.textContent = `−5💧 ${dmg}☠️`;
+    if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
   }
 });
 
@@ -1501,6 +1604,11 @@ function raf() {
 requestAnimationFrame(raf);
 
 /* ---------- Initial ---------- */
+// hydratácia pixel ikon — [data-emoji] dostanú pixelizovaný emoji canvas,
+// [data-pix] ručne kreslené SVG z PIX knižnice (HP/mana v HUD)
+hydratePix();
+document.querySelectorAll(".pix-ico[data-pix]").forEach(el => { el.innerHTML = pixSvg(el.dataset.pix); });
+
 gridEl.style.gridTemplateColumns = `repeat(${board.w}, ${TILE_W}px)`;
 gridEl.style.gridTemplateRows = `repeat(${board.h}, ${TILE_H}px)`;
 renderGrid({}, []);
