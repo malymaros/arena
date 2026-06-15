@@ -23,8 +23,10 @@ function startServer() {
 function connect() {
   return new Promise((resolve, reject) => {
     const sock = io(URL, { transports: ["websocket"] });
-    const ctx = { sock, slot: null, lastState: null, lastTimeline: null, gameOver: null };
-    sock.on("you_are", (s) => { ctx.slot = s; });
+    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null };
+    sock.on("you_are", (s) => { ctx.slot = s?.slot ?? s; ctx.isHost = !!s?.isHost; });
+    sock.on("game_result", (g) => { ctx.gameResult = g; });
+    sock.on("new_game", () => { /* séria: ďalšia hra — sloty prídu cez you_are */ });
     sock.on("state", (s) => {
       ctx.lastState = s;
       if (s.timeline) ctx.lastTimeline = s.timeline;
@@ -98,9 +100,21 @@ function invariantCheck(tl, label) {
   }
 }
 
+// host nakonfiguruje zápas (single match, časovač vypnutý nech testy nikto neauto-lockne)
+function configureMatch(host, opts = {}) {
+  host.sock.emit("configure_match", {
+    format: opts.format || "single",
+    tilesPerRound: opts.tilesPerRound ?? 1,
+    tileWeights: opts.tileWeights || { dmg: 75, heal: 12, mana: 8, ik: 5 },
+    timer: opts.timer || "off",
+  });
+}
+
 async function freshGame(c1, c2) {
   c1.sock.emit("retry");
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 150));
+  configureMatch(c1);
+  await new Promise(r => setTimeout(r, 150));
   c1.sock.emit("choose_character", "fire");
   c2.sock.emit("choose_character", "lightning");
   await new Promise(r => setTimeout(r, 200));
@@ -329,6 +343,36 @@ async function main() {
   check(t14last.p1.y === 0, "T14: dash hore zo stredného radu presunie o 1 (clamp)",
     `pos=${t14last.p1.x},${t14last.p1.y}`);
   invariantCheck(tl, "T14b");
+
+  /* ---------- Test 15: BO3 séria — skóre, swap strán, game_over až pri rozhodnutí ---------- */
+  // mana-only tiles (žiadne dmg/heal/ik) => HP sa mení len cez akcie => kill je deterministický
+  c1.sock.emit("retry");
+  await new Promise(r => setTimeout(r, 150));
+  configureMatch(c1, { format: "bo3", tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+  await new Promise(r => setTimeout(r, 150));
+  c1.gameOver = null; c1.gameResult = null;
+  check(c1.slot === "p1" && c1.lastState?.series?.format === "bo3" && c1.lastState?.series?.needed === 2,
+    "T15: BO3 nakonfigurované, host hru 1 začína vľavo (p1)",
+    `slot=${c1.slot}, series=${JSON.stringify(c1.lastState?.series)}`);
+  c1.sock.emit("choose_character", "fire");
+  c2.sock.emit("choose_character", "lightning");
+  await new Promise(r => setTimeout(r, 200));
+  // 2 kolá: fire special (celý riadok 5 dmg) zabije p2 (10 HP); p2 ostáva na riadku y=1 bez obrany
+  await playRound(c1, c2, [R, SP, S], [M("left"), R, ML]);
+  tl = await playRound(c1, c2, [R, SP, S], [M("left"), R, ML]);
+  const t15last = tl[tl.length - 1];
+  check(t15last.p2.hp === 0, "T15: p2 padol vo 2. kole (fire special 2×5)", `p2 hp=${t15last.p2.hp}`);
+  check(c1.gameOver === null, "T15: pri vedení 1:0 v BO3 sa game_over NEodošle");
+  check(c1.gameResult && c1.gameResult.matchOver === false && c1.gameResult.gameWinner === "p1",
+    "T15: game_result hlási víťaza hry a matchOver=false", `gr=${JSON.stringify(c1.gameResult)}`);
+  check(c1.gameResult?.series?.winsP1 === 1 && c1.gameResult?.series?.winsP2 === 0,
+    "T15: skóre série 1:0 pre p1", `series=${JSON.stringify(c1.gameResult?.series)}`);
+  // počkaj na new_game + swap strán (server čaká na dohranie timeline na klientovi)
+  const t0 = Date.now();
+  while (c1.slot !== "p2" && Date.now() - t0 < 20000) await new Promise(r => setTimeout(r, 100));
+  check(c1.slot === "p2", "T15: v hre 2 sa strany prehodili — host je teraz vpravo (p2)", `slot=${c1.slot}`);
+  check(c1.lastState?.series?.gameIndex === 2, "T15: séria postúpila na hru 2",
+    `gameIndex=${c1.lastState?.series?.gameIndex}`);
 
   c1.sock.close(); c2.sock.close();
   server.kill();

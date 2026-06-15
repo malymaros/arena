@@ -436,18 +436,74 @@ body {
 /* Char select */
 .char-select {
   position: fixed; inset: 0; background: rgba(0,0,0,0.72);
-  display: flex; align-items: center; justify-content: center; gap: 28px; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; z-index: 9999;
 }
 .char-select.hidden { display: none; }
+.char-cards { display: flex; align-items: center; justify-content: center; gap: 28px; }
+
+/* náhľad špeciálnej abilitky pri hoveri nad mágom */
+.char-ability {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  height: 230px; /* fixná výška od začiatku — karty sú vyššie hneď, nič pri hoveri neskáče */
+}
+.char-ability.hidden { visibility: hidden; }
+.ca-title {
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 13px; color: #ffb300; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6);
+}
+.ca-grid { display: grid; gap: 3px; padding: 6px; background: rgba(12,14,18,.7); box-shadow: 0 0 0 2px #000; border-radius: 2px; }
+.ca-grid .mini-cell { position: relative; width: 42px; height: 30px; background: #2b2e34; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5); }
+/* zasiahnuté bunky pulzujú načerveno — podobne ako preview v hre */
+.ca-grid .mini-cell.hit { animation: mini-hit-pulse 1s ease-in-out infinite; }
+@keyframes mini-hit-pulse {
+  0%, 100% { background: #7a2a1c; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5); }
+  50%      { background: #ff5a3c; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), 0 0 10px rgba(255,90,60,.85); }
+}
+.ca-grid .mini-cell.caster { background: #ffb300; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), inset 0 0 0 3px rgba(0,0,0,.25); }
+/* malý castiaci mág priamo v bunke castera */
+.ca-grid .mini-cell .mini-caster { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.ca-text {
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 11px; color: #cfd2d6; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6);
+}
+/* dmg + mana, výraznejšie pod popisom útoku */
+.ca-stats {
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 18px; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.65);
+}
+.ca-stats .ca-dmg { color: #ff7a4d; display: inline-flex; align-items: center; gap: 8px; }
+.ca-stats .pix-ico { width: 24px; height: 24px; }
+/* jemné dorovnanie čísla k lebke (lebka je v emoji vizuálne nižšie) */
+.ca-stats .ca-num { position: relative; top: 1px; }
 .char-card {
-  width: 220px; height: 240px; padding: 16px; border-radius: 16px;
-  background: #121315; color: #fff; border: 1px solid #2a2b2e; cursor: pointer; text-align: center;
-  display: grid; grid-template-rows: 1fr auto; gap: 10px;
+  width: 220px; height: 240px; padding: 0; border-radius: 2px;
+  background: #5a6473; color: #fff; border: none; cursor: pointer; text-align: center;
+  position: relative; overflow: hidden; /* sprite vyplní celú kartu, orez je až na ráme karty */
+  /* oranžový pixel okraj — farba hry; tvrdý čierny obrys + bevel ako zvyšok UI */
+  box-shadow:
+    0 0 0 3px #ffb300,
+    0 0 0 5px #000,
+    inset 0 3px 0 rgba(255,255,255,.06),
+    inset 0 -4px 0 rgba(0,0,0,.5);
   transition: transform .15s ease, box-shadow .15s ease;
 }
-.char-card:hover { transform: translateY(-4px); box-shadow: 0 8px 28px rgba(0,0,0,.45); }
-.char-canvas { width: 160px; height: 160px; justify-self: center; image-rendering: pixelated; }
-.char-name { font-weight: 700; }
+.char-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 0 0 3px #ffc333,
+    0 0 0 5px #000,
+    0 10px 28px rgba(0,0,0,.5),
+    0 0 18px rgba(255,179,0,.55);
+}
+.char-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.char-name {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 8px;
+  background: linear-gradient(transparent, rgba(0,0,0,.7));
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 10px; line-height: 1.5; color: #ffb300; letter-spacing: 1px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,.7);
+}
 
 /* Game Over */
 /* hláška pre tretieho a ďalších pripojených — semi-transparentný pixel box, hru vidí a môže sledovať */
@@ -503,6 +559,117 @@ body {
 .hud-turn .go-verdict.tie  { color: #ddd;    text-shadow: 2px 2px 0 #333,    4px 4px 0 rgba(0,0,0,.55); }
 
 .panel { display: grid; gap: 8px; justify-items: center; }
+
+/* ---------- Series crowns (BO3/BO5) + turn timer ---------- */
+/* placeholdery pod žrďou vlajky (celá vlajka visí pod HUD boxom: top:100% + 40px margin, výška 308px),
+   centrované na stred widgetu hráča; nezískaná hra = obrys koruny, získaná = plná pixel-art koruna */
+.series-crowns{
+  position: absolute;
+  top: calc(100% + 392px); /* pod hrotom žrde vlajky, s odstupom */
+  left: 50%; transform: translateX(-50%);
+  display: flex; gap: 10px; justify-content: center;
+  z-index: 2; pointer-events: none;
+}
+.series-crowns.hidden{ display: none; }
+.series-crowns .crown{ width: 78px; height: 78px; display: inline-block; filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
+.series-crowns .crown svg{ display: block; width: 100%; height: 100%; }
+.series-crowns .crown.won{ filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
+.turn-timer{
+  position: fixed; top: 78px; left: 50%; transform: translateX(-50%);
+  z-index: 4;
+  padding: 8px 14px; border-radius: 2px;
+  background: rgba(12,14,18,.8); box-shadow: 0 0 0 2px #000;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 20px; letter-spacing: 1px; color: #e8e8e8;
+  text-shadow: 2px 2px 0 rgba(0,0,0,.6); pointer-events: none; min-width: 64px; text-align: center;
+}
+.turn-timer.hidden{ display: none; }
+/* quick-draw: časovač beží až keď súper locklne -> daj ho pod hlášku „OPPONENT IS READY" s medzerou */
+.turn-timer.below-status{ top: 172px; }
+.turn-timer.urgent{ color: #ff6b6b; animation: timer-pulse .5s steps(2) infinite; }
+@keyframes timer-pulse{ 50%{ transform: translateX(-50%) scale(1.12); } }
+
+/* ---------- Lobby (úvodná obrazovka hosta) ---------- */
+.lobby{
+  position: fixed; inset: 0; z-index: 9999; overflow: auto;
+  background: rgba(0,0,0,.82);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
+}
+.lobby.hidden{ display: none; }
+.lobby-card{
+  background: #121315; border: 1px solid #2a2b2e; box-shadow: 0 0 0 2px #000, 0 12px 40px rgba(0,0,0,.6);
+  border-radius: 4px; padding: 24px 28px; width: min(620px, 94vw);
+}
+.lobby-title{ font-size: 30px; color: #ffb300; text-align: center; margin: 0 0 4px;
+  text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.5); letter-spacing: 3px; }
+.lobby-sub{ font-size: 11px; color: #9aa; text-align: center; margin: 0 0 18px; letter-spacing: 1px; }
+.lobby-section{ margin-bottom: 18px; }
+.lobby-label{ font-size: 10px; color: #cfd2d6; letter-spacing: 1px; margin-bottom: 8px; }
+.opt-row{ display: flex; flex-wrap: wrap; gap: 8px; }
+.opt{
+  flex: 1 1 auto; min-width: 56px; padding: 10px 8px; cursor: pointer;
+  background: #1c1d20; color: #cfd2d6; border: none; box-shadow: 0 0 0 2px #000;
+  border-radius: 2px; font-family: inherit; font-size: 10px; letter-spacing: 1px;
+  text-shadow: 1px 1px 0 rgba(0,0,0,.6); transition: background .12s, color .12s;
+}
+.opt:hover{ background: #26282c; }
+/* aktívna voľba — oranžová, farba hry (rovnaká ako GAME OVER / ROUND) */
+.opt.active{ background: #ffb300; color: #2a1c00; box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3); }
+.weights{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.weight{ display: flex; align-items: center; gap: 8px; font-size: 10px; color: #cfd2d6; }
+.weight .w-ico{ width: 16px; height: 16px; display: inline-block; image-rendering: pixelated; flex: 0 0 auto; }
+.weight input{
+  width: 88px; margin-left: auto; padding: 6px 10px; background: #0c0e12; color: #fff; border: none; box-sizing: border-box;
+  box-shadow: 0 0 0 2px #000; border-radius: 2px; font-family: inherit; font-size: 11px; text-align: left; flex: 0 0 auto;
+}
+.weight .pct{ color: #888; font-size: 10px; flex: 0 0 auto; }
+.weights-sum{ margin-top: 8px; font-size: 10px; color: #ffb300; }
+.weights-sum.bad{ color: #ff6b6b; }
+.lobby-start{
+  width: 100%; margin-top: 8px; padding: 16px; cursor: pointer; border: none; border-radius: 2px;
+  background: #ffb300; color: #2a1c00; font-family: inherit; font-size: 14px; letter-spacing: 2px;
+  text-shadow: 1px 1px 0 rgba(255,255,255,.25);
+  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
+}
+.lobby-start:hover{ background: #ffc333; }
+.lobby-start:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
+.lobby-start:disabled{ background: #444; color: #888; cursor: not-allowed; box-shadow: 0 0 0 2px #000; }
+
+.lobby-wait{
+  position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.82);
+  display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 14px; color: #cfd2d6;
+  letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6); line-height: 1.8;
+}
+.lobby-wait.hidden{ display: none; }
+
+/* ---------- Intermission (medzi hrami série) ---------- */
+.intermission{
+  position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,.75);
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
+}
+.intermission.hidden{ display: none; }
+.intermission-box{ text-align: center; }
+.im-title{ font-size: 22px; color: #ffd54f; text-shadow: 3px 3px 0 rgba(0,0,0,.5); margin-bottom: 24px; letter-spacing: 2px; }
+.im-crowns{ display: flex; align-items: flex-start; justify-content: center; gap: 32px; margin-bottom: 26px; }
+.im-col{ display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.im-side{ display: flex; gap: 10px; min-height: 48px; }
+.im-side .crown{ width: 48px; height: 48px; display: inline-block; filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
+.im-side .crown svg{ display: block; width: 100%; height: 100%; }
+.im-who{ font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 11px; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6); }
+.im-who.you{ color: #ffb300; }
+.im-who.opp{ color: #9aa; }
+.im-vs{ align-self: center; font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 14px; color: #9aa; text-shadow: 2px 2px 0 rgba(0,0,0,.6); }
+/* novo získaná koruna „dopadne" — zväčší sa a so žiarou sadne na miesto */
+.im-side .crown.new{ animation: crown-pop .8s ease-out both; }
+@keyframes crown-pop{
+  0%   { transform: scale(2.6) rotate(-22deg); opacity: 0; filter: drop-shadow(0 0 18px #ffd54f); }
+  55%  { transform: scale(1.25) rotate(7deg);  opacity: 1; filter: drop-shadow(0 0 14px #ffd54f); }
+  100% { transform: scale(1) rotate(0);        opacity: 1; filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
+}
+.im-next{ font-size: 12px; color: #9aa; letter-spacing: 1px; }
 
 /* kompaktnejšie na menších šírkach */
 @media (max-width: 1100px){

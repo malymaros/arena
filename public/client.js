@@ -30,6 +30,13 @@ const logP2     = document.getElementById("log-p2");
 const goOverlay= document.getElementById("gameover");
 const retryBtn = document.getElementById("retry");
 
+const lobbyEl     = document.getElementById("lobby");
+const lobbyWaitEl = document.getElementById("lobby-wait");
+const intermissionEl = document.getElementById("intermission");
+const crownsP1El = document.getElementById("crowns-p1");
+const crownsP2El = document.getElementById("crowns-p2");
+const turnTimerEl    = document.getElementById("turn-timer");
+
 const cs = getComputedStyle(document.documentElement);
 const TILE_W = parseInt(cs.getPropertyValue("--tile-w")) || 260;
 const TILE_H = parseInt(cs.getPropertyValue("--tile-h")) || 185;
@@ -70,6 +77,8 @@ const SPECIAL_ANIMS = {
   lightning: { file: "Light_charge.png", fps: SPECIAL_FPS, loop: true },
   wanderer:  { file: "Magic_sphere.png", fps: SPECIAL_FPS, loop: true },
 };
+// niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
+const FX_OFFSET_X = { lightning: 0.18 };
 
 const CHAR_META = {
   fire:      { name: "Fire Wizard",      dir: "fire" },
@@ -87,12 +96,16 @@ const ANIM_DEF = {
 };
 
 let me = null;
+let isHost = false;               // prvý pripojený hráč nastavuje zápas v lobby
+let serverGameResult = null;      // výsledok poslednej dohranej hry (séria) — vyhodnotí sa na konci timeline
 let board = { w: 4, h: 3 };
-let state = { p1:null, p2:null, arena:null, turn:1, starter:"p1" };
+let state = { p1:null, p2:null, arena:null, turn:1, starter:"p1", phase:"lobby" };
 let myQueue = [];
 let goldenArmed = false;     // objednaný golden shield (extra akcia pred kolom, len keď som druhý)
 let goldenManaArmed = false; // objednaný golden mana refill (extra akcia po konci kola)
 let chosenChar = null;
+let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
+let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
 
 // počas special castu skryjeme bežný actor sprite
 let castingNow = { p1:false, p2:false };
@@ -129,14 +142,15 @@ function ensureSpriteMeta(charDir, file) {
     img.src = `/assets/${charDir}/${file}`;
   });
 }
-function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H) {
+function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0) {
   const idx = anim.loop ? Math.floor((t / (1000 / anim.fps)) % meta.frames)
                         : Math.min(meta.frames - 1, Math.floor(t / (1000 / anim.fps)));
   const sx = idx * meta.fw;
-  const scale = Math.min(dstW / meta.fw, dstH / meta.fh) * 0.95;
+  const scale = Math.min(dstW / meta.fw, dstH / meta.fh) * fill;
   const dw = meta.fw * scale, dh = meta.fh * scale;
-  const dx = (dstW - dw) / 2, dy = (dstH - dh) / 2;
-  ctx.clearRect(0, 0, dstW, dstH);
+  // anchorY: 0 = hore, 0.5 = stred, 1 = dole; offsetX/offsetY = posun v px (záporné offsetY dvíha hore)
+  const dx = (dstW - dw) / 2 + offsetX, dy = (dstH - dh) * anchorY + offsetY;
+  if (clear) ctx.clearRect(0, 0, dstW, dstH); // clear=false -> vrstvenie (efekt navrch mága)
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(meta.img, sx, 0, meta.fw, meta.fh, dx, dy, dw, dh);
 }
@@ -477,6 +491,28 @@ const PIX = {
     "...aa...",
     "........",
   ]},
+  // séria — vyhratá hra: plná zlatá koruna s gemmami
+  crown: { pal: { a: "#ffcf3f", b: "#c98a17", c: "#ff5a5a" }, rows: [
+    ".a.aa.a.",
+    ".a.aa.a.",
+    ".aaaaaa.",
+    ".acaaca.",
+    ".abaaba.",
+    ".aaaaaa.",
+    "........",
+    "........",
+  ]},
+  // séria — nezískaná hra: len obrys koruny (tlmená zlatá)
+  crown_outline: { pal: { o: "#7d6526" }, rows: [
+    ".o.oo.o.",
+    ".o.oo.o.",
+    ".oo..oo.",
+    ".o....o.",
+    ".o....o.",
+    ".oooooo.",
+    "........",
+    "........",
+  ]},
 };
 function pixSvg(name) {
   const def = PIX[name];
@@ -557,10 +593,16 @@ function updateTurnStatus() {
   const mine = me ? state?.[me] : null;
   const opp  = opSlot ? state?.[opSlot] : null;
 
+  const timerMode = !!state?.config?.timer && state.config.timer !== "off";
   let txt = null, cls = null;
   if (!playing && !gameOverShown && mine?.char && opp?.char) {
-    if (mine.locked && !opp.locked)      { txt = "✔ LOCKED - WAITING FOR OPPONENT…"; cls = "waiting"; }
-    else if (!mine.locked && opp.locked) { txt = "⚠️ OPPONENT IS READY - YOUR MOVE! ⚠️"; cls = "your-move"; }
+    if (mine.locked && !opp.locked) {
+      // „locked - waiting" — vo fixnom časovom režime skry; v quickdraw a bezčasovom nechaj
+      if (!timerMode || state.config.timer === "quickdraw") { txt = "✔ LOCKED - WAITING FOR OPPONENT…"; cls = "waiting"; }
+    } else if (!mine.locked && opp.locked) {
+      // „your move" — nechaj v quickdraw (spúšťa časovač) a v bezčasovom režime; vo fixnom časovom skry
+      if (!timerMode || state.config.timer === "quickdraw") { txt = "⚠️ OPPONENT IS READY - YOUR MOVE! ⚠️"; cls = "your-move"; }
+    }
   }
 
   if (!txt) { turnStatusEl.classList.add("hidden"); return; }
@@ -571,7 +613,7 @@ function updateTurnStatus() {
 
 function renderHUD() {
   if (hudTurn && !gameOverShown) {
-    hudTurn.textContent = `ROUND ${state.turn}`;
+    hudTurn.textContent = (state?.phase === "playing") ? `ROUND ${state.turn}` : "";
   }
   updateTurnStatus();
   renderBar(hudP1Hp,   state?.p1?.hp);
@@ -727,7 +769,7 @@ function renderGrid(s, effects = []) {
 
       // tile podfarbenie + ikona; IK prekrýva všetko
       const tileType = tileMap.get(key);
-      const isIK = s?.ik && s.ik.x === x && s.ik.y === y;
+      const isIK = Array.isArray(s?.iks) && s.iks.some(t => t.x === x && t.y === y);
       if (isIK) {
         cell.classList.add("tile-ik");
       } else if (tileType) {
@@ -1016,6 +1058,12 @@ function renderQueue() {
 
   updateActionButtons();
   updateLockButton();
+  sendDraft(); // priebežne posli rozpracovanú voľbu serveru (pre backstop pri vypršaní času)
+}
+// pošli serveru aktuálnu rozpracovanú frontu + golden flagy (server ju pri timeoute zahrá a doplní chýbajúce)
+function sendDraft() {
+  if (!me || state?.phase !== "playing" || lockedIn || state?.[me]?.locked) return;
+  socket.emit("draft_queue", { queue: myQueue, golden: goldenArmed, goldenMana: goldenManaArmed });
 }
 // zneaktívni tlačidlá akcií, ktoré už sú v queue (každá max 1× za kolo)
 function updateActionButtons() {
@@ -1089,13 +1137,36 @@ function showGameOverSequence(winner) {
       else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
       else if (me)                  { verdict = "LOSER!"; cls = "lose"; }
       else                          { verdict = `${winner.toUpperCase()} WINS`; cls = "tie"; } // divák
-      if (hudTurn) hudTurn.innerHTML = `GAME OVER<span class="go-verdict ${cls}">${verdict}</span>`;
+      // pri sérii (BO3/BO5) doplň finálne skóre
+      const ser = serverGameResult?.series || state?.series;
+      let scoreLine = "";
+      if (ser && ser.format && ser.format !== "single") {
+        // skóre drží strany (ľavá : pravá), rovnako ako koruny v HUD — nie „ja : oponent"
+        scoreLine = `<span class="go-verdict tie">${ser.winsP1 ?? 0} : ${ser.winsP2 ?? 0}</span>`;
+        renderSeriesCrowns(ser); // dokresli finálne koruny (server po match_over už neposiela state)
+      }
+      if (hudTurn) hudTurn.innerHTML = `GAME OVER<span class="go-verdict ${cls}">${verdict}</span>${scoreLine}`;
       // uprac overlay z poslednej akcie (special/melee cast) — po game over ho už renderGrid neuprace
       actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
       // víťazova postavička spamuje cast animáciu priamo na svojom políčku (žiadny extra sprite)
       if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
       goOverlay.classList.remove("hidden");
     }, afterDeathWait);
+  }, waitAttack);
+}
+
+// animácia konca hry (smrť porazeného + víťazstvo) bez finálneho overlayu — pre medzihru série
+function playGameEndAnim(winner, after) {
+  const loser = winner === "p1" ? "p2" : (winner === "p2" ? "p1" : null);
+  const now = performance.now();
+  const lastEnd = Math.max(lastAttackEndAt.p1, lastAttackEndAt.p2);
+  const waitAttack = Math.max(0, lastEnd - now);
+  setTimeout(() => {
+    let afterDeathWait = 300;
+    if (winner !== "draw" && loser) { setAnim(loser, "dead", 1200); afterDeathWait = 1300; }
+    actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
+    if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
+    setTimeout(() => { if (after) after(); }, afterDeathWait);
   }, waitAttack);
 }
 
@@ -1108,13 +1179,14 @@ function schedulePlayTimeline(timeline) {
 
   const gen = ++playGen;
   playing = true;
+  stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) — zhasni prípadný stale časovač
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
 
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
 
   const first = timeline[0];
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
-  state.tiles = first.tiles; state.ik = first.ik;
+  state.tiles = first.tiles; state.iks = first.iks;
   renderHUD();
   const NEXT_TURN = (first.turn ?? state.turn) + 1;
   const NEXT_STARTER = (NEXT_TURN % 2 === 1) ? "p1" : "p2";
@@ -1130,10 +1202,14 @@ function schedulePlayTimeline(timeline) {
     if (i >= timeline.length) {
       playing = false;
 
-      // ak server zahlásil výhru alebo stav hovorí o výhre -> spusti GO sekvenciu (po animáciách)
-      const winner = serverWinner || computeWinnerFromState(state);
+      // koniec hry: ak séria pokračuje -> medzihra; ak je rozhodnutá -> game over
+      const winner = serverWinner || serverGameResult?.gameWinner || computeWinnerFromState(state);
       if (winner) {
-        showGameOverSequence(winner);
+        if (serverGameResult && !serverGameResult.matchOver) {
+          playGameEndAnim(winner, () => showIntermission(winner, serverGameResult.series));
+        } else {
+          showGameOverSequence(winner);
+        }
         return;
       }
 
@@ -1155,6 +1231,7 @@ function schedulePlayTimeline(timeline) {
       renderQueue();
       lockBtn.disabled = false;
       updateLockButton();
+      // časovač ďalšieho kola príde zo servera (turn_timer); displej sa zapne po dohraní timeline
       return;
     }
 
@@ -1164,7 +1241,7 @@ function schedulePlayTimeline(timeline) {
     const beforeP2 = prev?.p2 || state.p2;
 
     state.p1 = frame.p1; state.p2 = frame.p2;
-    state.tiles = frame.tiles; state.ik = frame.ik;
+    state.tiles = frame.tiles; state.iks = frame.iks;
     if (frame.starter !== undefined) {
       state.starter = frame.starter;
     }
@@ -1269,11 +1346,28 @@ function drawCharSelectFrame(now) {
     const dir = CHAR_META[key]?.dir;
     if (!dir) return;
     const ctx = cvs.getContext("2d");
-    const anim = ANIM_DEF.idle;
+    // mág, ktorého abilitku pozeráme: cyklicky prehráva animáciu SPECIÁLU (efektový sprite, rovnako ako v hre),
+    // v rovnakej veľkosti ako idle (centrovaný, nie zoomnutý)
+    const fx = (key === abilityHoverChar) && SPECIAL_ANIMS[key];
+    const anim = fx ? { file: SPECIAL_ANIMS[key].file, fps: SPECIAL_FPS, loop: true } : ANIM_DEF.idle;
+    // lightning efekt má obsah posunutý vľavo vo frame -> dorovnaj doprava
+    const offX = fx ? (FX_OFFSET_X[key] || 0) * cvs.width : 0;
+    // canvas vypĺňa celú kartu; sprite väčší, mierne zdvihnutý hore (offsetY), orez je až na ráme karty
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height))
+      .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height, 1.31, 0.98, true, offX, -52))
       .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
   });
+
+  // malý castiaci mág v bunke castera mini-dosky — tiež animácia špeciálu (efektový sprite)
+  if (abilityHoverChar && abilityCasterCanvas && SPECIAL_ANIMS[abilityHoverChar]) {
+    const dir = CHAR_META[abilityHoverChar]?.dir;
+    const fxAnim = { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
+    const offX = (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
+    if (dir) ensureSpriteMeta(dir, fxAnim.file)
+      .then(meta => drawSprite(abilityCasterCanvas.getContext("2d"), meta, fxAnim, now, abilityCasterCanvas.width, abilityCasterCanvas.height, 1.1, 0.5, true, offX))
+      .catch(() => {});
+  }
+
   if (!selEl.classList.contains("hidden")) {
     charPreviewRaf = requestAnimationFrame(drawCharSelectFrame);
   } else {
@@ -1281,6 +1375,8 @@ function drawCharSelectFrame(now) {
   }
 }
 function startCharSelectPreview() {
+  abilityHoverChar = null; abilityCasterCanvas = null; // bez hoveru žiadny cast; náhľad sa zobrazí až po nadídení
+  document.getElementById("char-ability")?.classList.add("hidden");
   if (charPreviewRaf) cancelAnimationFrame(charPreviewRaf);
   charPreviewRaf = requestAnimationFrame(drawCharSelectFrame);
 }
@@ -1296,6 +1392,58 @@ selEl.addEventListener("click", (e) => {
   chosenChar = key;
   socket.emit("choose_character", key);
 });
+
+/* ---------- Náhľad špeciálu mága (hover vo výbere) ---------- */
+const charAbilityEl = document.getElementById("char-ability");
+// reprezentatívna pozícia castera, ktorá najlepšie ukáže tvar zásahu daného mága + cena many špeciálu
+const SPECIAL_MANA = 5;
+const ABILITY_PREVIEW = {
+  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row" },
+  lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
+  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours" },
+};
+function renderAbilityPreview(char) {
+  const def = ABILITY_PREVIEW[char];
+  if (!def || !charAbilityEl) return;
+  abilityHoverChar = char; // preview loop prepne tohto mága na cyklický cast špeciálu
+  const w = board.w || 4, h = board.h || 3;
+  const hit = new Set(cellsForSpecialPreview({ x: def.caster.x, y: def.caster.y, char }).map(([x, y]) => `${x},${y}`));
+  const grid = document.getElementById("ca-grid");
+  grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
+  grid.innerHTML = "";
+  abilityCasterCanvas = null;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const c = document.createElement("div");
+    c.className = "mini-cell";
+    if (def.caster.x === x && def.caster.y === y) {
+      c.classList.add("caster");
+      // malý castiaci mág priamo v bunke castera (rAF ho cyklicky kreslí)
+      const mini = document.createElement("canvas");
+      mini.className = "mini-caster";
+      mini.width = 48; mini.height = 34;
+      c.appendChild(mini);
+      abilityCasterCanvas = mini;
+    } else if (hit.has(`${x},${y}`)) {
+      c.classList.add("hit");
+    }
+    grid.appendChild(c);
+  }
+  document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
+  document.getElementById("ca-text").textContent = def.desc;
+  const stats = document.getElementById("ca-stats");
+  stats.innerHTML = `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span></span>`;
+  hydratePix(stats);
+  charAbilityEl.classList.remove("hidden");
+}
+function clearAbilityPreview() {
+  abilityHoverChar = null;
+  abilityCasterCanvas = null;
+  charAbilityEl?.classList.add("hidden");
+}
+selEl.querySelectorAll(".char-card").forEach(card => {
+  card.addEventListener("mouseenter", () => renderAbilityPreview(card.dataset.char));
+});
+selEl.querySelector(".char-cards")?.addEventListener("mouseleave", clearAbilityPreview);
 
 /* ---------- Controls ---------- */
 const moveBtn    = document.getElementById("move-btn");
@@ -1463,13 +1611,189 @@ lockBtn.addEventListener("click", () => {
   lockBtn.classList.remove("ready");
   lockBtn.textContent = "LOCKED";
   lockBtn.disabled = true;
+  stopTurnTimer();
 });
 
 /* ---------- Retry ---------- */
 retryBtn.addEventListener("click", () => { socket.emit("retry"); });
 
+/* ---------- Phase UI (lobby / waiting / char-select) ---------- */
+const otherSlot = () => (me === "p1" ? "p2" : me === "p2" ? "p1" : null);
+
+function applyPhaseUI(s) {
+  const phase = s?.phase || "playing";
+  const controls = document.querySelector(".controls-row");
+
+  // lobby: host vidí nastavenia, druhý hráč čaká
+  if (phase === "lobby" && !isSpectator) {
+    if (isHost) { showLobby(s); lobbyWaitEl.classList.add("hidden"); }
+    else { lobbyEl.classList.add("hidden"); lobbyWaitEl.classList.remove("hidden"); }
+  } else {
+    lobbyEl.classList.add("hidden");
+    lobbyWaitEl.classList.add("hidden");
+  }
+
+  // char-select len v hernej fáze, kým nemám zvolenú postavu
+  const needChar = phase === "playing" && !isSpectator && me && !s?.[me]?.char;
+  if (needChar) { selEl.classList.remove("hidden"); startCharSelectPreview(); }
+  else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
+
+  if (controls && !isSpectator) controls.style.display = (phase === "playing") ? "" : "none";
+}
+
+// séria (BO3/BO5): v HUD boxe každého hráča rad placeholderov, ktoré sa po vyhratej hre menia na koruny
+function renderSeriesCrowns(ser) {
+  const single = !ser || !ser.format || ser.format === "single";
+  if (single) {
+    crownsP1El.classList.add("hidden"); crownsP2El.classList.add("hidden");
+    crownsP1El.innerHTML = ""; crownsP2El.innerHTML = "";
+    return;
+  }
+  const needed = ser.needed || 1;
+  // nezískaná hra -> obrys koruny; získaná -> plná pixel-art koruna
+  const build = (won) => Array.from({ length: needed },
+    (_, i) => `<span class="crown${i < won ? " won" : ""}">${pixSvg(i < won ? "crown" : "crown_outline")}</span>`).join("");
+  // koruny sú viazané na slot (ľavá/pravá strana); osoba si svoje výhry nesie na svoju aktuálnu stranu
+  crownsP1El.innerHTML = build(ser.winsP1 || 0);
+  crownsP2El.innerHTML = build(ser.winsP2 || 0);
+  crownsP1El.classList.remove("hidden"); crownsP2El.classList.remove("hidden");
+}
+function updateMatchScore(s) {
+  renderSeriesCrowns(s?.phase === "lobby" ? null : s?.series);
+}
+
+/* ---------- Turn timer (server-riadený displej + auto-lock) ---------- */
+// server posiela zostávajúci čas (event `turn_timer` aj `state.timerMs`), takže displej sedí so serverom
+// a po refreshi sa zosynchronizuje; klient pri vypršaní auto-lockne (drží už rozpracovanú frontu)
+const TIMER_DIRS = ["up", "down", "left", "right"];
+let serverTimerEndsAt = 0; // performance.now()-based deadline zo servera (0 = bez limitu)
+
+function setServerTimer(ms) {
+  serverTimerEndsAt = (ms == null) ? 0 : performance.now() + ms;
+}
+function stopTurnTimer() {
+  serverTimerEndsAt = 0;
+  turnTimerEl.classList.add("hidden");
+  turnTimerEl.classList.remove("urgent", "below-status");
+}
+// tik (volaný z raf): odpočet zobraz len počas plánovania; pri vypršaní auto-lockne
+function tickTurnTimer(now) {
+  const mine = state?.[me];
+  const planning = !!serverTimerEndsAt && !playing && !gameOverShown && state?.phase === "playing"
+    && !isSpectator && mine?.char && state?.[otherSlot()]?.char && !mine.locked;
+  if (!planning) {
+    turnTimerEl.classList.add("hidden");
+    turnTimerEl.classList.remove("urgent", "below-status");
+    return;
+  }
+  const remain = Math.max(0, serverTimerEndsAt - now);
+  turnTimerEl.classList.remove("hidden");
+  turnTimerEl.classList.toggle("below-status", state?.config?.timer === "quickdraw"); // pod „OPPONENT IS READY"
+  turnTimerEl.textContent = `⏱ ${Math.ceil(remain / 1000)}`;
+  turnTimerEl.classList.toggle("urgent", remain <= 5000);
+  if (remain <= 0) { serverTimerEndsAt = 0; autoLockTimeout(); }
+}
+// vyprší čas — náhodne doplň nevyplnené z 3 základných akcií a zamkni (gold akcie sa nikdy nepridajú samé)
+function autoLockTimeout() {
+  if (uiLocked() || playing || !me || state?.[me]?.locked) { stopTurnTimer(); return; }
+  const used = new Set(myQueue.map(a => a.type));
+  const pool = ["recharge", "shield", "mirror", "melee", "special", "move", "dash", "attack"].filter(t => !used.has(t));
+  while (myQueue.length < 3 && pool.length) {
+    const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
+    else myQueue.push({ type: t });
+  }
+  const payload = [...myQueue];
+  if (goldenArmed) payload.unshift({ type: "golden_shield" });
+  if (goldenManaArmed) payload.push({ type: "golden_mana" });
+  socket.emit("lock_in", payload);
+  lockedIn = true;
+  closePickers();
+  renderQueue();
+  lockBtn.classList.add("locked"); lockBtn.classList.remove("ready");
+  lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
+  stopTurnTimer();
+}
+
+/* ---------- Lobby (host nastavuje zápas) ---------- */
+let lobbyBuilt = false;
+function showLobby() {
+  lobbyEl.classList.remove("hidden");
+  if (lobbyBuilt) return;
+  lobbyBuilt = true;
+
+  // segmentové prepínače: klik nastaví .active v rámci skupiny
+  lobbyEl.querySelectorAll(".opt-row").forEach(row => {
+    row.addEventListener("click", (e) => {
+      const btn = e.target.closest(".opt");
+      if (!btn) return;
+      row.querySelectorAll(".opt").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
+
+  const sumEl = document.getElementById("lobby-weights-sum");
+  const startBtn = document.getElementById("lobby-start");
+  const inputs = [...lobbyEl.querySelectorAll("#lobby-weights input")];
+  const refreshSum = () => {
+    const sum = inputs.reduce((a, i) => a + (parseInt(i.value, 10) || 0), 0);
+    sumEl.textContent = `Total: ${sum}%`;
+    const ok = sum === 100;
+    sumEl.classList.toggle("bad", !ok);
+    startBtn.disabled = !ok;
+  };
+  inputs.forEach(i => i.addEventListener("input", refreshSum));
+  refreshSum();
+
+  startBtn.addEventListener("click", () => {
+    const pick = (id) => lobbyEl.querySelector(`#${id} .opt.active`)?.dataset.val;
+    const weights = {};
+    inputs.forEach(i => { weights[i.dataset.key] = parseInt(i.value, 10) || 0; });
+    const config = {
+      format: pick("lobby-format") || "single",
+      tilesPerRound: parseInt(pick("lobby-tiles-count") || "1", 10),
+      tileWeights: weights,
+      timer: pick("lobby-timer") || "off",
+    };
+    if (Object.values(weights).reduce((a, b) => a + b, 0) !== 100) return;
+    socket.emit("configure_match", config);
+  });
+}
+
+/* ---------- Intermission (medzi hrami série) ---------- */
+function showIntermission(gameWinner, series) {
+  const mineWon = me && gameWinner === me;
+  document.getElementById("im-title").textContent =
+    gameWinner === "draw" ? "TIE" : (mineWon ? "YOU WON THIS GAME!" : "YOU LOST THIS GAME");
+
+  const needed = series?.needed || 1;
+  // placeholdery + koruny pre obe strany; práve získaná koruna (posledná na víťaznej strane) sa animuje
+  const renderSide = (won, isWinnerSide) => Array.from({ length: needed }, (_, i) => {
+    const isWon = i < (won || 0);
+    const isNew = isWinnerSide && i === (won || 0) - 1;
+    return `<span class="crown${isNew ? " new" : ""}">${pixSvg(isWon ? "crown" : "crown_outline")}</span>`;
+  }).join("");
+  document.getElementById("im-crowns-l").innerHTML = renderSide(series?.winsP1, gameWinner === "p1");
+  document.getElementById("im-crowns-r").innerHTML = renderSide(series?.winsP2, gameWinner === "p2");
+
+  // popisky strán — kde som ja (slot pred swapom), drží strany ako koruny v HUD
+  const whoL = document.getElementById("im-who-l");
+  const whoR = document.getElementById("im-who-r");
+  whoL.textContent = me === "p1" ? "YOU" : "OPPONENT";
+  whoR.textContent = me === "p2" ? "YOU" : "OPPONENT";
+  whoL.className = "im-who " + (me === "p1" ? "you" : "opp");
+  whoR.className = "im-who " + (me === "p2" ? "you" : "opp");
+
+  document.getElementById("im-next").textContent = "Next game starting…";
+  intermissionEl.classList.remove("hidden");
+}
+
 /* ---------- Sockets ---------- */
-socket.on("you_are", (slot) => { me = slot; });
+// you_are nesie slot (ľavá/pravá rola, mení sa medzi hrami série) aj či som host
+socket.on("you_are", (info) => {
+  if (info && typeof info === "object") { me = info.slot; isHost = !!info.isHost; }
+  else { me = info; } // spätná kompat.
+});
 
 // hra je plná — divák hru sleduje, ale nemá výber postavy ani ovládanie (box s hláškou dole)
 let isSpectator = false;
@@ -1488,8 +1812,11 @@ socket.on("reset", () => {
 
   // reset game-over stavov ešte pred renderHUD — inak by guard nechal visieť GAME OVER text
   serverWinner = null;
+  serverGameResult = null;
   gameOverShown = false;
   lastAttackEndAt = { p1:0, p2:0 };
+  stopTurnTimer();
+  intermissionEl.classList.add("hidden");
 
   goOverlay.classList.add("hidden");
   chosenChar = null;
@@ -1511,10 +1838,8 @@ socket.on("reset", () => {
   lockBtn.classList.remove("locked");
   lockBtn.disabled = false;
   lockBtn.textContent = "LOCK IN";
-  if (!isSpectator) {
-    selEl.classList.remove("hidden");
-    startCharSelectPreview();
-  }
+  if (hudTurn) hudTurn.textContent = "";
+  // char-select / lobby riadi applyPhaseUI z nasledujúceho state eventu
   renderGrid({}, []);
   renderHUD();
 });
@@ -1529,14 +1854,9 @@ socket.on("state", (s) => {
     renderArenaLayers(s.arena, ARENAS_CLIENT[s.arena] || []);
   }
 
-  // char select overlay (divák bez slotu výber nikdy nevidí)
-  if (!isSpectator && !s[me]?.char) {
-    selEl.classList.remove("hidden");
-    startCharSelectPreview();
-  } else if (!selEl.classList.contains("hidden")) {
-    selEl.classList.add("hidden");
-    stopCharSelectPreview();
-  }
+  // lobby / čakanie / char-select podľa fázy hry
+  applyPhaseUI(s);
+  updateMatchScore(s);
 
   if (s.timeline) {
     // finálny stav (vrátane nových tiles) nevykresľuj hneď — ukáže ho až posledný frame timeline
@@ -1558,7 +1878,12 @@ socket.on("state", (s) => {
     const cost = specialBtn.querySelector(".cost");
     if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
   }
+
+  setServerTimer(s.timerMs ?? null); // synchronizuj odpočet so serverom (drží aj po refreshi)
 });
+
+// server posiela zostávajúci čas na ťah — klient sa naň synchronizuje (displej + auto-lock)
+socket.on("turn_timer", ({ ms }) => setServerTimer(ms));
 
 // Server stále posiela "game_over" – len si zapamätáme, nezobrazíme hneď overlay.
 // Overlay zobrazíme až po dobehnutí útoku a animácii smrti.
@@ -1566,10 +1891,38 @@ socket.on("game_over", ({ winner }) => {
   serverWinner = winner;
 });
 
+// výsledok jednej hry série — vyhodnotí sa až na konci prehrávania timeline
+socket.on("game_result", (r) => { serverGameResult = r; });
+
+// medzi hrami série: resetuj UI kola (skóre ostáva), char-select pre ďalšiu hru riadi nasledujúci state
+socket.on("new_game", () => {
+  playGen++; playing = false;
+  serverWinner = null; serverGameResult = null; gameOverShown = false;
+  lastAttackEndAt = { p1:0, p2:0 };
+  stopTurnTimer();
+  intermissionEl.classList.add("hidden");
+  goOverlay.classList.add("hidden");
+  chosenChar = null;
+  dirPicker.classList.add("hidden"); aimPicker.classList.add("hidden");
+  clearActionLogs();
+  myQueue = []; goldenArmed = false; goldenManaArmed = false; lockedIn = false;
+  document.getElementById("golden-btn")?.classList.remove("armed");
+  document.getElementById("golden-mana-btn")?.classList.remove("armed");
+  closePickers(); renderQueue();
+  animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
+  castingNow = { p1:false, p2:false };
+  facingOverride = { p1: { sx: 0, until: 0 }, p2: { sx: 0, until: 0 } };
+  clearActors();
+  lockBtn.classList.remove("locked"); lockBtn.disabled = false; lockBtn.textContent = "LOCK IN";
+  if (hudTurn) hudTurn.textContent = "";
+});
+
 /* ---------- RAF: actors + FX ---------- */
 function raf() {
   const now = performance.now();
   const map = { p1: actorP1, p2: actorP2 };
+
+  tickTurnTimer(now); // odpočet času na ťah (auto-lock pri vypršaní)
 
   // po vypršaní facing override (streľba do strany) otoč postavu späť k súperovi —
   // positionActors sa inak volá len pri timeline frame-och, takže posledná akcia kola by ostala "visieť"

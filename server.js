@@ -43,6 +43,20 @@ const GOLDEN_MANA_GAIN = 6; // golden mana refill: +6 many za HP; cena v HP rast
 const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash"]);
 const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 
+/* -------------------- Match / lobby config -------------------- */
+// koľko vyhratých hier treba na zisk série
+const MATCH_FORMATS = { single: 1, bo3: 2, bo5: 3 };
+// časový limit na ťah — vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
+const TIMER_OPTIONS = new Set(["off", "10", "30", "60", "quickdraw"]);
+
+// predvolené nastavenia (predvyplnia lobby na klientovi)
+const DEFAULT_CONFIG = {
+  format: "single",                              // "single" | "bo3" | "bo5"
+  tilesPerRound: 1,                              // 1 | 2 | 3 — koľko tiles sa spawne na konci kola
+  tileWeights: { dmg: 75, heal: 12, mana: 8, ik: 5 }, // % šanca typu, spolu 100
+  timer: "30",                                   // "off" | "10" | "30" | "60" | "quickdraw"
+};
+
 const MOVE_DELAY_MS    = 800;  // posun postavy trvá 700 ms + malý buffer
 const SMALL_DELAY_MS   = 600;  // 2× pomalšie (bolo 300)
 const SPECIAL_REPEAT   = 3;
@@ -50,7 +64,9 @@ const SPECIAL_BEAT_MS  = 900;  // 2× pomalšie (bolo 450)
 const CHARGE_STEP_MS   = 560;  // 2× pomalšie (bolo 280)
 
 /* -------------------- Game state -------------------- */
-let sockets = { p1: null, p2: null };
+// identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
+// ktorá sa medzi hrami série prehadzuje (štartér danej hry vždy sedí v p1 = vľavo)
+let personSockets = { A: null, B: null };
 let game = null;
 
 function newPlayer(slot) {
@@ -68,12 +84,16 @@ function newPlayer(slot) {
     goldenMana: false, // objednaný golden mana refill (extra akcia po konci kola)
     manaRefills: 0,    // koľkokrát už hráč refill použil — určuje rastúcu HP cenu
     locked: false,
-    queue: []
+    queue: [],
+    // priebežne posielaná rozpracovaná voľba — pri vypršaní času ju backstop zachová a doplní len chýbajúce
+    draft: { queue: [], golden: false, goldenMana: false }
   };
 }
 
 function newGame() {
   game = {
+    phase: "lobby",   // "lobby" | "playing" | "match_over"
+    config: null,     // nastaví host cez configure_match
     board: { ...BOARD },
     players: {
       p1: newPlayer("p1"),
@@ -83,10 +103,37 @@ function newGame() {
     turn: 1,
     starter: "p1", // odd -> p1, even -> p2
     tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" } — pribúdajú od konca 1. kola
-    ik: null,      // { x, y } — insta-kill tile; jediný prekrýva iné políčka, každé kolo sa presúva
+    iks: [],       // [{ x, y }] — insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
+    // séria zápasov
+    seats: { p1: "A", p2: "B" }, // ktorá osoba sedí v ktorom slote v aktuálnej hre
+    seriesWins: { A: 0, B: 0 },
+    series: { gameIndex: 1, needed: 1, firstStarter: "A", format: "single" },
   };
 }
 newGame();
+
+function otherPerson(p) { return p === "A" ? "B" : "A"; }
+function slotForPerson(person) { return game.seats.p1 === person ? "p1" : "p2"; }
+function socketForSlot(slot) { return personSockets[game.seats[slot]]; }
+
+// séria zhrnutá pre klienta — výhry namapované na aktuálne sloty (osoba si nesie skóre na svoju stranu)
+function seriesSnapshot() {
+  return {
+    gameIndex: game.series.gameIndex,
+    needed: game.series.needed,
+    format: game.series.format,
+    winsP1: game.seriesWins[game.seats.p1] || 0,
+    winsP2: game.seriesWins[game.seats.p2] || 0,
+  };
+}
+
+// pošli každej osobe jej aktuálny slot (mení sa medzi hrami) + či je host
+function emitYouAre() {
+  for (const person of ["A", "B"]) {
+    const sock = personSockets[person];
+    if (sock) sock.emit("you_are", { slot: slotForPerson(person), isHost: person === "A" });
+  }
+}
 
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
@@ -96,14 +143,18 @@ function cloneActor(a) {
 }
 function snapshot() {
   return {
+    phase: game.phase,
+    config: game.config ? { ...game.config, tileWeights: { ...game.config.tileWeights } } : null,
+    series: seriesSnapshot(),
     board: { ...game.board },
     p1: cloneActor(game.players.p1),
     p2: cloneActor(game.players.p2),
     arena: game.arena,
     turn: game.turn,
     starter: game.starter,
+    timerMs: timerRemainingMs(), // zostávajúci čas na ťah (null = bez limitu) — klient sa naň synchronizuje aj po refreshi
     tiles: game.tiles.map(t => ({ ...t })),
-    ik: game.ik ? { ...game.ik } : null
+    iks: game.iks.map(t => ({ ...t }))
   };
 }
 
@@ -176,10 +227,11 @@ function okAdmin(keyFromClient) {
   return !ADMIN_KEY || ADMIN_KEY === keyFromClient;
 }
 function forceResetAll() {
-  try { if (sockets.p1) sockets.p1.disconnect(true); } catch {}
-  try { if (sockets.p2) sockets.p2.disconnect(true); } catch {}
-  sockets.p1 = null;
-  sockets.p2 = null;
+  clearTurnTimer();
+  try { if (personSockets.A) personSockets.A.disconnect(true); } catch {}
+  try { if (personSockets.B) personSockets.B.disconnect(true); } catch {}
+  personSockets.A = null;
+  personSockets.B = null;
   newGame();
   io.emit("reset");
   io.emit("state", snapshot());
@@ -355,12 +407,11 @@ function doAction(slot, action, tl) {
 }
 
 /* -------------------- Special tiles -------------------- */
-function playerAt(x, y) {
-  const { p1, p2 } = game.players;
-  return (p1.x === x && p1.y === y) || (p2.x === x && p2.y === y);
-}
 function hasTile(x, y) {
   return game.tiles.some(t => t.x === x && t.y === y);
+}
+function hasIK(x, y) {
+  return game.iks.some(t => t.x === x && t.y === y);
 }
 function pickCell(filterFn) {
   const cells = [];
@@ -378,7 +429,7 @@ function endOfStepTileEffects(tl) {
   for (const slot of order) {
     const p = game.players[slot];
     if (p.hp <= 0) continue;
-    if (game.ik && game.ik.x === p.x && game.ik.y === p.y) continue; // IK prekrýva => pickup neaktívny
+    if (hasIK(p.x, p.y)) continue; // IK prekrýva => pickup neaktívny
     const idx = game.tiles.findIndex(t => (t.type === "heal" || t.type === "mana") && t.x === p.x && t.y === p.y);
     if (idx === -1) continue;
     const tile = game.tiles[idx];
@@ -409,7 +460,7 @@ function endOfStepTileEffects(tl) {
     const p = game.players[slot];
     if (p.hp <= 0) continue;
     let dmg = 0, tileType = null;
-    if (game.ik && game.ik.x === p.x && game.ik.y === p.y) { dmg = 10; tileType = "ik"; }
+    if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
     else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) { dmg = 1; tileType = "dmg"; }
     if (dmg > 0) {
       // najprv zvýrazni vyhodnocované políčko, potom zásah
@@ -422,32 +473,129 @@ function endOfStepTileEffects(tl) {
   }
 }
 
-// koniec kola: presun IK + spawn nového tile (75 % dmg, zvyšok heal/mana/IK)
+// vyber typ tile podľa percentuálnych váh (dmg/heal/mana/ik, spolu ~100); null ak sú všetky 0
+function rollTileType(weights) {
+  const order = ["dmg", "heal", "mana", "ik"];
+  const total = order.reduce((a, k) => a + Math.max(0, weights?.[k] || 0), 0);
+  if (total <= 0) return null;
+  let r = Math.random() * total;
+  for (const k of order) {
+    r -= Math.max(0, weights?.[k] || 0);
+    if (r < 0) return k;
+  }
+  return order[order.length - 1];
+}
+
+// presunie každý existujúci IK na nové políčko; dva IK nesmú skončiť na rovnakom (ostatné tiles a hráči nevadia)
+function relocateIKs() {
+  const placed = [];
+  for (const ik of game.iks) {
+    const c = pickCell((x, y) => !placed.some(p => p.x === x && p.y === y));
+    placed.push(c || ik); // bez voľného políčka ostane na mieste
+  }
+  game.iks = placed;
+}
+
+// koniec kola: presun IK + spawn tilesPerRound nových tiles podľa percentuálnych váh
 function endOfRoundTiles() {
-  if (game.ik) {
-    const c = pickCell((x, y) => !playerAt(x, y) && !(x === game.ik.x && y === game.ik.y));
-    if (c) game.ik = c;
+  if (!game.config) return;
+  relocateIKs();
+
+  const n = Math.max(1, Math.min(3, game.config.tilesPerRound || 1));
+  for (let k = 0; k < n; k++) {
+    const type = rollTileType(game.config.tileWeights);
+    if (!type) break;
+    if (type === "ik") {
+      // IK môže vzniknúť hocikde (aj pod hráčom, aj nad iným tile); len nie na inom IK
+      const c = pickCell((x, y) => !hasIK(x, y));
+      if (c) game.iks.push(c);
+    } else {
+      // môže byť aj pod hráčom; nie na existujúcom tile ani pod IK; bez voľného políčka sa spawn preskočí
+      const c = pickCell((x, y) => !hasTile(x, y) && !hasIK(x, y));
+      if (c) game.tiles.push({ x: c.x, y: c.y, type });
+    }
   }
+}
 
-  const r = Math.random();
-  let type;
-  if (r < 0.75) type = "dmg";
-  else if (game.ik) type = r < 0.875 ? "heal" : "mana";
-  else type = r < 0.8333 ? "heal" : r < 0.9166 ? "mana" : "ik";
+/* -------------------- Turn timer (server-side enforcement) -------------------- */
+// časovač beží na serveri (nezávisle od fokusu tabu); klient si robí len vlastný displej + skorší auto-lock.
+// backstop tu garantuje, že kolo sa vyhodnotí, aj keď je niektorý tab na pozadí (throttle rAF) alebo odpojený.
+const QUICKDRAW_MS = 10000;
+const TIMER_GRACE_MS = 2500; // server strieľa o čosi neskôr než klient, nech foreground tab stihne auto-lock s rozpracovanou frontou
+let turnTimer = null;
+let turnDeadline = null; // Date.now() času, kedy má klient odpočítavať/auto-locknúť (bez grace); zdieľané s klientom
 
-  if (type === "ik") {
-    // IK môže vzniknúť hocikde — aj pod hráčom (únik = pohyb), aj nad iným tile
-    const c = pickCell(() => true);
-    if (c) game.ik = c;
+function timerRemainingMs() { return turnDeadline ? Math.max(0, turnDeadline - Date.now()) : null; }
+
+function clearTurnTimer() {
+  if (turnTimer) { clearTimeout(turnTimer); turnTimer = null; }
+  turnDeadline = null;
+  io.emit("turn_timer", { ms: null });
+}
+
+// platná základná akcia? (move/attack/dash potrebujú smer)
+function validBasicAction(a, used) {
+  if (!a || !ACTION_TYPES.has(a.type) || used.has(a.type)) return false;
+  if ((a.type === "move" || a.type === "attack" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
+  return true;
+}
+// hráč, ktorý sa nestihol locknúť: zachová svoju rozpracovanú frontu (draft) a chýbajúce do 3 doplní náhodne
+function fillFromDraft(draftQueue) {
+  const q = [], used = new Set();
+  for (const a of (Array.isArray(draftQueue) ? draftQueue : [])) {
+    if (q.length >= 3) break;
+    if (!validBasicAction(a, used)) continue;
+    q.push({ type: a.type, dir: a.dir || null });
+    used.add(a.type);
+  }
+  const pool = [...ACTION_TYPES].filter(t => !used.has(t));
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const dirs = [...MOVE_DIRS];
+  while (q.length < 3 && pool.length) {
+    const t = pool.shift();
+    q.push((t === "move" || t === "attack" || t === "dash") ? { type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] } : { type: t });
+  }
+  return q;
+}
+
+// naplánuj backstop pre práve začínajúce kolo; extraMs = čas, kým klient dohrá timeline (počas neho neplánuje)
+function beginPlanningTimer(extraMs = 0) {
+  const t = game.config?.timer;
+  if (t === "10" || t === "30" || t === "60") {
+    armTurnTimer(extraMs + parseInt(t, 10) * 1000);
   } else {
-    // môže byť aj pod hráčom; nie na existujúcom tile ani pod IK; bez voľného políčka sa spawn preskočí
-    const c = pickCell((x, y) => !hasTile(x, y) && !(game.ik && game.ik.x === x && game.ik.y === y));
-    if (c) game.tiles.push({ x: c.x, y: c.y, type });
+    clearTurnTimer(); // "off"/"quickdraw" -> teraz žiadny limit (quickdraw sa nasadí až po locku)
   }
+}
+// intendedMs = čas, ktorý klient odpočítava a po ktorom auto-lockne; server backstop strieľa o grace neskôr
+function armTurnTimer(intendedMs) {
+  if (turnTimer) clearTimeout(turnTimer);
+  turnDeadline = Date.now() + intendedMs;
+  turnTimer = setTimeout(onTurnTimeout, intendedMs + TIMER_GRACE_MS);
+  io.emit("turn_timer", { ms: intendedMs });
+}
+
+function onTurnTimeout() {
+  turnTimer = null;
+  turnDeadline = null;
+  if (game.phase !== "playing") return;
+  if (!game.players.p1.char || !game.players.p2.char) return;
+  for (const slot of ["p1", "p2"]) {
+    const p = game.players[slot];
+    if (p.locked) continue;
+    // zahraj, čo má hráč rozpracované (draft), chýbajúce do 3 doplň náhodne; gold zachovaj len keď si ho navolil
+    p.queue = fillFromDraft(p.draft?.queue);
+    p.golden = !!p.draft?.golden && slot !== game.starter; // golden shield len pre nestartéra
+    p.goldenMana = !!p.draft?.goldenMana;
+    p.locked = true;
+  }
+  if (game.players.p1.locked && game.players.p2.locked) resolveTurn();
+  else io.emit("state", snapshot());
 }
 
 /* -------------------- Turn resolution -------------------- */
 function resolveTurn() {
+  clearTurnTimer();
   const tl = [];
   // prvý „nulový“ frame pre hladký začiatok
   pushStateFrame(tl, [], 10);
@@ -536,18 +684,103 @@ function resolveTurn() {
 
   io.emit("state", { ...snapshot(), timeline: tl });
 
-  if (ended) {
-    const w = winnerNow(); // "p1" | "p2" | "draw"
-    io.emit("game_over", { winner: w });
-  }
-
-  // príprava na ďalšie plánovanie
+  // príprava na ďalšie plánovanie (lokálny stav; vizuálne odomkne až klient po dohraní timeline)
   game.players.p1.locked = false;
   game.players.p2.locked = false;
   game.players.p1.queue = [];
   game.players.p2.queue = [];
   game.players.p1.goldenMana = false; // nevyhodnotený refill (ukončené kolo) prepadá
   game.players.p2.goldenMana = false;
+  game.players.p1.draft = { queue: [], golden: false, goldenMana: false };
+  game.players.p2.draft = { queue: [], golden: false, goldenMana: false };
+
+  const dur = tl.reduce((a, f) => a + (f.delayMs || 0), 0);
+  if (ended) {
+    handleGameEnd(dur);
+  } else {
+    // ďalšie kolo: backstop začne až po čase, kým klient dohrá timeline (počas neho neplánuje)
+    beginPlanningTimer(dur);
+  }
+}
+
+// koniec jednej hry: zapíš výhru do série; ak je séria rozhodnutá -> match_over,
+// inak po dohraní timeline (na klientovi) spusti ďalšiu hru (swap strán + nový char-select)
+function handleGameEnd(timelineDurationMs) {
+  clearTurnTimer();
+  const w = winnerNow(); // "p1" | "p2" | "draw"
+  let winnerPerson = null;
+  if (w === "p1" || w === "p2") {
+    winnerPerson = game.seats[w];
+    game.seriesWins[winnerPerson] = (game.seriesWins[winnerPerson] || 0) + 1;
+  }
+  const matchOver = !!winnerPerson && game.seriesWins[winnerPerson] >= game.series.needed;
+
+  // game_result dostanú obaja — klient ho vyhodnotí až na konci prehrávania timeline
+  io.emit("game_result", { gameWinner: w, series: seriesSnapshot(), matchOver });
+
+  if (matchOver) {
+    game.phase = "match_over";
+    io.emit("game_over", { winner: w, series: seriesSnapshot() }); // séria skončila
+  } else {
+    // medzihra: počkaj, kým klient dohrá timeline + animáciu smrti + zobrazí skóre, potom ďalšia hra
+    setTimeout(() => {
+      io.emit("new_game", { series: seriesSnapshot() });
+      startGame(game.series.gameIndex + 1);
+    }, (timelineDurationMs || 0) + 6500);
+  }
+}
+
+/* -------------------- Match / game start -------------------- */
+function startMatch(config) {
+  game.config = config;
+  game.series = {
+    gameIndex: 0,
+    needed: MATCH_FORMATS[config.format] || 1,
+    firstStarter: "A", // hru 1 začína host (osoba A); v BO3/BO5 sa štartér strieda
+    format: config.format,
+  };
+  game.seriesWins = { A: 0, B: 0 };
+  startGame(1);
+}
+
+// pripraví novú hru v sérii: prehodí štartéra na ľavú stranu (slot p1), resetne hráčov,
+// vyčistí postavy (char-select pred každou hrou) a re-emitne sloty (osoba mohla zmeniť stranu)
+function startGame(gameIndex) {
+  clearTurnTimer();
+  const starterPerson = (gameIndex % 2 === 1)
+    ? game.series.firstStarter
+    : otherPerson(game.series.firstStarter);
+  game.series.gameIndex = gameIndex;
+  game.seats = { p1: starterPerson, p2: otherPerson(starterPerson) };
+
+  game.players.p1 = newPlayer("p1");
+  game.players.p2 = newPlayer("p2");
+  game.turn = 1;
+  game.starter = "p1"; // štartér hry sedí v p1 a začína 1. kolo
+  game.tiles = [];
+  game.iks = [];
+  game.phase = "playing";
+
+  emitYouAre();
+  io.emit("state", snapshot());
+}
+
+// očisti a zvaliduj nastavenia z lobby; pri nezmysle vráti null
+function sanitizeConfig(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const format = MATCH_FORMATS[raw.format] ? raw.format : null;
+  if (!format) return null;
+  const timer = TIMER_OPTIONS.has(String(raw.timer)) ? String(raw.timer) : "off";
+  const perRound = Math.max(1, Math.min(3, Math.round(Number(raw.tilesPerRound) || 1)));
+  const w = raw.tileWeights || {};
+  const weights = {};
+  let sum = 0;
+  for (const k of ["dmg", "heal", "mana", "ik"]) {
+    const v = Math.max(0, Math.round(Number(w[k]) || 0));
+    weights[k] = v; sum += v;
+  }
+  if (sum !== 100) return null; // percentá musia dať presne 100
+  return { format, tilesPerRound: perRound, tileWeights: weights, timer };
 }
 
 /* -------------------- Admin endpoint -------------------- */
@@ -559,24 +792,43 @@ app.get("/admin/reset-all", (req, res) => {
 
 /* -------------------- IO -------------------- */
 io.on("connection", (socket) => {
-  let slot = null;
-  if (!sockets.p1) { sockets.p1 = socket; slot = "p1"; }
-  else if (!sockets.p2) { sockets.p2 = socket; slot = "p2"; }
+  // identita = osoba A/B (A = host); slot sa odvodí z aktuálnych seats a mení sa medzi hrami
+  let person = null;
+  if (!personSockets.A) { personSockets.A = socket; person = "A"; }
+  else if (!personSockets.B) { personSockets.B = socket; person = "B"; }
+  socket.data.person = person;
 
-  if (slot) socket.emit("you_are", slot);
-  else socket.emit("spectator"); // oba sloty obsadené — tretí a ďalší len dostanú info, že hra beží
+  if (person) socket.emit("you_are", { slot: slotForPerson(person), isHost: person === "A" });
+  else socket.emit("spectator"); // obe osoby obsadené — tretí a ďalší len dostanú info, že hra beží
   socket.emit("state", snapshot());
 
+  // úvodná obrazovka: host nastaví formát + tiles + časový limit a spustí zápas
+  socket.on("configure_match", (raw) => {
+    if (person !== "A") return;          // konfiguruje len host
+    if (game.phase !== "lobby") return;  // len pred začiatkom zápasu
+    const config = sanitizeConfig(raw);
+    if (!config) return;
+    startMatch(config);
+  });
+
   socket.on("choose_character", (key) => {
-    if (!slot) return;
+    if (!person) return;
+    if (game.phase !== "playing") return;       // postava sa volí len v hernej fáze (pred kolami)
     if (!["fire","lightning","wanderer"].includes(key)) return;
+    const slot = slotForPerson(person);
     const me = game.players[slot];
+    if (me.char) return;                          // postava sa pre danú hru volí raz
     me.char = key;
+    // obaja vybrali -> začína 1. kolo, naštartuj časovač pred emitom (snapshot nesie timerMs pre refresh-sync)
+    if (game.players.p1.char && game.players.p2.char) beginPlanningTimer(0);
     io.emit("state", snapshot());
   });
 
   socket.on("lock_in", (queue) => {
-    if (!slot) return;
+    if (!person) return;
+    if (game.phase !== "playing") return;
+    const slot = slotForPerson(person);
+    if (!game.players.p1.char || !game.players.p2.char) return; // ešte sa vyberajú postavy
     if (!validQueue(queue, slot)) return;
     const me = game.players[slot];
     let q = queue;
@@ -590,11 +842,31 @@ io.on("connection", (socket) => {
     if (game.players.p1.locked && game.players.p2.locked) {
       resolveTurn();
     } else {
+      // quick-draw: hneď ako sa jeden locklne, druhý má QUICKDRAW_MS na ťah
+      if (game.config?.timer === "quickdraw") armTurnTimer(QUICKDRAW_MS);
       io.emit("state", snapshot());
     }
   });
 
+  // priebežne posielaná rozpracovaná voľba — backstop ju pri timeoute zahrá (a doplní len chýbajúce do 3)
+  socket.on("draft_queue", (d) => {
+    if (!person || game.phase !== "playing") return;
+    const slot = slotForPerson(person);
+    const me = game.players[slot];
+    if (me.locked) return;
+    const inQ = Array.isArray(d?.queue) ? d.queue : [];
+    const out = [], used = new Set();
+    for (const a of inQ) {
+      if (out.length >= 3) break;
+      if (!validBasicAction(a, used)) continue;
+      out.push({ type: a.type, dir: a.dir || null });
+      used.add(a.type);
+    }
+    me.draft = { queue: out, golden: !!d?.golden, goldenMana: !!d?.goldenMana };
+  });
+
   socket.on("retry", () => {
+    clearTurnTimer();
     newGame();
     io.emit("reset");
     io.emit("state", snapshot());
@@ -607,8 +879,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    if (sockets.p1 === socket) sockets.p1 = null;
-    if (sockets.p2 === socket) sockets.p2 = null;
+    const wasPlayer = personSockets.A === socket || personSockets.B === socket;
+    if (personSockets.A === socket) personSockets.A = null;
+    if (personSockets.B === socket) personSockets.B = null;
+    if (wasPlayer) clearTurnTimer(); // bez hráča nemá zmysel auto-resolve; odpojenie diváka časovač neruší
   });
 });
 

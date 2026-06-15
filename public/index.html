@@ -15,6 +15,8 @@
 
     <!-- Stred: kolo -->
     <div class="hud-turn" id="hud-turn"></div>
+    <!-- Odpočet času na ťah -->
+    <div id="turn-timer" class="turn-timer hidden"></div>
     <!-- Indikácia čakania na ťah — kto je locknutý a na koho sa čaká -->
     <div id="turn-status" class="turn-status hidden"></div>
 
@@ -47,6 +49,7 @@
           <div class="bar mana-bar" id="p1-mana"></div>
         </div>
       </div>
+      <div class="series-crowns hidden" id="crowns-p1" title="Games won"></div>
       <div class="action-log" id="log-p1"></div>
     </div>
 
@@ -79,6 +82,7 @@
           <div class="bar mana-bar" id="p2-mana"></div>
         </div>
       </div>
+      <div class="series-crowns hidden" id="crowns-p2" title="Games won"></div>
       <div class="action-log" id="log-p2"></div>
     </div>
 
@@ -171,22 +175,101 @@
 
   <!-- Character select -->
   <div id="char-select" class="char-select">
-    <div class="char-card" data-char="fire">
-      <canvas class="char-canvas" width="160" height="160" data-char="fire"></canvas>
-      <div class="char-name">Fire Wizard</div>
+    <div class="char-cards">
+      <div class="char-card" data-char="fire">
+        <canvas class="char-canvas" width="220" height="240" data-char="fire"></canvas>
+        <div class="char-name">Fire Wizard</div>
+      </div>
+      <div class="char-card" data-char="lightning">
+        <canvas class="char-canvas" width="220" height="240" data-char="lightning"></canvas>
+        <div class="char-name">Lightning Mage</div>
+      </div>
+      <div class="char-card" data-char="wanderer">
+        <canvas class="char-canvas" width="220" height="240" data-char="wanderer"></canvas>
+        <div class="char-name">Wanderer Magician</div>
+      </div>
     </div>
-    <div class="char-card" data-char="lightning">
-      <canvas class="char-canvas" width="160" height="160" data-char="lightning"></canvas>
-      <div class="char-name">Lightning Mage</div>
-    </div>
-    <div class="char-card" data-char="wanderer">
-      <canvas class="char-canvas" width="160" height="160" data-char="wanderer"></canvas>
-      <div class="char-name">Wanderer Magician</div>
+    <!-- náhľad špeciálnej abilitky mága, na ktorom je kurzor -->
+    <div id="char-ability" class="char-ability hidden">
+      <div class="ca-title" id="ca-title"></div>
+      <div class="ca-grid" id="ca-grid"></div>
+      <div class="ca-text" id="ca-text"></div>
+      <div class="ca-stats" id="ca-stats"></div>
     </div>
   </div>
 
   <!-- Tretí a ďalší pripojený hráč — hra je plná, len informačná hláška -->
   <div id="spectator" class="spectator hidden">Game in progress…</div>
+
+  <!-- Úvodná obrazovka — nastavenia zápasu (vidí len host = prvý pripojený) -->
+  <div id="lobby" class="lobby hidden">
+    <div class="lobby-card">
+      <h1 class="lobby-title">ARENA</h1>
+      <p class="lobby-sub">Match setup</p>
+
+      <div class="lobby-section">
+        <div class="lobby-label">FORMAT</div>
+        <div class="opt-row" id="lobby-format">
+          <button class="opt" data-val="single">Single</button>
+          <button class="opt active" data-val="bo3">Best of 3</button>
+          <button class="opt" data-val="bo5">Best of 5</button>
+        </div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">SPECIAL TILES PER ROUND</div>
+        <div class="opt-row" id="lobby-tiles-count">
+          <button class="opt active" data-val="1">1</button>
+          <button class="opt" data-val="2">2</button>
+          <button class="opt" data-val="3">3</button>
+        </div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">TILE CHANCE (must total 100%)</div>
+        <div class="weights" id="lobby-weights">
+          <label class="weight"><span class="w-ico pix-ico" data-pix="flame"></span>Damage
+            <input type="number" min="0" max="100" data-key="dmg" value="75"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="heart"></span>Heal
+            <input type="number" min="0" max="100" data-key="heal" value="12"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="drop"></span>Mana
+            <input type="number" min="0" max="100" data-key="mana" value="8"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="skull"></span>Insta-kill
+            <input type="number" min="0" max="100" data-key="ik" value="5"><span class="pct">%</span></label>
+        </div>
+        <div class="weights-sum" id="lobby-weights-sum">Total: 100%</div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">TURN TIMER</div>
+        <div class="opt-row" id="lobby-timer">
+          <button class="opt" data-val="off">Off</button>
+          <button class="opt" data-val="10">10s</button>
+          <button class="opt active" data-val="30">30s</button>
+          <button class="opt" data-val="60">60s</button>
+          <button class="opt" data-val="quickdraw">10s after lock</button>
+        </div>
+      </div>
+
+      <button id="lobby-start" class="lobby-start">START</button>
+    </div>
+  </div>
+
+  <!-- Druhý hráč čaká, kým host nastaví zápas -->
+  <div id="lobby-wait" class="lobby-wait hidden">Waiting for host to set up the match…</div>
+
+  <!-- Medzihra medzi hrami série -->
+  <div id="intermission" class="intermission hidden">
+    <div class="intermission-box">
+      <div class="im-title" id="im-title"></div>
+      <div class="im-crowns">
+        <div class="im-col"><div class="im-side" id="im-crowns-l"></div><div class="im-who" id="im-who-l"></div></div>
+        <div class="im-vs">VS</div>
+        <div class="im-col"><div class="im-side" id="im-crowns-r"></div><div class="im-who" id="im-who-r"></div></div>
+      </div>
+      <div class="im-next" id="im-next"></div>
+    </div>
+  </div>
 
   <!-- Game over — verdikt sa píše do hud-turn, tu je len Play again v strede -->
   <div id="gameover" class="gameover hidden">

@@ -19,8 +19,12 @@ Environment variables: `PORT` (default 3000), `ADMIN_KEY` (optional password for
 
 Two files contain all the logic:
 
-- `server.js` — authoritative game state and turn resolution (single global game, exactly 2 player slots: `p1`/`p2`)
+- `server.js` — authoritative game state and turn resolution (single global game; two **persons** A/B map to board **slots** `p1`/`p2`)
 - `public/client.js` — rendering, animation, and input; trusts the server's state but replays it via timelines
+
+### Match lifecycle, lobby & series
+
+`game.phase` is a state machine: `lobby → playing → match_over`. The **first connected person (A) is the host** and sees the lobby setup screen; person B sees a waiting screen. The host emits `configure_match` (`{ format, tilesPerRound, tileWeights, timer }`, validated/sanitized server-side; tile percentages must sum to exactly 100) which starts the match. Format is `single | bo3 | bo5` (`MATCH_FORMATS` = wins needed: 1/2/3). Identity is the **person** (A/B); the **slot** `p1`/`p2` is just the left/right board role and **swaps between games** so the game's starter always sits in `p1` (left) — `game.seats` maps slot→person, `emitYouAre()` re-sends each client its current slot (`you_are` is now `{ slot, isHost }`). The series starter alternates each game (`firstStarter` = A); within a game the per-round starter still alternates by turn parity (turn resets to 1 each game). Series score is tracked **per person** in `game.seriesWins` and exposed per current slot via `seriesSnapshot()`. Characters are **re-picked before every game** (each game clears `char` → char-select reappears). When a game ends, `handleGameEnd()` records the win and emits `game_result` (`{ gameWinner, series, matchOver }`); on `matchOver` it also emits `game_over` (series decided), otherwise it schedules the next game (`new_game` + fresh `playing` state) after the client has played out the timeline. The **turn timer** (`config.timer` = `off | 10 | 30 | 60 | quickdraw`) is **client-driven**: the client counts down and on expiry auto-fills the 3 basic action slots with random valid actions and auto-locks (golden actions are never auto-added); the server just validates the resulting `lock_in`.
 
 ### Server-authoritative timeline model
 
@@ -28,12 +32,12 @@ The core pattern: the client does **not** simulate the game state. Each turn, bo
 
 When changing game logic, the server-side `do*` action functions must push frames via `pushStateFrame()` for anything the client should animate — state changes without frames render as teleports.
 
-Turn resolution checks for a winner (`hp <= 0`) after **every individual action and every individual tile hit** and aborts the rest of the turn on lethal — the first death ends the game, so a draw cannot occur. `game_over` is emitted alongside the final timeline, but the client deliberately delays the overlay until attack/death animations finish (`serverWinner` + `showGameOverSequence`).
+Turn resolution checks for a winner (`hp <= 0`) after **every individual action and every individual tile hit** and aborts the rest of the turn on lethal — the first death ends the game, so a draw cannot occur. At game end `game_result` is emitted alongside the final timeline (and `game_over` too if the series is decided); the client deliberately delays the overlay until attack/death animations finish (`serverWinner`/`serverGameResult` + `showGameOverSequence`, or `playGameEndAnim` → `showIntermission` between games in a series).
 
 ### Socket protocol
 
-Client → server: `choose_character` (fire | lightning | wanderer), `lock_in` (array of 3 actions, or 4 with `golden_shield` first — only valid from the round's non-starter), `retry`, `admin_reset_all`.
-Server → client: `you_are` (slot assignment, first-come-first-served), `state` (snapshot, optionally with `timeline`), `game_over`, `reset`.
+Client → server: `configure_match` (host only, in `lobby` phase), `choose_character` (fire | lightning | wanderer — only in `playing` phase, once per game), `lock_in` (array of 3 actions, or 4 with `golden_shield` first — only valid from the round's non-starter; only in `playing` phase), `retry`, `admin_reset_all`.
+Server → client: `you_are` (`{ slot, isHost }`; slot may change between games), `state` (snapshot incl. `phase`/`config`/`series`, optionally with `timeline`), `game_result` (per-game outcome), `new_game` (next game in series — reset round UI, keep score), `game_over` (series decided), `reset`.
 
 ### Game balance constants
 
@@ -43,7 +47,7 @@ Character specials differ by hit zone: fire hits the whole row (5 dmg), lightnin
 
 Defenses cover **the opponent's next action** after activation and are consumed by it even if it dealt no damage: shield (2 mana) blocks all damage, mirror (4 mana) reflects the full damage back at the attacker (applied raw — reflected damage cannot be shielded or re-reflected), golden shield (3 mana, pre-round extra action of the non-starter) sets the same `shield` flag. All are armed/consumed in the `resolveTurn()` loop, applied in `applyHit()`, and expire at end of round — they do **not** carry over. Strict interleaving means two own defenses are never armed simultaneously — each one covers exactly the opponent action that follows its activation.
 
-Special tiles spawn at the end of every round (75% dmg, rest heal/mana/IK) and resolve at the **end of each step** in `endOfStepTileEffects()`: dmg tiles are permanent (1 dmg if standing on them), heal/mana are the only consumables (taken by the round starter if both players share the cell), and the single IK tile (10 dmg) is the only overlay — it relocates each round and hides tiles beneath it. Tile damage bypasses all defenses (shield/mirror).
+Special tiles spawn at the end of every round — **`config.tilesPerRound` (1–3) rolls per round**, each typed by `config.tileWeights` (`dmg`/`heal`/`mana`/`ik` percentages summing to 100; `rollTileType()`). They resolve at the **end of each step** in `endOfStepTileEffects()`: dmg tiles are permanent (1 dmg if standing on them), heal/mana are the only consumables (taken by the round starter if both players share the cell), and IK tiles (10 dmg) are overlays that hide tiles beneath them. **IK is now a list (`game.iks`), multiple allowed** — every IK relocates each round (`relocateIKs()`) and may overlap other tiles and players; the only constraint is that two IK tiles never share a cell. Tile damage bypasses all defenses (shield/mirror).
 
 HP and mana both cap at 10 and are rendered in the HUD as 10-segment bars (`renderBar()` in `client.js`). Tile size is rectangular, driven by the `--tile-w`/`--tile-h` CSS variables, which `client.js` reads at startup (`TILE_W`/`TILE_H`).
 
