@@ -855,6 +855,118 @@ body {
   }
   .mana-bar.low-warn { animation: lowmana-flash .45s ease-in-out 2; }
 
+  /* ============ MIRROR REFLECT FX ============ */
+  .mirror-fx { position: absolute; pointer-events: none; z-index: 6; }
+
+  /* zrkadlová tabuľa: vyšľahne, zableskne, praskne (gold rám + cyan sklo ako ikona) */
+  .mirror-pane{
+    transform: translate(-50%, -50%) scaleY(0);
+    border: 4px solid #d4a017;
+    background: linear-gradient(135deg,
+      rgba(255,255,255,.92) 0%, rgba(178,235,242,.5) 45%, rgba(212,160,23,.45) 100%);
+    box-shadow: 0 0 30px rgba(178,235,242,.95), inset 0 0 20px rgba(255,255,255,.85);
+    animation: mirror-pane .5s ease-out forwards;
+  }
+  @keyframes mirror-pane{
+    0%   { transform: translate(-50%,-50%) scaleY(0)    skewX(0deg);  opacity: 0; filter: brightness(1); }
+    22%  { transform: translate(-50%,-50%) scaleY(1.08) skewX(0deg);  opacity: 1; filter: brightness(1.8); }
+    55%  { transform: translate(-50%,-50%) scaleY(1)    skewX(-3deg); opacity: 1; filter: brightness(1.2); }
+    100% { transform: translate(-50%,-50%) scaleY(1.02) skewX(10deg); opacity: 0; filter: brightness(2.2); }
+  }
+
+  /* 🪞 emoji ako zdroj lúča — vyskočí, kopne pri výstrele, zhasne */
+  .mirror-emoji{
+    transform: translate(-50%,-50%) scale(0);
+    filter: drop-shadow(0 0 10px rgba(178,235,242,.9));
+    animation: mirror-emoji .8s ease-out forwards;
+  }
+  .mirror-emoji canvas{ display:block; width:100%; height:100%; image-rendering: pixelated; }
+  @keyframes mirror-emoji{
+    0%   { transform: translate(-50%,-50%) scale(0)    rotate(-25deg); opacity: 0; }
+    18%  { transform: translate(-50%,-50%) scale(1.25) rotate(0deg);   opacity: 1; }
+    32%  { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    44%  { transform: translate(-50%,-50%) scale(1.18); filter: drop-shadow(0 0 18px #ffffff) brightness(1.7); } /* recoil pri výstrele lúča */
+    58%  { transform: translate(-50%,-50%) scale(1); filter: drop-shadow(0 0 10px rgba(178,235,242,.9)); }
+    100% { transform: translate(-50%,-50%) scale(1.05); opacity: 0; }
+  }
+
+  /* rázová vlna */
+  .mirror-ring{
+    border: 5px solid #d4f7fb;
+    border-radius: 50%;
+    transform: translate(-50%,-50%) scale(.12);
+    box-shadow: 0 0 22px rgba(178,235,242,.85), inset 0 0 14px rgba(178,235,242,.6);
+    animation: mirror-ring .6s ease-out forwards;
+  }
+  @keyframes mirror-ring{
+    0%   { transform: translate(-50%,-50%) scale(.12); opacity: .95; }
+    100% { transform: translate(-50%,-50%) scale(2.6); opacity: 0; }
+  }
+
+  /* sklenené úlomky */
+  .mirror-shard{
+    width: 11px; height: 11px;
+    background: linear-gradient(135deg, #ffffff, #b2ebf2 60%, #d4a017);
+    box-shadow: 0 0 8px rgba(178,235,242,.9);
+    transform: translate(-50%,-50%);
+    animation: mirror-shard .55s ease-out forwards;
+  }
+  @keyframes mirror-shard{
+    0%   { transform: translate(-50%,-50%) rotate(0deg); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)); opacity: 0; }
+  }
+
+  /* lúč odrazu obranca → útočník (wrap drží rotáciu, vnútro animuje scaleX) */
+  .mirror-beam-wrap{ transform-origin: left center; }
+  .mirror-beam{
+    width: 100%; height: 100%;
+    transform-origin: left center;
+    transform: scaleX(0);
+    border-radius: 7px;
+    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #b2ebf2 22%, #ffffff 55%, #ffe082 100%);
+    box-shadow: 0 0 20px 6px rgba(178,235,242,.85);
+    animation: mirror-beam .42s cubic-bezier(.2,.7,.3,1) .16s forwards;
+  }
+  @keyframes mirror-beam{
+    0%   { transform: scaleX(0); opacity: 0; }
+    25%  { opacity: 1; }
+    65%  { transform: scaleX(1); opacity: 1; filter: brightness(1.6); }
+    100% { transform: scaleX(1); opacity: 0; filter: brightness(1); }
+  }
+
+  /* veľký nápis REFLECTED! — punchier než bežný float */
+  .mirror-reflect-text{
+    position: absolute;
+    z-index: 7;
+    transform: translateX(-50%);
+    font-family: "Press Start 2P", Impact, sans-serif;
+    font-size: 16px;
+    color: #ffffff;
+    text-shadow: 0 0 10px #b2ebf2, 2px 2px 0 #00838f, 4px 4px 0 rgba(0,0,0,.6);
+    pointer-events: none;
+    white-space: nowrap;
+    animation: reflect-pop .9s ease-out forwards;
+  }
+  @keyframes reflect-pop{
+    0%   { transform: translateX(-50%) scale(.3); opacity: 0; }
+    30%  { transform: translateX(-50%) scale(1.25); opacity: 1; }
+    45%  { transform: translateX(-50%) scale(1); opacity: 1; }
+    80%  { transform: translateX(-50%) translateY(-14px) scale(1); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(-30px) scale(1); opacity: 0; }
+  }
+
+  /* otras boardu pri odraze */
+  @keyframes fx-shake{
+    0%,100% { transform: translate(0,0); }
+    15% { transform: translate(-7px, 4px); }
+    30% { transform: translate(6px, -5px); }
+    45% { transform: translate(-5px, -3px); }
+    60% { transform: translate(5px, 4px); }
+    75% { transform: translate(-3px, 2px); }
+    90% { transform: translate(2px, -2px); }
+  }
+  .board.fx-shake{ animation: fx-shake .45s ease-in-out; }
+
   /* prstenec aktívneho štítu na bunke hráča */
   @keyframes shield-glow{ 0%,100%{ opacity:.65; } 50%{ opacity:1; } }
   .cell.cell-shielded::after{
@@ -873,12 +985,13 @@ body {
     box-shadow: 0 0 18px rgba(255,200,60,.5), inset 0 0 14px rgba(255,200,60,.3);
   }
 
-  /* prstenec aktívneho mirroru — čiarkovaný, fialkastý odlesk */
+  /* prstenec aktívneho mirroru — čiarkovaný, vo farbe pozadia mirroru (teal) */
   .cell.cell-mirrored::before{
     content: "";
     position: absolute; inset: 9px;
-    border: 3px dashed rgba(206,147,216,.9);
+    border: 3px dashed #00838f;
     border-radius: 12px;
+    box-shadow: 0 0 12px rgba(0,131,143,.6), inset 0 0 10px rgba(0,131,143,.4);
     pointer-events: none;
     animation: shield-glow 1s ease-in-out infinite;
   }

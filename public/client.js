@@ -251,6 +251,84 @@ function spawnManaFloat(slot, amount = 4) {
   setTimeout(() => el.remove(), 1000);
 }
 
+// stred bunky hráča v súradniciach actorsEl
+function centerOf(slot) {
+  const p = state?.[slot];
+  if (!p) return null;
+  const { left, top } = cellToPx(p.x, p.y);
+  return { x: left + TILE_W / 2, y: top + TILE_H / 2 };
+}
+
+// efektná animácia odrazu: zrkadlová tabuľa flashne a praskne pri obrancovi,
+// rázová vlna + sklenené úlomky, lúč vystrelí späť do útočníka, board sa otrasie
+function spawnMirrorReflect(defenderSlot) {
+  const d = centerOf(defenderSlot);
+  if (!d) return;
+  const a = centerOf(defenderSlot === "p1" ? "p2" : "p1");
+
+  const add = (cls, style) => {
+    const el = document.createElement("div");
+    el.className = "mirror-fx " + cls;
+    Object.assign(el.style, style);
+    actorsEl.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+    return el;
+  };
+
+  // 1) zrkadlová tabuľa (glassy flash) za emoji
+  add("mirror-pane", {
+    left: d.x + "px", top: d.y + "px",
+    width: Math.round(TILE_W * 0.6) + "px",
+    height: Math.round(TILE_H * 0.92) + "px",
+  });
+
+  // 1b) samotné 🪞 emoji ako zdroj lúča — pixelizované ako zvyšok UI
+  const emoSize = Math.round(TILE_H * 0.6);
+  const emo = add("mirror-emoji pix-ico", {
+    left: d.x + "px", top: d.y + "px",
+    width: emoSize + "px", height: emoSize + "px",
+  });
+  emo.dataset.emoji = "🪞";
+  pixelizeEmoji(emo, 24);
+
+  // 2) rázová vlna
+  const ring = Math.round(TILE_H * 1.1);
+  add("mirror-ring", { left: d.x + "px", top: d.y + "px", width: ring + "px", height: ring + "px" });
+
+  // 3) sklenené úlomky letiace do strán
+  for (let i = 0; i < 12; i++) {
+    const ang  = (Math.PI * 2 * i / 12) + (i * 0.37);          // pseudo-náhodný rozptyl bez Math.random()
+    const dist = 46 + (i % 4) * 22;
+    const el = add("mirror-shard", { left: d.x + "px", top: d.y + "px" });
+    el.style.setProperty("--dx", Math.round(Math.cos(ang) * dist) + "px");
+    el.style.setProperty("--dy", Math.round(Math.sin(ang) * dist) + "px");
+    el.style.setProperty("--rot", Math.round(ang * 180 / Math.PI * 2) + "deg");
+  }
+
+  // 4) lúč odrazu obranca → útočník
+  if (a) {
+    const dist = Math.hypot(a.x - d.x, a.y - d.y);
+    const ang  = Math.atan2(a.y - d.y, a.x - d.x) * 180 / Math.PI;
+    const wrap = add("mirror-beam-wrap", {
+      left: d.x + "px", top: (d.y - 7) + "px",
+      width: dist + "px", height: "14px",
+      transform: `rotate(${ang}deg)`,
+    });
+    const beam = document.createElement("div");
+    beam.className = "mirror-beam";
+    wrap.appendChild(beam);
+  }
+
+  // 5) otras boardu
+  const boardEl = gridEl.parentElement;
+  if (boardEl) {
+    boardEl.classList.remove("fx-shake");
+    void boardEl.offsetWidth;
+    boardEl.classList.add("fx-shake");
+    setTimeout(() => boardEl.classList.remove("fx-shake"), 450);
+  }
+}
+
 /* ---------- arena ---------- */
 // interné rozlíšenie pozadia — vrstvy sa zmenšia sem a CSS ich roztiahne s pixelated,
 // čím vzniknú skutočné veľké pixely (menšie čísla = hrubší pixel art)
@@ -419,21 +497,22 @@ const TILE_TO_PIX = { dmg: "flame", heal: "heart", mana: "drop", ik: "skull" };
 function tileSvg(type) { return pixSvg(TILE_TO_PIX[type] || type); }
 
 // jemná pixelizácia emoji: nakreslí sa do malého canvasu a CSS ho roztiahne s pixelated
+function pixelizeEmoji(el, res) {
+  if (el.dataset.done) return;
+  el.dataset.done = "1";
+  el.innerHTML = "";
+  res = res || (el.classList.contains("mini") ? 10 : 20);
+  const cvs = document.createElement("canvas");
+  cvs.width = res; cvs.height = res;
+  const ctx = cvs.getContext("2d");
+  ctx.font = `${res - 3}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(el.dataset.emoji, res / 2, res / 2 + 1);
+  el.appendChild(cvs);
+}
 function hydratePix(root = document) {
-  root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => {
-    if (el.dataset.done) return;
-    el.dataset.done = "1";
-    el.innerHTML = "";
-    const res = el.classList.contains("mini") ? 10 : 20;
-    const cvs = document.createElement("canvas");
-    cvs.width = res; cvs.height = res;
-    const ctx = cvs.getContext("2d");
-    ctx.font = `${res - 3}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(el.dataset.emoji, res / 2, res / 2 + 1);
-    el.appendChild(cvs);
-  });
+  root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => pixelizeEmoji(el));
 }
 
 /* ---------- HUD ---------- */
@@ -1134,7 +1213,8 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.from, "🪞 MIRROR", "shield-float");
       }
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
-        spawnFloat(e.target, "🪞 REFLECTED!", "mirror-float");
+        spawnMirrorReflect(e.target);
+        spawnFloat(e.target, "🪞 REFLECTED!", "mirror-reflect-text");
       }
       if (e.kind === "golden_shield" && (e.from === "p1" || e.from === "p2")) {
         // navonok je to SHIELD, len zlatý — "golden shield" je interné pomenovanie
