@@ -1668,8 +1668,14 @@ function updateMatchScore(s) {
 const TIMER_DIRS = ["up", "down", "left", "right"];
 let serverTimerEndsAt = 0; // performance.now()-based deadline zo servera (0 = bez limitu)
 
+// DOČASNÁ DIAGNOSTIKA časovača — zapni cez ?tdebug=1; loguje prečo sa časovač (ne)zobrazí
+const TDEBUG = new URLSearchParams(location.search).has("tdebug");
+const tlog = (...a) => { if (TDEBUG) console.log("[timer]", ...a); };
+let _lastPlanning = null;
+
 function setServerTimer(ms) {
   serverTimerEndsAt = (ms == null) ? 0 : performance.now() + ms;
+  tlog("setServerTimer", ms);
 }
 function stopTurnTimer() {
   serverTimerEndsAt = 0;
@@ -1681,6 +1687,13 @@ function tickTurnTimer(now) {
   const mine = state?.[me];
   const planning = !!serverTimerEndsAt && !playing && !gameOverShown && state?.phase === "playing"
     && !isSpectator && mine?.char && state?.[otherSlot()]?.char && !mine.locked;
+  if (TDEBUG && planning !== _lastPlanning) {
+    _lastPlanning = planning;
+    tlog(`planning=${planning}`, {
+      timerEndsAt: !!serverTimerEndsAt, playing, gameOverShown, phase: state?.phase,
+      isSpectator, me, mineChar: mine?.char, otherChar: state?.[otherSlot()]?.char, mineLocked: mine?.locked,
+    });
+  }
   if (!planning) {
     turnTimerEl.classList.add("hidden");
     turnTimerEl.classList.remove("urgent", "below-status");
@@ -1845,6 +1858,7 @@ socket.on("reset", () => {
 });
 
 socket.on("state", (s) => {
+  tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing });
   state = s; board = s.board || board;
 
   // arena
@@ -1883,7 +1897,7 @@ socket.on("state", (s) => {
 });
 
 // server posiela zostávajúci čas na ťah — klient sa naň synchronizuje (displej + auto-lock)
-socket.on("turn_timer", ({ ms }) => setServerTimer(ms));
+socket.on("turn_timer", ({ ms }) => { tlog("recv turn_timer", ms); setServerTimer(ms); });
 
 // Server stále posiela "game_over" – len si zapamätáme, nezobrazíme hneď overlay.
 // Overlay zobrazíme až po dobehnutí útoku a animácii smrti.
@@ -1896,6 +1910,7 @@ socket.on("game_result", (r) => { serverGameResult = r; });
 
 // medzi hrami série: resetuj UI kola (skóre ostáva), char-select pre ďalšiu hru riadi nasledujúci state
 socket.on("new_game", () => {
+  tlog("recv new_game");
   playGen++; playing = false;
   serverWinner = null; serverGameResult = null; gameOverShown = false;
   lastAttackEndAt = { p1:0, p2:0 };
