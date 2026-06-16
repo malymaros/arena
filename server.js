@@ -57,11 +57,13 @@ const DEFAULT_CONFIG = {
   timer: "30",                                   // "off" | "10" | "30" | "60" | "quickdraw"
 };
 
-const MOVE_DELAY_MS    = 800;  // posun postavy trvá 700 ms + malý buffer
-const SMALL_DELAY_MS   = 600;  // 2× pomalšie (bolo 300)
+// celkové spomalenie animácií kola (1 = pôvodné tempo); MUSÍ sedieť s client.js ANIM_SLOW
+const ANIM_SLOW = 1.5;
+const MOVE_DELAY_MS    = Math.round(800 * ANIM_SLOW); // posun postavy + malý buffer
+const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
 const SPECIAL_REPEAT   = 3;
-const SPECIAL_BEAT_MS  = 900;  // 2× pomalšie (bolo 450)
-const CHARGE_STEP_MS   = 560;  // 2× pomalšie (bolo 280)
+const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
+const CHARGE_STEP_MS   = Math.round(560 * ANIM_SLOW);
 
 /* -------------------- Game state -------------------- */
 // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,

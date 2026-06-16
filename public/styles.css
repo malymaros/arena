@@ -189,7 +189,8 @@ body {
 .sprite-actor {
   position: absolute; width: var(--tile-w); height: var(--tile-h);
   image-rendering: pixelated;
-  transition: left 700ms linear, top 700ms linear, transform 150ms ease; /* sync s MOVE_MS */
+  /* --move-ms nastavuje client.js z MOVE_MS (sync s ANIM_SLOW) */
+  transition: left var(--move-ms, 700ms) linear, top var(--move-ms, 700ms) linear, transform 150ms ease;
 }
 /* ghost — náhľad vlastnej pozície po naplánovaných movoch */
 .sprite-ghost {
@@ -426,6 +427,41 @@ body {
   color: rgba(255,255,255,.4);
 }
 .g-ico.dim{ opacity: .35; }
+
+/* round-script lišta: moje beaty = zlatý lining, súperove = dim, kurzor = práve animovaný beat */
+.q-badge.mine{ box-shadow: 0 0 0 1px #000, 0 0 0 3px rgba(212,160,23,.9); }
+.q-badge.mine.q-slot{
+  background: transparent; box-shadow: none;
+  border: 2px dashed rgba(255,213,79,.6); color: rgba(255,213,79,.75);
+}
+.q-badge.opp{ opacity: .82; }
+.q-badge.opp.q-slot{
+  background: transparent; box-shadow: none;
+  border: 2px dashed rgba(255,255,255,.15); color: rgba(255,255,255,.3);
+}
+.q-badge.opp.revealed{ opacity: .92; box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,255,255,.12); }
+/* kurzor — beat, ktorý sa práve animuje; sunie sa zľava doprava ako kolo prebieha */
+.q-badge.q-now{
+  transform: translateY(-3px) scale(1.08); z-index: 1;
+  outline: 2px solid #fff; outline-offset: 1px;
+  box-shadow: 0 0 12px 3px rgba(255,213,79,.95);
+  transition: transform .12s ease;
+}
+
+/* dôležitosť = veľkosť: 3 hlavné akcie veľké, golden menšie a voliteľné */
+.q-badge.main{ width: 56px; height: 40px; padding: 0; font-size: 17px; } /* fixná výška → väčšie číslo nerozťahuje box */
+.q-badge.opt { width: 32px; padding: 5px 0; font-size: 12px; align-self: center; }
+/* prázdny golden slot — statické solídne orámovanie (nepulzuje; pulz má len povinných 6 dvojíc) */
+.q-badge.opt.q-slot{ background: transparent; box-shadow: none; border: 2px solid rgba(255,255,255,.18); }
+.q-badge.opt.mine.q-slot{ border-color: rgba(212,160,23,.55); } /* moje extra = tlmené zlaté */
+/* prázdne povinné sloty jemne pulzujú = „nastav ma" (číslo ①②③) */
+.q-badge.main.mine.q-slot{ font-weight: 900; font-size: 26px; line-height: 1; }
+.q-badge.main.mine.q-slot:not(.revealed){ animation: q-prompt 1.4s ease-in-out infinite; }
+@keyframes q-prompt{
+  0%, 100% { border-color: rgba(255,213,79,.4);  box-shadow: none; }
+  50%      { border-color: rgba(255,213,79,1);   box-shadow: 0 0 9px rgba(255,213,79,.45); }
+}
+
 /* vertikálny predel medzi golden shieldom a bežnými 3 akciami vo fronte */
 .q-divider{
   width: 2px; height: 28px; flex: none; align-self: center;
@@ -588,6 +624,25 @@ body {
 .turn-timer.below-status{ top: 172px; }
 .turn-timer.urgent{ color: #ff6b6b; animation: timer-pulse .5s steps(2) infinite; }
 @keyframes timer-pulse{ 50%{ transform: translateX(-50%) scale(1.12); } }
+
+/* „ROUND N" animácia medzi kolami — round-script ostane vidieť, kým dobehne */
+.round-banner{
+  position: fixed; top: 40%; left: 50%; transform: translate(-50%,-50%) scale(.6);
+  z-index: 50; pointer-events: none;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 60px; letter-spacing: 5px; color: #ffd54f;
+  text-shadow: 5px 5px 0 #000, 0 0 28px rgba(255,200,60,.75);
+  opacity: 0;
+}
+.round-banner.hidden{ display: none; }
+.round-banner.show{ animation: round-pop 1.9s ease-out forwards; }
+@keyframes round-pop{
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(.5); }
+  16%  { opacity: 1; transform: translate(-50%,-50%) scale(1.14); }
+  28%  {              transform: translate(-50%,-50%) scale(1); }
+  72%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(1.05); }
+}
 
 /* ---------- Lobby (úvodná obrazovka hosta) ---------- */
 .lobby{
@@ -757,7 +812,7 @@ body {
   /* „YOU" značka — poskakujúca zlatá šípka nad vlastnou postavou */
   .you-marker{
     position: absolute; z-index: 6; pointer-events: none;
-    transition: left 700ms linear, top 700ms linear; /* sync s pohybom postavy (MOVE_MS) */
+    transition: left var(--move-ms, 700ms) linear, top var(--move-ms, 700ms) linear; /* sync s pohybom postavy */
   }
   .you-marker-bob{
     display: flex; flex-direction: column; align-items: center;

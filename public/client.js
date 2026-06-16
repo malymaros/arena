@@ -36,6 +36,7 @@ const intermissionEl = document.getElementById("intermission");
 const crownsP1El = document.getElementById("crowns-p1");
 const crownsP2El = document.getElementById("crowns-p2");
 const turnTimerEl    = document.getElementById("turn-timer");
+const roundBannerEl  = document.getElementById("round-banner");
 
 const cs = getComputedStyle(document.documentElement);
 const TILE_W = parseInt(cs.getPropertyValue("--tile-w")) || 260;
@@ -71,9 +72,13 @@ actorsEl.appendChild(youMarker);
 const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47 };
 
 // === Timing ===
-const MOVE_MS = 700; // musí sedieť s CSS transition left/top na .sprite-actor
-const ATTACK_SWING_MS = 1600;
-const HURT_MS = 1600;
+// celkové spomalenie animácií kola (1 = pôvodné tempo) — MUSÍ sedieť so server.js ANIM_SLOW
+const ANIM_SLOW = 1.5;
+const MOVE_MS = Math.round(700 * ANIM_SLOW); // pohyb na boarde; CSS číta --move-ms (nastavené nižšie)
+const ATTACK_SWING_MS = Math.round(1600 * ANIM_SLOW);
+const HURT_MS = Math.round(1600 * ANIM_SLOW);
+const NEW_ROUND_MS = 1900; // „ROUND N" animácia medzi kolami (musí sedieť s CSS .round-banner.show)
+document.documentElement.style.setProperty("--move-ms", MOVE_MS + "ms"); // drž CSS pohyb v sync so spomalením
 
 // Projektil
 const CHARGE_SCALE = 1.0;
@@ -1003,107 +1008,124 @@ function positionActors(s, immediate = false) {
 }
 
 /* ---------- Queue + Lock ---------- */
+// ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove)
+function actionBadgeView(a) {
+  const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
+  switch (a?.type) {
+    case "move":          return { cls: "move",    text: `🚶${arrow[a.dir] || "?"}` };
+    case "dash":          return { cls: "dash",    text: `🏃${arrow[a.dir] || "?"}` };
+    case "recharge":      return { cls: "mana",    text: "🙏" };
+    case "attack":        return { cls: "attack",  text: `🏹${arrow[a.dir] || ""}` };
+    case "melee":         return { cls: "melee",   text: "🗡️" };
+    case "special":       return { cls: "special", text: "✨" };
+    case "shield":        return { cls: "shield",  text: "🛡️" };
+    case "mirror":        return { cls: "mirror",  text: "🪞" };
+    case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
+    case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
+    default:              return { cls: "",        text: a?.type || "" };
+  }
+}
+
+// hover náhľad dosahu pre moje útok/special/melee badge (z ghost pozície v danom kroku)
+function attachQueueHover(el, a, idx) {
+  if (a.type === "attack") {
+    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForAimPreview(p, a.dir)); });
+    el.addEventListener("mouseleave", clearPreviewCells);
+  } else if (a.type === "special") {
+    el.addEventListener("mouseenter", () => { const mine = state?.[me]; const p = ghostPos(idx); if (mine?.char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: mine.char })); });
+    el.addEventListener("mouseleave", clearPreviewCells);
+  } else if (a.type === "melee") {
+    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells([[p.x, p.y]]); });
+    el.addEventListener("mouseleave", clearPreviewCells);
+  }
+}
+
+// lišta = celá interleave kostra kola v reálnom poradí vyhodnotenia:
+// [golden shield] | a1(štartér) a1(nestartér) | a2 a2 | a3 a3 | golden mana(š) golden mana(n)
+// moje sloty vypĺňam (zlatý lining), súperove sú "?" placeholdery (odhalia sa počas animácie)
+let qBeatEls = []; // sloty podľa pozície 0..8 (pre kurzor + odhalenie súpera počas animácie)
 function renderQueue() {
   queueEl.innerHTML = "";
-  const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
+  qBeatEls = [];
 
-  // fixná štruktúra fronty: [golden shield][|][akcia 1][akcia 2][akcia 3][|][golden mana]
-  // prázdne pozície sú placeholder sloty — šírka sa pridávaním akcií nemení
-  const addDivider = () => {
-    const d = document.createElement("div");
-    d.className = "q-divider";
-    queueEl.appendChild(d);
-  };
-  const addSlot = (innerHTML, title) => {
-    const ph = document.createElement("div");
-    ph.className = "q-badge q-slot";
-    ph.innerHTML = innerHTML;
-    if (title) ph.title = title;
-    queueEl.appendChild(ph);
-  };
+  const starterSlot = state?.starter || "p1";
+  const otherS = starterSlot === "p1" ? "p2" : "p1";
+  // 9 beatov v reálnom poradí; owner = komu beat patrí (golden shield iba nestartérovi)
+  const layout = [
+    { pos: 0, kind: "gshield", owner: otherS },
+    { pos: 1, kind: "act", idx: 0, owner: starterSlot },
+    { pos: 2, kind: "act", idx: 0, owner: otherS },
+    { pos: 3, kind: "act", idx: 1, owner: starterSlot },
+    { pos: 4, kind: "act", idx: 1, owner: otherS },
+    { pos: 5, kind: "act", idx: 2, owner: starterSlot },
+    { pos: 6, kind: "act", idx: 2, owner: otherS },
+    { pos: 7, kind: "gmana", owner: starterSlot },
+    { pos: 8, kind: "gmana", owner: otherS },
+  ];
 
-  // pre-slot: golden shield (vyhodnotí sa pred kolom)
-  if (goldenArmed) {
-    const g = document.createElement("div");
-    g.className = "q-badge golden";
-    g.innerHTML = '<span class="g-ico">🛡️</span>';
-    g.title = "Golden Shield - resolves before the round starts";
-    queueEl.appendChild(g);
-  } else {
-    addSlot('<span class="g-ico dim">🛡️</span>', "Golden Shield slot");
-  }
-  addDivider();
+  layout.forEach((b) => {
+    if (b.pos === 1 || b.pos === 7) { // predely: golden shield | akcie | golden mana
+      const d = document.createElement("div");
+      d.className = "q-divider";
+      queueEl.appendChild(d);
+    }
+    const mine = !!me && b.owner === me;
+    const el = document.createElement("div");
+    el.dataset.pos = String(b.pos);
+    // veľkosť = dôležitosť: 3 hlavné akcie "main" (veľké), golden "opt" (malé, voliteľné)
+    el.className = "q-badge " + (mine ? "mine" : "opp") + " " + (b.kind === "act" ? "main" : "opt");
 
-  // 3 sloty bežných akcií — nevyplnené ukazujú poradové číslo
-  for (let i = 0; i < 3; i++) {
-    const a = myQueue[i];
-    if (!a) { addSlot(String(i + 1), "Action slot"); continue; }
+    let filled = null;
+    if (mine) {
+      if (b.kind === "gshield")    filled = goldenArmed ? { type: "golden_shield" } : null;
+      else if (b.kind === "gmana") filled = goldenManaArmed ? { type: "golden_mana" } : null;
+      else                         filled = myQueue[b.idx] || null;
+    }
 
-    const div = document.createElement("div");
-    div.className = "q-badge";
-    if (a.type === "move") {
-      div.classList.add("move");  div.textContent = `🚶${arrow[a.dir] || "?"}`;
-    } else if (a.type === "dash") {
-      div.classList.add("dash");  div.textContent = `🏃${arrow[a.dir] || "?"}`;
-    } else if (a.type === "recharge") {
-      div.classList.add("mana");  div.textContent = "🙏";
-    } else if (a.type === "attack") {
-      div.classList.add("attack"); div.textContent = `🏹${arrow[a.dir] || ""}`;
-    } else if (a.type === "melee") {
-      div.classList.add("melee"); div.textContent = "🗡️";
-    } else if (a.type === "special") {
-      div.classList.add("special"); div.textContent = "✨";
-    } else if (a.type === "shield") {
-      div.classList.add("shield"); div.textContent = "🛡️";
-    } else if (a.type === "mirror") {
-      div.classList.add("mirror"); div.textContent = "🪞";
+    if (filled) {
+      const v = actionBadgeView(filled);
+      if (v.cls) el.classList.add(v.cls);
+      if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
+      if (b.kind === "act") attachQueueHover(el, filled, b.idx);
     } else {
-      div.textContent = a.type;
+      el.classList.add("q-slot");
+      if (b.kind === "gshield")    el.innerHTML = '<span class="g-ico dim">🛡️</span>';
+      else if (b.kind === "gmana") el.innerHTML = '<span class="g-ico dim">🙏</span>';
+      else el.textContent = mine ? ["①", "②", "③"][b.idx] : String(b.idx + 1); // ja kružok, súper holé cifry
+      el.title = mine ? "Your action (required)" : "Opponent (hidden until it resolves)";
     }
 
-    // hover nad badge útoku/specialu ukáže zásah z pozície platnej v tom kroku (ghost)
-    if (a.type === "attack") {
-      div.addEventListener("mouseenter", () => {
-        const p = ghostPos(i);
-        if (p) showPreviewCells(cellsForAimPreview(p, a.dir));
-      });
-      div.addEventListener("mouseleave", clearPreviewCells);
-    }
-    if (a.type === "special") {
-      div.addEventListener("mouseenter", () => {
-        const mine = state?.[me];
-        const p = ghostPos(i);
-        if (mine?.char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: mine.char }));
-      });
-      div.addEventListener("mouseleave", clearPreviewCells);
-    }
-    if (a.type === "melee") {
-      div.addEventListener("mouseenter", () => {
-        const p = ghostPos(i);
-        if (p) showPreviewCells([[p.x, p.y]]);
-      });
-      div.addEventListener("mouseleave", clearPreviewCells);
-    }
-
-    queueEl.appendChild(div);
-  }
-
-  addDivider();
-  // post-slot: golden mana refill (vyhodnotí sa po konci kola)
-  if (goldenManaArmed) {
-    const g = document.createElement("div");
-    g.className = "q-badge golden";
-    g.innerHTML = '<span class="g-ico">🙏</span>';
-    g.title = "Golden Mana Refill - resolves after the round ends";
-    queueEl.appendChild(g);
-  } else {
-    addSlot('<span class="g-ico dim">🙏</span>', "Golden Mana slot");
-  }
+    queueEl.appendChild(el);
+    qBeatEls[b.pos] = el;
+  });
 
   updateActionButtons();
   updateLockButton();
   sendDraft(); // priebežne posli rozpracovanú voľbu serveru (pre backstop pri vypršaní času)
 }
+
+// počas animácie: posuň kurzor na práve vyhodnocovaný beat a odhal súperovu akciu
+function highlightRoundBeat(from, action, counts, starterSlot) {
+  let pos;
+  if (action.type === "golden_shield")    pos = 0;
+  else if (action.type === "golden_mana") pos = (from === starterSlot) ? 7 : 8;
+  else { const k = counts[from]++; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
+  if (pos == null) return;
+  qBeatEls.forEach(e => e && e.classList.remove("q-now"));
+  const el = qBeatEls[pos];
+  if (!el) return;
+  // odhal súperovu akciu (moje sú už vyplnené z plánovania)
+  if (el.classList.contains("opp")) {
+    const v = actionBadgeView(action);
+    el.classList.remove("q-slot");
+    el.classList.add("revealed");
+    if (v.cls) el.classList.add(v.cls);
+    if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
+    el.title = "Opponent";
+  }
+  el.classList.add("q-now");
+}
+function clearRoundCursor() { qBeatEls.forEach(e => e && e.classList.remove("q-now")); }
 // pošli serveru aktuálnu rozpracovanú frontu + golden flagy (server ju pri timeoute zahrá a doplní chýbajúce)
 function sendDraft() {
   if (!me || state?.phase !== "playing" || lockedIn || state?.[me]?.locked) return;
@@ -1214,6 +1236,20 @@ function playGameEndAnim(winner, after) {
   }, waitAttack);
 }
 
+// medzikolová „ROUND N" animácia — round-script zostane vidieť, kým dobehne; potom callback resetuje lištu
+function playNewRoundTransition(nextTurn, done) {
+  if (!roundBannerEl) { setTimeout(done, NEW_ROUND_MS); return; }
+  roundBannerEl.textContent = `ROUND ${nextTurn}`;
+  roundBannerEl.classList.remove("hidden", "show");
+  void roundBannerEl.offsetWidth; // reštart animácie
+  roundBannerEl.classList.add("show");
+  setTimeout(() => {
+    roundBannerEl.classList.remove("show");
+    roundBannerEl.classList.add("hidden");
+    done();
+  }, NEW_ROUND_MS);
+}
+
 /* ---------- Timeline prehrávanie ---------- */
 let playGen = 0;      // generácia prehrávania — novšia timeline zruší staršiu slučku
 let playing = false;  // počas prehrávania neaktualizuj UI zo snapshotov a drž LOCK zamknutý
@@ -1229,6 +1265,9 @@ function schedulePlayTimeline(timeline) {
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
 
   const first = timeline[0];
+  // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
+  const playStarter = first.starter ?? state?.starter ?? "p1";
+  const beatCounts = { p1: 0, p2: 0 };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
   state.tiles = first.tiles; state.iks = first.iks;
   renderHUD();
@@ -1249,6 +1288,7 @@ function schedulePlayTimeline(timeline) {
       // koniec hry: ak séria pokračuje -> medzihra; ak je rozhodnutá -> game over
       const winner = serverWinner || serverGameResult?.gameWinner || computeWinnerFromState(state);
       if (winner) {
+        clearRoundCursor();
         if (serverGameResult && !serverGameResult.matchOver) {
           playGameEndAnim(winner, () => showIntermission(winner, serverGameResult.series));
         } else {
@@ -1257,25 +1297,28 @@ function schedulePlayTimeline(timeline) {
         return;
       }
 
-      // inak bežný koniec kola
-      state.turn = NEXT_TURN;
-      state.starter = NEXT_STARTER;
-      renderHUD();
-
-      if (state.p1) state.p1.locked = false;
-      if (state.p2) state.p2.locked = false;
-
-      renderGrid(state, []);
-      myQueue = [];
-      goldenArmed = false;
-      goldenManaArmed = false;
-      lockedIn = false; // kolo dobehlo — odomkni ovládanie
-      document.getElementById("golden-btn")?.classList.remove("armed");
-      document.getElementById("golden-mana-btn")?.classList.remove("armed");
-      renderQueue();
-      lockBtn.disabled = false;
-      updateLockButton();
-      // časovač ďalšieho kola príde zo servera (turn_timer); displej sa zapne po dohraní timeline
+      // bežný koniec kola: round-script (odhalení súperi + kurzor) nechaj vidieť, prehraj
+      // „ROUND N" animáciu a až po nej resetuj lištu na ďalšie kolo
+      const doneGen = gen;
+      playNewRoundTransition(NEXT_TURN, () => {
+        if (doneGen !== playGen) return; // medzitým začalo nové prehrávanie — neresetuj
+        state.turn = NEXT_TURN;
+        state.starter = NEXT_STARTER;
+        renderHUD();
+        if (state.p1) state.p1.locked = false;
+        if (state.p2) state.p2.locked = false;
+        renderGrid(state, []);
+        myQueue = [];
+        goldenArmed = false;
+        goldenManaArmed = false;
+        lockedIn = false; // kolo dobehlo — odomkni ovládanie
+        document.getElementById("golden-btn")?.classList.remove("armed");
+        document.getElementById("golden-mana-btn")?.classList.remove("armed");
+        renderQueue(); // až teraz vyčisti round-script pre ďalšie kolo
+        lockBtn.disabled = false;
+        updateLockButton();
+        // časovač ďalšieho kola príde zo servera (turn_timer); displej sa zapne po dohraní timeline
+      });
       return;
     }
 
@@ -1347,6 +1390,7 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) {
         appendActionLog(e.from, e.action);
+        highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
       }
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
         // zlatý text, ak blokoval golden shield
@@ -1924,7 +1968,7 @@ socket.on("state", (s) => {
     renderGrid(s);
     renderHUD();
     positionActors(s, true);
-    updateLockButton();
+    renderQueue(); // prekresli round-script lištu (zlatý skeleton mojich slotov hneď, bez interakcie)
   }
   // počas prehrávania snapshot bez timeline nevykresľuj — framy bežiacej timeline majú prednosť
 
