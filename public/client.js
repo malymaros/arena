@@ -60,6 +60,16 @@ actorGhost.style.width = ACTOR_W + "px"; actorGhost.style.height = ACTOR_H + "px
 actorGhost.style.display = "none";
 actorsEl.appendChild(actorGhost);
 
+// „YOU" značka — poskakujúca zlatá šípka nad vlastnou postavou (kotví sa k pozícii aktéra)
+const youMarker = document.createElement("div");
+youMarker.className = "you-marker";
+youMarker.innerHTML = `<div class="you-marker-bob"><span class="you-tag">YOU</span><span class="you-tip"></span></div>`;
+youMarker.style.display = "none";
+actorsEl.appendChild(youMarker);
+// horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
+// jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
+const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47 };
+
 // === Timing ===
 const MOVE_MS = 700; // musí sedieť s CSS transition left/top na .sprite-actor
 const ATTACK_SWING_MS = 1600;
@@ -630,6 +640,10 @@ function renderHUD() {
   hudBoxP1.classList.toggle("foe", me === "p2");
   hudBoxP2.classList.toggle("foe", me === "p1");
 
+  // zlatý glow okolo vlastnej postavy na boarde (rozlíšenie „kto som")
+  actorP1.classList.toggle("me", me === "p1");
+  actorP2.classList.toggle("me", me === "p2");
+
   // rovnaká postava u oboch → P2 v alternatívnej farbe (postava na boarde, portrét aj ghost)
   const same = sameCharNow();
   actorP2.classList.toggle("alt-color", same);
@@ -954,6 +968,36 @@ function positionActors(s, immediate = false) {
     el.dataset.slot = slot;
     if (same) el.dataset.pair = "1"; else el.removeAttribute("data-pair");
   });
+
+  // „YOU" značka nad vlastnou postavou — sleduje aktéra (rovnaké transition ako pohyb)
+  const meData = me ? s[me] : null;
+  if (meData && meData.char) {
+    const { left, top } = cellToPx(meData.x, meData.y);
+    const px = left - (ACTOR_W - TILE_W) / 2;
+    const py = top  - (ACTOR_H - TILE_H);
+    const shift = same ? (me === "p1" ? -22 : 22) : 0;
+    // vertikálne: hlava je ~48 % pod vrchom rámu (zmerané, hlava na riadku ~62/128) —
+    // značku kotvíme jej spodkom (chevron) tesne nad hlavu cez translateY(-100%)
+    const headY = py + ACTOR_H * 0.48 - 2;
+    // horizontálne: postava nie je v strede rámca; stred hlavy + flip podľa smeru otočenia
+    const headCx = HEAD_CX[meData.char] ?? 0.5;
+    const headDx = facing[me] * ACTOR_W * (headCx - 0.5);
+    const markerX = px + ACTOR_W / 2 + shift + headDx;
+    youMarker.style.display = "block";
+    youMarker.style.transform = "translate(-50%, -100%)";
+    if (immediate || !actorsInitialized) {
+      youMarker.style.transition = "none";
+      youMarker.style.left = markerX + "px";
+      youMarker.style.top  = headY + "px";
+      void youMarker.offsetHeight;
+      youMarker.style.transition = "";
+    } else {
+      youMarker.style.left = markerX + "px";
+      youMarker.style.top  = headY + "px";
+    }
+  } else {
+    youMarker.style.display = "none";
+  }
 
   actorsInitialized = true;
 }
@@ -1335,6 +1379,7 @@ function clearActors() {
     el.style.left = "0px"; el.style.top = "0px";
     el.style.transform = "translateX(0) scaleX(1)";
   });
+  youMarker.style.display = "none";
   actorsInitialized = false;
 }
 

@@ -745,6 +745,39 @@ body {
   /* HUD portrét — len v zdravom stave; wounded/critical/dead degradácia má prednosť */
   .hud-char.alt-color:not(.wounded):not(.critical):not(.dead){ filter: saturate(.22) brightness(1.4); }
 
+  /* zlatý glow okolo VLASTNEJ postavy na boarde — „kto som" (musí byť po .alt-color) */
+  .sprite-actor.me{
+    filter: drop-shadow(0 0 1px #fff3b0) drop-shadow(0 0 4px #ffc107) drop-shadow(0 0 8px #ff9100);
+  }
+  .sprite-actor.me.alt-color{
+    filter: saturate(.22) brightness(1.4)
+            drop-shadow(0 0 1px #fff3b0) drop-shadow(0 0 4px #ffc107) drop-shadow(0 0 8px #ff9100);
+  }
+
+  /* „YOU" značka — poskakujúca zlatá šípka nad vlastnou postavou */
+  .you-marker{
+    position: absolute; z-index: 6; pointer-events: none;
+    transition: left 700ms linear, top 700ms linear; /* sync s pohybom postavy (MOVE_MS) */
+  }
+  .you-marker-bob{
+    display: flex; flex-direction: column; align-items: center;
+    animation: you-bob .5s steps(2) alternate infinite;
+  }
+  .you-tag{
+    font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+    font-size: 10px; letter-spacing: 1px; line-height: 1; color: #2a2000;
+    background: linear-gradient(180deg, #ffd54f 0 3px, #d4a017 3px 100%);
+    padding: 4px 7px 3px; border-radius: 2px;
+    box-shadow: 0 0 0 2px #000, 0 0 10px rgba(255,200,60,.6);
+    text-shadow: 0 1px 0 rgba(255,255,255,.35);
+  }
+  .you-tip{
+    width: 0; height: 0; margin-top: -1px;
+    border-left: 6px solid transparent; border-right: 6px solid transparent;
+    border-top: 8px solid #b8860b;
+  }
+  @keyframes you-bob{ from{ transform: translateY(0); } to{ transform: translateY(-5px); } }
+
   /* degradácia portrétu podľa HP (Doom-style) */
   .hud-char.wounded{
     filter: saturate(.5) brightness(.72) sepia(.7) hue-rotate(-32deg)
