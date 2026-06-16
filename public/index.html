@@ -229,13 +229,13 @@
         <div class="lobby-label">TILE CHANCE (must total 100%)</div>
         <div class="weights" id="lobby-weights">
           <label class="weight"><span class="w-ico pix-ico" data-pix="flame"></span>Damage
-            <input type="number" min="0" max="100" data-key="dmg" value="75"><span class="pct">%</span></label>
+            <input type="number" min="0" max="100" step="10" data-key="dmg" value="70"><span class="pct">%</span></label>
           <label class="weight"><span class="w-ico pix-ico" data-pix="heart"></span>Heal
-            <input type="number" min="0" max="100" data-key="heal" value="12"><span class="pct">%</span></label>
+            <input type="number" min="0" max="100" step="10" data-key="heal" value="10"><span class="pct">%</span></label>
           <label class="weight"><span class="w-ico pix-ico" data-pix="drop"></span>Mana
-            <input type="number" min="0" max="100" data-key="mana" value="8"><span class="pct">%</span></label>
+            <input type="number" min="0" max="100" step="10" data-key="mana" value="10"><span class="pct">%</span></label>
           <label class="weight"><span class="w-ico pix-ico" data-pix="skull"></span>Insta-kill
-            <input type="number" min="0" max="100" data-key="ik" value="5"><span class="pct">%</span></label>
+            <input type="number" min="0" max="100" step="10" data-key="ik" value="10"><span class="pct">%</span></label>
         </div>
         <div class="weights-sum" id="lobby-weights-sum">Total: 100%</div>
       </div>
@@ -243,9 +243,9 @@
       <div class="lobby-section">
         <div class="lobby-label">TURN TIMER</div>
         <div class="opt-row" id="lobby-timer">
-          <button class="opt" data-val="off">Off</button>
+          <button class="opt active" data-val="off">Off</button>
           <button class="opt" data-val="10">10s</button>
-          <button class="opt active" data-val="30">30s</button>
+          <button class="opt" data-val="30">30s</button>
           <button class="opt" data-val="60">60s</button>
           <button class="opt" data-val="quickdraw">10s after lock</button>
         </div>
