@@ -127,10 +127,6 @@ body {
 }
 
 /* Efekty buniek */
-.cell.hl-recharge::before {
-  content: ""; position: absolute; inset: 0; border: 2px solid rgba(0,128,255,.55);
-  background: rgba(0,128,255,.15); border-radius: 12px; pointer-events: none;
-}
 @keyframes hit-blink { 0%,100%{background-color:transparent} 25%,75%{background-color:rgba(255,0,0,.35)} }
 .cell.hit-blink { animation: hit-blink 300ms ease-in-out 1; }
 
@@ -800,14 +796,7 @@ body {
   /* HUD portrét — len v zdravom stave; wounded/critical/dead degradácia má prednosť */
   .hud-char.alt-color:not(.wounded):not(.critical):not(.dead){ filter: saturate(.22) brightness(1.4); }
 
-  /* zlatý glow okolo VLASTNEJ postavy na boarde — „kto som" (musí byť po .alt-color) */
-  .sprite-actor.me{
-    filter: drop-shadow(0 0 1px #fff3b0) drop-shadow(0 0 4px #ffc107) drop-shadow(0 0 8px #ff9100);
-  }
-  .sprite-actor.me.alt-color{
-    filter: saturate(.22) brightness(1.4)
-            drop-shadow(0 0 1px #fff3b0) drop-shadow(0 0 4px #ffc107) drop-shadow(0 0 8px #ff9100);
-  }
+  /* glow postavy (zlatý „YOU" / pulzujúca obrana / alt-color) rieši JS: actorFilter() v rAF (inline filter) */
 
   /* „YOU" značka — poskakujúca zlatá šípka nad vlastnou postavou */
   .you-marker{
@@ -1092,6 +1081,90 @@ body {
     color: #ffd54f;
   }
 
+  /* „Goku" nabíjacia aura pri recharge — naviazaná na postavu (cx = päta) */
+  .charge-aura{ position: absolute; z-index: 4; pointer-events: none; }
+  .charge-aura .ca-core{
+    position: absolute; left: 0; bottom: calc(var(--tile-h) * .42);
+    width: calc(var(--tile-w) * .4); height: calc(var(--tile-h) * .95);
+    transform: translate(-50%, 50%);
+    background: radial-gradient(ellipse at center, rgba(120,190,255,.8), rgba(87,169,255,.35) 45%, rgba(87,169,255,0) 72%);
+    animation: ca-core 1.1s ease-out forwards;
+  }
+  .charge-aura .ca-ring{
+    position: absolute; left: 0; bottom: 0;
+    width: calc(var(--tile-w) * .5); height: calc(var(--tile-h) * .26);
+    border: 4px solid rgba(120,190,255,.85); border-radius: 50%;
+    box-shadow: 0 0 12px rgba(87,169,255,.7);
+    transform: translate(-50%, 50%);
+    animation: ca-ring .5s ease-out infinite;
+  }
+  .charge-aura .ca-streak{
+    position: absolute; left: 0; bottom: 0; width: 4px;
+    transform: translateX(-50%);
+    background: linear-gradient(to top, rgba(87,169,255,0), #57a9ff 45%, #eaf4ff);
+    box-shadow: 0 0 6px rgba(87,169,255,.9);
+    border-radius: 2px;
+    animation: ca-streak .5s ease-out infinite;
+  }
+  @keyframes ca-core{
+    0%   { opacity: 0;   transform: translate(-50%,50%) scale(.5); }
+    25%  { opacity: .9;  transform: translate(-50%,50%) scale(1.05); }
+    60%  { opacity: .65; transform: translate(-50%,50%) scale(1); }
+    100% { opacity: 0;   transform: translate(-50%,50%) scale(1.15); }
+  }
+  @keyframes ca-ring{
+    0%   { opacity: .85; transform: translate(-50%,50%) scale(.4); }
+    100% { opacity: 0;   transform: translate(-50%,50%) scale(1.25); }
+  }
+  @keyframes ca-streak{
+    0%   { opacity: 0; transform: translateX(-50%) translateY(0)     scaleY(.6); }
+    25%  { opacity: 1; }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-170%) scaleY(1.1); }
+  }
+
+  /* úspešný blok štítu — hexagonálna bariéra flashne + rázové prstence + iskry */
+  .shield-fx{ position: absolute; z-index: 6; pointer-events: none; transform: translate(-50%,-50%); }
+  .shield-fx.sb-barrier{
+    clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
+    background: linear-gradient(135deg, rgba(150,235,245,.9), rgba(77,208,225,.35));
+    box-shadow: 0 0 26px rgba(77,208,225,.85);
+    animation: sb-barrier .5s ease-out forwards;
+  }
+  .shield-fx.sb-barrier.gold{ background: linear-gradient(135deg, rgba(255,230,150,.92), rgba(255,200,60,.4)); box-shadow: 0 0 26px rgba(255,200,60,.85); }
+  @keyframes sb-barrier{
+    0%   { opacity: 0;  transform: translate(-50%,-50%) scale(.55); }
+    30%  { opacity: 1;  transform: translate(-50%,-50%) scale(1.08); }
+    55%  { opacity: .9; transform: translate(-50%,-50%) scale(1); }
+    100% { opacity: 0;  transform: translate(-50%,-50%) scale(1.14); }
+  }
+  .shield-fx.sb-flash{
+    width: 34px; height: 34px; border-radius: 50%;
+    background: radial-gradient(circle, #fff, rgba(77,208,225,.7) 50%, transparent 72%);
+    animation: sb-flash .35s ease-out forwards;
+  }
+  .shield-fx.sb-flash.gold{ background: radial-gradient(circle, #fff, rgba(255,200,60,.7) 50%, transparent 72%); }
+  @keyframes sb-flash{ 0%{opacity:0;transform:translate(-50%,-50%) scale(.3);} 35%{opacity:1;transform:translate(-50%,-50%) scale(1.5);} 100%{opacity:0;transform:translate(-50%,-50%) scale(2);} }
+  .shield-fx.sb-ring{
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 3px solid rgba(150,235,245,.9); box-shadow: 0 0 12px rgba(77,208,225,.7);
+    animation: sb-ring .55s ease-out forwards;
+  }
+  .shield-fx.sb-ring.gold{ border-color: rgba(255,215,100,.9); box-shadow: 0 0 12px rgba(255,200,60,.7); }
+  @keyframes sb-ring{ 0%{opacity:.9;transform:translate(-50%,-50%) scale(.4);} 100%{opacity:0;transform:translate(-50%,-50%) scale(4.2);} }
+  /* roztrieštené úlomky štítu — glassy, rotujú a letia na všetky strany */
+  .shield-fx.sb-shard{
+    background: linear-gradient(135deg, #eafbff, rgba(77,208,225,.8));
+    box-shadow: 0 0 14px rgba(77,208,225,1), 0 0 4px #fff inset;
+    border: 1px solid rgba(255,255,255,.7);
+    clip-path: polygon(50% 0, 100% 62%, 62% 100%, 0 72%);
+    animation: sb-shard .8s ease-out forwards;
+  }
+  .shield-fx.sb-shard.gold{ background: linear-gradient(135deg, #fff6da, rgba(255,200,60,.8)); box-shadow: 0 0 14px rgba(255,200,60,1); border-color: rgba(255,255,255,.7); }
+  @keyframes sb-shard{
+    0%   { opacity: 1; transform: translate(-50%,-50%) translate(0,0)                rotate(0deg); }
+    100% { opacity: 0; transform: translate(-50%,-50%) translate(var(--dx),var(--dy)) rotate(var(--rot)); }
+  }
+
   /* výstraha pri pokuse o akciu bez dostatku many */
   .lowmana-float {
     position: absolute;
@@ -1222,32 +1295,5 @@ body {
   }
   .board.fx-shake{ animation: fx-shake .45s ease-in-out; }
 
-  /* prstenec aktívneho štítu na bunke hráča */
-  @keyframes shield-glow{ 0%,100%{ opacity:.65; } 50%{ opacity:1; } }
-  .cell.cell-shielded::after{
-    content: "";
-    position: absolute; inset: 5px;
-    border: 3px solid rgba(0,229,255,.85);
-    border-radius: 12px;
-    box-shadow: 0 0 18px rgba(0,229,255,.45), inset 0 0 14px rgba(0,229,255,.25);
-    pointer-events: none;
-    animation: shield-glow 1s ease-in-out infinite;
-  }
-
-  /* zlatý prstenec, keď shield pochádza z golden shieldu */
-  .cell.cell-shielded.gold::after{
-    border-color: rgba(255,200,60,.9);
-    box-shadow: 0 0 18px rgba(255,200,60,.5), inset 0 0 14px rgba(255,200,60,.3);
-  }
-
-  /* prstenec aktívneho mirroru — čiarkovaný, vo farbe pozadia mirroru (teal) */
-  .cell.cell-mirrored::before{
-    content: "";
-    position: absolute; inset: 9px;
-    border: 3px dashed #00838f;
-    border-radius: 12px;
-    box-shadow: 0 0 12px rgba(0,131,143,.6), inset 0 0 10px rgba(0,131,143,.4);
-    pointer-events: none;
-    animation: shield-glow 1s ease-in-out infinite;
-  }
+  /* štít/mirror sa už nekreslia na bunku — pulzujúci glow je per-postavu (JS actorFilter) */
   

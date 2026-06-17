@@ -280,6 +280,96 @@ function spawnManaFloat(slot, amount = 4) {
   setTimeout(() => el.remove(), 1000);
 }
 
+// glow okolo postavy: obrana (pulzuje) nahrádza zlatý „YOU", inak fallback na zlatý
+const YOU_GOLD_GLOW = "drop-shadow(0 0 1px #fff3b0) drop-shadow(0 0 4px #ffc107) drop-shadow(0 0 8px #ff9100)";
+const GLOW_COL = { shield: "#4dd0e1", shieldGold: "#ffca28", mirror: "#ce93d8" }; // štít / golden / mirror
+function pulseGlow(color, now) {
+  const c = color, t = 0.5 + 0.5 * Math.sin(now / 240); // 0..1 pulz
+  const b1 = (3 + 2 * t).toFixed(1);
+  const b2 = (8 + 5 * t).toFixed(1);
+  const b3 = (14 + 9 * t).toFixed(1);
+  // hrubý plný obrys (viac tesných vrstiev) + pulzujúca žiara
+  return `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 ${b1}px ${c}) drop-shadow(0 0 ${b2}px ${c}) drop-shadow(0 0 ${b3}px ${c})`;
+}
+// filter postavy: alt-color (zhodný mág) + glow (obrana pulzuje > inak zlatý „YOU")
+function actorFilter(slot, now) {
+  const st = state?.[slot];
+  const alt = sameCharNow() && slot === "p2" ? "saturate(.22) brightness(1.4) " : "";
+  let glow = "";
+  if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
+  else if (st?.mirror) glow = pulseGlow(GLOW_COL.mirror, now);
+  else if (slot === me) glow = YOU_GOLD_GLOW;
+  return (alt + glow).trim();
+}
+
+// „Goku" nabíjacia aura pri recharge — naviazaná na postavu (offset pri zdieľanom políčku)
+function spawnChargeAura(slot) {
+  const p = state?.[slot];
+  if (!p) return;
+  const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
+  const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+  // postava nie je v strede bunky — rovnaký horizontálny offset tela ako „YOU" vlajka (HEAD_CX + flip)
+  const facing = computeFacing(state?.p1, state?.p2);
+  const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
+  const { left, top } = cellToPx(p.x, p.y);
+  const cont = document.createElement("div");
+  cont.className = "charge-aura";
+  cont.style.left = (left + TILE_W / 2 + shift + headDx) + "px";
+  cont.style.top  = (top + TILE_H) + "px"; // päta postavy = spodok bunky
+  cont.innerHTML = '<span class="ca-core"></span><span class="ca-ring"></span>';
+  for (let i = 0; i < 18; i++) {
+    const s = document.createElement("span");
+    s.className = "ca-streak";
+    s.style.left = ((Math.random() * 2 - 1) * TILE_W * 0.2).toFixed(0) + "px"; // užší rozptyl = na postave
+    s.style.height = (TILE_H * (0.55 + Math.random() * 0.6)).toFixed(0) + "px";
+    s.style.animationDelay = (Math.random() * 0.55).toFixed(2) + "s";
+    cont.appendChild(s);
+  }
+  actorsEl.appendChild(cont);
+  setTimeout(() => cont.remove(), 1100);
+}
+
+// efektný náraz do štítu pri úspešnom bloku — hexagonálna bariéra flashne, rázové prstence + iskry
+function spawnShieldBlock(slot, gold) {
+  const p = state?.[slot];
+  if (!p) return;
+  const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
+  const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+  const facing = computeFacing(state?.p1, state?.p2);
+  const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
+  const { left, top } = cellToPx(p.x, p.y);
+  const cx = left + TILE_W / 2 + shift + headDx;
+  const cy = top + TILE_H * 0.5;
+
+  const add = (cls, style) => {
+    const el = document.createElement("div");
+    el.className = "shield-fx " + cls + (gold ? " gold" : "");
+    el.style.left = cx + "px"; el.style.top = cy + "px";
+    Object.assign(el.style, style || {});
+    actorsEl.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+    return el;
+  };
+
+  add("sb-barrier", { width: Math.round(TILE_W * 0.7) + "px", height: Math.round(TILE_H * 0.95) + "px" });
+  add("sb-flash", {});
+  add("sb-ring", {});
+  // štít sa roztriešti — veľa veľkých úlomkov letí ďaleko na všetky strany so spinom
+  const N = 24;
+  for (let i = 0; i < N; i++) {
+    const ang = (Math.PI * 2 * i / N) + i * 0.17;
+    const dist = 95 + (i % 4) * 40 + Math.random() * 30;
+    const sh = add("sb-shard", {
+      width: (16 + Math.random() * 16).toFixed(0) + "px",
+      height: (18 + Math.random() * 16).toFixed(0) + "px",
+      animationDelay: ".08s", // najprv bariéra zaregistruje náraz, potom sa roztriešti
+    });
+    sh.style.setProperty("--dx", Math.round(Math.cos(ang) * dist) + "px");
+    sh.style.setProperty("--dy", Math.round(Math.sin(ang) * dist) + "px");
+    sh.style.setProperty("--rot", Math.round(ang * 180 / Math.PI * 2 + 60) + "deg");
+  }
+}
+
 // stred bunky hráča v súradniciach actorsEl
 function centerOf(slot) {
   const p = state?.[slot];
@@ -645,9 +735,6 @@ function renderHUD() {
   hudBoxP1.classList.toggle("foe", me === "p2");
   hudBoxP2.classList.toggle("foe", me === "p1");
 
-  // zlatý glow okolo vlastnej postavy na boarde (rozlíšenie „kto som")
-  actorP1.classList.toggle("me", me === "p1");
-  actorP2.classList.toggle("me", me === "p2");
 
   // rovnaká postava u oboch → P2 v alternatívnej farbe (postava na boarde, portrét aj ghost)
   const same = sameCharNow();
@@ -739,7 +826,6 @@ function renderGrid(s, effects = []) {
   castingNow.p1 = false;
   castingNow.p2 = false;
 
-  const recharge = new Set();
   const charges  = [];
   const specials = [];
   const meleeCasts = [];
@@ -753,7 +839,6 @@ function renderGrid(s, effects = []) {
   const previewSet = new Set();
 
   for (const e of effects) {
-    if (e?.kind === "recharge")  for (const [x,y] of e.cells || []) recharge.add(`${x},${y}`);
     if (e?.kind === "charge")    charges.push(e);
     if (e?.kind === "special")   specials.push(e);
     if (e?.kind === "hit")       hitTarget = e.target;
@@ -783,7 +868,6 @@ function renderGrid(s, effects = []) {
       cell.dataset.y = y;
 
       const key = `${x},${y}`;
-      if (recharge.has(key))   cell.classList.add("hl-recharge");
       if (previewSet.has(key)) cell.classList.add("preview-red");
 
       // tile podfarbenie + ikona; IK prekrýva všetko
@@ -832,13 +916,7 @@ function renderGrid(s, effects = []) {
       const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
       if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
       if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
-
-      // aktívne obrany — prstenec na bunke hráča (shield plný, golden zlatý, mirror čiarkovaný)
-      if ((isP1 && s?.p1?.shield) || (isP2 && s?.p2?.shield)) {
-        cell.classList.add("cell-shielded");
-        if ((isP1 && s?.p1?.shieldGold) || (isP2 && s?.p2?.shieldGold)) cell.classList.add("gold");
-      }
-      if ((isP1 && s?.p1?.mirror) || (isP2 && s?.p2?.mirror)) cell.classList.add("cell-mirrored");
+      // aktívne obrany (shield/mirror) sa už nekreslia na bunku — pulzujúci glow je per-postavu (actorFilter)
 
       gridEl.appendChild(cell);
     }
@@ -1369,6 +1447,7 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
         const amt = (typeof e.amount === "number" ? e.amount : 4);
         spawnManaFloat(e.from, amt);
+        spawnChargeAura(e.from); // „Goku" nabíjacia aura na postave
       }
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🛡️ SHIELD", "shield-float");
@@ -1393,6 +1472,7 @@ function schedulePlayTimeline(timeline) {
         highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
       }
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
+        spawnShieldBlock(e.target, !!e.gold); // efektný náraz do štítu
         // zlatý text, ak blokoval golden shield
         if (e.gold) spawnFloat(e.target, "🛡️ BLOCKED", "golden-float");
         else spawnFloat(e.target, "🛡️ BLOCKED", "block-float");
@@ -2049,6 +2129,7 @@ function raf() {
       return;
     }
     cvs.style.display = "block";
+    cvs.style.filter = actorFilter(slot, now); // glow: obrana (pulz) > zlatý „YOU", + alt-color
 
     const dir  = CHAR_META[st.char].dir;
     // victory = slučka special efektu daného mága (nie melee švih) priamo na actor canvase
