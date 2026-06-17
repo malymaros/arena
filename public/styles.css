@@ -397,7 +397,18 @@ body {
 .btn.shake { animation: shake .35s; }
 
 /* Queue badges */
-#queue, .queue { display: flex; gap: 6px; min-height: 36px; align-items: center; flex-wrap: nowrap; }
+#queue, .queue { display: flex; gap: 6px; min-height: 36px; align-items: center; flex-wrap: nowrap; position: relative; }
+/* zelená šípka pod lištou — počas animácie ukazuje na práve vykonávaný beat (kĺže sa) */
+.q-cursor{
+  position: absolute; bottom: -16px; left: 0; width: 0; height: 0;
+  border-left: 9px solid transparent; border-right: 9px solid transparent;
+  border-bottom: 14px solid #54e07a;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 6px rgba(84,224,122,.85)) drop-shadow(0 1px 0 #000);
+  opacity: 0; pointer-events: none;
+  transition: left .18s ease, opacity .15s ease;
+}
+.q-cursor.show{ opacity: 1; }
 .q-badge {
   width: 48px; padding: 6px 0; box-sizing: border-box;
   border-radius: 2px; font-weight: 700; font-size: 14px;
@@ -1253,13 +1264,44 @@ body {
     border-radius: 7px;
     background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #b2ebf2 22%, #ffffff 55%, #ffe082 100%);
     box-shadow: 0 0 20px 6px rgba(178,235,242,.85);
-    animation: mirror-beam .42s cubic-bezier(.2,.7,.3,1) .16s forwards;
+    animation: mirror-beam .7s cubic-bezier(.2,.7,.3,1) .16s forwards;
   }
+  /* dopad (scaleX=1) ostáva na ~0.43s (sync s dmg), beam potom dlhšie drží a pomalšie zhasína */
   @keyframes mirror-beam{
     0%   { transform: scaleX(0); opacity: 0; }
-    25%  { opacity: 1; }
-    65%  { transform: scaleX(1); opacity: 1; filter: brightness(1.6); }
+    15%  { opacity: 1; }
+    38%  { transform: scaleX(1); opacity: 1; filter: brightness(1.6); }
+    62%  { transform: scaleX(1); opacity: 1; filter: brightness(1.3); }
     100% { transform: scaleX(1); opacity: 0; filter: brightness(1); }
+  }
+
+  /* odraz speciálu — rovnaký hladký beam ako basic, len fialovo ladený (nie pruhy) */
+  .mirror-beam.special{
+    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #ce93d8 20%, #ffffff 48%, #b39ddb 72%, #ce93d8 100%);
+    box-shadow: 0 0 24px 7px rgba(186,104,200,.85);
+  }
+
+  /* odraz melee — hrubý drsný roztrasený burst cez skoro celé políčko (beam nemá kam letieť) */
+  .mirror-melee{
+    transform: translate(-50%,-50%);
+    background: linear-gradient(180deg, rgba(234,255,255,.95), rgba(178,235,242,.55));
+    box-shadow: 0 0 34px 12px rgba(178,235,242,.9);
+    clip-path: polygon(50% 0, 61% 33%, 100% 38%, 70% 60%, 84% 100%, 50% 76%, 16% 100%, 30% 60%, 0 38%, 39% 33%);
+    animation: mirror-melee .8s steps(10) forwards; /* steps = choppy/drsný pixel pohyb */
+  }
+  /* special na rovnakom políčku — rovnaký drsný burst, len fialovo */
+  .mirror-melee.special{
+    background: linear-gradient(180deg, rgba(243,217,255,.95), rgba(206,147,216,.55));
+    box-shadow: 0 0 34px 12px rgba(186,104,200,.9);
+  }
+  @keyframes mirror-melee{
+    0%   { opacity: 0; transform: translate(-50%,-50%) scale(.5)  rotate(-6deg); }
+    12%  { opacity: 1; transform: translate(-50%,-50%) scale(1.14) rotate(6deg); }
+    26%  { transform: translate(-50%,-50%) scale(.95) rotate(-5deg); }
+    40%  { transform: translate(-50%,-50%) scale(1.1) rotate(4deg); filter: brightness(1.6); }
+    55%  { transform: translate(-50%,-50%) scale(.98) rotate(-3deg); }
+    70%  { transform: translate(-50%,-50%) scale(1.05) rotate(2deg); }
+    100% { opacity: 0; transform: translate(-50%,-50%) scale(1.12) rotate(0deg); }
   }
 
   /* veľký nápis REFLECTED! — punchier než bežný float */

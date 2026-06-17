@@ -64,6 +64,7 @@ const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
 const SPECIAL_REPEAT   = 3;
 const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
 const CHARGE_STEP_MS   = Math.round(560 * ANIM_SLOW);
+const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
 
 /* -------------------- Game state -------------------- */
 // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
@@ -305,7 +306,7 @@ function doBasic(slot, dir, tl) {
     if (!inBounds(x, y)) break;
     pushStateFrame(tl, [{ kind: "charge", from: slot, dir, cell: [x, y] }], CHARGE_STEP_MS);
     if (op && op.x === x && op.y === y) {
-      applyHit(opS, Math.max(1, BASIC_DMG_MAX - dist), tl);
+      applyHit(opS, Math.max(1, BASIC_DMG_MAX - dist), tl, "basic");
       break;
     }
   }
@@ -325,12 +326,12 @@ function doMelee(slot, tl) {
     pushStateFrame(tl, [{ kind: "melee", from: slot }], SPECIAL_BEAT_MS);
   }
   if (op && op.x === me.x && op.y === me.y) {
-    applyHit(opS, MELEE_DMG, tl);
+    applyHit(opS, MELEE_DMG, tl, "melee");
   }
 }
 
 // aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, mirror ho odrazí do útočníka)
-function applyHit(targetSlot, rawDmg, tl) {
+function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
   const t = game.players[targetSlot];
   if (t.shield) {
     pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
@@ -341,7 +342,9 @@ function applyHit(targetSlot, rawDmg, tl) {
     // poradie: najprv mirror frame (HP ešte nezmenené), až potom hit frame s poklesom HP útočníka
     const atkSlot = other(targetSlot);
     const atk = game.players[atkSlot];
-    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot }], SMALL_DELAY_MS);
+    // delay = čas dopadu beamu (nie SMALL_DELAY_MS), aby dmg padol hneď ako beam zasiahne — bez medzery;
+    // atk/dmg riadia hrúbku a štýl beamu na klientovi (basic podľa dmg, melee hrubý, special fialovo prepletený)
+    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: rawDmg, atk: kind }], MIRROR_BEAM_MS);
     atk.hp = Math.max(0, atk.hp - rawDmg);
     pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: rawDmg }], SMALL_DELAY_MS);
     return;
@@ -387,7 +390,7 @@ function doSpecial(slot, tl) {
   // vyhodnotenie zásahu
   const { dmg, hit } = specialDamageAndHit(game.players, slot);
   if (dmg > 0 && hit) {
-    applyHit(hit, dmg, tl);
+    applyHit(hit, dmg, tl, "special");
   } else {
     pushStateFrame(tl, [], SMALL_DELAY_MS);
   }

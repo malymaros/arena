@@ -71,6 +71,10 @@ actorsEl.appendChild(youMarker);
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
 const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47 };
 
+// zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
+const qCursor = document.createElement("div");
+qCursor.className = "q-cursor";
+
 // === Timing ===
 // celkové spomalenie animácií kola (1 = pôvodné tempo) — MUSÍ sedieť so server.js ANIM_SLOW
 const ANIM_SLOW = 1.5;
@@ -380,7 +384,7 @@ function centerOf(slot) {
 
 // efektná animácia odrazu: zrkadlová tabuľa flashne a praskne pri obrancovi,
 // rázová vlna + sklenené úlomky, lúč vystrelí späť do útočníka, board sa otrasie
-function spawnMirrorReflect(defenderSlot) {
+function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic") {
   const d = centerOf(defenderSlot);
   if (!d) return;
   const a = centerOf(defenderSlot === "p1" ? "p2" : "p1");
@@ -424,27 +428,41 @@ function spawnMirrorReflect(defenderSlot) {
     el.style.setProperty("--rot", Math.round(ang * 180 / Math.PI * 2) + "deg");
   }
 
-  // 4) lúč odrazu obranca → útočník
-  if (a) {
+  // 4) odraz: melee — alebo special na rovnakom políčku — = hrubý drsný burst (beam nemá kam letieť);
+  //    inak smerový lúč k útočníkovi
+  const foeSlot = defenderSlot === "p1" ? "p2" : "p1";
+  const dp = state?.[defenderSlot], ap = state?.[foeSlot];
+  const sameCell = !!(dp && ap && dp.x === ap.x && dp.y === ap.y);
+  const useBurst = atkKind === "melee" || (atkKind === "special" && sameCell);
+  if (useBurst) {
+    // burst cez skoro celé políčko; pri speciáli vo fialovom prevedení
+    add("mirror-melee" + (atkKind === "special" ? " special" : ""), {
+      left: d.x + "px", top: d.y + "px",
+      width: Math.round(TILE_W * 0.9) + "px",
+      height: Math.round(TILE_H * 0.95) + "px",
+    });
+  } else if (a) {
     const dist = Math.hypot(a.x - d.x, a.y - d.y);
     const ang  = Math.atan2(a.y - d.y, a.x - d.x) * 180 / Math.PI;
+    // hrúbka: basic podľa dmg (1/2/3) s výraznými rozostupmi, special ako najhrubší basic, fialovo ladený
+    const thick = atkKind === "special" ? 48 : ({ 1: 12, 2: 28, 3: 48 }[dmg] || 12);
     const wrap = add("mirror-beam-wrap", {
-      left: d.x + "px", top: (d.y - 7) + "px",
-      width: dist + "px", height: "14px",
+      left: d.x + "px", top: (d.y - thick / 2) + "px",
+      width: dist + "px", height: thick + "px",
       transform: `rotate(${ang}deg)`,
     });
     const beam = document.createElement("div");
-    beam.className = "mirror-beam";
+    beam.className = "mirror-beam" + (atkKind === "special" ? " special" : "");
     wrap.appendChild(beam);
   }
 
-  // 5) otras boardu
+  // 5) otras boardu — pri burste (melee/special-na-políčku) silnejší (drsnejší dojem)
   const boardEl = gridEl.parentElement;
   if (boardEl) {
     boardEl.classList.remove("fx-shake");
     void boardEl.offsetWidth;
     boardEl.classList.add("fx-shake");
-    setTimeout(() => boardEl.classList.remove("fx-shake"), 450);
+    setTimeout(() => boardEl.classList.remove("fx-shake"), useBurst ? 650 : 450);
   }
 }
 
@@ -1176,6 +1194,8 @@ function renderQueue() {
     queueEl.appendChild(el);
     qBeatEls[b.pos] = el;
   });
+  qCursor.classList.remove("show"); // počas plánovania skrytá; zobrazí ju až animácia
+  queueEl.appendChild(qCursor);     // zelená šípka (mimo flex flow, absolútna)
 
   updateActionButtons();
   updateLockButton();
@@ -1202,8 +1222,14 @@ function highlightRoundBeat(from, action, counts, starterSlot) {
     el.title = "Opponent";
   }
   el.classList.add("q-now");
+  // zelená šípka pod lištou sa presunie pod aktuálny beat
+  qCursor.style.left = (el.offsetLeft + el.offsetWidth / 2) + "px";
+  qCursor.classList.add("show");
 }
-function clearRoundCursor() { qBeatEls.forEach(e => e && e.classList.remove("q-now")); }
+function clearRoundCursor() {
+  qBeatEls.forEach(e => e && e.classList.remove("q-now"));
+  qCursor.classList.remove("show");
+}
 // pošli serveru aktuálnu rozpracovanú frontu + golden flagy (server ju pri timeoute zahrá a doplní chýbajúce)
 function sendDraft() {
   if (!me || state?.phase !== "playing" || lockedIn || state?.[me]?.locked) return;
@@ -1456,7 +1482,7 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.from, "🪞 MIRROR", "shield-float");
       }
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
-        spawnMirrorReflect(e.target);
+        spawnMirrorReflect(e.target, e.dmg, e.atk);
         spawnFloat(e.target, "🪞 REFLECTED!", "mirror-reflect-text");
       }
       if (e.kind === "golden_shield" && (e.from === "p1" || e.from === "p2")) {
