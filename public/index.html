@@ -108,8 +108,12 @@
 
   <!-- Controls toolbar -->
   <div class="controls-row">
-    <!-- Golden Shield — samostatné tlačidlo naľavo od panela, len pre hráča, ktorý v kole nezačína -->
-    <button id="golden-btn" class="btn act golden hidden" title="Golden Shield (−3 mana) - extra action resolved before the round starts. Available only when you go second."><span class="g-ico pix-ico" data-emoji="🛡️"></span><span class="cost">−3<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+    <!-- Golden predťah — jedno tlačidlo naľavo od panela, predelené na 2 polovice (ŠTÍT | MIRROR);
+         len pre hráča, ktorý v kole nezačína; rozsvieti sa vždy len zvolená polovica -->
+    <div id="golden-btn" class="btn act golden golden-split hidden">
+      <button type="button" class="golden-half shield-half" data-gold="shield" title="Golden Shield (−3 mana) - extra action resolved before the round starts. Available only when you go second."><span class="g-ico pix-ico" data-emoji="🛡️"></span><span class="cost">−3<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+      <button type="button" class="golden-half mirror-half" data-gold="mirror" title="Golden Mirror (−5 mana) - extra action resolved before the round starts; reflects the damage back. Available only when you go second."><span class="g-ico mirror pix-ico" data-emoji="🪞"></span><span class="cost">−5<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+    </div>
 
   <div class="controls">
     <div class="actions">

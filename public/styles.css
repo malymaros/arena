@@ -351,8 +351,50 @@ body {
     0 0 16px rgba(255,200,60,.55);
 }
 
+/* golden predťah: tlačidlo ROVNAKO VEĽKÉ ako golden-mana, len rozdelené na 2 polovice (ŠTÍT | MIRROR).
+   Zlato je na samotných poloviciach (nie na kontajneri), aby každá mala vlastný hover aj armed stav.
+   Žiadny overflow:hidden — inak by sa orezal zámok (🔒 ::after je umiestnený mimo tlačidla). */
+.btn.golden.golden-split{
+  padding: 0; gap: 0;
+  flex-direction: row; align-items: stretch; /* .btn.act inak núti column */
+  background: none;
+}
+.golden-half{
+  flex: 1 1 0; min-width: 0;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px 4px;                  /* padding + gap rovnaké ako golden-mana → rovnaká výška */
+  font-size: 24px; line-height: 1.1;  /* rovnako veľká ikona ako bežné .btn.act (button nededí font) */
+  color: #fff; border: none; cursor: pointer;
+  /* tlmené zlato v plochých pásoch — rovnaké ako neaktívne .btn.golden */
+  background: linear-gradient(180deg,
+    #a87f0a 0 4px, #8f6f05 4px calc(100% - 4px), #5d4a00 calc(100% - 4px) 100%);
+  transition: filter .12s ease, background .15s ease, box-shadow .15s ease;
+}
+.golden-half + .golden-half{ border-left: 2px solid rgba(0,0,0,.55); } /* viditeľný šev medzi polovicami */
+.golden-half .cost{ font-size: 11px; font-weight: 800; opacity: .95; white-space: nowrap; }
+/* hover: jemné rozžiarenie zlata danej polovice (rovnako ako golden-mana); kontajner sám sa nerozsvieti.
+   Pri zamknutom tlačidle (starter / lock-in / picker) hover nič nemení — ostáva sivé. */
+.btn.golden.golden-split:not(.locked-perm):not(.locked-ui):hover{ filter: none; }
+.btn.golden.golden-split:not(.locked-perm):not(.locked-ui) .golden-half:hover{ filter: brightness(1.08); }
+/* zvolená polovica: jasné zlato + žiara (rovnako ako pôvodný .armed) */
+.golden-half.armed{
+  background: linear-gradient(180deg,
+    #ffd54f 0 4px, #d4a017 4px calc(100% - 4px), #8a6d00 calc(100% - 4px) 100%);
+  filter: brightness(1.1);
+  box-shadow: 0 0 16px rgba(255,200,60,.55);
+}
+.btn.golden.golden-split:not(.locked-perm):not(.locked-ui) .golden-half.armed:hover{ filter: brightness(1.18); }
+.btn.golden.locked-perm .golden-half{ cursor: not-allowed; }
+
 /* rovnaký štít, len v zlatej — filter na samotnej emoji ikone */
 .g-ico{ filter: sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.1); }
+/* golden MIRROR ikona (tlačidlo + lišta ťahov + widgety + záznam pod plochou): sklo ostáva modré
+   ako originál, zlatý je len RÁM (tvrdý obrys, bez žiary — v pokoji pôsobí úplne neutrálne, nesvieti) */
+.g-ico.mirror{
+  filter:
+    drop-shadow(1.5px 0 0 #d4a017) drop-shadow(-1.5px 0 0 #d4a017)
+    drop-shadow(0 1.5px 0 #d4a017) drop-shadow(0 -1.5px 0 #d4a017);
+}
 
 /* akcia už použitá v tomto kole (vrátane Move bez data-act) */
 .actions .btn:disabled { opacity: .35; cursor: default; filter: none; transform: none; }
@@ -936,6 +978,7 @@ body {
   .a-badge.mirror   { background: #00525b; }
   .a-badge.special  { background: #5e1387; }
   .a-badge.golden_shield { background: #8a6d00; }
+  .a-badge.golden_mirror { background: #8a6d00; }
   .a-badge.golden_mana   { background: #8a6d00; }
   /* prázdny slot záznamu — čiarkovaný placeholder, rovnaká šírka ako vyplnený badge */
   .a-badge.a-slot{
@@ -1304,6 +1347,27 @@ body {
     100% { opacity: 0; transform: translate(-50%,-50%) scale(1.12) rotate(0deg); }
   }
 
+  /* ===== GOLDEN MIRROR — tie isté animácie, odraz/lúč v zlatej (analogicky ku golden shieldu).
+     Odrazová plocha (sklo aj jej žiar) ostáva modrá ako na origináli — zlatý je iba RÁM. ===== */
+  .mirror-fx.gold.mirror-pane{ border-color: #ffd54f; }
+  .mirror-fx.gold.mirror-ring{
+    border-color: #ffe9a8;
+    box-shadow: 0 0 22px rgba(255,200,60,.85), inset 0 0 14px rgba(255,200,60,.6);
+  }
+  .mirror-fx.gold.mirror-shard{
+    background: linear-gradient(135deg, #fff6da, #ffd54f 60%, #b8860b);
+    box-shadow: 0 0 8px rgba(255,200,60,.9);
+  }
+  /* po .special, aby zlatý odraz speciálu ostal zlatý (rovnaká špecifickosť → vyhráva poradie) */
+  .mirror-beam.gold{
+    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #ffe082 22%, #ffffff 55%, #ffb300 100%);
+    box-shadow: 0 0 20px 6px rgba(255,200,60,.85);
+  }
+  .mirror-fx.gold.mirror-melee{
+    background: linear-gradient(180deg, rgba(255,247,214,.95), rgba(255,213,79,.55));
+    box-shadow: 0 0 34px 12px rgba(255,200,60,.9);
+  }
+
   /* veľký nápis REFLECTED! — punchier než bežný float */
   .mirror-reflect-text{
     position: absolute;
@@ -1316,6 +1380,9 @@ body {
     pointer-events: none;
     white-space: nowrap;
     animation: reflect-pop .9s ease-out forwards;
+  }
+  .mirror-reflect-text.gold{
+    text-shadow: 0 0 10px #ffe082, 2px 2px 0 #b8860b, 4px 4px 0 rgba(0,0,0,.6);
   }
   @keyframes reflect-pop{
     0%   { transform: translateX(-50%) scale(.3); opacity: 0; }

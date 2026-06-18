@@ -128,6 +128,7 @@ const S = { type: "shield" };
 const MI = { type: "mirror" };
 const ML = { type: "melee" };
 const G = { type: "golden_shield" };
+const GMI = { type: "golden_mirror" };
 const GM = { type: "golden_mana" };
 const SP = { type: "special" };
 
@@ -280,6 +281,33 @@ async function main() {
   const t10last = tl[tl.length - 1];
   check(t10last.p2.mana === 5, "T10: P2 mana sedí (6−3+4−2=5)", `mana=${t10last.p2.mana}`);
   invariantCheck(tl, "T10");
+
+  /* ---------- Test 10b: golden mirror — ten istý predťah, ale odraz namiesto štítu ---------- */
+  await freshGame(c1, c2);
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  // starter (P1) golden mirror poslať nesmie — rovnako ako golden shield ho server odmietne
+  c1.sock.emit("lock_in", [GMI, A("right"), R, S]);
+  c2.sock.emit("lock_in", [GMI, R, S, M("up")]);
+  let gmiRejected = false;
+  try { await waitTimeline(c1, 1200); } catch { gmiRejected = true; }
+  check(gmiRejected, "T10b: starter s golden mirrorom je odmietnutý");
+  // platný lock P1 (útok na dist 3 = 1 dmg) → P2 golden mirror odrazí prvý úder startera späť do P1
+  c1.sock.emit("lock_in", [A("right"), R, S]);
+  tl = await waitTimeline(c1);
+  await new Promise(r => setTimeout(r, 150));
+  const gmiFx     = tl.flatMap(f => f.effects || []).filter(e => e.kind === "golden_mirror" && e.from === "p2");
+  const gmiMirror = tl.flatMap(f => f.effects || []).filter(e => e.kind === "mirror" && e.target === "p2");
+  const gmiP1Hits = sumEffects(tl).hits.filter(h => h.target === "p1");
+  const gmiP2Hits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(gmiFx.length === 1, "T10b: golden mirror efekt v timeline", `fx=${gmiFx.length}`);
+  check(gmiMirror.length === 1 && gmiMirror[0].gold === true, "T10b: odraz je označený ako zlatý",
+    `mirror=${JSON.stringify(gmiMirror)}`);
+  check(gmiP1Hits.length === 1 && gmiP1Hits[0].dmg === 1, "T10b: odrazený basic (1 dmg) zasiahol startera",
+    `hits=${JSON.stringify(gmiP1Hits)}`);
+  check(gmiP2Hits.length === 0, "T10b: obranca s golden mirrorom nedostal dmg", `hits=${JSON.stringify(gmiP2Hits)}`);
+  const t10blast = tl[tl.length - 1];
+  check(t10blast.p2.mana === 3, "T10b: P2 mana sedí (6−5+4−2=3)", `mana=${t10blast.p2.mana}`);
+  invariantCheck(tl, "T10b");
 
   /* ---------- Test 11: speciály — fire 5 dmg na riadku, lightning 3 dmg na opačnej parite ---------- */
   await freshGame(c1, c2);

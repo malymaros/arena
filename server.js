@@ -37,6 +37,7 @@ const RECHARGE_GAIN = 4;
 const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
 const MIRROR_COST = 4; // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
 const GOLDEN_COST = 3; // extra akcia hráča, ktorý je v kole druhý — štít vyhodnotený pred prvou akciou startera
+const GOLDEN_MIRROR_COST = 5; // ten istý predťah, ale mirror (odraz) namiesto štítu — zlaté vizuály
 const DASH_COST   = 4; // presun až o 2 políčka jedným smerom
 const GOLDEN_MANA_GAIN = 6; // golden mana refill: +6 many za HP; cena v HP rastie s každým použitím (1, 2, 3…)
 
@@ -83,13 +84,15 @@ function newPlayer(slot) {
     shield: false,     // zruší celý dmg najbližšej súperovej akcie
     shieldGold: false, // aktívny shield pochádza z golden shieldu (zlaté vizuály)
     mirror: false,     // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
+    mirrorGold: false, // aktívny mirror pochádza z golden mirroru (zlaté vizuály)
     golden: false,     // objednaný golden shield (extra akcia pred začiatkom kola)
+    goldenMirror: false, // objednaný golden mirror (rovnaký predťah, ale odraz namiesto štítu)
     goldenMana: false, // objednaný golden mana refill (extra akcia po konci kola)
     manaRefills: 0,    // koľkokrát už hráč refill použil — určuje rastúcu HP cenu
     locked: false,
     queue: [],
     // priebežne posielaná rozpracovaná voľba — pri vypršaní času ju backstop zachová a doplní len chýbajúce
-    draft: { queue: [], golden: false, goldenMana: false }
+    draft: { queue: [], golden: false, goldenMirror: false, goldenMana: false }
   };
 }
 
@@ -141,8 +144,8 @@ function emitYouAre() {
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, manaRefills, locked } = a;
-  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, manaRefills, locked };
+  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, locked } = a;
+  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, locked };
 }
 function snapshot() {
   return {
@@ -198,11 +201,11 @@ function specialDamageAndHit(players, slot) {
 }
 
 // 3 akcie, každý typ max 1× za kolo, len známe typy a smery (move, attack aj dash nesú dir)
-// voliteľný prefix golden_shield (len hráč, ktorý v kole NEzačína) a sufix golden_mana (ktokoľvek)
+// voliteľný prefix golden_shield/golden_mirror (len hráč, ktorý v kole NEzačína) a sufix golden_mana (ktokoľvek)
 function validQueue(queue, slot) {
   if (!Array.isArray(queue)) return false;
   let q = queue;
-  if (q[0] && q[0].type === "golden_shield") {
+  if (q[0] && (q[0].type === "golden_shield" || q[0].type === "golden_mirror")) {
     if (slot === game.starter) return false;
     q = q.slice(1);
   }
@@ -344,7 +347,7 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
     const atk = game.players[atkSlot];
     // delay = čas dopadu beamu (nie SMALL_DELAY_MS), aby dmg padol hneď ako beam zasiahne — bez medzery;
     // atk/dmg riadia hrúbku a štýl beamu na klientovi (basic podľa dmg, melee hrubý, special fialovo prepletený)
-    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: rawDmg, atk: kind }], MIRROR_BEAM_MS);
+    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: rawDmg, atk: kind, gold: !!t.mirrorGold }], MIRROR_BEAM_MS);
     atk.hp = Math.max(0, atk.hp - rawDmg);
     pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: rawDmg }], SMALL_DELAY_MS);
     return;
@@ -367,6 +370,7 @@ function doMirror(slot, tl) {
   if (a.mana < MIRROR_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   a.mana -= MIRROR_COST;
   a.mirror = true;
+  a.mirrorGold = false;
   pushStateFrame(tl, [{ kind: "mirror_on", from: slot }], SMALL_DELAY_MS);
 }
 
@@ -591,6 +595,7 @@ function onTurnTimeout() {
     // zahraj, čo má hráč rozpracované (draft), chýbajúce do 3 doplň náhodne; gold zachovaj len keď si ho navolil
     p.queue = fillFromDraft(p.draft?.queue);
     p.golden = !!p.draft?.golden && slot !== game.starter; // golden shield len pre nestartéra
+    p.goldenMirror = !!p.draft?.goldenMirror && slot !== game.starter; // golden mirror tiež len pre nestartéra
     p.goldenMana = !!p.draft?.goldenMana;
     p.locked = true;
   }
@@ -608,20 +613,30 @@ function resolveTurn() {
   const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
   let ended = false;
 
-  // golden shield — extra akcia hráča, ktorý je v kole druhý, vyhodnotená pred prvou akciou startera
+  // golden shield / golden mirror — extra predťah hráča, ktorý je v kole druhý, vyhodnotený pred prvou akciou startera
   const second = order[1];
-  if (game.players[second].golden) {
+  if (game.players[second].golden || game.players[second].goldenMirror) {
     const gp = game.players[second];
-    pushStateFrame(tl, [{ kind: "action", from: second, action: { type: "golden_shield", dir: null } }], 250);
-    if (gp.mana >= GOLDEN_COST) {
-      gp.mana -= GOLDEN_COST;
-      gp.shield = true;
-      gp.shieldGold = true;
-      pushStateFrame(tl, [{ kind: "golden_shield", from: second }], SMALL_DELAY_MS);
+    const isMirror = gp.goldenMirror;
+    const cost = isMirror ? GOLDEN_MIRROR_COST : GOLDEN_COST;
+    const type = isMirror ? "golden_mirror" : "golden_shield";
+    pushStateFrame(tl, [{ kind: "action", from: second, action: { type, dir: null } }], 250);
+    if (gp.mana >= cost) {
+      gp.mana -= cost;
+      if (isMirror) {
+        gp.mirror = true;
+        gp.mirrorGold = true;
+        pushStateFrame(tl, [{ kind: "golden_mirror", from: second }], SMALL_DELAY_MS);
+      } else {
+        gp.shield = true;
+        gp.shieldGold = true;
+        pushStateFrame(tl, [{ kind: "golden_shield", from: second }], SMALL_DELAY_MS);
+      }
     } else {
       pushInvalid(tl, second, SMALL_DELAY_MS, "mana");
     }
     gp.golden = false;
+    gp.goldenMirror = false;
   }
 
   outer:
@@ -636,7 +651,7 @@ function resolveTurn() {
       if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null } }], 250);
       doAction(slot, act, tl);
       if (foeShieldArmed) { game.players[foe].shield = false; game.players[foe].shieldGold = false; }
-      if (foeMirrorArmed) game.players[foe].mirror = false;
+      if (foeMirrorArmed) { game.players[foe].mirror = false; game.players[foe].mirrorGold = false; }
 
       // po každej akcii skontroluj lethal
       const w = winnerNow();
@@ -655,6 +670,8 @@ function resolveTurn() {
   game.players.p2.shieldGold = false;
   game.players.p1.mirror = false;
   game.players.p2.mirror = false;
+  game.players.p1.mirrorGold = false;
+  game.players.p2.mirrorGold = false;
 
   if (!ended) {
     // koniec kola — presun IK a spawn nového tile (vidno ich vo finálnom frame)
@@ -696,8 +713,10 @@ function resolveTurn() {
   game.players.p2.queue = [];
   game.players.p1.goldenMana = false; // nevyhodnotený refill (ukončené kolo) prepadá
   game.players.p2.goldenMana = false;
-  game.players.p1.draft = { queue: [], golden: false, goldenMana: false };
-  game.players.p2.draft = { queue: [], golden: false, goldenMana: false };
+  game.players.p1.goldenMirror = false;
+  game.players.p2.goldenMirror = false;
+  game.players.p1.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false };
+  game.players.p2.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false };
 
   const dur = tl.reduce((a, f) => a + (f.delayMs || 0), 0);
   if (ended) {
@@ -838,7 +857,8 @@ io.on("connection", (socket) => {
     const me = game.players[slot];
     let q = queue;
     me.golden = q[0]?.type === "golden_shield";
-    if (me.golden) q = q.slice(1);
+    me.goldenMirror = q[0]?.type === "golden_mirror";
+    if (me.golden || me.goldenMirror) q = q.slice(1);
     me.goldenMana = q[q.length - 1]?.type === "golden_mana";
     if (me.goldenMana) q = q.slice(0, -1);
     me.queue = q.map(a => ({ ...a }));
@@ -867,7 +887,7 @@ io.on("connection", (socket) => {
       out.push({ type: a.type, dir: a.dir || null });
       used.add(a.type);
     }
-    me.draft = { queue: out, golden: !!d?.golden, goldenMana: !!d?.goldenMana };
+    me.draft = { queue: out, golden: !!d?.golden, goldenMirror: !!d?.goldenMirror, goldenMana: !!d?.goldenMana };
   });
 
   socket.on("retry", () => {

@@ -120,8 +120,9 @@ let serverGameResult = null;      // výsledok poslednej dohranej hry (séria) �
 let board = { w: 4, h: 3 };
 let state = { p1:null, p2:null, arena:null, turn:1, starter:"p1", phase:"lobby" };
 let myQueue = [];
-let goldenArmed = false;     // objednaný golden shield (extra akcia pred kolom, len keď som druhý)
-let goldenManaArmed = false; // objednaný golden mana refill (extra akcia po konci kola)
+let goldenArmed = false;       // objednaný golden shield (extra predťah pred kolom, len keď som druhý)
+let goldenMirrorArmed = false; // objednaný golden mirror — ten istý predťah, len odraz (vzájomne výlučný s golden shieldom)
+let goldenManaArmed = false;   // objednaný golden mana refill (extra akcia po konci kola)
 let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
@@ -286,7 +287,7 @@ function spawnManaFloat(slot, amount = 4) {
 
 // glow okolo postavy: obrana (pulzuje) nahrádza zlatý „YOU", inak fallback na zlatý
 const YOU_GOLD_GLOW = "drop-shadow(0 0 1px #fff3b0) drop-shadow(0 0 4px #ffc107) drop-shadow(0 0 8px #ff9100)";
-const GLOW_COL = { shield: "#4dd0e1", shieldGold: "#ffca28", mirror: "#ce93d8" }; // štít / golden / mirror
+const GLOW_COL = { shield: "#4dd0e1", shieldGold: "#ffca28", mirror: "#ce93d8", mirrorGold: "#ffca28" }; // štít / golden štít / mirror / golden mirror
 function pulseGlow(color, now) {
   const c = color, t = 0.5 + 0.5 * Math.sin(now / 240); // 0..1 pulz
   const b1 = (3 + 2 * t).toFixed(1);
@@ -301,7 +302,7 @@ function actorFilter(slot, now) {
   const alt = sameCharNow() && slot === "p2" ? "saturate(.22) brightness(1.4) " : "";
   let glow = "";
   if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
-  else if (st?.mirror) glow = pulseGlow(GLOW_COL.mirror, now);
+  else if (st?.mirror) glow = pulseGlow(st.mirrorGold ? GLOW_COL.mirrorGold : GLOW_COL.mirror, now);
   else if (slot === me) glow = YOU_GOLD_GLOW;
   return (alt + glow).trim();
 }
@@ -384,14 +385,14 @@ function centerOf(slot) {
 
 // efektná animácia odrazu: zrkadlová tabuľa flashne a praskne pri obrancovi,
 // rázová vlna + sklenené úlomky, lúč vystrelí späť do útočníka, board sa otrasie
-function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic") {
+function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = false) {
   const d = centerOf(defenderSlot);
   if (!d) return;
   const a = centerOf(defenderSlot === "p1" ? "p2" : "p1");
 
   const add = (cls, style) => {
     const el = document.createElement("div");
-    el.className = "mirror-fx " + cls;
+    el.className = "mirror-fx " + cls + (gold ? " gold" : "");
     Object.assign(el.style, style);
     actorsEl.appendChild(el);
     setTimeout(() => el.remove(), 900);
@@ -452,7 +453,7 @@ function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic") {
       transform: `rotate(${ang}deg)`,
     });
     const beam = document.createElement("div");
-    beam.className = "mirror-beam" + (atkKind === "special" ? " special" : "");
+    beam.className = "mirror-beam" + (atkKind === "special" ? " special" : "") + (gold ? " gold" : "");
     wrap.appendChild(beam);
   }
 
@@ -774,6 +775,7 @@ function actionIcon(action) {
     case "shield":   return "🛡️";
     case "mirror":   return "🪞";
     case "golden_shield": return "🛡️";
+    case "golden_mirror": return "🪞";
     case "special":  return "✨";
     default:         return "?";
   }
@@ -805,11 +807,12 @@ function appendActionLog(slot, action) {
   if (!log) return;
   if (!log.children.length) buildActionLogSkeleton(log);
 
-  if (action?.type === "golden_shield") {
+  if (action?.type === "golden_shield" || action?.type === "golden_mirror") {
     const el = log.querySelector(".a-slot.slot-pre");
     if (el) {
-      el.className = "a-badge golden_shield";
-      el.innerHTML = '<span class="g-ico">🛡️</span>';
+      const mirror = action.type === "golden_mirror";
+      el.className = "a-badge " + action.type;
+      el.innerHTML = mirror ? '<span class="g-ico mirror">🪞</span>' : '<span class="g-ico">🛡️</span>';
     }
     return;
   }
@@ -1117,6 +1120,7 @@ function actionBadgeView(a) {
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
+    case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
     default:              return { cls: "",        text: a?.type || "" };
   }
@@ -1173,7 +1177,7 @@ function renderQueue() {
 
     let filled = null;
     if (mine) {
-      if (b.kind === "gshield")    filled = goldenArmed ? { type: "golden_shield" } : null;
+      if (b.kind === "gshield")    filled = goldenArmed ? { type: "golden_shield" } : goldenMirrorArmed ? { type: "golden_mirror" } : null;
       else if (b.kind === "gmana") filled = goldenManaArmed ? { type: "golden_mana" } : null;
       else                         filled = myQueue[b.idx] || null;
     }
@@ -1205,7 +1209,7 @@ function renderQueue() {
 // počas animácie: posuň kurzor na práve vyhodnocovaný beat a odhal súperovu akciu
 function highlightRoundBeat(from, action, counts, starterSlot) {
   let pos;
-  if (action.type === "golden_shield")    pos = 0;
+  if (action.type === "golden_shield" || action.type === "golden_mirror") pos = 0;
   else if (action.type === "golden_mana") pos = (from === starterSlot) ? 7 : 8;
   else { const k = counts[from]++; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
   if (pos == null) return;
@@ -1233,7 +1237,7 @@ function clearRoundCursor() {
 // pošli serveru aktuálnu rozpracovanú frontu + golden flagy (server ju pri timeoute zahrá a doplní chýbajúce)
 function sendDraft() {
   if (!me || state?.phase !== "playing" || lockedIn || state?.[me]?.locked) return;
-  socket.emit("draft_queue", { queue: myQueue, golden: goldenArmed, goldenMana: goldenManaArmed });
+  socket.emit("draft_queue", { queue: myQueue, golden: goldenArmed, goldenMirror: goldenMirrorArmed, goldenMana: goldenManaArmed });
 }
 // zneaktívni tlačidlá akcií, ktoré už sú v queue (každá max 1× za kolo)
 function updateActionButtons() {
@@ -1414,9 +1418,10 @@ function schedulePlayTimeline(timeline) {
         renderGrid(state, []);
         myQueue = [];
         goldenArmed = false;
+        goldenMirrorArmed = false;
         goldenManaArmed = false;
         lockedIn = false; // kolo dobehlo — odomkni ovládanie
-        document.getElementById("golden-btn")?.classList.remove("armed");
+        syncGoldenHalves();
         document.getElementById("golden-mana-btn")?.classList.remove("armed");
         renderQueue(); // až teraz vyčisti round-script pre ďalšie kolo
         lockBtn.disabled = false;
@@ -1482,12 +1487,16 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.from, "🪞 MIRROR", "shield-float");
       }
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
-        spawnMirrorReflect(e.target, e.dmg, e.atk);
-        spawnFloat(e.target, "🪞 REFLECTED!", "mirror-reflect-text");
+        spawnMirrorReflect(e.target, e.dmg, e.atk, !!e.gold);
+        spawnFloat(e.target, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
       }
       if (e.kind === "golden_shield" && (e.from === "p1" || e.from === "p2")) {
         // navonok je to SHIELD, len zlatý — "golden shield" je interné pomenovanie
         spawnFloat(e.from, "🛡️ SHIELD", "golden-float");
+      }
+      if (e.kind === "golden_mirror" && (e.from === "p1" || e.from === "p2")) {
+        // navonok je to MIRROR, len zlatý (predťah) — odraz padne neskôr cez mirror frame
+        spawnFloat(e.from, "🪞 MIRROR", "golden-float");
       }
       if (e.kind === "golden_mana" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, `🙏 +${e.gained ?? 6} MANA`, "golden-float");
@@ -1709,16 +1718,29 @@ moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"))
 attackBtn.addEventListener("click", () => togglePicker("attack", attackBtn, "attack"));
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
 
-// Golden Shield: extra akcia pred kolom — toggle; starterovi sa zobrazuje zamknutý (vizuálny zámok)
+// Golden predťah: jedno tlačidlo predelené na 2 rovnako široké polovice — ŠTÍT (−3) | MIRROR (−5).
+// Vzájomne výlučné; rozsvieti sa vždy len zvolená polovica. Starterovi zamknuté (vizuálny zámok).
 const goldenBtn = document.getElementById("golden-btn");
-goldenBtn.addEventListener("click", () => {
+const goldenShieldHalf = goldenBtn.querySelector(".shield-half");
+const goldenMirrorHalf = goldenBtn.querySelector(".mirror-half");
+
+// rozsvietenie polovíc podľa armed flagov
+function syncGoldenHalves() {
+  goldenShieldHalf?.classList.toggle("armed", goldenArmed);
+  goldenMirrorHalf?.classList.toggle("armed", goldenMirrorArmed);
+}
+
+function toggleGoldenHalf(mode) {
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(goldenBtn); return; }
   if (!me || state?.starter === me) { shakeBtn(goldenBtn); return; }
-  goldenArmed = !goldenArmed;
-  goldenBtn.classList.toggle("armed", goldenArmed);
+  if (mode === "shield") { goldenArmed = !goldenArmed; goldenMirrorArmed = false; }
+  else                   { goldenMirrorArmed = !goldenMirrorArmed; goldenArmed = false; }
+  syncGoldenHalves();
   renderQueue();
-});
+}
+goldenShieldHalf?.addEventListener("click", () => toggleGoldenHalf("shield"));
+goldenMirrorHalf?.addEventListener("click", () => toggleGoldenHalf("mirror"));
 
 // Golden Mana Refill: extra akcia po konci kola — toggle, dostupný obom hráčom
 const goldenManaBtn = document.getElementById("golden-mana-btn");
@@ -1739,10 +1761,11 @@ function updateGoldenButton() {
     goldenBtn.classList.toggle("hidden", !inGame);
     const isStarter = !!me && state?.starter === me;
     goldenBtn.classList.toggle("locked-perm", isStarter);
-    if (isStarter && goldenArmed) {
+    if (isStarter && (goldenArmed || goldenMirrorArmed)) {
       goldenArmed = false;
-      goldenBtn.classList.remove("armed");
+      goldenMirrorArmed = false;
     }
+    syncGoldenHalves();
   }
   if (goldenManaBtn) {
     const available = !!me && !!state?.[me]?.char;
@@ -1798,6 +1821,7 @@ lockBtn.addEventListener("click", () => {
   }
   const payload = [...myQueue];
   if (goldenArmed) payload.unshift({ type: "golden_shield" });
+  else if (goldenMirrorArmed) payload.unshift({ type: "golden_mirror" });
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
   socket.emit("lock_in", payload);
   lockedIn = true; // všetky tlačidlá idú do locked stavu až do konca kola
@@ -1913,6 +1937,7 @@ function autoLockTimeout() {
   }
   const payload = [...myQueue];
   if (goldenArmed) payload.unshift({ type: "golden_shield" });
+  else if (goldenMirrorArmed) payload.unshift({ type: "golden_mirror" });
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
   socket.emit("lock_in", payload);
   lockedIn = true;
@@ -2033,9 +2058,10 @@ socket.on("reset", () => {
   clearActionLogs();
   myQueue = [];
   goldenArmed = false;
+  goldenMirrorArmed = false;
   goldenManaArmed = false;
   lockedIn = false;
-  document.getElementById("golden-btn")?.classList.remove("armed");
+  syncGoldenHalves();
   document.getElementById("golden-mana-btn")?.classList.remove("armed");
   closePickers();
   renderQueue();
@@ -2115,8 +2141,8 @@ socket.on("new_game", () => {
   chosenChar = null;
   dirPicker.classList.add("hidden"); aimPicker.classList.add("hidden");
   clearActionLogs();
-  myQueue = []; goldenArmed = false; goldenManaArmed = false; lockedIn = false;
-  document.getElementById("golden-btn")?.classList.remove("armed");
+  myQueue = []; goldenArmed = false; goldenMirrorArmed = false; goldenManaArmed = false; lockedIn = false;
+  syncGoldenHalves();
   document.getElementById("golden-mana-btn")?.classList.remove("armed");
   closePickers(); renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
