@@ -801,10 +801,10 @@ function buildActionLogSkeleton(log) {
   mkSlot("slot-post", '<span class="g-ico dim">🙏</span>');
 }
 
-// akcie postupne vypĺňajú placeholder sloty (golden pre/post, bežné zľava doprava)
+// akcie postupne vypĺňajú placeholder sloty (golden pre/post, bežné zľava doprava); vráti vyplnený slot
 function appendActionLog(slot, action) {
   const log = slot === "p1" ? logP1 : logP2;
-  if (!log) return;
+  if (!log) return null;
   if (!log.children.length) buildActionLogSkeleton(log);
 
   if (action?.type === "golden_shield" || action?.type === "golden_mirror") {
@@ -814,7 +814,7 @@ function appendActionLog(slot, action) {
       el.className = "a-badge " + action.type;
       el.innerHTML = mirror ? '<span class="g-ico mirror">🪞</span>' : '<span class="g-ico">🛡️</span>';
     }
-    return;
+    return el;
   }
   if (action?.type === "golden_mana") {
     const el = log.querySelector(".a-slot.slot-post");
@@ -822,13 +822,14 @@ function appendActionLog(slot, action) {
       el.className = "a-badge golden_mana";
       el.innerHTML = '<span class="g-ico">🙏</span>';
     }
-    return;
+    return el;
   }
   const el = log.querySelector(".a-slot.slot-act");
   if (el) {
     el.className = `a-badge ${action?.type || ""}`;
     el.textContent = actionIcon(action);
   }
+  return el;
 }
 function clearActionLogs() {
   if (logP1) buildActionLogSkeleton(logP1);
@@ -1212,10 +1213,10 @@ function highlightRoundBeat(from, action, counts, starterSlot) {
   if (action.type === "golden_shield" || action.type === "golden_mirror") pos = 0;
   else if (action.type === "golden_mana") pos = (from === starterSlot) ? 7 : 8;
   else { const k = counts[from]++; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
-  if (pos == null) return;
+  if (pos == null) return null;
   qBeatEls.forEach(e => e && e.classList.remove("q-now"));
   const el = qBeatEls[pos];
-  if (!el) return;
+  if (!el) return null;
   // odhal súperovu akciu (moje sú už vyplnené z plánovania)
   if (el.classList.contains("opp")) {
     const v = actionBadgeView(action);
@@ -1229,6 +1230,7 @@ function highlightRoundBeat(from, action, counts, starterSlot) {
   // zelená šípka pod lištou sa presunie pod aktuálny beat
   qCursor.style.left = (el.offsetLeft + el.offsetWidth / 2) + "px";
   qCursor.classList.add("show");
+  return el;
 }
 function clearRoundCursor() {
   qBeatEls.forEach(e => e && e.classList.remove("q-now"));
@@ -1376,6 +1378,8 @@ function schedulePlayTimeline(timeline) {
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
   const playStarter = first.starter ?? state?.starter ?? "p1";
   const beatCounts = { p1: 0, p2: 0 };
+  // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) — keď príde "invalid", prečiarkneme ju
+  const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
   state.tiles = first.tiles; state.iks = first.iks;
   renderHUD();
@@ -1463,6 +1467,12 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", HURT_MS);
+        // nevykonaná akcia — prečiarkni práve zaznamenaný badge (log) aj beat (lišta) jemným červeným ✕
+        const acted = lastActed[e.target];
+        if (acted) {
+          acted.logEl?.classList.add("act-invalid");
+          acted.beatEl?.classList.add("act-invalid");
+        }
         // nedostatok many — výrazná výstraha: float + bliknutie mana baru v HUD
         if (e.reason === "mana") {
           spawnFloat(e.target, "⚠️ LOW MANA", "lowmana-float");
@@ -1474,6 +1484,11 @@ function schedulePlayTimeline(timeline) {
             setTimeout(() => bar.classList.remove("low-warn"), 1000);
           }
         }
+        // golden mana odmietnutá — jasná príčina
+        else if (e.reason === "mana_full") spawnFloat(e.target, "🙏 MANA FULL", "golden-float");
+        else if (e.reason === "hp_low")    spawnFloat(e.target, "🙏 LOW HP", "lowmana-float");
+        // basic mimo plochu — žiadne políčko nezasahuje
+        else if (e.reason === "offboard")  spawnFloat(e.target, "🏹 OFF-BOARD", "lowmana-float");
       }
       if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
         const amt = (typeof e.amount === "number" ? e.amount : 4);
@@ -1503,8 +1518,9 @@ function schedulePlayTimeline(timeline) {
         if (e.hpCost) spawnDamageFloat(e.from, e.hpCost);
       }
       if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) {
-        appendActionLog(e.from, e.action);
-        highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
+        const logEl  = appendActionLog(e.from, e.action);
+        const beatEl = highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
+        lastActed[e.from] = { logEl, beatEl }; // ak hneď príde "invalid", prečiarkneme práve tieto
       }
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
         spawnShieldBlock(e.target, !!e.gold); // efektný náraz do štítu

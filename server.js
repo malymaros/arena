@@ -64,7 +64,7 @@ const MOVE_DELAY_MS    = Math.round(800 * ANIM_SLOW); // posun postavy + malý b
 const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
 const SPECIAL_REPEAT   = 3;
 const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
-const CHARGE_STEP_MS   = Math.round(560 * ANIM_SLOW);
+const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za bunku — rýchla strela, aby ani 3-bunkový let nebol pomalší než iné akcie
 const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
 
 /* -------------------- Game state -------------------- */
@@ -299,6 +299,8 @@ function doBasic(slot, dir, tl) {
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
   if (!delta) { pushInvalid(tl, slot); return; }
   if (me.mana < BASIC_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  // strela nemá kam letieť (hráč na okraji mieri von z plochy, žiadne políčko nezasahuje) -> neplatný ťah, mana sa neminie
+  if (!inBounds(me.x + delta[0], me.y + delta[1])) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
   me.mana -= BASIC_COST;
 
   // strela letí zvoleným smerom; zastaví sa na prvom súperovi v dráhe alebo na okraji boardu
@@ -692,7 +694,8 @@ function resolveTurn() {
         p.manaRefills++;
         pushStateFrame(tl, [{ kind: "golden_mana", from: slot, hpCost: cost, gained }], SMALL_DELAY_MS);
       } else {
-        pushInvalid(tl, slot);
+        // odmietnutý refill: plná mana (naprázdno) alebo by bol smrteľný
+        pushInvalid(tl, slot, SMALL_DELAY_MS, p.mana >= MAX_MANA ? "mana_full" : "hp_low");
       }
     }
 

@@ -980,6 +980,20 @@ body {
   .a-badge.golden_shield { background: #8a6d00; }
   .a-badge.golden_mirror { background: #8a6d00; }
   .a-badge.golden_mana   { background: #8a6d00; }
+  /* nevykonaná akcia (odmietnutá serverom — napr. plná mana, strela mimo plochu) — jemný červený ✕
+     z rohu do rohu cez badge; rovnako v lište ťahov (.q-badge) aj v zázname pod widgetom (.a-badge).
+     Dve diagonály cez linear-gradient s rohovými kľúčovými slovami (magic-corner) → presne do rohov aj pri obdĺžniku. */
+  .q-badge.act-invalid, .a-badge.act-invalid{ position: relative; }
+  .q-badge.act-invalid::after, .a-badge.act-invalid::after{
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    /* SVG s preserveAspectRatio='none' → koncové body čiar sa mapujú presne do rohov boxu (aj obdĺžnik);
+       non-scaling-stroke drží rovnakú hrúbku 2px bez ohľadu na pomer strán */
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none' viewBox='0 0 10 10'><path d='M0 0L10 10M10 0L0 10' fill='none' stroke='%23e53935' stroke-width='2' stroke-opacity='.8' vector-effect='non-scaling-stroke'/></svg>");
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+  }
   /* prázdny slot záznamu — čiarkovaný placeholder, rovnaká šírka ako vyplnený badge */
   .a-badge.a-slot{
     background: transparent;
