@@ -215,6 +215,7 @@ let actorsInitialized = false;
 let serverWinner = null;          // koho ohlásil server
 let gameOverShown = false;        // či už bolo zobrazené GO
 let lastAttackEndAt = { p1:0, p2:0 }; // kedy (v čase performance.now) dobehne posledná animácia útoku
+let _finalRoundActive = false;    // „FINAL ROUND" sa zobrazí hore až keď prebehne banner (nie už počas summonu)
 
 // preview loop
 let charPreviewRaf = 0;
@@ -899,7 +900,10 @@ function updateTurnStatus() {
 
 function renderHUD() {
   if (hudTurn && !gameOverShown) {
-    hudTurn.textContent = (state?.phase === "playing") ? `ROUND ${state.turn}` : "";
+    // posledné (buffnuté) kolo po Last Stand → „FINAL ROUND"; prepne sa až s bannerom (_finalRoundActive)
+    hudTurn.textContent = (state?.phase === "playing")
+      ? (_finalRoundActive ? "FINAL ROUND" : `ROUND ${state.turn}`)
+      : "";
   }
   updateTurnStatus();
   renderBar(hudP1Hp,   state?.p1?.hp);
@@ -1530,7 +1534,10 @@ function playGameEndAnim(winner, after) {
 // medzikolová „ROUND N" animácia — round-script zostane vidieť, kým dobehne; potom callback resetuje lištu
 function playNewRoundTransition(nextTurn, done) {
   if (!roundBannerEl) { setTimeout(done, NEW_ROUND_MS); return; }
-  roundBannerEl.textContent = `ROUND ${nextTurn}`;
+  // ak ďalšie kolo je buffnuté (Last Stand) → „FINAL ROUND" namiesto „ROUND n"; až teraz prepni aj text hore
+  const final = !!state?.goldLocked;
+  roundBannerEl.textContent = final ? "FINAL ROUND" : `ROUND ${nextTurn}`;
+  if (final) _finalRoundActive = true;
   roundBannerEl.classList.remove("hidden", "show");
   void roundBannerEl.offsetWidth; // reštart animácie
   roundBannerEl.classList.add("show");
@@ -1766,9 +1773,9 @@ function schedulePlayTimeline(timeline) {
         const beatEl = highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
         lastActed[e.from] = { logEl, beatEl }; // ak hneď príde "invalid", prečiarkneme práve tieto
       }
-      // prázdny golden-mana beat — len posuň zelenú šípku naň (prázdne počkanie), bez záznamu akcie
+      // prázdny gold beat (golden shield/mirror = pos 0, golden mana = 7/8) — len posuň zelenú šípku naň
       if (e.kind === "beat_empty" && (e.from === "p1" || e.from === "p2")) {
-        const pos = (e.from === playStarter) ? 7 : 8;
+        const pos = e.beat === "gpre" ? 0 : (e.from === playStarter) ? 7 : 8;
         qBeatEls.forEach(x => x && x.classList.remove("q-now"));
         const el = qBeatEls[pos];
         if (el) {
@@ -2390,6 +2397,8 @@ socket.on("reset", () => {
 socket.on("state", (s) => {
   tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing });
   state = s; board = s.board || board;
+  // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
+  if (!s.timeline) _finalRoundActive = !!s.goldLocked;
 
   // arena
   if (s.arena && s.arena !== arenaEl.dataset.key) {

@@ -744,6 +744,9 @@ function resolveTurn() {
     gp.golden = false;
     gp.goldenMirror = false;
     pushStateFrame(tl, [], ACTION_GAP_MS); // oddeľ predťah od prvej akcie startera
+  } else {
+    // prázdny golden shield/mirror beat — zelená šípka cezeň prekrokuje (rovnako ako prázdny golden mana)
+    pushStateFrame(tl, [{ kind: "beat_empty", from: second, beat: "gpre" }], ACTION_GAP_MS);
   }
 
   outer:
@@ -802,7 +805,7 @@ function resolveTurn() {
       if (!p.goldenMana) {
         // prázdny golden-mana beat — zelená šípka cezeň prekrokuje s prázdnym počkaním (nie preskočenie).
         // V buffnutom poslednom kole (doomSlot) to nerobíme — tam je démon „end" bunka + banish.
-        if (!doomSlot) pushStateFrame(tl, [{ kind: "beat_empty", from: slot }], ACTION_GAP_MS);
+        if (!doomSlot) pushStateFrame(tl, [{ kind: "beat_empty", from: slot, beat: "gmana" }], ACTION_GAP_MS);
         continue;
       }
       p.goldenMana = false;
