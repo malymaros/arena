@@ -77,7 +77,7 @@ qCursor.className = "q-cursor";
 
 // === Timing ===
 // celkové spomalenie animácií kola (1 = pôvodné tempo) — MUSÍ sedieť so server.js ANIM_SLOW
-const ANIM_SLOW = 1.5;
+const ANIM_SLOW = 1.8;
 const MOVE_MS = Math.round(700 * ANIM_SLOW); // pohyb na boarde; CSS číta --move-ms (nastavené nižšie)
 // POZN.: neslučkové animácie (attack/attack2/hurt/dead) sa kvôli drawSprite(t=now) reálne neprehrávajú
 // frame po frame — len držia poslednú pózu. Preto ich NEdržíme fixný čas (predtým 2400 ms = vizuálny „drag“),
@@ -121,6 +121,9 @@ const ANIM_DEF = {
   run:     { file: "Run.png",      fps: 12, loop: true  },
   attack:  { file: "Attack_1.png", fps: 10, loop: false },
   attack2: { file: "Attack_2.png", fps: 10, loop: false },
+  // looping variant pre melee — malá postava sa seká súbežne s veľkým sprite-om (inak by zamrzla na poslednom frame).
+  // special nemá vlastný key: malá postava kreslí svoj efektový sprite (SPECIAL_ANIMS) cez key "casting" priamo v raf.
+  attack2_loop: { file: "Attack_2.png", fps: 10, loop: true },
   hurt:    { file: "Hurt.png",     fps: 10, loop: false },
   dead:    { file: "Dead.png",     fps: 7,  loop: false },
   victory: { file: "Idle.png", fps: 6, loop: true } // placeholder — raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
@@ -219,6 +222,9 @@ function updateSpecialCenter(casts) {
   actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
   if (!Array.isArray(casts) || casts.length === 0) return;
 
+  // veľký sprite musí byť otočený rovnako ako malá postava na ploche (poloha voči súperovi + override streľby)
+  const facing = computeFacing(state?.p1, state?.p2);
+
   for (const sp of casts) {
     const caster = state?.[sp.from];
     if (!caster || !caster.char) continue;
@@ -234,7 +240,7 @@ function updateSpecialCenter(casts) {
     cvs.dataset.file = file;
     if (sp.fps) cvs.dataset.fps = sp.fps;
 
-    const flip = sp.from === "p1" ? 1 : -1;
+    const flip = currentFacing(sp.from, facing);
     cvs.style.left = "50%";
     cvs.style.top  = "50%";
     cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
@@ -1464,15 +1470,17 @@ function schedulePlayTimeline(timeline) {
     if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y)) setAnim("p1", "run", MOVE_MS);
     if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y)) setAnim("p2", "run", MOVE_MS);
 
-    const shooters = new Set();
+    const shooters = new Set(); // basic strela — jednorazová póza
+    const casters  = new Set(); // special — looping, malá postava sa animuje súbežne s veľkým sprite-om
     for (const e of frame.effects || []) {
-      if ((e.kind === "charge" || e.kind === "attack_swing" || e.kind === "special") && e.from) shooters.add(e.from);
+      if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
+      if (e.kind === "special" && e.from) casters.add(e.from);
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení)
       if (e.kind === "charge" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
         facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, "attack2", frameHold); // melee beat = SPECIAL_BEAT_MS; re-triggered každý beat → drží švih celý beat
+        setAnim(e.from, "attack2_loop", frameHold); // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat)
         lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
@@ -1543,8 +1551,10 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
       }
     }
-    if (shooters.has("p1")) { setAnim("p1", "attack", frameHold); lastAttackEndAt.p1 = performance.now() + frameHold; }
-    if (shooters.has("p2")) { setAnim("p2", "attack", frameHold); lastAttackEndAt.p2 = performance.now() + frameHold; }
+    for (const s of ["p1", "p2"]) {
+      if (casters.has(s))       { setAnim(s, "casting", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; } // special: malá postava hrá svoj efektový sprite (nie úder)
+      else if (shooters.has(s)) { setAnim(s, "attack",  frameHold); lastAttackEndAt[s] = performance.now() + frameHold; }
+    }
 
     renderGrid(state, frame.effects || []);
     positionActors(state);
@@ -2211,8 +2221,10 @@ function raf() {
     cvs.style.filter = actorFilter(slot, now); // glow: obrana (pulz) > zlatý „YOU", + alt-color
 
     const dir  = CHAR_META[st.char].dir;
-    // victory = slučka special efektu daného mága (nie melee švih) priamo na actor canvase
-    const anim = animState[slot].key === "victory"
+    // victory aj casting (special) = slučka efektového sprite daného mága priamo na malej postave (nie úderový švih)
+    const aSt = animState[slot];
+    if (aSt.key === "casting" && aSt.until && now > aSt.until) { aSt.key = "idle"; aSt.until = 0; } // special dohral → späť do idle
+    const anim = (aSt.key === "victory" || aSt.key === "casting")
       ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
       : currentAnim(slot);
     ensureSpriteMeta(dir, anim.file)

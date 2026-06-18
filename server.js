@@ -59,9 +59,10 @@ const DEFAULT_CONFIG = {
 };
 
 // celkové spomalenie animácií kola (1 = pôvodné tempo); MUSÍ sedieť s client.js ANIM_SLOW
-const ANIM_SLOW = 1.5;
+const ANIM_SLOW = 1.8;
 const MOVE_DELAY_MS    = Math.round(800 * ANIM_SLOW); // posun postavy + malý buffer
 const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
+const ACTION_GAP_MS    = Math.round(350 * ANIM_SLOW); // pokojová pauza medzi jednotlivými akciami, nech sa dá sledovať každý ťah
 const SPECIAL_REPEAT   = 3;
 const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
 const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za bunku — rýchla strela, aby ani 3-bunkový let nebol pomalší než iné akcie
@@ -639,6 +640,7 @@ function resolveTurn() {
     }
     gp.golden = false;
     gp.goldenMirror = false;
+    pushStateFrame(tl, [], ACTION_GAP_MS); // oddeľ predťah od prvej akcie startera
   }
 
   outer:
@@ -658,6 +660,8 @@ function resolveTurn() {
       // po každej akcii skontroluj lethal
       const w = winnerNow();
       if (w) { ended = true; break outer; }
+      // krátka pokojová pauza medzi akciami, nech oko stihne zaregistrovať každý ťah
+      pushStateFrame(tl, [], ACTION_GAP_MS);
     }
 
     // koniec ťahu — efekty špeciálnych políčok (pickupy, dmg, IK)
