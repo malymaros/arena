@@ -1132,6 +1132,7 @@ body {
   }
   .dmg-float {  color: #ff5a5a; }
   .mana-float { color: #57a9ff; }
+  .mana-float.gold { color: #ffd54f; } /* golden mana — rovnaký float, len zlatý */
 
   /* štítové a heal bubliny */
   .heal-float{ color: #5eff8a; }
@@ -1199,6 +1200,18 @@ body {
     0%   { opacity: 0; transform: translateX(-50%) translateY(0)     scaleY(.6); }
     25%  { opacity: 1; }
     100% { opacity: 0; transform: translateX(-50%) translateY(-170%) scaleY(1.1); }
+  }
+  /* zlatá varianta nabíjacej aury — golden mana (rovnaký efekt ako recharge, len zlatý) */
+  .charge-aura.gold .ca-core{
+    background: radial-gradient(ellipse at center, rgba(255,224,140,.85), rgba(255,193,7,.4) 45%, rgba(255,193,7,0) 72%);
+  }
+  .charge-aura.gold .ca-ring{
+    border-color: rgba(255,214,90,.9);
+    box-shadow: 0 0 12px rgba(255,180,0,.75);
+  }
+  .charge-aura.gold .ca-streak{
+    background: linear-gradient(to top, rgba(255,193,7,0), #ffca28 45%, #fff3c0);
+    box-shadow: 0 0 6px rgba(255,180,0,.95);
   }
 
   /* úspešný blok štítu — hexagonálna bariéra flashne + rázové prstence + iskry */

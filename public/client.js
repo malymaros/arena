@@ -289,13 +289,13 @@ function spawnFloat(slot, text, className) {
   setTimeout(() => el.remove(), 1000);
 }
 
-function spawnManaFloat(slot, amount = 4) {
+function spawnManaFloat(slot, amount = 4, gold = false) {
   const target = state?.[slot];
   if (!target) return;
   const { left, top } = cellToPx(target.x, target.y);
 
   const el = document.createElement("div");
-  el.className = "mana-float";
+  el.className = gold ? "mana-float gold" : "mana-float"; // golden mana = ten istý efekt, len zlatý
   el.textContent = `+${amount} MANA`;
   el.style.left = (left + TILE_W / 2) + "px";
   el.style.top  = (top + 8 - floatOffsetFor(slot)) + "px";
@@ -326,7 +326,7 @@ function actorFilter(slot, now) {
 }
 
 // „Goku" nabíjacia aura pri recharge — naviazaná na postavu (offset pri zdieľanom políčku)
-function spawnChargeAura(slot) {
+function spawnChargeAura(slot, gold = false) {
   const p = state?.[slot];
   if (!p) return;
   const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
@@ -336,7 +336,7 @@ function spawnChargeAura(slot) {
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
   const { left, top } = cellToPx(p.x, p.y);
   const cont = document.createElement("div");
-  cont.className = "charge-aura";
+  cont.className = gold ? "charge-aura gold" : "charge-aura"; // golden mana = rovnaká aura, len zlatá
   cont.style.left = (left + TILE_W / 2 + shift + headDx) + "px";
   cont.style.top  = (top + TILE_H) + "px"; // päta postavy = spodok bunky
   cont.innerHTML = '<span class="ca-core"></span><span class="ca-ring"></span>';
@@ -1538,8 +1538,10 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.from, "🪞 MIRROR", "golden-float");
       }
       if (e.kind === "golden_mana" && (e.from === "p1" || e.from === "p2")) {
-        spawnFloat(e.from, `🙏 +${e.gained ?? 6} MANA`, "golden-float");
-        if (e.hpCost) spawnDamageFloat(e.from, e.hpCost);
+        // rovnaký efekt ako bežná mana (recharge), len v zlatej farbe
+        spawnManaFloat(e.from, e.gained ?? 6, true);
+        spawnChargeAura(e.from, true);
+        if (e.hpCost) spawnDamageFloat(e.from, e.hpCost); // HP cena golden many ostáva viditeľná
       }
       if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) {
         const logEl  = appendActionLog(e.from, e.action);
