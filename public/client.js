@@ -1221,6 +1221,7 @@ function renderQueue() {
   queueEl.appendChild(qCursor);     // zelená šípka (mimo flex flow, absolútna)
 
   updateActionButtons();
+  syncGoldenHalves(); // drž zamknutie zlatých polovíc v sync s frontou (shield/mirror ↔ golden)
   updateLockButton();
   sendDraft(); // priebežne posli rozpracovanú voľbu serveru (pre backstop pri vypršaní času)
 }
@@ -1263,7 +1264,11 @@ function sendDraft() {
 function updateActionButtons() {
   document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     const type = btn.dataset.act.split(":")[0];
-    btn.disabled = myQueue.some(a => a.type === type);
+    const used = myQueue.some(a => a.type === type);
+    btn.disabled = used; // skutočne navolené v kole = sivé „použité"
+    // golden predťah blokuje bežnú akciu rovnakého druhu ZÁMKOM (nie ako „použité") — klik shake-ne cez poistku v handleri
+    const goldenLock = (type === "shield" && goldenArmed) || (type === "mirror" && goldenMirrorArmed);
+    btn.classList.toggle("locked-golden", goldenLock && !used);
   });
   const moveUsed = myQueue.some(a => a.type === "move");
   moveBtn.disabled = moveUsed;
@@ -1765,14 +1770,23 @@ const goldenMirrorHalf = goldenBtn.querySelector(".mirror-half");
 function syncGoldenHalves() {
   goldenShieldHalf?.classList.toggle("armed", goldenArmed);
   goldenMirrorHalf?.classList.toggle("armed", goldenMirrorArmed);
+  // bežný štít/mirror vo fronte zamkne príslušnú zlatú polovicu (vzájomné vylúčenie)
+  goldenShieldHalf?.classList.toggle("locked", !goldenArmed && myQueue.some(a => a.type === "shield"));
+  goldenMirrorHalf?.classList.toggle("locked", !goldenMirrorArmed && myQueue.some(a => a.type === "mirror"));
 }
 
 function toggleGoldenHalf(mode) {
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(goldenBtn); return; }
   if (!me || state?.starter === me) { shakeBtn(goldenBtn); return; }
-  if (mode === "shield") { goldenArmed = !goldenArmed; goldenMirrorArmed = false; }
-  else                   { goldenMirrorArmed = !goldenMirrorArmed; goldenArmed = false; }
+  // golden shield/mirror sa vzájomne vylučuje s bežnou akciou rovnakého druhu vo fronte (zamknuté, kým ju nezrušíš)
+  if (mode === "shield") {
+    if (!goldenArmed && myQueue.some(a => a.type === "shield")) { shakeBtn(goldenBtn); return; }
+    goldenArmed = !goldenArmed; goldenMirrorArmed = false;
+  } else {
+    if (!goldenMirrorArmed && myQueue.some(a => a.type === "mirror")) { shakeBtn(goldenBtn); return; }
+    goldenMirrorArmed = !goldenMirrorArmed; goldenArmed = false;
+  }
   syncGoldenHalves();
   renderQueue();
 }
@@ -1826,6 +1840,11 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
 
     // každá akcia max 1× za kolo
     if (myQueue.some(a => a.type === type)) {
+      shakeBtn(btn);
+      return;
+    }
+    // vzájomné vylúčenie s golden predťahom: golden shield zamyká štít, golden mirror zamyká mirror
+    if ((type === "shield" && goldenArmed) || (type === "mirror" && goldenMirrorArmed)) {
       shakeBtn(btn);
       return;
     }
@@ -1966,6 +1985,9 @@ function tickTurnTimer(now) {
 function autoLockTimeout() {
   if (uiLocked() || playing || !me || state?.[me]?.locked) { stopTurnTimer(); return; }
   const used = new Set(myQueue.map(a => a.type));
+  // golden predťah už pokrýva štít/mirror — nedopĺňaj ich (inak by sa akcia zahrala 2× a server lock odmietol)
+  if (goldenArmed) used.add("shield");
+  if (goldenMirrorArmed) used.add("mirror");
   const pool = ["recharge", "shield", "mirror", "melee", "special", "move", "dash", "attack"].filter(t => !used.has(t));
   while (myQueue.length < 3 && pool.length) {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];

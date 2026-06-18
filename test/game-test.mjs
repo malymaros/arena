@@ -264,7 +264,7 @@ async function main() {
   c1.lastTimeline = null; c2.lastTimeline = null;
   // starter (P1) golden poslať nesmie — server lock ignoruje a kolo sa nespustí
   c1.sock.emit("lock_in", [G, A("right"), R, S]);
-  c2.sock.emit("lock_in", [G, R, S, M("up")]);
+  c2.sock.emit("lock_in", [G, R, ML, M("up")]); // golden_shield sa vylučuje s bežným shieldom → melee namiesto neho
   let goldenRejected = false;
   try { await waitTimeline(c1, 1200); } catch { goldenRejected = true; }
   check(goldenRejected, "T10: starter s golden shieldom je odmietnutý");
@@ -279,7 +279,7 @@ async function main() {
   check(gBlocks.length === 1 && gHits.length === 0, "T10: golden shield zablokoval prvý úder startera",
     `blocks=${gBlocks.length}, hits=${JSON.stringify(gHits)}`);
   const t10last = tl[tl.length - 1];
-  check(t10last.p2.mana === 5, "T10: P2 mana sedí (6−3+4−2=5)", `mana=${t10last.p2.mana}`);
+  check(t10last.p2.mana === 3, "T10: P2 mana sedí (6−3+4−4=3)", `mana=${t10last.p2.mana}`);
   invariantCheck(tl, "T10");
 
   /* ---------- Test 10b: golden mirror — ten istý predťah, ale odraz namiesto štítu ---------- */
@@ -308,6 +308,33 @@ async function main() {
   const t10blast = tl[tl.length - 1];
   check(t10blast.p2.mana === 3, "T10b: P2 mana sedí (6−5+4−2=3)", `mana=${t10blast.p2.mana}`);
   invariantCheck(tl, "T10b");
+
+  /* ---------- Test 10c: golden predťah sa vzájomne vylučuje s bežnou akciou rovnakého druhu ---------- */
+  await freshGame(c1, c2);
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  // P2 (nestartér) golden_shield + bežný shield v tom istom kole → server lock odmietne (akcia 2× za kolo)
+  c1.sock.emit("lock_in", [A("right"), R, S]);
+  c2.sock.emit("lock_in", [G, R, S, M("up")]);
+  let gsConflict = false;
+  try { await waitTimeline(c1, 1200); } catch { gsConflict = true; }
+  check(gsConflict, "T10c: golden_shield + shield je odmietnutý");
+  // golden_mirror + bežný mirror → tiež odmietnuté
+  await freshGame(c1, c2);
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [A("right"), R, S]);
+  c2.sock.emit("lock_in", [GMI, R, MI, M("up")]);
+  let gmiConflict = false;
+  try { await waitTimeline(c1, 1200); } catch { gmiConflict = true; }
+  check(gmiConflict, "T10c: golden_mirror + mirror je odmietnutý");
+  // golden_shield + bežný mirror (iný druh obrany) → POVOLENÉ, kolo beží normálne
+  await freshGame(c1, c2);
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [A("right"), R, S]);
+  c2.sock.emit("lock_in", [G, R, MI, M("up")]);
+  tl = await waitTimeline(c1);
+  const gsMixFx = tl.flatMap(f => f.effects || []).filter(e => e.kind === "golden_shield" && e.from === "p2");
+  check(gsMixFx.length === 1, "T10c: golden_shield + mirror je povolený (kolo prebehlo)", `fx=${gsMixFx.length}`);
+  invariantCheck(tl, "T10c");
 
   /* ---------- Test 11: speciály — fire 5 dmg na riadku, lightning 3 dmg na opačnej parite ---------- */
   await freshGame(c1, c2);

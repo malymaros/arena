@@ -206,8 +206,10 @@ function specialDamageAndHit(players, slot) {
 function validQueue(queue, slot) {
   if (!Array.isArray(queue)) return false;
   let q = queue;
+  let goldenPre = null;
   if (q[0] && (q[0].type === "golden_shield" || q[0].type === "golden_mirror")) {
     if (slot === game.starter) return false;
+    goldenPre = q[0].type;
     q = q.slice(1);
   }
   if (q.length && q[q.length - 1] && q[q.length - 1].type === "golden_mana") {
@@ -217,6 +219,9 @@ function validQueue(queue, slot) {
   const types = q.map(a => a && a.type);
   if (types.some(t => !ACTION_TYPES.has(t))) return false;
   if (new Set(types).size !== 3) return false;
+  // golden shield/mirror sa vzájomne vylučuje s príslušnou bežnou akciou — nemôžeš ju zahrať 2× za kolo
+  if (goldenPre === "golden_shield" && types.includes("shield")) return false;
+  if (goldenPre === "golden_mirror" && types.includes("mirror")) return false;
   return q.every(a => (a.type !== "move" && a.type !== "attack" && a.type !== "dash") || MOVE_DIRS.has(a.dir));
 }
 
@@ -552,8 +557,10 @@ function validBasicAction(a, used) {
   return true;
 }
 // hráč, ktorý sa nestihol locknúť: zachová svoju rozpracovanú frontu (draft) a chýbajúce do 3 doplní náhodne
-function fillFromDraft(draftQueue) {
-  const q = [], used = new Set();
+// exclude = typy, ktoré už pokrýva golden predťah (shield pri golden_shield, mirror pri golden_mirror) —
+// nesmú sa pridať ani z draftu, ani z náhodného doplnenia (inak by sa akcia zahrala 2× za kolo)
+function fillFromDraft(draftQueue, exclude = new Set()) {
+  const q = [], used = new Set(exclude);
   for (const a of (Array.isArray(draftQueue) ? draftQueue : [])) {
     if (q.length >= 3) break;
     if (!validBasicAction(a, used)) continue;
@@ -595,11 +602,15 @@ function onTurnTimeout() {
   for (const slot of ["p1", "p2"]) {
     const p = game.players[slot];
     if (p.locked) continue;
-    // zahraj, čo má hráč rozpracované (draft), chýbajúce do 3 doplň náhodne; gold zachovaj len keď si ho navolil
-    p.queue = fillFromDraft(p.draft?.queue);
+    // gold zachovaj len keď si ho navolil; vyhodnoť pred frontou, nech vieš, čo z nej vylúčiť
     p.golden = !!p.draft?.golden && slot !== game.starter; // golden shield len pre nestartéra
     p.goldenMirror = !!p.draft?.goldenMirror && slot !== game.starter; // golden mirror tiež len pre nestartéra
     p.goldenMana = !!p.draft?.goldenMana;
+    // zahraj, čo má hráč rozpracované (draft), chýbajúce do 3 doplň náhodne — bez akcie, ktorú už pokrýva golden
+    const exclude = new Set();
+    if (p.golden) exclude.add("shield");
+    if (p.goldenMirror) exclude.add("mirror");
+    p.queue = fillFromDraft(p.draft?.queue, exclude);
     p.locked = true;
   }
   if (game.players.p1.locked && game.players.p2.locked) resolveTurn();

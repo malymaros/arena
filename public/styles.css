@@ -387,6 +387,15 @@ body {
 }
 .btn.golden.golden-split:not(.locked-perm):not(.locked-ui) .golden-half.armed:hover{ filter: brightness(1.18); }
 .btn.golden.locked-perm .golden-half{ cursor: not-allowed; }
+/* zamknutá polovica — príslušný bežný štít/mirror je už vo fronte (vzájomné vylúčenie, zámok kým ho nezrušíš) */
+.golden-half.locked{ position: relative; filter: grayscale(.85) brightness(.5); cursor: not-allowed; }
+.golden-half.locked::after{
+  content: "🔒";
+  position: absolute; top: 1px; right: 2px;
+  font-size: 11px; line-height: 1;
+  text-shadow: 0 1px 2px rgba(0,0,0,.8);
+}
+.btn.golden.golden-split:not(.locked-perm):not(.locked-ui) .golden-half.locked:hover{ filter: grayscale(.85) brightness(.5); }
 
 /* rovnaký štít, len v zlatej — filter na samotnej emoji ikone */
 .g-ico{ filter: sepia(1) saturate(5) hue-rotate(-12deg) brightness(1.1); }
@@ -403,12 +412,12 @@ body {
 
 /* zamknuté tlačidlo — vizuálne neaktívne + zámok v rohu
    (.locked-ui = dočasný zámok pri otvorenom pickeri, .locked-perm = golden shield pre startera) */
-.btn.locked-ui, .btn.locked-perm{
+.btn.locked-ui, .btn.locked-perm, .btn.locked-golden{
   position: relative;
   filter: grayscale(.75) brightness(.55);
   cursor: not-allowed;
 }
-.btn.locked-ui::after, .btn.locked-perm::after{
+.btn.locked-ui::after, .btn.locked-perm::after, .btn.locked-golden::after{
   content: "🔒";
   position: absolute;
   top: -7px; right: -7px;
