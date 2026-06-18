@@ -68,6 +68,20 @@ const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
 const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za bunku — rýchla strela, aby ani 3-bunkový let nebol pomalší než iné akcie
 const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
 
+// Last Stand (duálne tlačidlo s golden mana) — démon zabije hráča a oživí ho na plno; ďalšie kolo je posledné
+// Last Stand sa prehráva FRAME-DRIVEN: každá fáza je samostatný frame (timeline prehrávač = jediný zdroj času),
+// HP/mana sú v snapshotoch (server-autoritatívne, žiadny lokálny tween), vizuál viaže klient na efekt s trvaním = delayMs.
+const LS_APPEAR_MS  = 1000; // démon sa vynorí v strede
+const LS_DRAIN_MS   = 1400; // odčerpanie HP/many na 0 (rozdelené na kroky)
+const LS_KILL_MS    = 700;  // smrť + démon zmizne zo stredu
+const LS_REVIVE_MS  = 700;  // démon sa objaví za postavou (0→1)
+const LS_RISE_MS    = 1600; // zlaté dvíhanie HP/many na 10
+const LS_SETTLE_MS  = 900;  // démon → 0.25, hráč vstane
+const LS_B_LEAVE_MS  = 1500; // banish: duch zosilnie a odíde z postavy
+const LS_B_CENTER_MS = 1000; // banish: duch sa objaví v strede
+const LS_B_DRAIN_MS  = 1400; // banish: odčerpanie HP/many na 0
+const LS_B_KILL_MS   = 700;  // banish: smrť + duch zmizne
+
 /* -------------------- Game state -------------------- */
 // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
 // ktorá sa medzi hrami série prehadzuje (štartér danej hry vždy sedí v p1 = vľavo)
@@ -90,10 +104,14 @@ function newPlayer(slot) {
     goldenMirror: false, // objednaný golden mirror (rovnaký predťah, ale odraz namiesto štítu)
     goldenMana: false, // objednaný golden mana refill (extra akcia po konci kola)
     manaRefills: 0,    // koľkokrát už hráč refill použil — určuje rastúcu HP cenu
+    lastStand: false,     // objednaný last stand (trailing gold akcia, výlučná s golden_mana)
+    lastStandBuff: false, // aktívne v poslednom (buffnutom) kole: 2× výstupný dmg, floor(½) prijatý dmg
+    lastStandDoom: false, // v tomto poslednom kole musí vyhrať, inak na jeho konci zomrie
+    down: false,          // leží „mŕtvy" počas Last Stand choreografie (smrť→oživenie) — klient kreslí dead pózu
     locked: false,
     queue: [],
     // priebežne posielaná rozpracovaná voľba — pri vypršaní času ju backstop zachová a doplní len chýbajúce
-    draft: { queue: [], golden: false, goldenMirror: false, goldenMana: false }
+    draft: { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false }
   };
 }
 
@@ -142,11 +160,30 @@ function emitYouAre() {
   }
 }
 
+// snapshot pre konkrétnu OSOBU — počas výberu postáv skry súperovu voľbu, kým si TÁTO osoba nevyberie
+// (inak rozmýšľajúci hráč vidí súperov pick a má výhodu). Po výbere oboch je stav už odhalený.
+function snapshotFor(person) {
+  const base = snapshot();
+  const mySlot = slotForPerson(person);
+  const oppSlot = mySlot === "p1" ? "p2" : "p1";
+  if (!game.players[mySlot]?.char && base[oppSlot]?.char) {
+    return { ...base, [oppSlot]: { ...base[oppSlot], char: null } };
+  }
+  return base;
+}
+// pošli stav obom osobám, každej s vlastným maskovaním súperovej postavy (počas char-selectu)
+function emitStateMasked() {
+  for (const person of ["A", "B"]) {
+    const sock = personSockets[person];
+    if (sock) sock.emit("state", snapshotFor(person));
+  }
+}
+
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, locked } = a;
-  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, locked };
+  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, down, locked } = a;
+  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, down, locked };
 }
 function snapshot() {
   return {
@@ -160,6 +197,8 @@ function snapshot() {
     turn: game.turn,
     starter: game.starter,
     timerMs: timerRemainingMs(), // zostávajúci čas na ťah (null = bez limitu) — klient sa naň synchronizuje aj po refreshi
+    // duálny gold button (golden mana + last stand) je v poslednom (buffnutom) kole zamknutý pre oboch
+    goldLocked: !!(game.players.p1.lastStandBuff || game.players.p2.lastStandBuff),
     tiles: game.tiles.map(t => ({ ...t })),
     iks: game.iks.map(t => ({ ...t }))
   };
@@ -212,7 +251,10 @@ function validQueue(queue, slot) {
     goldenPre = q[0].type;
     q = q.slice(1);
   }
-  if (q.length && q[q.length - 1] && q[q.length - 1].type === "golden_mana") {
+  const trailing = q.length && q[q.length - 1] && q[q.length - 1].type;
+  if (trailing === "golden_mana" || trailing === "last_stand") {
+    // duálny gold button je v poslednom (buffnutom) kole zamknutý pre oboch hráčov
+    if (game.players.p1.lastStandBuff || game.players.p2.lastStandBuff) return false;
     q = q.slice(0, -1);
   }
   if (q.length !== 3) return false;
@@ -317,7 +359,7 @@ function doBasic(slot, dir, tl) {
     if (!inBounds(x, y)) break;
     pushStateFrame(tl, [{ kind: "charge", from: slot, dir, cell: [x, y] }], CHARGE_STEP_MS);
     if (op && op.x === x && op.y === y) {
-      applyHit(opS, Math.max(1, BASIC_DMG_MAX - dist), tl, "basic");
+      applyHit(opS, Math.max(1, BASIC_DMG_MAX - dist) * dealMul(slot), tl, "basic");
       break;
     }
   }
@@ -337,9 +379,13 @@ function doMelee(slot, tl) {
     pushStateFrame(tl, [{ kind: "melee", from: slot }], SPECIAL_BEAT_MS);
   }
   if (op && op.x === me.x && op.y === me.y) {
-    applyHit(opS, MELEE_DMG, tl, "melee");
+    applyHit(opS, MELEE_DMG * dealMul(slot), tl, "melee");
   }
 }
+
+// Last Stand buff: postava v poslednom (buffnutom) kole dáva 2× dmg a prijatý dmg sa zaokrúhľuje na floor(½)
+function dealMul(slot)      { return game.players[slot].lastStandBuff ? 2 : 1; }
+function recvDmg(slot, dmg) { return game.players[slot].lastStandBuff ? Math.floor(dmg / 2) : dmg; }
 
 // aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, mirror ho odrazí do útočníka)
 function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
@@ -353,15 +399,17 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
     // poradie: najprv mirror frame (HP ešte nezmenené), až potom hit frame s poklesom HP útočníka
     const atkSlot = other(targetSlot);
     const atk = game.players[atkSlot];
+    const d = recvDmg(atkSlot, rawDmg); // ½ ak má útočník (príjemca odrazu) last stand buff
     // delay = čas dopadu beamu (nie SMALL_DELAY_MS), aby dmg padol hneď ako beam zasiahne — bez medzery;
     // atk/dmg riadia hrúbku a štýl beamu na klientovi (basic podľa dmg, melee hrubý, special fialovo prepletený)
     pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: rawDmg, atk: kind, gold: !!t.mirrorGold }], MIRROR_BEAM_MS);
-    atk.hp = Math.max(0, atk.hp - rawDmg);
-    pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: rawDmg }], SMALL_DELAY_MS);
+    atk.hp = Math.max(0, atk.hp - d);
+    pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: d }], SMALL_DELAY_MS);
     return;
   }
-  t.hp = Math.max(0, t.hp - rawDmg);
-  pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: rawDmg }], SMALL_DELAY_MS);
+  const d = recvDmg(targetSlot, rawDmg); // ½ ak má obranca last stand buff
+  t.hp = Math.max(0, t.hp - d);
+  pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
 }
 
 function doShield(slot, tl) {
@@ -402,7 +450,7 @@ function doSpecial(slot, tl) {
   // vyhodnotenie zásahu
   const { dmg, hit } = specialDamageAndHit(game.players, slot);
   if (dmg > 0 && hit) {
-    applyHit(hit, dmg, tl, "special");
+    applyHit(hit, dmg * dealMul(slot), tl, "special");
   } else {
     pushStateFrame(tl, [], SMALL_DELAY_MS);
   }
@@ -480,10 +528,11 @@ function endOfStepTileEffects(tl) {
     if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
     else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) { dmg = 1; tileType = "dmg"; }
     if (dmg > 0) {
-      // najprv zvýrazni vyhodnocované políčko, potom zásah
+      // najprv zvýrazni vyhodnocované políčko, potom zásah (½ ak má hráč last stand buff — platí aj na tile/IK)
       pushStateFrame(tl, [{ kind: "tile_proc", tile: tileType, cell: [p.x, p.y] }], 600);
-      p.hp = Math.max(0, p.hp - dmg);
-      pushStateFrame(tl, [{ kind: "hit", target: slot, dmg }], SMALL_DELAY_MS);
+      const d = recvDmg(slot, dmg);
+      p.hp = Math.max(0, p.hp - d);
+      pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d }], SMALL_DELAY_MS);
       // prvý mŕtvy okamžite ukončuje hru — druhý tile zásah sa už nevyhodnotí (remíza nemôže nastať)
       if (winnerNow()) return;
     }
@@ -605,7 +654,10 @@ function onTurnTimeout() {
     // gold zachovaj len keď si ho navolil; vyhodnoť pred frontou, nech vieš, čo z nej vylúčiť
     p.golden = !!p.draft?.golden && slot !== game.starter; // golden shield len pre nestartéra
     p.goldenMirror = !!p.draft?.goldenMirror && slot !== game.starter; // golden mirror tiež len pre nestartéra
-    p.goldenMana = !!p.draft?.goldenMana;
+    // duálny gold button (mana/last stand) je v poslednom buffnutom kole zamknutý pre oboch
+    const goldLocked = game.players.p1.lastStandBuff || game.players.p2.lastStandBuff;
+    p.goldenMana = !goldLocked && !!p.draft?.goldenMana;
+    p.lastStand  = !goldLocked && !!p.draft?.lastStand && !p.goldenMana; // výlučné s golden mana
     // zahraj, čo má hráč rozpracované (draft), chýbajúce do 3 doplň náhodne — bez akcie, ktorú už pokrýva golden
     const exclude = new Set();
     if (p.golden) exclude.add("shield");
@@ -617,6 +669,44 @@ function onTurnTimeout() {
   else io.emit("state", snapshot());
 }
 
+/* -------------------- Last Stand (frame-driven) -------------------- */
+// pomocné: plynulé prepísanie HP+many cez zopár frame-ov (HUD sa hýbe zo snapshotov)
+function lsTweenFrames(slot, toHp, toMana, totalMs, kind, tl) {
+  const p = game.players[slot];
+  const fromHp = p.hp, fromMana = p.mana, steps = 4;
+  for (let s = 1; s <= steps; s++) {
+    p.hp   = Math.round(fromHp   + (toHp   - fromHp)   * (s / steps));
+    p.mana = Math.round(fromMana + (toMana - fromMana) * (s / steps));
+    pushStateFrame(tl, [{ kind, target: slot }], Math.round(totalMs / steps));
+  }
+  p.hp = toHp; p.mana = toMana;
+}
+
+// summon: démon v strede → odčerpá HP/manu na 0 → smrť → objaví sa za postavou → zlaté dvíhanie na 10 → usadenie.
+// buff+doom (a tým golden stav na klientovi) sa zapnú až vo fáze „revive" (po smrti), nie počas umierania.
+function resolveLastStandSummon(slot, tl) {
+  const p = game.players[slot];
+  pushStateFrame(tl, [{ kind: "last_stand_summon", from: slot }], LS_APPEAR_MS); // démon v strede (HP ešte plné)
+  lsTweenFrames(slot, 0, 0, LS_DRAIN_MS, "last_stand_drain", tl);                 // HP+mana → 0
+  p.down = true;                                                                  // hráč padá mŕtvy (leží až do settle)
+  pushStateFrame(tl, [{ kind: "last_stand_kill", from: slot }], LS_KILL_MS);     // smrť + démon zmizne zo stredu
+  p.lastStandBuff = true; p.lastStandDoom = true;                                 // od TERAZ golden stav + buff/doom
+  pushStateFrame(tl, [{ kind: "last_stand_revive", from: slot }], LS_REVIVE_MS); // démon sa objaví za postavou (0→1)
+  lsTweenFrames(slot, START_HP, MAX_MANA, LS_RISE_MS, "last_stand_rise", tl);     // HP+mana 0 → 10 (zlaté), hráč stále leží
+  p.down = false;                                                                 // pri 10/10 hráč vstane
+  pushStateFrame(tl, [{ kind: "last_stand_settle", from: slot }], LS_SETTLE_MS); // démon → 0.25, hráč vstane
+}
+
+// banish: golden OFF → duch zosilnie a odíde z postavy → objaví sa v strede → odčerpá HP/manu na 0 → smrť.
+function resolveLastStandBanish(slot, tl) {
+  const p = game.players[slot];
+  pushStateFrame(tl, [{ kind: "last_stand_banish", from: slot }], LS_B_LEAVE_MS);         // golden off + duch odíde
+  pushStateFrame(tl, [{ kind: "last_stand_banish_center", from: slot }], LS_B_CENTER_MS); // duch v strede
+  lsTweenFrames(slot, 0, 0, LS_B_DRAIN_MS, "last_stand_drain", tl);                        // HP+mana → 0 (smrť; bez záverečného „hit" → žiadne červené bliknutie/−10 HP)
+  p.down = true;                                                                           // hráč padá mŕtvy
+  pushStateFrame(tl, [{ kind: "last_stand_banish_kill", from: slot }], LS_B_KILL_MS);     // démon zmizne, hráč leží mŕtvy
+}
+
 /* -------------------- Turn resolution -------------------- */
 function resolveTurn() {
   clearTurnTimer();
@@ -626,6 +716,8 @@ function resolveTurn() {
 
   const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
   let ended = false;
+  // doom: zachyť na začiatku kola — true len v buffnutom (poslednom) kole, NIE v aktivačnom (vtedy sa nastaví až v gold fáze)
+  const doomSlot = game.players.p1.lastStandDoom ? "p1" : game.players.p2.lastStandDoom ? "p2" : null;
 
   // golden shield / golden mirror — extra predťah hráča, ktorý je v kole druhý, vyhodnotený pred prvou akciou startera
   const second = order[1];
@@ -694,10 +786,25 @@ function resolveTurn() {
     // koniec kola — presun IK a spawn nového tile (vidno ich vo finálnom frame)
     endOfRoundTiles();
 
-    // golden mana refill — úplne posledná udalosť kola (+6 many za HP, cena rastie s každým použitím)
+    // post-round gold fáza: golden mana + last stand. Démon je len JEDEN — ak ho navolia obaja,
+    // vyhodnotí sa len tomu, koho akcia príde na rad prvá (starter), druhému červený ✗.
+    let demonUsed = false;
     for (const slot of order) {
       const p = game.players[slot];
-      if (!p.goldenMana) continue;
+      if (p.lastStand) {
+        p.lastStand = false;
+        pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "last_stand", dir: null } }], 250);
+        if (demonUsed) { pushInvalid(tl, slot, SMALL_DELAY_MS, "no_demon"); continue; }
+        demonUsed = true;
+        resolveLastStandSummon(slot, tl); // démon zabije + oživí na plno, nastaví buff + doom na ďalšie kolo
+        continue;
+      }
+      if (!p.goldenMana) {
+        // prázdny golden-mana beat — zelená šípka cezeň prekrokuje s prázdnym počkaním (nie preskočenie).
+        // V buffnutom poslednom kole (doomSlot) to nerobíme — tam je démon „end" bunka + banish.
+        if (!doomSlot) pushStateFrame(tl, [{ kind: "beat_empty", from: slot }], ACTION_GAP_MS);
+        continue;
+      }
       p.goldenMana = false;
       const cost = p.manaRefills + 1;
       pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "golden_mana", dir: null } }], 250);
@@ -714,6 +821,14 @@ function resolveTurn() {
       }
     }
 
+    // DOOM: ak je toto buffnuté (posledné) kolo a obaja stále žijú → démon Last Stand hráča opustí a zabije ho
+    if (doomSlot && !winnerNow()) {
+      resolveLastStandBanish(doomSlot, tl);
+      ended = true;
+    }
+  }
+
+  if (!ended) {
     // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)
     const nextTurn    = game.turn + 1;
     const nextStarter = nextTurn % 2 === 1 ? "p1" : "p2";
@@ -733,8 +848,10 @@ function resolveTurn() {
   game.players.p2.goldenMana = false;
   game.players.p1.goldenMirror = false;
   game.players.p2.goldenMirror = false;
-  game.players.p1.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false };
-  game.players.p2.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false };
+  game.players.p1.lastStand = false; // nevyhodnotený last stand prepadá (buff/doom NEresetujeme — nesú sa do posledného kola)
+  game.players.p2.lastStand = false;
+  game.players.p1.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false };
+  game.players.p2.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false };
 
   const dur = tl.reduce((a, f) => a + (f.delayMs || 0), 0);
   if (ended) {
@@ -842,7 +959,7 @@ io.on("connection", (socket) => {
 
   if (person) socket.emit("you_are", { slot: slotForPerson(person), isHost: person === "A" });
   else socket.emit("spectator"); // obe osoby obsadené — tretí a ďalší len dostanú info, že hra beží
-  socket.emit("state", snapshot());
+  socket.emit("state", person ? snapshotFor(person) : snapshot()); // pri pripojení počas char-selectu maskuj súperov pick
 
   // úvodná obrazovka: host nastaví formát + tiles + časový limit a spustí zápas
   socket.on("configure_match", (raw) => {
@@ -863,7 +980,7 @@ io.on("connection", (socket) => {
     me.char = key;
     // obaja vybrali -> začína 1. kolo, naštartuj časovač pred emitom (snapshot nesie timerMs pre refresh-sync)
     if (game.players.p1.char && game.players.p2.char) beginPlanningTimer(0);
-    io.emit("state", snapshot());
+    emitStateMasked(); // súperov pick sa odhalí až keď si vyberie aj druhý hráč (žiadna výhoda pre rozmýšľajúceho)
   });
 
   socket.on("lock_in", (queue) => {
@@ -877,8 +994,10 @@ io.on("connection", (socket) => {
     me.golden = q[0]?.type === "golden_shield";
     me.goldenMirror = q[0]?.type === "golden_mirror";
     if (me.golden || me.goldenMirror) q = q.slice(1);
-    me.goldenMana = q[q.length - 1]?.type === "golden_mana";
-    if (me.goldenMana) q = q.slice(0, -1);
+    const trailing = q[q.length - 1]?.type;
+    me.goldenMana = trailing === "golden_mana";
+    me.lastStand  = trailing === "last_stand";
+    if (me.goldenMana || me.lastStand) q = q.slice(0, -1);
     me.queue = q.map(a => ({ ...a }));
     me.locked = true;
 
@@ -905,7 +1024,7 @@ io.on("connection", (socket) => {
       out.push({ type: a.type, dir: a.dir || null });
       used.add(a.type);
     }
-    me.draft = { queue: out, golden: !!d?.golden, goldenMirror: !!d?.goldenMirror, goldenMana: !!d?.goldenMana };
+    me.draft = { queue: out, golden: !!d?.golden, goldenMirror: !!d?.goldenMirror, goldenMana: !!d?.goldenMana, lastStand: !!d?.lastStand };
   });
 
   socket.on("retry", () => {

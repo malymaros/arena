@@ -43,6 +43,20 @@ const TILE_W = parseInt(cs.getPropertyValue("--tile-w")) || 260;
 const TILE_H = parseInt(cs.getPropertyValue("--tile-h")) || 185;
 const GAP  = parseInt(getComputedStyle(gridEl).gap || "10") || 10;
 
+// === Last Stand „démon" sprite — strip 5024×314 = 16 štvorcových framov ===
+const DEATH_DIR   = "death";
+const DEATH_ANIM  = { file: "spritesheet_strip.png", fps: 10, loop: true };
+const LS_BADGE_IMG = '<img class="ls-badge" src="/assets/last_stand.png" alt="Last Stand">'; // ikona Last Standu (zmenšenina démona) do lišty/záznamu
+const DEATH_SCALE = 2.0;  // veľkosť stredového démona (násobok výšky bunky)
+
+// vzhľad démona „za postavou" počas golden stavu (časovanie fáz riadi server cez delayMs frame-ov)
+const DEATH_SEQ = {
+  behindRatio:   0.72, // veľkosť za postavou
+  behindOpacity: 0.25, // priehľadnosť za postavou v ustálenom golden stave
+  behindOffsetX: 0,    // doladenie pozície na postave (px)
+  behindOffsetY: 80,
+};
+
 // canvasy postáv — väčšie než bunka (1.5×), v positionActors centrované na bunku
 const ACTOR_SCALE = 1.875;
 const ACTOR_W = Math.round(TILE_W * ACTOR_SCALE);
@@ -60,6 +74,52 @@ actorGhost.width = ACTOR_W; actorGhost.height = ACTOR_H;
 actorGhost.style.width = ACTOR_W + "px"; actorGhost.style.height = ACTOR_H + "px";
 actorGhost.style.display = "none";
 actorsEl.appendChild(actorGhost);
+
+// DEATH summon — screen-space overlay (fixed, mimo stacking contextu .stage, aby bolo vidno v každej fáze).
+// Veľkosť medzi fázami riešime CSS transformom scale(); canvas má základnú „stredovú" veľkosť.
+const deathCenter = document.createElement("canvas");
+deathCenter.id = "death-center";
+{
+  const px = Math.round(TILE_H * DEATH_SCALE);
+  deathCenter.width = px; deathCenter.height = px;
+  deathCenter.style.width = px + "px"; deathCenter.style.height = px + "px";
+  deathCenter.style.position = "fixed";
+  deathCenter.style.left = "50%"; deathCenter.style.top = "50%";
+  deathCenter.style.transform = "translate(-50%, -50%)";
+  deathCenter.style.transformOrigin = "center";
+  deathCenter.style.pointerEvents = "none";
+  deathCenter.style.imageRendering = "pixelated";
+  deathCenter.style.opacity = "0"; // štartuje skrytý, sekvencia ho zobrazí
+  deathCenter.style.zIndex = "999999";
+}
+document.body.appendChild(deathCenter);
+
+// „za postavou" — board-space canvas v #actors so z-indexom pod sprite-om postavy (.sprite-actor = 3)
+const deathBehind = document.createElement("canvas");
+deathBehind.id = "death-behind";
+{
+  // rovnaký rozmer canvasu ako postava → kreslíme identicky a prekryjeme sa presne
+  deathBehind.width = ACTOR_W; deathBehind.height = ACTOR_H;
+  deathBehind.style.width = ACTOR_W + "px"; deathBehind.style.height = ACTOR_H + "px";
+  deathBehind.style.position = "absolute";
+  deathBehind.style.zIndex = "2"; // pod postavou (z-index 3), nad gridom
+  deathBehind.style.pointerEvents = "none";
+  deathBehind.style.imageRendering = "pixelated";
+  deathBehind.style.transformOrigin = "center"; // scale ostane centrovaný na postavu
+  deathBehind.style.opacity = "0";
+}
+actorsEl.appendChild(deathBehind);
+
+// hmlový oblak za sprite-om (radiálny gradient + blur) — „zaujímavý mlžný efekt" pri zjavení
+const deathFog = document.createElement("div");
+deathFog.id = "death-fog";
+Object.assign(deathFog.style, {
+  position: "fixed", left: "50%", top: "50%", width: "560px", height: "560px",
+  transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: "999998",
+  borderRadius: "50%", display: "none", filter: "blur(28px)", opacity: "0",
+  background: "radial-gradient(circle at center, rgba(214,190,255,.55), rgba(150,120,220,.28) 45%, rgba(120,90,200,0) 70%)",
+});
+document.body.appendChild(deathFog);
 
 // „YOU" značka — poskakujúca zlatá šípka nad vlastnou postavou (kotví sa k pozícii aktéra)
 const youMarker = document.createElement("div");
@@ -91,6 +151,7 @@ const INVALID_MSG = {
   mana_full: ["✨ MANA FULL",  "golden-float"],
   hp_low:    ["🙏 LOW HP",     "lowmana-float"],
   offboard:  ["🚫 OFF-BOARD",  "lowmana-float"],
+  no_demon:  ["✗ DEMON TAKEN", "dmg-float"], // druhý Last Stand v kole — démon je len jeden
 };
 const INVALID_MSG_DEFAULT = ["🚫 NO EFFECT", "lowmana-float"];
 const NEW_ROUND_MS = 1900; // „ROUND N" animácia medzi kolami (musí sedieť s CSS .round-banner.show)
@@ -138,6 +199,7 @@ let myQueue = [];
 let goldenArmed = false;       // objednaný golden shield (extra predťah pred kolom, len keď som druhý)
 let goldenMirrorArmed = false; // objednaný golden mirror — ten istý predťah, len odraz (vzájomne výlučný s golden shieldom)
 let goldenManaArmed = false;   // objednaný golden mana refill (extra akcia po konci kola)
+let lastStandArmed = false;    // objednaný Last Stand (duálny s golden mana, výlučný)
 let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
@@ -317,6 +379,11 @@ function pulseGlow(color, now) {
 // filter postavy: alt-color (zhodný mág) + glow (obrana pulzuje > inak zlatý „YOU")
 function actorFilter(slot, now) {
   const st = state?.[slot];
+  // golden recharge stav (death summon) — žiarivý zlatý pulz postavy, má prednosť pred ostatným
+  if (_deathGoldenSlot === slot) {
+    const t = 0.5 + 0.5 * Math.sin(now / 110);
+    return `brightness(${(1.15 + 0.45 * t).toFixed(2)}) saturate(1.5) ` + pulseGlow("#ffd24a", now);
+  }
   const alt = sameCharNow() && slot === "p2" ? "saturate(.22) brightness(1.4) " : "";
   let glow = "";
   if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
@@ -350,6 +417,83 @@ function spawnChargeAura(slot, gold = false) {
   }
   actorsEl.appendChild(cont);
   setTimeout(() => cont.remove(), 1100);
+}
+
+/* ---------- Last Stand — vizuál (démon v strede + za postavou, golden stav); riadené serverom cez timeline ---------- */
+let _deathGoldenSlot = null;   // slot v golden stave (číta actorFilter pre žiaru postavy)
+
+// základná pozícia anjela „za postavou" pre daný SLOT: stred anjela = stred TELA postavy (headDx + flip
+// podľa toho-ktorého slotu, nie napevno p1), päty na spodok bunky; canvas je ACTOR-veľký, scale z transform-origin center
+function computeDeathBound(slot) {
+  const tgt = state?.[slot];
+  if (!tgt) return { left: 0, top: 0 };
+  const { left, top } = cellToPx(tgt.x, tgt.y);
+  const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
+  const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+  const facing = computeFacing(state?.p1, state?.p2);
+  const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[tgt.char] ?? 0.5) - 0.5);
+  const bodyCx = left + TILE_W / 2 + shift + headDx;
+  return { left: bodyCx - ACTOR_W / 2, top: top - (ACTOR_H - TILE_H) };
+}
+
+// hmlový puff v strede (in = nábeh, out = reverz)
+function _deathFogPuff(ms, dir) {
+  deathFog.style.display = "block";
+  const a = dir === "in"
+    ? [{ opacity: 0, transform: "translate(-50%,-50%) scale(.35)" },
+       { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .55 },
+       { opacity: 0, transform: "translate(-50%,-50%) scale(1.5)" }]
+    : [{ opacity: 0, transform: "translate(-50%,-50%) scale(1.5)" },
+       { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .45 },
+       { opacity: 0, transform: "translate(-50%,-50%) scale(.35)" }];
+  deathFog.animate(a, { duration: ms, easing: dir === "in" ? "ease-out" : "ease-in" });
+}
+
+/* ---------- Last Stand — napojenie na server timeline ---------- */
+// Stredový démon (hmlový nábeh/zmiznutie) ako flourish summon/banish; HP/manu riadi server cez frames.
+// Trvalý golden stav (žiara + aura + démon za postavou) riadi raf podľa state[slot].lastStandBuff.
+let _lsRealActive = false; // beží reálny buffnutý stav (na upratanie po smrti/výhre)
+let _lsAuraAt = 0;         // throttle recharge aury v rafe
+let _lsBanishing = false;  // počas banishu nepripínaj démona za postavu (ide do stredu)
+
+function lsCenterAppear() {
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  deathCenter.getAnimations().forEach(a => a.cancel());
+  deathCenter.style.left = cx + "px"; deathCenter.style.top = cy + "px";
+  deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
+  _deathFogPuff(1400, "in");
+  deathCenter.animate([
+    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
+    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
+  ], { duration: 700, easing: "ease-out", fill: "forwards" });
+}
+function lsCenterDisappear() {
+  _deathFogPuff(700, "out");
+  const a = deathCenter.animate([
+    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
+    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
+  ], { duration: 700, easing: "ease-in", fill: "forwards" });
+  a.onfinish = () => { deathCenter.style.opacity = "0"; };
+}
+
+// (dev demo klávesy R/T odstránené — Last Stand sa hrá cez tlačidlo a riadi server)
+let _lsTransUntil = 0; // dokedy beží prechodová animácia démona (raf počas nej nedrží 0.25)
+// tvrdo schovaj stredového démona (koniec hry / nová hra / char-select — nech nevisí na ploche)
+function hideDeathCenter() {
+  deathCenter.getAnimations().forEach(a => a.cancel());
+  deathFog.getAnimations().forEach(a => a.cancel());
+  deathCenter.style.opacity = "0";
+  deathFog.style.opacity = "0";
+  deathFog.style.display = "none";
+}
+// umiestni démona za postavu (slot) podľa bunky + ladiace offsety (nemení opacity/scale)
+function placeDeathBehind(slot) {
+  const tgt = state?.[slot];
+  if (!tgt || !tgt.char) return;
+  const b = computeDeathBound(slot);
+  deathBehind.style.left = (b.left + DEATH_SEQ.behindOffsetX) + "px";
+  deathBehind.style.top  = (b.top  + DEATH_SEQ.behindOffsetY) + "px";
+  deathBehind.style.transform = `scale(${DEATH_SEQ.behindRatio})`;
 }
 
 // efektný náraz do štítu pri úspešnom bloku — hexagonálna bariéra flashne, rázové prstence + iskry
@@ -794,6 +938,8 @@ function actionIcon(action) {
     case "mirror":   return "🪞";
     case "golden_shield": return "🛡️";
     case "golden_mirror": return "🪞";
+    case "golden_mana": return "🙏";
+    case "last_stand": return "💀";
     case "special":  return "✨";
     default:         return "?";
   }
@@ -834,11 +980,11 @@ function appendActionLog(slot, action) {
     }
     return el;
   }
-  if (action?.type === "golden_mana") {
+  if (action?.type === "golden_mana" || action?.type === "last_stand") {
     const el = log.querySelector(".a-slot.slot-post");
     if (el) {
-      el.className = "a-badge golden_mana";
-      el.innerHTML = '<span class="g-ico">🙏</span>';
+      el.className = "a-badge " + action.type;
+      el.innerHTML = action.type === "last_stand" ? LS_BADGE_IMG : '<span class="g-ico">🙏</span>';
     }
     return el;
   }
@@ -1141,6 +1287,7 @@ function actionBadgeView(a) {
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
     case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
+    case "last_stand":    return { cls: "golden",  html: LS_BADGE_IMG };
     default:              return { cls: "",        text: a?.type || "" };
   }
 }
@@ -1169,6 +1316,7 @@ function renderQueue() {
 
   const starterSlot = state?.starter || "p1";
   const otherS = starterSlot === "p1" ? "p2" : "p1";
+  const lastRound = !!state?.goldLocked; // buffnuté posledné kolo — namiesto 2 gold-mana placeholderov jedna démon „end" bunka
   // 9 beatov v reálnom poradí; owner = komu beat patrí (golden shield iba nestartérovi)
   const layout = [
     { pos: 0, kind: "gshield", owner: otherS },
@@ -1178,15 +1326,25 @@ function renderQueue() {
     { pos: 4, kind: "act", idx: 1, owner: otherS },
     { pos: 5, kind: "act", idx: 2, owner: starterSlot },
     { pos: 6, kind: "act", idx: 2, owner: otherS },
-    { pos: 7, kind: "gmana", owner: starterSlot },
-    { pos: 8, kind: "gmana", owner: otherS },
   ];
+  if (lastRound) layout.push({ pos: 7, kind: "demon" }); // jedna zvýraznená démon bunka pre oboch (hra tu končí)
+  else layout.push({ pos: 7, kind: "gmana", owner: starterSlot }, { pos: 8, kind: "gmana", owner: otherS });
 
   layout.forEach((b) => {
-    if (b.pos === 1 || b.pos === 7) { // predely: golden shield | akcie | golden mana
+    if (b.pos === 1 || b.pos === 7) { // predely: golden shield | akcie | golden mana / démon
       const d = document.createElement("div");
       d.className = "q-divider";
       queueEl.appendChild(d);
+    }
+    if (b.kind === "demon") {
+      const el = document.createElement("div");
+      el.dataset.pos = "7";
+      el.className = "q-badge demon";
+      el.innerHTML = LS_BADGE_IMG;
+      el.title = "Last Stand — hra tu končí (banishment)";
+      queueEl.appendChild(el);
+      qBeatEls[7] = el;
+      return;
     }
     const mine = !!me && b.owner === me;
     const el = document.createElement("div");
@@ -1197,7 +1355,7 @@ function renderQueue() {
     let filled = null;
     if (mine) {
       if (b.kind === "gshield")    filled = goldenArmed ? { type: "golden_shield" } : goldenMirrorArmed ? { type: "golden_mirror" } : null;
-      else if (b.kind === "gmana") filled = goldenManaArmed ? { type: "golden_mana" } : null;
+      else if (b.kind === "gmana") filled = goldenManaArmed ? { type: "golden_mana" } : lastStandArmed ? { type: "last_stand" } : null;
       else                         filled = myQueue[b.idx] || null;
     }
 
@@ -1230,7 +1388,7 @@ function renderQueue() {
 function highlightRoundBeat(from, action, counts, starterSlot) {
   let pos;
   if (action.type === "golden_shield" || action.type === "golden_mirror") pos = 0;
-  else if (action.type === "golden_mana") pos = (from === starterSlot) ? 7 : 8;
+  else if (action.type === "golden_mana" || action.type === "last_stand") pos = (from === starterSlot) ? 7 : 8;
   else { const k = counts[from]++; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
   if (pos == null) return null;
   qBeatEls.forEach(e => e && e.classList.remove("q-now"));
@@ -1258,7 +1416,7 @@ function clearRoundCursor() {
 // pošli serveru aktuálnu rozpracovanú frontu + golden flagy (server ju pri timeoute zahrá a doplní chýbajúce)
 function sendDraft() {
   if (!me || state?.phase !== "playing" || lockedIn || state?.[me]?.locked) return;
-  socket.emit("draft_queue", { queue: myQueue, golden: goldenArmed, goldenMirror: goldenMirrorArmed, goldenMana: goldenManaArmed });
+  socket.emit("draft_queue", { queue: myQueue, golden: goldenArmed, goldenMirror: goldenMirrorArmed, goldenMana: goldenManaArmed, lastStand: lastStandArmed });
 }
 // zneaktívni tlačidlá akcií, ktoré už sú v queue (každá max 1× za kolo)
 function updateActionButtons() {
@@ -1424,6 +1582,7 @@ function schedulePlayTimeline(timeline) {
       const winner = serverWinner || serverGameResult?.gameWinner || computeWinnerFromState(state);
       if (winner) {
         clearRoundCursor();
+        setTimeout(hideDeathCenter, 700); // banish: démon ešte chvíľu drží, potom zmizne (a nech nevisí cez koniec hry)
         if (serverGameResult && !serverGameResult.matchOver) {
           playGameEndAnim(winner, () => showIntermission(winner, serverGameResult.series));
         } else {
@@ -1447,9 +1606,10 @@ function schedulePlayTimeline(timeline) {
         goldenArmed = false;
         goldenMirrorArmed = false;
         goldenManaArmed = false;
+        lastStandArmed = false;
         lockedIn = false; // kolo dobehlo — odomkni ovládanie
         syncGoldenHalves();
-        document.getElementById("golden-mana-btn")?.classList.remove("armed");
+        syncGoldDualHalves();
         renderQueue(); // až teraz vyčisti round-script pre ďalšie kolo
         lockBtn.disabled = false;
         updateLockButton();
@@ -1543,10 +1703,79 @@ function schedulePlayTimeline(timeline) {
         spawnChargeAura(e.from, true);
         if (e.hpCost) spawnDamageFloat(e.from, e.hpCost); // HP cena golden many ostáva viditeľná
       }
+      // Last Stand — FRAME-DRIVEN: každá fáza je efekt vo svojom frame; WAAPI trvanie = frameHold (= delayMs),
+      // takže to v pozadí pauzne/dobehne rovnako ako timeline. HP sa hýbe zo snapshotov (drain/rise), nie lokálne.
+      if (e.kind === "last_stand_summon" && (e.from === "p1" || e.from === "p2")) {
+        lsCenterAppear(); // démon sa vynorí v strede
+      }
+      if (e.kind === "last_stand_kill" && (e.from === "p1" || e.from === "p2")) {
+        lsCenterDisappear(); // stredový démon zmizne (smrť/ležanie rieši st.down v raf)
+      }
+      if (e.kind === "last_stand_revive" && (e.from === "p1" || e.from === "p2")) {
+        // démon sa objaví ZA postavou (0→1); raf nech počas prechodu (až po settle) démona neprepíše
+        _lsBanishing = false;
+        _lsTransUntil = performance.now() + 99 * 1000;
+        placeDeathBehind(e.from);
+        deathBehind.getAnimations().forEach(a => a.cancel());
+        deathBehind.animate([
+          { opacity: 0, filter: "drop-shadow(0 0 0px #ffd24a) blur(8px)", transform: `scale(${(DEATH_SEQ.behindRatio * 0.94).toFixed(3)})` },
+          { opacity: 1, filter: "drop-shadow(0 0 16px #ffd24a) blur(0px)", transform: `scale(${DEATH_SEQ.behindRatio})` },
+        ], { duration: frameHold, easing: "ease-out", fill: "forwards" });
+      }
+      if (e.kind === "last_stand_settle" && (e.from === "p1" || e.from === "p2")) {
+        placeDeathBehind(e.from);
+        deathBehind.getAnimations().forEach(a => a.cancel());
+        deathBehind.animate([
+          { opacity: 1, transform: `scale(${DEATH_SEQ.behindRatio})` },
+          { opacity: DEATH_SEQ.behindOpacity, transform: `scale(${DEATH_SEQ.behindRatio})` },
+        ], { duration: frameHold, easing: "ease-out", fill: "forwards" });
+        _lsTransUntil = performance.now() + frameHold; // potom raf preberie držanie démona za postavou (vstanie rieši st.down)
+      }
+      if (e.kind === "last_stand_banish" && (e.from === "p1" || e.from === "p2")) {
+        // zelená šípka nadíde na démon „end" bunku (krokovanie), potom prebehne banishment
+        const demonEl = qBeatEls[7];
+        if (demonEl) {
+          qBeatEls.forEach(x => x && x.classList.remove("q-now"));
+          demonEl.classList.add("q-now");
+          qCursor.style.left = (demonEl.offsetLeft + demonEl.offsetWidth / 2) + "px";
+          qCursor.classList.add("show");
+        }
+        // KROK 1: golden OFF (raf to drží cez _lsBanishing) + zhasni bežiace aury; duch zosilnie 0.25→1 a odíde
+        _lsBanishing = true;
+        _lsTransUntil = performance.now() + 99 * 1000;
+        _deathGoldenSlot = null;
+        hudBoxP1.classList.remove("death-golden"); hudBoxP2.classList.remove("death-golden");
+        document.querySelectorAll(".charge-aura.gold").forEach(n => n.remove());
+        placeDeathBehind(e.from);
+        deathBehind.getAnimations().forEach(a => a.cancel());
+        const a = deathBehind.animate([
+          { opacity: DEATH_SEQ.behindOpacity, transform: `scale(${DEATH_SEQ.behindRatio})` },
+          { opacity: 1, transform: `scale(${DEATH_SEQ.behindRatio})`, offset: .5 },
+          { opacity: 0, transform: `scale(${(DEATH_SEQ.behindRatio * 0.92).toFixed(3)})` },
+        ], { duration: frameHold, easing: "ease-in", fill: "forwards" });
+        a.onfinish = () => { deathBehind.style.opacity = "0"; };
+      }
+      if (e.kind === "last_stand_banish_center" && (e.from === "p1" || e.from === "p2")) {
+        lsCenterAppear(); // duch sa objaví v strede
+      }
+      if (e.kind === "last_stand_banish_kill" && (e.from === "p1" || e.from === "p2")) {
+        lsCenterDisappear(); // smrť/ležanie rieši st.down v raf
+      }
       if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) {
         const logEl  = appendActionLog(e.from, e.action);
         const beatEl = highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
         lastActed[e.from] = { logEl, beatEl }; // ak hneď príde "invalid", prečiarkneme práve tieto
+      }
+      // prázdny golden-mana beat — len posuň zelenú šípku naň (prázdne počkanie), bez záznamu akcie
+      if (e.kind === "beat_empty" && (e.from === "p1" || e.from === "p2")) {
+        const pos = (e.from === playStarter) ? 7 : 8;
+        qBeatEls.forEach(x => x && x.classList.remove("q-now"));
+        const el = qBeatEls[pos];
+        if (el) {
+          el.classList.add("q-now");
+          qCursor.style.left = (el.offsetLeft + el.offsetWidth / 2) + "px";
+          qCursor.classList.add("show");
+        }
       }
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
         spawnShieldBlock(e.target, !!e.gold); // efektný náraz do štítu
@@ -1725,7 +1954,7 @@ function actionButtonsAll() {
   return [
     moveBtn, attackBtn, dashBtn,
     document.getElementById("golden-btn"),
-    document.getElementById("golden-mana-btn"),
+    document.getElementById("gold-dual-btn"),
     ...generic
   ].filter(Boolean);
 }
@@ -1795,17 +2024,29 @@ function toggleGoldenHalf(mode) {
 goldenShieldHalf?.addEventListener("click", () => toggleGoldenHalf("shield"));
 goldenMirrorHalf?.addEventListener("click", () => toggleGoldenHalf("mirror"));
 
-// Golden Mana Refill: extra akcia po konci kola — toggle, dostupný obom hráčom
-const goldenManaBtn = document.getElementById("golden-mana-btn");
+// Golden Mana | Last Stand — duálne tlačidlo (2 polovice, vzájomne výlučné, ako golden shield/mirror).
+// Vykoná sa po konci kola; dostupné obom hráčom; v poslednom (buffnutom) kole zamknuté pre oboch.
+const goldDualBtn = document.getElementById("gold-dual-btn");
+const gmHalf = goldDualBtn.querySelector(".gm-half");
+const lsHalf = goldDualBtn.querySelector(".ls-half");
 const gmCostEl = document.getElementById("gm-cost");
-goldenManaBtn.addEventListener("click", () => {
+
+function syncGoldDualHalves() {
+  gmHalf?.classList.toggle("armed", goldenManaArmed);
+  lsHalf?.classList.toggle("armed", lastStandArmed);
+}
+function toggleGoldDual(mode) {
   if (uiLocked()) return;
-  if (openPicker) { shakeBtn(goldenManaBtn); return; }
+  if (openPicker) { shakeBtn(goldDualBtn); return; }
   if (!me || !state?.[me]?.char) return;
-  goldenManaArmed = !goldenManaArmed;
-  goldenManaBtn.classList.toggle("armed", goldenManaArmed);
+  if (state?.goldLocked) { shakeBtn(goldDualBtn); return; } // posledné kolo — zamknuté
+  if (mode === "mana") { goldenManaArmed = !goldenManaArmed; lastStandArmed = false; }
+  else                 { lastStandArmed  = !lastStandArmed;  goldenManaArmed = false; }
+  syncGoldDualHalves();
   renderQueue();
-});
+}
+gmHalf?.addEventListener("click", () => toggleGoldDual("mana"));
+lsHalf?.addEventListener("click", () => toggleGoldDual("laststand"));
 
 function updateGoldenButton() {
   if (goldenBtn) {
@@ -1820,12 +2061,16 @@ function updateGoldenButton() {
     }
     syncGoldenHalves();
   }
-  if (goldenManaBtn) {
+  if (goldDualBtn) {
     const available = !!me && !!state?.[me]?.char;
-    goldenManaBtn.classList.toggle("hidden", !available);
-    // cena v HP rastie s každým použitím (1, 2, 3…)
+    const locked = !!state?.goldLocked; // posledné (buffnuté) kolo — duálny button zamknutý pre oboch
+    goldDualBtn.classList.toggle("hidden", !available);
+    goldDualBtn.classList.toggle("locked-perm", locked); // rovnaký zámok (🔒 + sivé) ako golden shield/mirror pre startera
+    if (locked) { goldenManaArmed = false; lastStandArmed = false; }
+    // cena golden many v HP (srdiečka) rastie s každým použitím (1, 2, 3…); +6 mana je nad ňou (statické)
     const cost = (state?.[me]?.manaRefills ?? 0) + 1;
-    if (gmCostEl) { gmCostEl.innerHTML = `−${cost}${miniPix("❤️")} +6${miniPix("💧")}`; hydratePix(gmCostEl); }
+    if (gmCostEl) { gmCostEl.innerHTML = `−${cost}${miniPix("❤️")}`; hydratePix(gmCostEl); }
+    syncGoldDualHalves();
   }
 }
 
@@ -1881,6 +2126,7 @@ lockBtn.addEventListener("click", () => {
   if (goldenArmed) payload.unshift({ type: "golden_shield" });
   else if (goldenMirrorArmed) payload.unshift({ type: "golden_mirror" });
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
+  else if (lastStandArmed) payload.push({ type: "last_stand" });
   socket.emit("lock_in", payload);
   lockedIn = true; // všetky tlačidlá idú do locked stavu až do konca kola
   closePickers();
@@ -1912,7 +2158,7 @@ function applyPhaseUI(s) {
 
   // char-select len v hernej fáze, kým nemám zvolenú postavu
   const needChar = phase === "playing" && !isSpectator && me && !s?.[me]?.char;
-  if (needChar) { selEl.classList.remove("hidden"); startCharSelectPreview(); }
+  if (needChar) { hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); } // démon nesmie visieť cez výber
   else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
 
   if (controls && !isSpectator) controls.style.display = (phase === "playing") ? "" : "none";
@@ -2000,6 +2246,7 @@ function autoLockTimeout() {
   if (goldenArmed) payload.unshift({ type: "golden_shield" });
   else if (goldenMirrorArmed) payload.unshift({ type: "golden_mirror" });
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
+  else if (lastStandArmed) payload.push({ type: "last_stand" });
   socket.emit("lock_in", payload);
   lockedIn = true;
   closePickers();
@@ -2121,9 +2368,10 @@ socket.on("reset", () => {
   goldenArmed = false;
   goldenMirrorArmed = false;
   goldenManaArmed = false;
+  lastStandArmed = false;
   lockedIn = false;
   syncGoldenHalves();
-  document.getElementById("golden-mana-btn")?.classList.remove("armed");
+  syncGoldDualHalves();
   closePickers();
   renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
@@ -2196,15 +2444,16 @@ socket.on("new_game", () => {
   playGen++; playing = false;
   serverWinner = null; serverGameResult = null; gameOverShown = false;
   lastAttackEndAt = { p1:0, p2:0 };
+  hideDeathCenter(); // démon zo summon/banish nesmie prejsť do ďalšej hry
   stopTurnTimer();
   intermissionEl.classList.add("hidden");
   goOverlay.classList.add("hidden");
   chosenChar = null;
   dirPicker.classList.add("hidden"); aimPicker.classList.add("hidden");
   clearActionLogs();
-  myQueue = []; goldenArmed = false; goldenMirrorArmed = false; goldenManaArmed = false; lockedIn = false;
+  myQueue = []; goldenArmed = false; goldenMirrorArmed = false; goldenManaArmed = false; lastStandArmed = false; lockedIn = false;
   syncGoldenHalves();
-  document.getElementById("golden-mana-btn")?.classList.remove("armed");
+  syncGoldDualHalves();
   closePickers(); renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
   castingNow = { p1:false, p2:false };
@@ -2248,6 +2497,11 @@ function raf() {
     // victory aj casting (special) = slučka efektového sprite daného mága priamo na malej postave (nie úderový švih)
     const aSt = animState[slot];
     if (aSt.key === "casting" && aSt.until && now > aSt.until) { aSt.key = "idle"; aSt.until = 0; } // special dohral → späť do idle
+    // „leží mŕtvy" = HP na 0 (bežná smrť) ALEBO server-flag st.down (Last Stand choreografia smrť→oživenie).
+    // State-driven = robustné voči frame timingu aj pauznutiu tabu; board sprite tak hrá smrť rovnako ako HUD portrét.
+    const lyingDead = (st.hp ?? 1) <= 0 || st.down;
+    if (lyingDead && aSt.key !== "dead") { aSt.key = "dead"; aSt.until = 0; }
+    else if (!lyingDead && aSt.key === "dead") { aSt.key = "idle"; aSt.until = 0; }
     const anim = (aSt.key === "victory" || aSt.key === "casting")
       ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
       : currentAnim(slot);
@@ -2331,6 +2585,52 @@ function raf() {
       .then(meta => drawSprite(ctx, meta, anim, performance.now(), cvs.width, cvs.height))
       .catch(()=>{});
   });
+
+  // Last Stand — trvalý golden stav riadený serverom (state[slot].lastStandBuff):
+  // žiara postavy (actorFilter) + zlatý HUD + recharge aura + priehľadný démon za postavou
+  {
+    const buffSlot = state?.p1?.lastStandBuff ? "p1" : state?.p2?.lastStandBuff ? "p2" : null;
+    if (buffSlot) {
+      _lsRealActive = true;
+      // zlatý stav: buff zo servera sa zapne presne vo fáze „revive" (po smrti); počas banishu VYPNUTÝ
+      const goldOn = !_lsBanishing;
+      _deathGoldenSlot = goldOn ? buffSlot : null;
+      hudBoxP1.classList.toggle("death-golden", goldOn && buffSlot === "p1");
+      hudBoxP2.classList.toggle("death-golden", goldOn && buffSlot === "p2");
+      if (goldOn && now - _lsAuraAt > 950) { spawnChargeAura(buffSlot, true); _lsAuraAt = now; } // permanentná golden recharge
+      // démon sa drží za postavou na 0.25 — naviazaný na ŽIVÚ (interpolovanú) pozíciu sprite-u postavy,
+      // takže sa kĺže spolu s ňou (nie teleport). Okrem prechodov (revive/settle/banish), tie riadia efekty.
+      const tgt = state[buffSlot];
+      if (!_lsBanishing && now > _lsTransUntil && tgt && tgt.char) {
+        deathBehind.getAnimations().forEach(a => a.cancel());
+        const actorEl = buffSlot === "p1" ? actorP1 : actorP2;
+        const aLeft = parseFloat(getComputedStyle(actorEl).left) || 0; // počas pohybu = interpolovaná hodnota (CSS transition)
+        const aTop  = parseFloat(getComputedStyle(actorEl).top)  || 0;
+        const facing = computeFacing(state.p1, state.p2);
+        const headDx = (facing[buffSlot] || 1) * ACTOR_W * ((HEAD_CX[tgt.char] ?? 0.5) - 0.5);
+        const same = state.p1 && state.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
+        const shift = same ? (buffSlot === "p1" ? -22 : 22) : 0; // aktér nesie shift v transforme, nie v left
+        deathBehind.style.left = (aLeft + shift + headDx + DEATH_SEQ.behindOffsetX) + "px";
+        deathBehind.style.top  = (aTop + DEATH_SEQ.behindOffsetY) + "px";
+        deathBehind.style.transform = `scale(${DEATH_SEQ.behindRatio})`;
+        deathBehind.style.opacity = String(DEATH_SEQ.behindOpacity);
+      }
+    } else if (_lsRealActive) {
+      // koniec buffnutého stavu (smrť/výhra) — uprac
+      _lsRealActive = false; _lsBanishing = false; _deathGoldenSlot = null; _lsTransUntil = 0;
+      hudBoxP1.classList.remove("death-golden");
+      hudBoxP2.classList.remove("death-golden");
+      deathBehind.getAnimations().forEach(a => a.cancel());
+      deathBehind.style.opacity = "0";
+      hideDeathCenter();
+    }
+  }
+
+  // DEATH summon — framy do oboch canvasov: stredový overlay (fill 1.0) + „za postavou" (ako postava: ACTOR rozmer)
+  ensureSpriteMeta(DEATH_DIR, DEATH_ANIM.file).then(meta => {
+    drawSprite(deathCenter.getContext("2d"), meta, DEATH_ANIM, now, deathCenter.width, deathCenter.height, 1.0);
+    drawSprite(deathBehind.getContext("2d"), meta, DEATH_ANIM, now, ACTOR_W, ACTOR_H);
+  }).catch(()=>{});
 
   requestAnimationFrame(raf);
 }

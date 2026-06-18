@@ -23,9 +23,10 @@ function startServer() {
 function connect() {
   return new Promise((resolve, reject) => {
     const sock = io(URL, { transports: ["websocket"] });
-    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null };
+    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null };
     sock.on("you_are", (s) => { ctx.slot = s?.slot ?? s; ctx.isHost = !!s?.isHost; });
     sock.on("game_result", (g) => { ctx.gameResult = g; });
+    sock.on("turn_timer", (t) => { ctx.lastTimer = t; });
     sock.on("new_game", () => { /* séria: ďalšia hra — sloty prídu cez you_are */ });
     sock.on("state", (s) => {
       ctx.lastState = s;
@@ -130,6 +131,7 @@ const ML = { type: "melee" };
 const G = { type: "golden_shield" };
 const GMI = { type: "golden_mirror" };
 const GM = { type: "golden_mana" };
+const LS = { type: "last_stand" };
 const SP = { type: "special" };
 
 async function main() {
@@ -428,6 +430,113 @@ async function main() {
   check(c1.slot === "p2", "T15: v hre 2 sa strany prehodili — host je teraz vpravo (p2)", `slot=${c1.slot}`);
   check(c1.lastState?.series?.gameIndex === 2, "T15: séria postúpila na hru 2",
     `gameIndex=${c1.lastState?.series?.gameIndex}`);
+
+  // tiles bez dmg/IK — aby náhodný tile nezabil hráča a nepokazil deterministické last-stand scenáre
+  async function freshGameLS() {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { tileWeights: { dmg: 0, heal: 50, mana: 50, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "fire");
+    c2.sock.emit("choose_character", "lightning");
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  /* ---------- Test 16: Last Stand summon — oživenie na plno + buff + zámok ---------- */
+  await freshGameLS();
+  tl = await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]);
+  const lsSummon = tl.flatMap(f => f.effects || []).filter(e => e.kind === "last_stand_summon" && e.from === "p1");
+  check(lsSummon.length === 1, "T16: last_stand_summon efekt v timeline", `fx=${lsSummon.length}`);
+  const s16 = c1.lastState;
+  check(s16?.p1?.hp === 10 && s16?.p1?.mana === 10, "T16: p1 oživený na plné HP+manu", `hp=${s16?.p1?.hp} mana=${s16?.p1?.mana}`);
+  check(s16?.p1?.lastStandBuff === true, "T16: p1 má lastStandBuff", `buff=${s16?.p1?.lastStandBuff}`);
+  check(s16?.goldLocked === true, "T16: duálny gold button zamknutý (goldLocked)", `gl=${s16?.goldLocked}`);
+
+  /* ---------- Test 17: v poslednom kole je gold button zamknutý (lock_in s gold odmietnutý) ---------- */
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [R, S, M("down"), GM]); // golden mana v zamknutom kole → neplatné
+  c2.sock.emit("lock_in", [R, S, M("down")]);
+  let locked17 = false;
+  try { await waitTimeline(c1, 1500); } catch { locked17 = true; }
+  check(locked17, "T17: gold button v poslednom kole zamknutý (lock_in s golden_mana odmietnutý)");
+
+  /* ---------- Test 18: doom — ak obaja prežijú posledné kolo, Last Stand hráč zomrie (banish), súper vyhrá ---------- */
+  await freshGameLS();
+  await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]); // kolo 1: p1 summon
+  c1.gameResult = null;
+  const tlDoom = await playRound(c1, c2, [R, S, M("down")], [R, S, M("down")]); // kolo 2 buffnuté, obaja neškodní
+  const banish = tlDoom.flatMap(f => f.effects || []).filter(e => e.kind === "last_stand_banish" && e.from === "p1");
+  const doomLast = tlDoom[tlDoom.length - 1];
+  check(banish.length === 1, "T18: last_stand_banish na konci posledného kola", `fx=${banish.length}`);
+  check(doomLast.p1.hp === 0, "T18: p1 (last stand) zomrel na konci kola", `hp=${doomLast.p1.hp}`);
+  check(c1.gameResult?.gameWinner === "p2", "T18: súper (p2) vyhráva sériu", `gr=${JSON.stringify(c1.gameResult)}`);
+
+  /* ---------- Test 19: démon je len jeden — pri oboch Last Stand ho dostane len starter (p1), druhý ✗ ---------- */
+  await freshGameLS();
+  const tlX = await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up"), LS]);
+  const summonX = tlX.flatMap(f => f.effects || []).filter(e => e.kind === "last_stand_summon");
+  const invX = tlX.flatMap(f => f.effects || []).filter(e => e.kind === "invalid" && e.reason === "no_demon");
+  check(summonX.length === 1 && summonX[0].from === "p1", "T19: démon vyvolá len starter (p1)", `summon=${JSON.stringify(summonX)}`);
+  check(invX.length === 1 && invX[0].target === "p2", "T19: druhý Last Stand dostane ✗ (no_demon)", `inv=${JSON.stringify(invX)}`);
+  const s19 = c1.lastState;
+  check(s19?.p1?.lastStandBuff === true && !s19?.p2?.lastStandBuff, "T19: buff má len p1, nie p2",
+    `p1=${s19?.p1?.lastStandBuff} p2=${s19?.p2?.lastStandBuff}`);
+
+  /* ---------- Test 20: buff — Last Stand hráč dáva 2× dmg ---------- */
+  await freshGameLS();
+  // kolo 1: p1 dash doprava (0→2) + summon; p2 ostáva na (3,1)
+  await playRound(c1, c2, [D("right"), R, S, LS], [R, S, ML]);
+  // kolo 2 (buffnuté): p1 útok doprava z (2,1) na p2 (3,1) → dist 1 → základ 3 → 2× = 6
+  const tl2x = await playRound(c1, c2, [A("right"), R, S], [R, S, M("up")]);
+  const hit2x = sumEffects(tl2x).hits.find(h => h.target === "p2" && h.dmg === 6);
+  check(!!hit2x, "T20: Last Stand basic dáva 2× dmg (3→6)", `hits=${JSON.stringify(sumEffects(tl2x).hits)}`);
+
+  /* ---------- Test 21: p2 (nestartér) Last Stand → p1 NEdostane golden mana ---------- */
+  await freshGameLS();
+  const tlP2 = await playRound(c1, c2, [R, S, M("up")], [R, S, M("up"), LS]);
+  const gmFx21 = tlP2.flatMap(f => f.effects || []).filter(e => e.kind === "golden_mana");
+  const sumP2 = tlP2.flatMap(f => f.effects || []).filter(e => e.kind === "last_stand_summon");
+  check(gmFx21.length === 0, "T21: žiadny golden_mana efekt (p1 si ho nenastavil)", `gm=${JSON.stringify(gmFx21)}`);
+  check(sumP2.length === 1 && sumP2[0].from === "p2", "T21: démon dostal p2", `summon=${JSON.stringify(sumP2)}`);
+  const s21 = c1.lastState;
+  check(s21?.p2?.lastStandBuff === true && !s21?.p1?.lastStandBuff, "T21: buff má p2, p1 nie",
+    `p1=${s21?.p1?.lastStandBuff} p2=${s21?.p2?.lastStandBuff}`);
+  check(s21?.p1?.hp === 10, "T21: p1 HP nezmenené (žiadna golden mana cena)", `hp=${s21?.p1?.hp}`);
+
+  /* ---------- Test 22: časovač po Last Stand summone = dur(timeline) + čas na ťah (dlhá animácia nezje čas) ---------- */
+  c1.sock.emit("retry");
+  await new Promise(r => setTimeout(r, 150));
+  configureMatch(c1, { timer: "30", tileWeights: { dmg: 0, heal: 50, mana: 50, ik: 0 } });
+  await new Promise(r => setTimeout(r, 150));
+  c1.sock.emit("choose_character", "fire");
+  c2.sock.emit("choose_character", "lightning");
+  await new Promise(r => setTimeout(r, 250));
+  c1.lastTimer = null;
+  const tlLS = await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]); // p1 summon
+  const durLS = tlLS.reduce((a, f) => a + (f.delayMs || 0), 0);
+  await new Promise(r => setTimeout(r, 300)); // nech dôjde turn_timer po beginPlanningTimer(dur)
+  const tmr = c1.lastTimer;
+  check(!!tmr && typeof tmr.ms === "number", "T22: turn_timer prišiel po Last Stand summone", `tmr=${JSON.stringify(tmr)}`);
+  check(tmr && Math.abs(tmr.ms - (durLS + 30000)) <= 200,
+    "T22: turn_timer = dur(summon timeline) + 30s (časovač nenaruší Last Stand)",
+    `ms=${tmr?.ms} dur=${durLS} expected=${durLS + 30000}`);
+
+  /* ---------- Test 23: výber postáv — súperov pick je skrytý, kým si nevyberie aj druhý hráč ---------- */
+  c1.sock.emit("retry");
+  await new Promise(r => setTimeout(r, 150));
+  configureMatch(c1); // single, časovač off
+  await new Promise(r => setTimeout(r, 200));
+  // host (A=p1) si vyberie; nestartér (B=p2) ešte nevybral → NESMIE vidieť p1 pick
+  c1.sock.emit("choose_character", "fire");
+  await new Promise(r => setTimeout(r, 200));
+  check(c2.lastState?.p1 && c2.lastState.p1.char === null,
+    "T23: kým si druhý hráč nevyberie, súperov pick je skrytý", `vidí p1.char=${c2.lastState?.p1?.char}`);
+  check(c1.lastState?.p1?.char === "fire", "T23: vlastný pick vidím hneď", `p1.char=${c1.lastState?.p1?.char}`);
+  // teraz si vyberie aj p2 → obom sa pick odhalí
+  c2.sock.emit("choose_character", "lightning");
+  await new Promise(r => setTimeout(r, 200));
+  check(c2.lastState?.p1?.char === "fire" && c2.lastState?.p2?.char === "lightning",
+    "T23: po vlastnom výbere sa súperov pick odhalí", `p1=${c2.lastState?.p1?.char} p2=${c2.lastState?.p2?.char}`);
 
   c1.sock.close(); c2.sock.close();
   server.kill();
