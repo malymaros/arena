@@ -124,6 +124,8 @@ body {
   transform: translate(-50%, -50%); /* scaleX(-1) nastavuje JS */
   pointer-events: none;
   image-rendering: pixelated;
+  /* nad vrstvou postáv (#actors) — inak projektil na obsadenej bunke (súper vedľa, vzdialenosť 1) skryje sprite */
+  z-index: 5;
 }
 
 /* Efekty buniek */

@@ -248,7 +248,7 @@ function doMove(slot, dir, tl) {
   const a = game.players[slot];
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir] || [0,0];
   const nx = a.x + delta[0], ny = a.y + delta[1];
-  if (!inBounds(nx, ny)) { pushInvalid(tl, slot); return; }
+  if (!inBounds(nx, ny)) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
   a.x = nx; a.y = ny;
   pushStateFrame(tl, [], MOVE_DELAY_MS);
 }
@@ -264,7 +264,7 @@ function doDash(slot, dir, tl) {
   for (let s = 0; s < 2; s++) {
     if (inBounds(nx + delta[0], ny + delta[1])) { nx += delta[0]; ny += delta[1]; steps++; }
   }
-  if (!steps) { pushInvalid(tl, slot); return; }
+  if (!steps) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
 
   a.mana -= DASH_COST;
   a.x = nx; a.y = ny;
@@ -275,7 +275,7 @@ function doRecharge(slot, tl) {
   const a = game.players[slot];
 
   // Na maxime many -> neplatné, žiadna modrá animácia/bublina
-  if (a.mana >= MAX_MANA) { pushInvalid(tl, slot); return; }
+  if (a.mana >= MAX_MANA) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana_full"); return; }
 
   const before = a.mana;
   a.mana = Math.min(MAX_MANA, a.mana + RECHARGE_GAIN);

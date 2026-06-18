@@ -79,8 +79,20 @@ qCursor.className = "q-cursor";
 // celkové spomalenie animácií kola (1 = pôvodné tempo) — MUSÍ sedieť so server.js ANIM_SLOW
 const ANIM_SLOW = 1.5;
 const MOVE_MS = Math.round(700 * ANIM_SLOW); // pohyb na boarde; CSS číta --move-ms (nastavené nižšie)
-const ATTACK_SWING_MS = Math.round(1600 * ANIM_SLOW);
-const HURT_MS = Math.round(1600 * ANIM_SLOW);
+// POZN.: neslučkové animácie (attack/attack2/hurt/dead) sa kvôli drawSprite(t=now) reálne neprehrávajú
+// frame po frame — len držia poslednú pózu. Preto ich NEdržíme fixný čas (predtým 2400 ms = vizuálny „drag“),
+// ale presne po dobu daného timeline frame-u (frame.delayMs), aby póza zmizla keď začne ďalšia akcia.
+// special/melee tým ostávajú dlhé (ich beaty majú delayMs 1350 ms), basic/hurt sa skrátia na svoj frame.
+const POSE_TAIL_MS = 300; // o koľko dlhšie strelec „pozerá“ v smere streľby, nech otočenie vydrží po dopad
+
+// každá nevykonaná akcia povie PREČO — dôvod zo servera → [text floatu, CSS trieda]; default = všeobecné odmietnutie
+const INVALID_MSG = {
+  mana:      ["⚠️ LOW MANA",  "lowmana-float"],
+  mana_full: ["✨ MANA FULL",  "golden-float"],
+  hp_low:    ["🙏 LOW HP",     "lowmana-float"],
+  offboard:  ["🚫 OFF-BOARD",  "lowmana-float"],
+};
+const INVALID_MSG_DEFAULT = ["🚫 NO EFFECT", "lowmana-float"];
 const NEW_ROUND_MS = 1900; // „ROUND N" animácia medzi kolami (musí sedieť s CSS .round-banner.show)
 document.documentElement.style.setProperty("--move-ms", MOVE_MS + "ms"); // drž CSS pohyb v sync so spomalením
 
@@ -1436,6 +1448,8 @@ function schedulePlayTimeline(timeline) {
     }
 
     const frame = timeline[i++];
+    // pózu neslučkovej animácie držíme presne po dobu, čo je tento frame na obrazovke (žiadny presah do ďalšej akcie)
+    const frameHold = frame.delayMs ?? 600;
 
     const beforeP1 = prev?.p1 || state.p1;
     const beforeP2 = prev?.p2 || state.p2;
@@ -1455,27 +1469,29 @@ function schedulePlayTimeline(timeline) {
       if ((e.kind === "charge" || e.kind === "attack_swing" || e.kind === "special") && e.from) shooters.add(e.from);
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení)
       if (e.kind === "charge" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
-        facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + ATTACK_SWING_MS };
+        facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, "attack2", ATTACK_SWING_MS);
-        lastAttackEndAt[e.from] = performance.now() + ATTACK_SWING_MS;
+        setAnim(e.from, "attack2", frameHold); // melee beat = SPECIAL_BEAT_MS; re-triggered každý beat → drží švih celý beat
+        lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
-        setAnim(e.target, "hurt", HURT_MS);
+        setAnim(e.target, "hurt", frameHold);
         if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
-        setAnim(e.target, "hurt", HURT_MS);
+        setAnim(e.target, "hurt", frameHold);
         // nevykonaná akcia — prečiarkni práve zaznamenaný badge (log) aj beat (lišta) jemným červeným ✕
         const acted = lastActed[e.target];
         if (acted) {
           acted.logEl?.classList.add("act-invalid");
           acted.beatEl?.classList.add("act-invalid");
         }
-        // nedostatok many — výrazná výstraha: float + bliknutie mana baru v HUD
+        // vždy zobraz dôvod (aj neznámy → default), nech žiadna nevykonaná akcia nie je „tichá“
+        const [msg, cls] = INVALID_MSG[e.reason] || INVALID_MSG_DEFAULT;
+        spawnFloat(e.target, msg, cls);
+        // nedostatok many — navyše výrazná výstraha: bliknutie mana baru v HUD
         if (e.reason === "mana") {
-          spawnFloat(e.target, "⚠️ LOW MANA", "lowmana-float");
           const bar = e.target === "p1" ? hudP1Mana : hudP2Mana;
           if (bar) {
             bar.classList.remove("low-warn");
@@ -1484,11 +1500,6 @@ function schedulePlayTimeline(timeline) {
             setTimeout(() => bar.classList.remove("low-warn"), 1000);
           }
         }
-        // golden mana odmietnutá — jasná príčina
-        else if (e.reason === "mana_full") spawnFloat(e.target, "🙏 MANA FULL", "golden-float");
-        else if (e.reason === "hp_low")    spawnFloat(e.target, "🙏 LOW HP", "lowmana-float");
-        // basic mimo plochu — žiadne políčko nezasahuje
-        else if (e.reason === "offboard")  spawnFloat(e.target, "🏹 OFF-BOARD", "lowmana-float");
       }
       if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
         const amt = (typeof e.amount === "number" ? e.amount : 4);
@@ -1532,8 +1543,8 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
       }
     }
-    if (shooters.has("p1")) { setAnim("p1", "attack", ATTACK_SWING_MS); lastAttackEndAt.p1 = performance.now() + ATTACK_SWING_MS; }
-    if (shooters.has("p2")) { setAnim("p2", "attack", ATTACK_SWING_MS); lastAttackEndAt.p2 = performance.now() + ATTACK_SWING_MS; }
+    if (shooters.has("p1")) { setAnim("p1", "attack", frameHold); lastAttackEndAt.p1 = performance.now() + frameHold; }
+    if (shooters.has("p2")) { setAnim("p2", "attack", frameHold); lastAttackEndAt.p2 = performance.now() + frameHold; }
 
     renderGrid(state, frame.effects || []);
     positionActors(state);
