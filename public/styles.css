@@ -375,6 +375,24 @@ body {
 }
 .btn.act.demon:disabled{ filter: grayscale(.7) brightness(.55); cursor: not-allowed; }
 
+/* Last Hope tlačidlo — žiarivo červené, len ikona last_hope.png (naľavo od golden shield/mirror) */
+.btn.act.lasthope{
+  background: #3a0808; color: #ffd9d9;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px rgba(255,70,70,.9), 0 0 18px rgba(255,30,30,.7);
+}
+.btn.act.lasthope.hidden{ display: none; }
+.btn.act.lasthope .lh-ico{
+  width: 34px; height: 36px; object-fit: contain; image-rendering: pixelated;
+  filter: drop-shadow(0 0 5px rgba(255,60,60,.95));
+}
+.btn.act.lasthope .lh-cost{ display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 800; color: #ffd9d9; }
+.btn.act.lasthope .lh-cost .mini{ width: 14px; height: 14px; }
+.btn.act.lasthope:not(:disabled):hover{ filter: brightness(1.12); }
+.btn.act.lasthope.armed{
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px rgba(255,130,130,1), 0 0 26px rgba(255,40,40,1);
+  filter: brightness(1.18);
+}
+
 /* golden predťah: tlačidlo ROVNAKO VEĽKÉ ako golden-mana, len rozdelené na 2 polovice (ŠTÍT | MIRROR).
    Zlato je na samotných poloviciach (nie na kontajneri), aby každá mala vlastný hover aj armed stav.
    Žiadny overflow:hidden — inak by sa orezal zámok (🔒 ::after je umiestnený mimo tlačidla). */
@@ -505,6 +523,11 @@ body {
 .q-badge.demon .ls-badge{ width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 /* démon ÚTOK navolený ako ťah (má .main) — zlatá obruba (ako tlačidlo), odlíšenie od červeného banishmentu */
 .q-badge.main.demon{ box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,210,74,.9), 0 0 12px rgba(255,200,60,.55); }
+/* Last Hope bunka v lište — veľkosť ako banishment démon bunka, žiarivo červená; placeholder kým sa nenavolí */
+.q-badge.lasthope{ width: 56px; height: 40px; padding: 0; overflow: hidden; background: #3a0808; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,70,70,.7), 0 0 12px rgba(255,40,40,.6); }
+.q-badge.lasthope.q-slot{ background: #240606; }
+.q-badge.lasthope .lh-badge{ width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.q-badge.lasthope .lh-dim{ font-size: 18px; font-weight: 800; color: rgba(255,150,150,.65); }
 
 /* prázdny slot fronty — čiarkovaný placeholder, rovnaká šírka ako vyplnený badge */
 .q-badge.q-slot{
@@ -1249,6 +1272,18 @@ body {
     background: linear-gradient(to top, rgba(255,193,7,0), #ffca28 45%, #fff3c0);
     box-shadow: 0 0 6px rgba(255,180,0,.95);
   }
+  /* červená varianta nabíjacej aury — Last Hope ultra mód */
+  .charge-aura.red .ca-core{
+    background: radial-gradient(ellipse at center, rgba(255,140,140,.85), rgba(255,60,60,.4) 45%, rgba(255,60,60,0) 72%);
+  }
+  .charge-aura.red .ca-ring{
+    border-color: rgba(255,110,110,.9);
+    box-shadow: 0 0 12px rgba(255,50,50,.8);
+  }
+  .charge-aura.red .ca-streak{
+    background: linear-gradient(to top, rgba(255,60,60,0), #ff5a5a 45%, #ffd6d6);
+    box-shadow: 0 0 6px rgba(255,50,50,.95);
+  }
 
   /* death summon — golden recharge stav: žiari LEN widget hráča (vlajka a korunky NIE).
      HP a mana sú zlaté (čísla, emoji, bary); pulzujú LEN HP a mana bary, zvyšok widgetu nie. */
@@ -1280,6 +1315,26 @@ body {
   @keyframes death-bar-pulse{
     0%,100%{ box-shadow: 0 0 0 2px #000, 0 0 4px rgba(255,210,74,.5); }
     50%    { box-shadow: 0 0 0 2px #000, 0 0 16px 2px rgba(255,210,74,.95); }
+  }
+
+  /* Last Hope ultra mód — len MANA: červená výplň + pulz baru + červené číslo a kvapka (analógia k zlatému Last Stand) */
+  .hud-box.mana-ultra .mana-bar .fill{
+    background: linear-gradient(90deg,
+      #ffd0d0 0 4px, #ff4d4d 4px calc(100% - 4px), #a30000 calc(100% - 4px) 100%) !important;
+  }
+  .hud-box.mana-ultra .mana-bar{ animation: mana-ultra-pulse .7s ease-in-out infinite; }
+  /* červené mana číslo (prebije aj .me override) */
+  .hud-box.mana-ultra .bar-num.mana-num{
+    color: #ff6b6b !important;
+    text-shadow: 0 2px 0 rgba(0,0,0,.8), 0 0 8px rgba(255,80,80,.95);
+  }
+  /* červená mana kvapka */
+  .hud-box.mana-ultra .bar-label .ico[data-pix="drop"]{
+    filter: sepia(1) saturate(8) hue-rotate(-38deg) brightness(1.05) drop-shadow(0 0 4px rgba(255,80,80,.9));
+  }
+  @keyframes mana-ultra-pulse{
+    0%,100%{ box-shadow: 0 0 0 2px #000, 0 0 4px rgba(255,70,70,.5); }
+    50%    { box-shadow: 0 0 0 2px #000, 0 0 16px 2px rgba(255,70,70,.95); }
   }
 
   /* mana polovica má 3 riadky (ruky / +6 mana / cena v srdiečkach) — zhutni padding+gap+font,

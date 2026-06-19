@@ -134,6 +134,7 @@ const GM = { type: "golden_mana" };
 const LS = { type: "last_stand" };
 const SP = { type: "special" };
 const DEMON = { type: "demon" };
+const LHOPE = { type: "last_hope" };
 
 async function main() {
   const server = await startServer();
@@ -538,6 +539,38 @@ async function main() {
   const idxMir = flatMir.indexOf("mirror");
   check(idxOut !== -1 && idxMir !== -1 && idxOut < idxMir,
     "T26: démon zmizne (demon_center_out) pred mirror odrazom", `out=${idxOut} mirror=${idxMir}`);
+
+  /* ---------- Test 26b: shield na démon útok — démon zmizne PRED block animáciou (nech je blok vidno) ---------- */
+  await freshGameLS();
+  await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]); // kolo 1: p1 summon
+  const tlBlk = await playRound(c1, c2, [DEMON, R, M("up")], [S, R, M("down")]); // p2 shield pred p1 démonom
+  const flatBlk = tlBlk.flatMap(f => (f.effects || []).map(e => e.kind));
+  const bOut = flatBlk.indexOf("demon_center_out");
+  const bBlk = flatBlk.indexOf("block");
+  check(bOut !== -1 && bBlk !== -1 && bOut < bBlk,
+    "T26b: démon zmizne (demon_center_out) pred block animáciou", `out=${bOut} block=${bBlk}`);
+
+  /* ---------- Test 27: Last Hope — nebuffnutý hráč vo final kole: HP→1, mana→10, ultra buff ---------- */
+  await freshGameLS();
+  await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]); // kolo 1: p1 summon → p1 buff, p2 nebuffnutý
+  c1.gameResult = null;
+  // kolo 2 (final, starter p2): p2 zahrá Last Hope ako úvodnú akciu (pred golden); nikto neútočí → p1 doom banish
+  const tlHope = await playRound(c1, c2, [R, S, M("up")], [LHOPE, R, S, M("down")]);
+  const hopeSummon = tlHope.flatMap(f => f.effects || []).filter(e => e.kind === "last_hope_summon" && e.from === "p2");
+  check(hopeSummon.length === 1, "T27: last_hope_summon efekt v timeline", `fx=${hopeSummon.length}`);
+  const settleFrame = tlHope.find(f => (f.effects || []).some(e => e.kind === "last_hope_settle" && e.from === "p2"));
+  check(settleFrame?.p2?.hp === 1 && settleFrame?.p2?.mana === 10, "T27: p2 HP→1, mana→10 po Last Hope", `hp=${settleFrame?.p2?.hp} mana=${settleFrame?.p2?.mana}`);
+  check(settleFrame?.p2?.lastHopeBuff === true, "T27: p2 má lastHopeBuff (ultra mód)", `buff=${settleFrame?.p2?.lastHopeBuff}`);
+
+  /* ---------- Test 28: Last Hope smie len NEbuffnutý hráč; buffnutý (Last Stand) ho má odmietnutý ---------- */
+  await freshGameLS();
+  await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]); // p1 buff
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [LHOPE, R, S, M("down")]); // p1 je buffnutý → Last Hope neplatný
+  c2.sock.emit("lock_in", [R, S, M("up")]);
+  let hopeRejected = false;
+  try { await waitTimeline(c1, 1500); } catch { hopeRejected = true; }
+  check(hopeRejected, "T28: Last Hope buffnutým (Last Stand) hráčom je odmietnutý");
 
   /* ---------- Test 22: časovač po Last Stand summone = dur(timeline) + čas na ťah (dlhá animácia nezje čas) ---------- */
   c1.sock.emit("retry");

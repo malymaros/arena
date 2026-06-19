@@ -49,6 +49,12 @@ const DEATH_ANIM  = { file: "spritesheet_strip.png", fps: 10, loop: true };
 const LS_BADGE_IMG = '<img class="ls-badge" src="/assets/last_stand.png" alt="Last Stand">'; // ikona Last Standu (zmenšenina démona) do lišty/záznamu
 const DEATH_SCALE = 2.0;  // veľkosť stredového démona (násobok výšky bunky)
 
+// === Last Hope „hope" postava — strip (analógia k death sprite) ===
+const HOPE_DIR  = "hope";
+// 9216×512 = 12 framov po 768px (framy NIE sú štvorcové → frame inference háda zle, preto explicitné frames)
+const HOPE_ANIM = { file: "sprite_strip.png", fps: 10, loop: true, frames: 12 };
+const LH_BADGE_IMG = '<img class="lh-badge" src="/assets/last_hope.png" alt="Last Hope">'; // ikona Last Hope do lišty
+
 // vzhľad démona „za postavou" počas golden stavu (časovanie fáz riadi server cez delayMs frame-ov)
 const DEATH_SEQ = {
   behindRatio:   0.72, // veľkosť za postavou
@@ -121,6 +127,37 @@ Object.assign(deathFog.style, {
   background: "radial-gradient(circle at center, rgba(214,190,255,.55), rgba(150,120,220,.28) 45%, rgba(120,90,200,0) 70%)",
 });
 document.body.appendChild(deathFog);
+
+// Last Hope — stredový „hope" overlay (analógia k deathCenter), vlastný canvas nech sa nebije s démonom
+const hopeCenter = document.createElement("canvas");
+hopeCenter.id = "hope-center";
+{
+  // canvas v pomere framu (768×512 = 1.5:1) a poriadne veľký, nech hope postava vyplní priestor (nie letterbox)
+  const ch = Math.round(TILE_H * 3.4);
+  const cw = Math.round(ch * 768 / 512);
+  hopeCenter.width = cw; hopeCenter.height = ch;
+  hopeCenter.style.width = cw + "px"; hopeCenter.style.height = ch + "px";
+  hopeCenter.style.position = "fixed";
+  hopeCenter.style.left = "50%"; hopeCenter.style.top = "50%";
+  hopeCenter.style.transform = "translate(-50%, -50%)";
+  hopeCenter.style.transformOrigin = "center";
+  hopeCenter.style.pointerEvents = "none";
+  hopeCenter.style.imageRendering = "pixelated";
+  hopeCenter.style.opacity = "0";
+  hopeCenter.style.zIndex = "999999";
+}
+document.body.appendChild(hopeCenter);
+
+// červený hmlový oblak pre Last Hope (analógia k deathFog, len červený)
+const hopeFog = document.createElement("div");
+hopeFog.id = "hope-fog";
+Object.assign(hopeFog.style, {
+  position: "fixed", left: "50%", top: "50%", width: "560px", height: "560px",
+  transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: "999998",
+  borderRadius: "50%", display: "none", filter: "blur(28px)", opacity: "0",
+  background: "radial-gradient(circle at center, rgba(255,120,120,.55), rgba(220,60,60,.28) 45%, rgba(200,40,40,0) 70%)",
+});
+document.body.appendChild(hopeFog);
 
 // „YOU" značka — poskakujúca zlatá šípka nad vlastnou postavou (kotví sa k pozícii aktéra)
 const youMarker = document.createElement("div");
@@ -201,6 +238,7 @@ let goldenArmed = false;       // objednaný golden shield (extra predťah pred 
 let goldenMirrorArmed = false; // objednaný golden mirror — ten istý predťah, len odraz (vzájomne výlučný s golden shieldom)
 let goldenManaArmed = false;   // objednaný golden mana refill (extra akcia po konci kola)
 let lastStandArmed = false;    // objednaný Last Stand (duálny s golden mana, výlučný)
+let lastHopeArmed = false;     // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
 let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
@@ -242,16 +280,19 @@ function ensureSpriteMeta(charDir, file) {
   });
 }
 function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0) {
-  const idx = anim.loop ? Math.floor((t / (1000 / anim.fps)) % meta.frames)
-                        : Math.min(meta.frames - 1, Math.floor(t / (1000 / anim.fps)));
-  const sx = idx * meta.fw;
-  const scale = Math.min(dstW / meta.fw, dstH / meta.fh) * fill;
-  const dw = meta.fw * scale, dh = meta.fh * scale;
+  // anim.frames prepíše odhad počtu framov (keď framy nie sú štvorcové a inference zlyhá)
+  const total = anim.frames || meta.frames;
+  const fw = anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
+  const idx = anim.loop ? Math.floor((t / (1000 / anim.fps)) % total)
+                        : Math.min(total - 1, Math.floor(t / (1000 / anim.fps)));
+  const sx = idx * fw;
+  const scale = Math.min(dstW / fw, dstH / meta.fh) * fill;
+  const dw = fw * scale, dh = meta.fh * scale;
   // anchorY: 0 = hore, 0.5 = stred, 1 = dole; offsetX/offsetY = posun v px (záporné offsetY dvíha hore)
   const dx = (dstW - dw) / 2 + offsetX, dy = (dstH - dh) * anchorY + offsetY;
   if (clear) ctx.clearRect(0, 0, dstW, dstH); // clear=false -> vrstvenie (efekt navrch mága)
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(meta.img, sx, 0, meta.fw, meta.fh, dx, dy, dw, dh);
+  ctx.drawImage(meta.img, sx, 0, fw, meta.fh, dx, dy, dw, dh);
 }
 
 /* ---------- animation state ---------- */
@@ -395,7 +436,7 @@ function actorFilter(slot, now) {
 }
 
 // „Goku" nabíjacia aura pri recharge — naviazaná na postavu (offset pri zdieľanom políčku)
-function spawnChargeAura(slot, gold = false) {
+function spawnChargeAura(slot, gold = false, red = false) {
   const p = state?.[slot];
   if (!p) return;
   const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
@@ -405,7 +446,8 @@ function spawnChargeAura(slot, gold = false) {
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
   const { left, top } = cellToPx(p.x, p.y);
   const cont = document.createElement("div");
-  cont.className = gold ? "charge-aura gold" : "charge-aura"; // golden mana = rovnaká aura, len zlatá
+  // golden mana = rovnaká aura, len zlatá; Last Hope ultra mód = červená
+  cont.className = red ? "charge-aura red" : gold ? "charge-aura gold" : "charge-aura";
   cont.style.left = (left + TILE_W / 2 + shift + headDx) + "px";
   cont.style.top  = (top + TILE_H) + "px"; // päta postavy = spodok bunky
   cont.innerHTML = '<span class="ca-core"></span><span class="ca-ring"></span>';
@@ -457,6 +499,8 @@ function _deathFogPuff(ms, dir) {
 let _lsRealActive = false; // beží reálny buffnutý stav (na upratanie po smrti/výhre)
 let _lsAuraAt = 0;         // throttle recharge aury v rafe
 let _lsBanishing = false;  // počas banishu nepripínaj démona za postavu (ide do stredu)
+let _lhRealActive = false; // beží Last Hope ultra mód (na upratanie po skončení kola/hry)
+let _lhAuraAt = 0;         // throttle červenej aury v rafe
 
 function lsCenterAppear() {
   const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
@@ -497,6 +541,45 @@ function demonCenterDisappear() {
     { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(1.4)" },
   ], { duration: 700, easing: "ease-in", fill: "forwards" });
   a.onfinish = () => { deathCenter.style.opacity = "0"; };
+}
+
+// Last Hope — červená „hope" postava v strede (analógia k lsCenterAppear, len červená hmla a hope sprite)
+function _hopeFogPuff(ms, dir) {
+  hopeFog.style.display = "block";
+  const a = dir === "in"
+    ? [{ opacity: 0, transform: "translate(-50%,-50%) scale(.35)" },
+       { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .55 },
+       { opacity: 0, transform: "translate(-50%,-50%) scale(1.5)" }]
+    : [{ opacity: 0, transform: "translate(-50%,-50%) scale(1.5)" },
+       { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .45 },
+       { opacity: 0, transform: "translate(-50%,-50%) scale(.35)" }];
+  hopeFog.animate(a, { duration: ms, easing: dir === "in" ? "ease-out" : "ease-in" });
+}
+function hopeCenterAppear() {
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  hopeCenter.getAnimations().forEach(a => a.cancel());
+  hopeCenter.style.left = cx + "px"; hopeCenter.style.top = cy + "px";
+  hopeFog.style.left = cx + "px"; hopeFog.style.top = cy + "px";
+  _hopeFogPuff(1400, "in");
+  hopeCenter.animate([
+    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
+    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
+  ], { duration: 700, easing: "ease-out", fill: "forwards" });
+}
+function hopeCenterDisappear() {
+  _hopeFogPuff(700, "out");
+  const a = hopeCenter.animate([
+    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
+    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
+  ], { duration: 700, easing: "ease-in", fill: "forwards" });
+  a.onfinish = () => { hopeCenter.style.opacity = "0"; };
+}
+function hideHopeCenter() {
+  hopeCenter.getAnimations().forEach(a => a.cancel());
+  hopeFog.getAnimations().forEach(a => a.cancel());
+  hopeCenter.style.opacity = "0";
+  hopeFog.style.opacity = "0";
+  hopeFog.style.display = "none";
 }
 
 // (dev demo klávesy R/T odstránené — Last Stand sa hrá cez tlačidlo a riadi server)
@@ -1323,8 +1406,9 @@ function actionBadgeView(a) {
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
     case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
-    case "last_stand":    return { cls: "golden",  html: LS_BADGE_IMG };
-    case "demon":         return { cls: "demon",   html: LS_BADGE_IMG };
+    case "last_stand":    return { cls: "golden",   html: LS_BADGE_IMG };
+    case "demon":         return { cls: "demon",    html: LS_BADGE_IMG };
+    case "last_hope":     return { cls: "lasthope", html: LH_BADGE_IMG };
     default:              return { cls: "",        text: a?.type || "" };
   }
 }
@@ -1357,8 +1441,12 @@ function renderQueue() {
   const starterSlot = state?.starter || "p1";
   const otherS = starterSlot === "p1" ? "p2" : "p1";
   const lastRound = !!state?.goldLocked; // buffnuté posledné kolo — namiesto 2 gold-mana placeholderov jedna démon „end" bunka
-  // 9 beatov v reálnom poradí; owner = komu beat patrí (golden shield iba nestartérovi)
-  const layout = [
+  const buffSlot = state?.p1?.lastStandBuff ? "p1" : state?.p2?.lastStandBuff ? "p2" : null;
+  const hopeSlot = buffSlot ? (buffSlot === "p1" ? "p2" : "p1") : null; // nebuffnutý hráč — vlastník Last Hope bunky
+  // beaty v reálnom poradí; owner = komu beat patrí (golden shield iba nestartérovi)
+  const layout = [];
+  if (lastRound && hopeSlot) layout.push({ pos: 9, kind: "lasthope", owner: hopeSlot }); // úplne vľavo, len vo final kole
+  layout.push(
     { pos: 0, kind: "gshield", owner: otherS },
     { pos: 1, kind: "act", idx: 0, owner: starterSlot },
     { pos: 2, kind: "act", idx: 0, owner: otherS },
@@ -1366,12 +1454,13 @@ function renderQueue() {
     { pos: 4, kind: "act", idx: 1, owner: otherS },
     { pos: 5, kind: "act", idx: 2, owner: starterSlot },
     { pos: 6, kind: "act", idx: 2, owner: otherS },
-  ];
+  );
   if (lastRound) layout.push({ pos: 7, kind: "demon" }); // jedna zvýraznená démon bunka pre oboch (hra tu končí)
   else layout.push({ pos: 7, kind: "gmana", owner: starterSlot }, { pos: 8, kind: "gmana", owner: otherS });
 
   layout.forEach((b) => {
-    if (b.pos === 1 || b.pos === 7) { // predely: golden shield | akcie | golden mana / démon
+    // predely: [last_hope] | golden shield | akcie | golden mana / démon
+    if ((b.pos === 0 && lastRound && hopeSlot) || b.pos === 1 || b.pos === 7) {
       const d = document.createElement("div");
       d.className = "q-divider";
       queueEl.appendChild(d);
@@ -1384,6 +1473,23 @@ function renderQueue() {
       el.title = "Last Stand — hra tu končí (banishment)";
       queueEl.appendChild(el);
       qBeatEls[7] = el;
+      return;
+    }
+    if (b.kind === "lasthope") {
+      const mine = b.owner === me;
+      const el = document.createElement("div");
+      el.dataset.pos = "9";
+      el.className = "q-badge lasthope " + (mine ? "mine" : "opp");
+      if (mine && lastHopeArmed) {
+        el.innerHTML = LH_BADGE_IMG;
+        el.title = "Last Hope (navolené)";
+      } else {
+        el.classList.add("q-slot");
+        el.innerHTML = '<span class="lh-dim">?</span>';
+        el.title = mine ? "Last Hope (final round)" : "Opponent (hidden until it resolves)";
+      }
+      queueEl.appendChild(el);
+      qBeatEls[9] = el;
       return;
     }
     const mine = !!me && b.owner === me;
@@ -1428,7 +1534,8 @@ function renderQueue() {
 // počas animácie: posuň kurzor na práve vyhodnocovaný beat a odhal súperovu akciu
 function highlightRoundBeat(from, action, counts, starterSlot) {
   let pos;
-  if (action.type === "golden_shield" || action.type === "golden_mirror") pos = 0;
+  if (action.type === "last_hope") pos = 9;
+  else if (action.type === "golden_shield" || action.type === "golden_mirror") pos = 0;
   else if (action.type === "golden_mana" || action.type === "last_stand") pos = (from === starterSlot) ? 7 : 8;
   else { const k = counts[from]++; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
   if (pos == null) return null;
@@ -1457,7 +1564,7 @@ function clearRoundCursor() {
 // pošli serveru aktuálnu rozpracovanú frontu + golden flagy (server ju pri timeoute zahrá a doplní chýbajúce)
 function sendDraft() {
   if (!me || state?.phase !== "playing" || lockedIn || state?.[me]?.locked) return;
-  socket.emit("draft_queue", { queue: myQueue, golden: goldenArmed, goldenMirror: goldenMirrorArmed, goldenMana: goldenManaArmed, lastStand: lastStandArmed });
+  socket.emit("draft_queue", { queue: myQueue, golden: goldenArmed, goldenMirror: goldenMirrorArmed, goldenMana: goldenManaArmed, lastStand: lastStandArmed, lastHope: lastHopeArmed });
 }
 // zneaktívni tlačidlá akcií, ktoré už sú v queue (každá max 1× za kolo)
 function updateActionButtons() {
@@ -1655,6 +1762,7 @@ function schedulePlayTimeline(timeline) {
         goldenMirrorArmed = false;
         goldenManaArmed = false;
         lastStandArmed = false;
+        lastHopeArmed = false;
         lockedIn = false; // kolo dobehlo — odomkni ovládanie
         syncGoldenHalves();
         syncGoldDualHalves();
@@ -1760,6 +1868,14 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "demon_center_out" && (e.from === "p1" || e.from === "p2")) {
         demonCenterDisappear();
       }
+      // Last Hope: červená „hope" postava v strede → HP→1, mana→10 (HUD zo snapshotov) → zmizne, červený ultra mód ostáva
+      if (e.kind === "last_hope_summon" && (e.from === "p1" || e.from === "p2")) {
+        hopeCenterAppear();
+      }
+      if (e.kind === "last_hope_settle" && (e.from === "p1" || e.from === "p2")) {
+        hopeCenterDisappear();
+        spawnChargeAura(e.from, false, true); // červený nábeh ultra módu
+      }
       if (e.kind === "last_stand_summon" && (e.from === "p1" || e.from === "p2")) {
         lsCenterAppear(); // démon sa vynorí v strede
       }
@@ -1810,7 +1926,7 @@ function schedulePlayTimeline(timeline) {
       }
       // prázdny gold beat (golden shield/mirror = pos 0, golden mana = 7/8) — len posuň zelenú šípku naň
       if (e.kind === "beat_empty" && (e.from === "p1" || e.from === "p2")) {
-        const pos = e.beat === "gpre" ? 0 : (e.from === playStarter) ? 7 : 8;
+        const pos = e.beat === "lhope" ? 9 : e.beat === "gpre" ? 0 : (e.from === playStarter) ? 7 : 8;
         qBeatEls.forEach(x => x && x.classList.remove("q-now"));
         const el = qBeatEls[pos];
         if (el) {
@@ -1998,6 +2114,7 @@ function actionButtonsAll() {
     document.getElementById("golden-btn"),
     document.getElementById("gold-dual-btn"),
     document.getElementById("demon-btn"),
+    document.getElementById("last-hope-btn"),
     ...generic
   ].filter(Boolean);
 }
@@ -2113,6 +2230,19 @@ demonBtn?.addEventListener("mouseenter", () => {
 });
 demonBtn?.addEventListener("mouseleave", clearPreviewCells);
 
+// Last Hope — len nebuffnutý hráč vo final kole; toggle úvodnej akcie (ako armed flag, nie do myQueue)
+const lastHopeBtn = document.getElementById("last-hope-btn");
+function canPlayLastHope() {
+  return !!me && !!state?.[me]?.char && !!state?.goldLocked && !state?.[me]?.lastStandBuff;
+}
+lastHopeBtn?.addEventListener("click", () => {
+  if (uiLocked()) return;
+  if (openPicker) { shakeBtn(lastHopeBtn); return; }
+  if (!canPlayLastHope()) { shakeBtn(lastHopeBtn); return; }
+  lastHopeArmed = !lastHopeArmed;
+  renderQueue();
+});
+
 function updateGoldenButton() {
   if (goldenBtn) {
     // viditeľný obom hráčom; starterovi zamknutý (zámok + neaktívny vzhľad)
@@ -2150,6 +2280,17 @@ function updateGoldenButton() {
     } else {
       demonBtn.disabled = false;
       demonBtn.classList.remove("armed");
+    }
+  }
+  // Last Hope tlačidlo — len nebuffnutý hráč vo final kole (naľavo od golden shield/mirror)
+  if (lastHopeBtn) {
+    const showHope = canPlayLastHope();
+    lastHopeBtn.classList.toggle("hidden", !showHope);
+    if (showHope) {
+      lastHopeBtn.classList.toggle("armed", lastHopeArmed);
+    } else {
+      if (lastHopeArmed) lastHopeArmed = false; // mimo final kola nesmie ostať navolené
+      lastHopeBtn.classList.remove("armed");
     }
   }
 }
@@ -2205,6 +2346,7 @@ lockBtn.addEventListener("click", () => {
   const payload = [...myQueue];
   if (goldenArmed) payload.unshift({ type: "golden_shield" });
   else if (goldenMirrorArmed) payload.unshift({ type: "golden_mirror" });
+  if (lastHopeArmed) payload.unshift({ type: "last_hope" }); // úplne prvý, ešte pred golden shield/mirror
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
   else if (lastStandArmed) payload.push({ type: "last_stand" });
   socket.emit("lock_in", payload);
@@ -2325,6 +2467,7 @@ function autoLockTimeout() {
   const payload = [...myQueue];
   if (goldenArmed) payload.unshift({ type: "golden_shield" });
   else if (goldenMirrorArmed) payload.unshift({ type: "golden_mirror" });
+  if (lastHopeArmed) payload.unshift({ type: "last_hope" }); // úplne prvý (gold akcie sa nedopĺňajú, navolený Last Hope sa zachová)
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
   else if (lastStandArmed) payload.push({ type: "last_stand" });
   socket.emit("lock_in", payload);
@@ -2449,6 +2592,7 @@ socket.on("reset", () => {
   goldenMirrorArmed = false;
   goldenManaArmed = false;
   lastStandArmed = false;
+  lastHopeArmed = false;
   lockedIn = false;
   syncGoldenHalves();
   syncGoldDualHalves();
@@ -2533,7 +2677,7 @@ socket.on("new_game", () => {
   chosenChar = null;
   dirPicker.classList.add("hidden"); aimPicker.classList.add("hidden");
   clearActionLogs();
-  myQueue = []; goldenArmed = false; goldenMirrorArmed = false; goldenManaArmed = false; lastStandArmed = false; lockedIn = false;
+  myQueue = []; goldenArmed = false; goldenMirrorArmed = false; goldenManaArmed = false; lastStandArmed = false; lastHopeArmed = false; lockedIn = false;
   syncGoldenHalves();
   syncGoldDualHalves();
   closePickers(); renderQueue();
@@ -2715,6 +2859,28 @@ function raf() {
     drawSprite(deathBehind.getContext("2d"), meta, DEATH_ANIM, now, ACTOR_W, ACTOR_H);
   }).catch(()=>{});
 
+  // Last Hope — trvalý červený ultra mód (state[slot].lastHopeBuff): pulzujúci červený mana bar + periodická červená aura
+  {
+    const hopeSlot = state?.p1?.lastHopeBuff ? "p1" : state?.p2?.lastHopeBuff ? "p2" : null;
+    hudBoxP1.classList.toggle("mana-ultra", hopeSlot === "p1");
+    hudBoxP2.classList.toggle("mana-ultra", hopeSlot === "p2");
+    if (hopeSlot) {
+      _lhRealActive = true;
+      const tgt = state[hopeSlot];
+      if (tgt && tgt.char && !tgt.down && now - _lhAuraAt > 950) { spawnChargeAura(hopeSlot, false, true); _lhAuraAt = now; }
+    } else if (_lhRealActive) {
+      _lhRealActive = false;
+      hudBoxP1.classList.remove("mana-ultra");
+      hudBoxP2.classList.remove("mana-ultra");
+      hideHopeCenter();
+    }
+  }
+
+  // Last Hope summon — hope sprite do stredového overlay (viditeľnosť riadi opacity cez hopeCenterAppear/Disappear)
+  ensureSpriteMeta(HOPE_DIR, HOPE_ANIM.file).then(meta => {
+    drawSprite(hopeCenter.getContext("2d"), meta, HOPE_ANIM, now, hopeCenter.width, hopeCenter.height, 1.0);
+  }).catch(()=>{});
+
   requestAnimationFrame(raf);
 }
 requestAnimationFrame(raf);
@@ -2796,4 +2962,63 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   });
 
   document.body.appendChild(btn);
+})();
+
+/* ---------- DEBUG: hope sprite animácia (?hopedebug=1) ----------
+   Samostatný náhľad — nájdi správny počet framov v sprite_strip.png (frame inference predpokladá štvorec).
+   [ / ]  počet framov   |   - / =  fps   |   ←/→  ručný krok   |   medzerník  pauza   |   0  auto */
+(function hopeDebug() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has("hopedebug")) return;
+
+  const ov = document.createElement("div");
+  Object.assign(ov.style, {
+    position: "fixed", inset: "0", zIndex: "2000000", background: "#101012",
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px",
+  });
+  const info = document.createElement("div");
+  Object.assign(info.style, { color: "#fff", font: "15px monospace", textAlign: "center", whiteSpace: "pre", lineHeight: "1.5" });
+  const cv = document.createElement("canvas");
+  cv.width = 512; cv.height = 512;
+  Object.assign(cv.style, { width: "512px", height: "512px", imageRendering: "pixelated", background: "#1c1c20", border: "1px solid #444" });
+  ov.appendChild(info); ov.appendChild(cv);
+  document.body.appendChild(ov);
+
+  const ctx = cv.getContext("2d");
+  let frames = Number(params.get("frames")) || 18; // štart = inference (9216/512)
+  let fps = 10, manual = -1, paused = false;
+
+  const img = new Image();
+  img.src = "/assets/hope/sprite_strip.png";
+
+  function draw(t) {
+    if (img.complete && img.naturalWidth) {
+      const fw = img.naturalWidth / frames, fh = img.naturalHeight;
+      const idx = manual >= 0 ? manual : (paused ? 0 : Math.floor((t / (1000 / fps)) % frames));
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.imageSmoothingEnabled = false;
+      const scale = Math.min(cv.width / fw, cv.height / fh);
+      const dw = fw * scale, dh = fh * scale;
+      ctx.drawImage(img, Math.round(idx * fw), 0, Math.round(fw), fh, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
+      info.textContent =
+        `hope sprite ${img.naturalWidth}×${img.naturalHeight}\n` +
+        `frames=${frames}  frameW=${(img.naturalWidth / frames).toFixed(1)}  fps=${fps}  frame=${idx}${manual >= 0 ? " [MANUAL]" : paused ? " [PAUSE]" : ""}\n` +
+        `[ / ] frames     - / = fps     ←/→ krok     medzerník pauza     0 auto`;
+    } else {
+      info.textContent = "načítavam /assets/hope/sprite_strip.png …";
+    }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "[") frames = Math.max(1, frames - 1);
+    else if (e.key === "]") frames = Math.min(64, frames + 1);
+    else if (e.key === "-" || e.key === "_") fps = Math.max(1, fps - 1);
+    else if (e.key === "=" || e.key === "+") fps = Math.min(30, fps + 1);
+    else if (e.key === "ArrowLeft")  manual = ((manual < 0 ? 0 : manual - 1) + frames) % frames;
+    else if (e.key === "ArrowRight") manual = ((manual < 0 ? 0 : manual + 1)) % frames;
+    else if (e.key === " ") { manual = -1; paused = !paused; e.preventDefault(); }
+    else if (e.key === "0") { manual = -1; paused = false; }
+  });
 })();

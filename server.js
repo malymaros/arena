@@ -91,6 +91,12 @@ const LS_B_CENTER_MS = 1000; // banish: duch sa objaví v strede
 const LS_B_DRAIN_MS  = 1400; // banish: odčerpanie HP/many na 0
 const LS_B_KILL_MS   = 700;  // banish: smrť + duch zmizne
 
+// Last Hope — úvodná akcia NEbuffnutého hráča vo final kole (vyhodnotí sa PRED golden shield/mirror).
+// Červená „hope" postava: HP padne na 1, mana sa naplní na 10, hráč ide do ultra módu = 4× dmg do konca kola.
+const LH_APPEAR_MS = 1000; // hope postava sa vynorí v strede
+const LH_DRAIN_MS  = 1400; // HP→1, mana→10
+const LH_SETTLE_MS = 900;  // postava zmizne, červený ultra mód zostáva
+
 /* -------------------- Game state -------------------- */
 // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
 // ktorá sa medzi hrami série prehadzuje (štartér danej hry vždy sedí v p1 = vľavo)
@@ -117,10 +123,12 @@ function newPlayer(slot) {
     lastStandBuff: false, // aktívne v poslednom (buffnutom) kole: 2× výstupný dmg, floor(½) prijatý dmg
     lastStandDoom: false, // v tomto poslednom kole musí vyhrať, inak na jeho konci zomrie
     down: false,          // leží „mŕtvy" počas Last Stand choreografie (smrť→oživenie) — klient kreslí dead pózu
+    lastHope: false,      // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
+    lastHopeBuff: false,  // aktívny Last Hope ultra mód v poslednom kole: 4× výstupný dmg, floor(½) prijatý dmg
     locked: false,
     queue: [],
     // priebežne posielaná rozpracovaná voľba — pri vypršaní času ju backstop zachová a doplní len chýbajúce
-    draft: { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false }
+    draft: { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false, lastHope: false }
   };
 }
 
@@ -191,8 +199,8 @@ function emitStateMasked() {
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, down, locked } = a;
-  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, down, locked };
+  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
+  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
 }
 function snapshot() {
   return {
@@ -250,10 +258,16 @@ function specialDamageAndHit(players, slot) {
 }
 
 // 3 akcie, každý typ max 1× za kolo, len známe typy a smery (move, attack aj dash nesú dir)
-// voliteľný prefix golden_shield/golden_mirror (len hráč, ktorý v kole NEzačína) a sufix golden_mana (ktokoľvek)
+// voliteľný úvod last_hope (len nebuffnutý hráč vo final kole) → potom golden_shield/golden_mirror (nestartér) → 3 akcie → sufix golden_mana
 function validQueue(queue, slot) {
   if (!Array.isArray(queue)) return false;
   let q = queue;
+  // úplne prvý môže byť last_hope — len pre nebuffnutého hráča v poslednom (final) kole
+  if (q[0] && q[0].type === "last_hope") {
+    const finalRound = !!(game.players.p1.lastStandBuff || game.players.p2.lastStandBuff);
+    if (!finalRound || game.players[slot]?.lastStandBuff) return false;
+    q = q.slice(1);
+  }
   let goldenPre = null;
   if (q[0] && (q[0].type === "golden_shield" || q[0].type === "golden_mirror")) {
     if (slot === game.starter) return false;
@@ -394,9 +408,10 @@ function doMelee(slot, tl) {
   }
 }
 
-// Last Stand buff: postava v poslednom (buffnutom) kole dáva 2× dmg a prijatý dmg sa zaokrúhľuje na floor(½)
-function dealMul(slot)      { return game.players[slot].lastStandBuff ? 2 : 1; }
-function recvDmg(slot, dmg) { return game.players[slot].lastStandBuff ? Math.floor(dmg / 2) : dmg; }
+// Výstupný násobič dmg: Last Hope ultra mód = 4×, Last Stand buff = 2×, inak 1×.
+// Prijatý dmg sa zaokrúhľuje na floor(½) pri Last Stand aj Last Hope (½ chráni 1-HP Last Hope hráča pred dmg tile).
+function dealMul(slot)      { const p = game.players[slot]; return p.lastHopeBuff ? 4 : p.lastStandBuff ? 2 : 1; }
+function recvDmg(slot, dmg) { const p = game.players[slot]; return (p.lastStandBuff || p.lastHopeBuff) ? Math.floor(dmg / 2) : dmg; }
 
 // aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, mirror ho odrazí do útočníka)
 function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
@@ -491,15 +506,15 @@ function doDemon(slot, tl) {
 
   // zásah: súper dostane dmg, ak NESTOJÍ na kasterovej bunke; cez shield/mirror (applyHit) — bez 2× buffu (10 = istá smrť)
   const inRange = op && !(op.x === me.x && op.y === me.y);
-  // ak súper odrazí (mirror), démon nech najprv zmizne zo stredu a až POTOM letí odrazený lúč späť do kastera
-  const reflects = inRange && op.mirror && !op.shield;
-  if (reflects) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS);
+  // ak súper bráni (shield alebo mirror), démon nech najprv zmizne zo stredu, nech je block/odraz animácia viditeľná
+  const defended = inRange && (op.shield || op.mirror);
+  if (defended) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS);
   if (inRange) {
     applyHit(opS, DEMON_DMG, tl, "demon");
   } else {
     pushStateFrame(tl, [], SMALL_DELAY_MS);
   }
-  if (!reflects) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS); // inak démon zmizne až po zásahu
+  if (!defended) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS); // inak démon zmizne až po zásahu
 }
 
 function doAction(slot, action, tl) {
@@ -707,6 +722,8 @@ function onTurnTimeout() {
     const goldLocked = game.players.p1.lastStandBuff || game.players.p2.lastStandBuff;
     p.goldenMana = !goldLocked && !!p.draft?.goldenMana;
     p.lastStand  = !goldLocked && !!p.draft?.lastStand && !p.goldenMana; // výlučné s golden mana
+    // Last Hope — len nebuffnutý hráč vo final kole; nikdy sa nedopĺňa náhodne, len ak ho hráč navolil
+    p.lastHope   = goldLocked && !p.lastStandBuff && !!p.draft?.lastHope;
     // zahraj, čo má hráč rozpracované (draft), chýbajúce do 3 doplň náhodne — bez akcie, ktorú už pokrýva golden
     const exclude = new Set();
     if (p.golden) exclude.add("shield");
@@ -746,6 +763,15 @@ function resolveLastStandSummon(slot, tl) {
   pushStateFrame(tl, [{ kind: "last_stand_settle", from: slot }], LS_SETTLE_MS); // démon → 0.25, hráč vstane
 }
 
+// Last Hope summon: červená „hope" postava v strede → HP padne na 1, mana sa naplní na 10 → postava zmizne, ultra mód (4×) ostáva.
+function resolveLastHopeSummon(slot, tl) {
+  const p = game.players[slot];
+  pushStateFrame(tl, [{ kind: "last_hope_summon", from: slot }], LH_APPEAR_MS); // hope postava v strede
+  lsTweenFrames(slot, 1, MAX_MANA, LH_DRAIN_MS, "last_hope_drain", tl);          // HP→1, mana→10
+  p.lastHopeBuff = true;                                                          // od TERAZ červený ultra mód = 4× dmg
+  pushStateFrame(tl, [{ kind: "last_hope_settle", from: slot }], LH_SETTLE_MS);  // postava zmizne, červený mód zostáva
+}
+
 // banish: golden OFF → duch zosilnie a odíde z postavy → objaví sa v strede → odčerpá HP/manu na 0 → smrť.
 function resolveLastStandBanish(slot, tl) {
   const p = game.players[slot];
@@ -767,6 +793,22 @@ function resolveTurn() {
   let ended = false;
   // doom: zachyť na začiatku kola — true len v buffnutom (poslednom) kole, NIE v aktivačnom (vtedy sa nastaví až v gold fáze)
   const doomSlot = game.players.p1.lastStandDoom ? "p1" : game.players.p2.lastStandDoom ? "p2" : null;
+
+  // Last Hope — úvodná akcia NEbuffnutého hráča vo final kole, vyhodnotená PRED golden shield/mirror.
+  // Týka sa len final kola (niekto má lastStandBuff); pre nebuffnutého buď zahranie, alebo prázdny beat (kurzor cezeň prejde).
+  if (game.players.p1.lastStandBuff || game.players.p2.lastStandBuff) {
+    for (const slot of order) {
+      const p = game.players[slot];
+      if (p.lastStandBuff) continue; // buffnutý hráč Last Hope nemá (má démon útok)
+      if (p.lastHope) {
+        p.lastHope = false;
+        pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "last_hope", dir: null } }], 250);
+        resolveLastHopeSummon(slot, tl);
+      } else {
+        pushStateFrame(tl, [{ kind: "beat_empty", from: slot, beat: "lhope" }], ACTION_GAP_MS);
+      }
+    }
+  }
 
   // golden shield / golden mirror — extra predťah hráča, ktorý je v kole druhý, vyhodnotený pred prvou akciou startera
   const second = order[1];
@@ -902,8 +944,10 @@ function resolveTurn() {
   game.players.p2.goldenMirror = false;
   game.players.p1.lastStand = false; // nevyhodnotený last stand prepadá (buff/doom NEresetujeme — nesú sa do posledného kola)
   game.players.p2.lastStand = false;
-  game.players.p1.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false };
-  game.players.p2.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false };
+  game.players.p1.lastHope = false; // nevyhodnotený last hope prepadá (buff platí len v rozohranom final kole, hra ním aj tak končí)
+  game.players.p2.lastHope = false;
+  game.players.p1.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false, lastHope: false };
+  game.players.p2.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false, lastHope: false };
 
   const dur = tl.reduce((a, f) => a + (f.delayMs || 0), 0);
   if (ended) {
@@ -1043,6 +1087,8 @@ io.on("connection", (socket) => {
     if (!validQueue(queue, slot)) return;
     const me = game.players[slot];
     let q = queue;
+    me.lastHope = q[0]?.type === "last_hope"; // úvodná akcia (pred golden) — validQueue už overil, že smie
+    if (me.lastHope) q = q.slice(1);
     me.golden = q[0]?.type === "golden_shield";
     me.goldenMirror = q[0]?.type === "golden_mirror";
     if (me.golden || me.goldenMirror) q = q.slice(1);
@@ -1077,7 +1123,7 @@ io.on("connection", (socket) => {
       out.push({ type: a.type, dir: a.dir || null });
       used.add(a.type);
     }
-    me.draft = { queue: out, golden: !!d?.golden, goldenMirror: !!d?.goldenMirror, goldenMana: !!d?.goldenMana, lastStand: !!d?.lastStand };
+    me.draft = { queue: out, golden: !!d?.golden, goldenMirror: !!d?.goldenMirror, goldenMana: !!d?.goldenMana, lastStand: !!d?.lastStand, lastHope: !!d?.lastHope };
   });
 
   socket.on("retry", () => {
