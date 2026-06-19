@@ -689,11 +689,19 @@ body {
 .round-banner{
   position: fixed; top: 40%; left: 50%; transform: translate(-50%,-50%) scale(.6);
   z-index: 50; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center;
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
   font-size: 60px; letter-spacing: 5px; color: #ffd54f;
   text-shadow: 5px 5px 0 #000, 0 0 28px rgba(255,200,60,.75);
   opacity: 0;
 }
+/* veľký démon tile pod „FINAL ROUND" (rovnaký vzhľad ako .q-badge.demon — červený okraj) */
+.round-banner .rb-demon{
+  width: 120px; height: 120px; overflow: hidden; border-radius: 4px;
+  background: #2a0d12;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px rgba(255,90,90,.75), 0 0 28px rgba(255,60,60,.6);
+}
+.round-banner .rb-demon img{ width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .round-banner.hidden{ display: none; }
 .round-banner.show{ animation: round-pop 1.9s ease-out forwards; }
 @keyframes round-pop{

@@ -106,6 +106,7 @@ deathBehind.id = "death-behind";
   deathBehind.style.pointerEvents = "none";
   deathBehind.style.imageRendering = "pixelated";
   deathBehind.style.transformOrigin = "center"; // scale ostane centrovaný na postavu
+  deathBehind.style.transition = "opacity .45s ease-out"; // plynulé stmievanie (revive 0→1, settle 1→0.25); left/top sa nehýbe transition-om (sleduje per-frame)
   deathBehind.style.opacity = "0";
 }
 actorsEl.appendChild(deathBehind);
@@ -478,7 +479,6 @@ function lsCenterDisappear() {
 }
 
 // (dev demo klávesy R/T odstránené — Last Stand sa hrá cez tlačidlo a riadi server)
-let _lsTransUntil = 0; // dokedy beží prechodová animácia démona (raf počas nej nedrží 0.25)
 // tvrdo schovaj stredového démona (koniec hry / nová hra / char-select — nech nevisí na ploche)
 function hideDeathCenter() {
   deathCenter.getAnimations().forEach(a => a.cancel());
@@ -1534,10 +1534,14 @@ function playGameEndAnim(winner, after) {
 // medzikolová „ROUND N" animácia — round-script zostane vidieť, kým dobehne; potom callback resetuje lištu
 function playNewRoundTransition(nextTurn, done) {
   if (!roundBannerEl) { setTimeout(done, NEW_ROUND_MS); return; }
-  // ak ďalšie kolo je buffnuté (Last Stand) → „FINAL ROUND" namiesto „ROUND n"; až teraz prepni aj text hore
+  // ak ďalšie kolo je buffnuté (Last Stand) → „FINAL ROUND" + veľký démon tile (červený okraj) pod nápisom
   const final = !!state?.goldLocked;
-  roundBannerEl.textContent = final ? "FINAL ROUND" : `ROUND ${nextTurn}`;
-  if (final) _finalRoundActive = true;
+  if (final) {
+    roundBannerEl.innerHTML = 'FINAL ROUND<span class="rb-demon"><img src="/assets/last_stand.png" alt="" /></span>';
+    _finalRoundActive = true; // text hore sa prepne až teraz (s bannerom)
+  } else {
+    roundBannerEl.textContent = `ROUND ${nextTurn}`;
+  }
   roundBannerEl.classList.remove("hidden", "show");
   void roundBannerEl.offsetWidth; // reštart animácie
   roundBannerEl.classList.add("show");
@@ -1719,24 +1723,12 @@ function schedulePlayTimeline(timeline) {
         lsCenterDisappear(); // stredový démon zmizne (smrť/ležanie rieši st.down v raf)
       }
       if (e.kind === "last_stand_revive" && (e.from === "p1" || e.from === "p2")) {
-        // démon sa objaví ZA postavou (0→1); raf nech počas prechodu (až po settle) démona neprepíše
+        // démon sa objaví ZA postavou — opacity cez CSS transition (0→1); počas revive/rise hráč LEŽÍ (st.down=true),
+        // takže raf sa démona nedotýka. Settle (down=false) potom v rafe plynulo stmaví na 0.25.
         _lsBanishing = false;
-        _lsTransUntil = performance.now() + 99 * 1000;
         placeDeathBehind(e.from);
-        deathBehind.getAnimations().forEach(a => a.cancel());
-        deathBehind.animate([
-          { opacity: 0, filter: "drop-shadow(0 0 0px #ffd24a) blur(8px)", transform: `scale(${(DEATH_SEQ.behindRatio * 0.94).toFixed(3)})` },
-          { opacity: 1, filter: "drop-shadow(0 0 16px #ffd24a) blur(0px)", transform: `scale(${DEATH_SEQ.behindRatio})` },
-        ], { duration: frameHold, easing: "ease-out", fill: "forwards" });
-      }
-      if (e.kind === "last_stand_settle" && (e.from === "p1" || e.from === "p2")) {
-        placeDeathBehind(e.from);
-        deathBehind.getAnimations().forEach(a => a.cancel());
-        deathBehind.animate([
-          { opacity: 1, transform: `scale(${DEATH_SEQ.behindRatio})` },
-          { opacity: DEATH_SEQ.behindOpacity, transform: `scale(${DEATH_SEQ.behindRatio})` },
-        ], { duration: frameHold, easing: "ease-out", fill: "forwards" });
-        _lsTransUntil = performance.now() + frameHold; // potom raf preberie držanie démona za postavou (vstanie rieši st.down)
+        deathBehind.style.filter = "drop-shadow(0 0 16px #ffd24a)";
+        deathBehind.style.opacity = "1"; // CSS transition spraví plynulý nábeh z 0
       }
       if (e.kind === "last_stand_banish" && (e.from === "p1" || e.from === "p2")) {
         // zelená šípka nadíde na démon „end" bunku (krokovanie), potom prebehne banishment
@@ -1749,7 +1741,6 @@ function schedulePlayTimeline(timeline) {
         }
         // KROK 1: golden OFF (raf to drží cez _lsBanishing) + zhasni bežiace aury; duch zosilnie 0.25→1 a odíde
         _lsBanishing = true;
-        _lsTransUntil = performance.now() + 99 * 1000;
         _deathGoldenSlot = null;
         hudBoxP1.classList.remove("death-golden"); hudBoxP2.classList.remove("death-golden");
         document.querySelectorAll(".charge-aura.gold").forEach(n => n.remove());
@@ -2608,10 +2599,11 @@ function raf() {
       hudBoxP2.classList.toggle("death-golden", goldOn && buffSlot === "p2");
       if (goldOn && now - _lsAuraAt > 950) { spawnChargeAura(buffSlot, true); _lsAuraAt = now; } // permanentná golden recharge
       // démon sa drží za postavou na 0.25 — naviazaný na ŽIVÚ (interpolovanú) pozíciu sprite-u postavy,
-      // takže sa kĺže spolu s ňou (nie teleport). Okrem prechodov (revive/settle/banish), tie riadia efekty.
+      // takže sa kĺže spolu s ňou (nie teleport). Drží sa keď postava STOJÍ (server flag !st.down) — počas
+      // summon/banish prechodov (st.down=true, resp. _lsBanishing) ho riadia efekty. State-driven = robustné.
       const tgt = state[buffSlot];
-      if (!_lsBanishing && now > _lsTransUntil && tgt && tgt.char) {
-        deathBehind.getAnimations().forEach(a => a.cancel());
+      if (!_lsBanishing && tgt && tgt.char && !tgt.down) {
+        // pozícia sleduje postavu per-frame (bez transition); opacity 0.25 dotiahne CSS transition plynulo (z 1 po settle)
         const actorEl = buffSlot === "p1" ? actorP1 : actorP2;
         const aLeft = parseFloat(getComputedStyle(actorEl).left) || 0; // počas pohybu = interpolovaná hodnota (CSS transition)
         const aTop  = parseFloat(getComputedStyle(actorEl).top)  || 0;
@@ -2626,7 +2618,7 @@ function raf() {
       }
     } else if (_lsRealActive) {
       // koniec buffnutého stavu (smrť/výhra) — uprac
-      _lsRealActive = false; _lsBanishing = false; _deathGoldenSlot = null; _lsTransUntil = 0;
+      _lsRealActive = false; _lsBanishing = false; _deathGoldenSlot = null;
       hudBoxP1.classList.remove("death-golden");
       hudBoxP2.classList.remove("death-golden");
       deathBehind.getAnimations().forEach(a => a.cancel());
