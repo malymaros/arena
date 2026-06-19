@@ -353,6 +353,28 @@ body {
     0 0 16px rgba(255,200,60,.55);
 }
 
+/* Démon útok — bordové tlačidlo s červeným rámom (rovnaký motív ako démon „end" bunka / FINAL ROUND tile) */
+.btn.act.demon{
+  width: 122px; height: auto;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 8px;
+  background: #2a0d12; color: #ffd9d9;
+  /* zlatá obruba — odlíši démon ÚTOK od červeného banishment motívu (FINAL „end" bunka) */
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px rgba(255,210,74,.9), 0 0 18px rgba(255,200,60,.55);
+}
+.btn.act.demon.hidden{ display: none; }
+.btn.act.demon .ls-ico{
+  width: 34px; height: 38px; object-fit: contain; image-rendering: pixelated;
+  filter: drop-shadow(0 0 4px rgba(255,80,80,.85));
+}
+.btn.act.demon .cost{ font-size: 12px; font-weight: 800; white-space: nowrap; opacity: 1; }
+.btn.act.demon:not(:disabled):hover{ filter: brightness(1.1); }
+.btn.act.demon.armed{
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px rgba(255,225,130,1), 0 0 26px rgba(255,200,60,.85);
+  filter: brightness(1.12);
+}
+.btn.act.demon:disabled{ filter: grayscale(.7) brightness(.55); cursor: not-allowed; }
+
 /* golden predťah: tlačidlo ROVNAKO VEĽKÉ ako golden-mana, len rozdelené na 2 polovice (ŠTÍT | MIRROR).
    Zlato je na samotných poloviciach (nie na kontajneri), aby každá mala vlastný hover aj armed stav.
    Žiadny overflow:hidden — inak by sa orezal zámok (🔒 ::after je umiestnený mimo tlačidla). */
@@ -478,6 +500,11 @@ body {
 .q-badge.mirror  { background: #00525b; }
 .q-badge.special { background: #5e1387; }
 .q-badge.golden  { background: #8a6d00; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,213,79,.55); }
+/* démon „end" banishment bunka (pos 7) — červený okraj; platí pri každej šírke */
+.q-badge.demon   { background: #2a0d12; overflow: hidden; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,90,90,.6), 0 0 12px rgba(255,60,60,.55); }
+.q-badge.demon .ls-badge{ width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+/* démon ÚTOK navolený ako ťah (má .main) — zlatá obruba (ako tlačidlo), odlíšenie od červeného banishmentu */
+.q-badge.main.demon{ box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,210,74,.9), 0 0 12px rgba(255,200,60,.55); }
 
 /* prázdny slot fronty — čiarkovaný placeholder, rovnaká šírka ako vyplnený badge */
 .q-badge.q-slot{

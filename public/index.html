@@ -180,6 +180,10 @@
       <button type="button" class="golden-half gm-half" data-dual="mana" title="Golden Mana Refill (+6 mana for HP, cost grows each use) - extra action resolved after the round ends."><span class="g-ico pix-ico" data-emoji="🙏"></span><span class="cost gm-gain">+6<span class="pix-ico mini" data-emoji="💧"></span></span><span class="cost gm-hp" id="gm-cost">−1<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
       <button type="button" class="golden-half ls-half" data-dual="laststand" title="Last Stand (−10 HP) - the demon kills you and revives you at full HP/mana. Next round is your LAST: you deal 2× damage and take ½, but if you don't kill the opponent you die. The demon is shared - only one player can summon it. Locks this gold button for both next round."><img class="ls-ico" src="/assets/last_stand.png" alt="Last Stand" /><span class="cost">−10<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
     </div>
+
+    <!-- Démon útok — len pre buffnutého hráča v poslednom (FINAL) kole, namiesto zamknutého gold dual buttonu.
+         Zaberá jeden z 3 akčných slotov; 10 dmg na všetky políčka okrem toho, na ktorom stojíš. -->
+    <button id="demon-btn" class="btn act demon hidden" title="Demon Attack (−10 mana) - 10 damage to every cell except the one you stand on. Counts as one of your 3 actions; only in your FINAL ROUND."><img class="ls-ico" src="/assets/last_stand.png" alt="Demon" /><span class="cost">−10<span class="pix-ico mini" data-emoji="💧"></span></span></button>
   </div>
 
   <!-- Character select -->

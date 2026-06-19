@@ -478,6 +478,27 @@ function lsCenterDisappear() {
   a.onfinish = () => { deathCenter.style.opacity = "0"; };
 }
 
+// Démon útok — veľký démon v strede (100 % väčší než summon = scale 2); zvyšok kreslí raf do deathCenter
+function demonCenterAppear() {
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  deathCenter.getAnimations().forEach(a => a.cancel());
+  deathCenter.style.left = cx + "px"; deathCenter.style.top = cy + "px";
+  deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
+  _deathFogPuff(1000, "in");
+  deathCenter.animate([
+    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(1.1)" },
+    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(2)" },
+  ], { duration: 700, easing: "ease-out", fill: "forwards" });
+}
+function demonCenterDisappear() {
+  _deathFogPuff(700, "out");
+  const a = deathCenter.animate([
+    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(2)" },
+    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(1.4)" },
+  ], { duration: 700, easing: "ease-in", fill: "forwards" });
+  a.onfinish = () => { deathCenter.style.opacity = "0"; };
+}
+
 // (dev demo klávesy R/T odstránené — Last Stand sa hrá cez tlačidlo a riadi server)
 // tvrdo schovaj stredového démona (koniec hry / nová hra / char-select — nech nevisí na ploche)
 function hideDeathCenter() {
@@ -1040,6 +1061,10 @@ function renderGrid(s, effects = []) {
       if (caster) previewSet.add(`${caster.x},${caster.y}`);
       meleeCasts.push({ from: e.from, file: ANIM_DEF.attack2.file, fps: ANIM_DEF.attack2.fps });
     }
+    // démon útok — blikajú zasahované bunky (všetky okrem kasterovej)
+    if (e?.kind === "demon_attack" && Array.isArray(e.cells)) {
+      e.cells.forEach(([x, y]) => previewSet.add(`${x},${y}`));
+    }
   }
 
   for (const sp of specials) {
@@ -1134,6 +1159,13 @@ function cellsForSpecialPreview(meState){
       if (cx>=0 && cy>=0 && cx<board.w && cy<board.h) cells.push([cx,cy]);
     });
   }
+  return cells;
+}
+// dosah démon útoku — všetky políčka okrem toho, na ktorom kaster (ghost) stojí
+function cellsForDemonPreview(p){
+  if (!p) return [];
+  const cells = [];
+  for (let y=0; y<board.h; y++) for (let x=0; x<board.w; x++) if (!(x===p.x && y===p.y)) cells.push([x,y]);
   return cells;
 }
 /* ---------- Ghost — simulácia vlastnej pozície počas naplánovaného kola ---------- */
@@ -1292,6 +1324,7 @@ function actionBadgeView(a) {
     case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
     case "last_stand":    return { cls: "golden",  html: LS_BADGE_IMG };
+    case "demon":         return { cls: "demon",   html: LS_BADGE_IMG };
     default:              return { cls: "",        text: a?.type || "" };
   }
 }
@@ -1306,6 +1339,9 @@ function attachQueueHover(el, a, idx) {
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells([[p.x, p.y]]); });
+    el.addEventListener("mouseleave", clearPreviewCells);
+  } else if (a.type === "demon") {
+    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForDemonPreview(p)); });
     el.addEventListener("mouseleave", clearPreviewCells);
   }
 }
@@ -1384,6 +1420,7 @@ function renderQueue() {
 
   updateActionButtons();
   syncGoldenHalves(); // drž zamknutie zlatých polovíc v sync s frontou (shield/mirror ↔ golden)
+  updateGoldenButton(); // drž démon tlačidlo (armed/disabled podľa fronty) v sync aj pri úprave fronty
   updateLockButton();
   sendDraft(); // priebežne posli rozpracovanú voľbu serveru (pre backstop pri vypršaní času)
 }
@@ -1716,6 +1753,13 @@ function schedulePlayTimeline(timeline) {
       }
       // Last Stand — FRAME-DRIVEN: každá fáza je efekt vo svojom frame; WAAPI trvanie = frameHold (= delayMs),
       // takže to v pozadí pauzne/dobehne rovnako ako timeline. HP sa hýbe zo snapshotov (drain/rise), nie lokálne.
+      // Démon útok (buffnutý hráč): veľký démon v strede je jediná show — postavička stojí v idle (žiadna casting póza)
+      if (e.kind === "demon_summon" && (e.from === "p1" || e.from === "p2")) {
+        demonCenterAppear();
+      }
+      if (e.kind === "demon_center_out" && (e.from === "p1" || e.from === "p2")) {
+        demonCenterDisappear();
+      }
       if (e.kind === "last_stand_summon" && (e.from === "p1" || e.from === "p2")) {
         lsCenterAppear(); // démon sa vynorí v strede
       }
@@ -1953,6 +1997,7 @@ function actionButtonsAll() {
     moveBtn, attackBtn, dashBtn,
     document.getElementById("golden-btn"),
     document.getElementById("gold-dual-btn"),
+    document.getElementById("demon-btn"),
     ...generic
   ].filter(Boolean);
 }
@@ -2046,6 +2091,28 @@ function toggleGoldDual(mode) {
 gmHalf?.addEventListener("click", () => toggleGoldDual("mana"));
 lsHalf?.addEventListener("click", () => toggleGoldDual("laststand"));
 
+// Démon útok — tlačidlo dostupné len buffnutému hráčovi v poslednom kole (namiesto zamknutého gold dual buttonu).
+// Správa sa ako bežná akcia: pridá/odoberie {type:"demon"} do/z myQueue (max 3, raz za kolo).
+const demonBtn = document.getElementById("demon-btn");
+demonBtn?.addEventListener("click", () => {
+  if (uiLocked()) return;
+  if (openPicker) { shakeBtn(demonBtn); return; }
+  if (!me || !state?.[me]?.char || !state?.[me]?.lastStandBuff) return;
+  const idx = myQueue.findIndex(a => a.type === "demon");
+  if (idx >= 0) { myQueue.splice(idx, 1); } // opätovný klik = odober z fronty
+  else {
+    if (myQueue.length >= 3) { shakeBtn(demonBtn); return; }
+    myQueue.push({ type: "demon" });
+  }
+  renderQueue();
+});
+demonBtn?.addEventListener("mouseenter", () => {
+  if (!me || !state?.[me]?.lastStandBuff) return;
+  const p = ghostPos();
+  if (p) showPreviewCells(cellsForDemonPreview(p));
+});
+demonBtn?.addEventListener("mouseleave", clearPreviewCells);
+
 function updateGoldenButton() {
   if (goldenBtn) {
     // viditeľný obom hráčom; starterovi zamknutý (zámok + neaktívny vzhľad)
@@ -2069,6 +2136,21 @@ function updateGoldenButton() {
     const cost = (state?.[me]?.manaRefills ?? 0) + 1;
     if (gmCostEl) { gmCostEl.innerHTML = `−${cost}${miniPix("❤️")}`; hydratePix(gmCostEl); }
     syncGoldDualHalves();
+  }
+  // démon útok — v poslednom (FINAL) kole pre buffnutého hráča; nahrádza inak zamknutý gold dual button
+  if (demonBtn) {
+    const buffed = !!me && !!state?.[me]?.lastStandBuff;
+    const showDemon = !!me && !!state?.[me]?.char && !!state?.goldLocked && buffed;
+    demonBtn.classList.toggle("hidden", !showDemon);
+    if (showDemon) {
+      if (goldDualBtn) goldDualBtn.classList.add("hidden"); // duálny button je aj tak zamknutý — schovaj ho
+      const used = myQueue.some(a => a.type === "demon");
+      demonBtn.classList.toggle("armed", used);
+      demonBtn.disabled = !used && myQueue.length >= 3; // plná fronta a démon nie je v nej → nedá sa pridať
+    } else {
+      demonBtn.disabled = false;
+      demonBtn.classList.remove("armed");
+    }
   }
 }
 

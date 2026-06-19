@@ -13,7 +13,12 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 
-app.use(express.static(path.join(__dirname, "public")));
+// no-store: prehliadač vždy načíta čerstvé statické súbory (žiadny tvrdý refresh po zmene client.js/index.html)
+app.use(express.static(path.join(__dirname, "public"), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => res.setHeader("Cache-Control", "no-store"),
+}));
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
@@ -40,6 +45,10 @@ const GOLDEN_COST = 3; // extra akcia hráča, ktorý je v kole druhý — ští
 const GOLDEN_MIRROR_COST = 5; // ten istý predťah, ale mirror (odraz) namiesto štítu — zlaté vizuály
 const DASH_COST   = 4; // presun až o 2 políčka jedným smerom
 const GOLDEN_MANA_GAIN = 6; // golden mana refill: +6 many za HP; cena v HP rastie s každým použitím (1, 2, 3…)
+
+// Démon útok — dostupný LEN buffnutému hráčovi v poslednom (Last Stand) kole; zaberá jeden z 3 akčných slotov
+const DEMON_COST = 10; // celá mana
+const DEMON_DMG  = 10; // zasiahne každé políčko OKREM toho, na ktorom kaster stojí (vyhodnotí sa cez shield/mirror)
 
 const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash"]);
 const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
@@ -259,7 +268,9 @@ function validQueue(queue, slot) {
   }
   if (q.length !== 3) return false;
   const types = q.map(a => a && a.type);
-  if (types.some(t => !ACTION_TYPES.has(t))) return false;
+  // démon útok je platný typ len pre buffnutého hráča (posledné kolo) a je bez smeru
+  const canDemon = !!game.players[slot]?.lastStandBuff;
+  if (types.some(t => !ACTION_TYPES.has(t) && !(t === "demon" && canDemon))) return false;
   if (new Set(types).size !== 3) return false;
   // golden shield/mirror sa vzájomne vylučuje s príslušnou bežnou akciou — nemôžeš ju zahrať 2× za kolo
   if (goldenPre === "golden_shield" && types.includes("shield")) return false;
@@ -456,6 +467,41 @@ function doSpecial(slot, tl) {
   }
 }
 
+// Démon útok (len buffnutý hráč v poslednom kole): veľký démon v strede sa animuje ako special,
+// blikajú cieľové bunky (všetky okrem kasterovej) a potom dá 10 dmg súperovi, ak na niektorej stojí.
+function doDemon(slot, tl) {
+  const me  = game.players[slot];
+  const opS = other(slot);
+  const op  = game.players[opS];
+
+  if (me.mana < DEMON_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  me.mana -= DEMON_COST;
+
+  // dosah = všetky políčka okrem toho, na ktorom kaster stojí (jediná „bezpečná" bunka pre súpera)
+  const cells = [];
+  for (let y = 0; y < game.board.h; y++)
+    for (let x = 0; x < game.board.w; x++)
+      if (!(x === me.x && y === me.y)) cells.push([x, y]);
+
+  // démon sa vynorí veľký v strede + bliká cieľové bunky v rovnakej kadencii ako special (ultimatka)
+  pushStateFrame(tl, [{ kind: "demon_summon", from: slot }], LS_APPEAR_MS);
+  for (let r = 0; r < SPECIAL_REPEAT; r++) {
+    pushStateFrame(tl, [{ kind: "demon_attack", from: slot, cells }], SPECIAL_BEAT_MS);
+  }
+
+  // zásah: súper dostane dmg, ak NESTOJÍ na kasterovej bunke; cez shield/mirror (applyHit) — bez 2× buffu (10 = istá smrť)
+  const inRange = op && !(op.x === me.x && op.y === me.y);
+  // ak súper odrazí (mirror), démon nech najprv zmizne zo stredu a až POTOM letí odrazený lúč späť do kastera
+  const reflects = inRange && op.mirror && !op.shield;
+  if (reflects) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS);
+  if (inRange) {
+    applyHit(opS, DEMON_DMG, tl, "demon");
+  } else {
+    pushStateFrame(tl, [], SMALL_DELAY_MS);
+  }
+  if (!reflects) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS); // inak démon zmizne až po zásahu
+}
+
 function doAction(slot, action, tl) {
   if (!action) return;
   switch (action.type) {
@@ -467,6 +513,7 @@ function doAction(slot, action, tl) {
     case "special":  return doSpecial(slot, tl);
     case "shield":   return doShield(slot, tl);
     case "mirror":   return doMirror(slot, tl);
+    case "demon":    return doDemon(slot, tl);
     default: break;
   }
 }
@@ -599,20 +646,22 @@ function clearTurnTimer() {
   io.emit("turn_timer", { ms: null });
 }
 
-// platná základná akcia? (move/attack/dash potrebujú smer)
-function validBasicAction(a, used) {
-  if (!a || !ACTION_TYPES.has(a.type) || used.has(a.type)) return false;
+// platná základná akcia? (move/attack/dash potrebujú smer); allowDemon = buffnutý hráč smie navoliť aj démon útok
+function validBasicAction(a, used, allowDemon = false) {
+  if (!a) return false;
+  const known = ACTION_TYPES.has(a.type) || (allowDemon && a.type === "demon");
+  if (!known || used.has(a.type)) return false;
   if ((a.type === "move" || a.type === "attack" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
   return true;
 }
 // hráč, ktorý sa nestihol locknúť: zachová svoju rozpracovanú frontu (draft) a chýbajúce do 3 doplní náhodne
 // exclude = typy, ktoré už pokrýva golden predťah (shield pri golden_shield, mirror pri golden_mirror) —
 // nesmú sa pridať ani z draftu, ani z náhodného doplnenia (inak by sa akcia zahrala 2× za kolo)
-function fillFromDraft(draftQueue, exclude = new Set()) {
+function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false) {
   const q = [], used = new Set(exclude);
   for (const a of (Array.isArray(draftQueue) ? draftQueue : [])) {
     if (q.length >= 3) break;
-    if (!validBasicAction(a, used)) continue;
+    if (!validBasicAction(a, used, allowDemon)) continue;
     q.push({ type: a.type, dir: a.dir || null });
     used.add(a.type);
   }
@@ -662,7 +711,7 @@ function onTurnTimeout() {
     const exclude = new Set();
     if (p.golden) exclude.add("shield");
     if (p.goldenMirror) exclude.add("mirror");
-    p.queue = fillFromDraft(p.draft?.queue, exclude);
+    p.queue = fillFromDraft(p.draft?.queue, exclude, !!p.lastStandBuff);
     p.locked = true;
   }
   if (game.players.p1.locked && game.players.p2.locked) resolveTurn();
@@ -1021,9 +1070,10 @@ io.on("connection", (socket) => {
     if (me.locked) return;
     const inQ = Array.isArray(d?.queue) ? d.queue : [];
     const out = [], used = new Set();
+    const allowDemon = !!me.lastStandBuff;
     for (const a of inQ) {
       if (out.length >= 3) break;
-      if (!validBasicAction(a, used)) continue;
+      if (!validBasicAction(a, used, allowDemon)) continue;
       out.push({ type: a.type, dir: a.dir || null });
       used.add(a.type);
     }

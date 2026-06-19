@@ -133,6 +133,7 @@ const GMI = { type: "golden_mirror" };
 const GM = { type: "golden_mana" };
 const LS = { type: "last_stand" };
 const SP = { type: "special" };
+const DEMON = { type: "demon" };
 
 async function main() {
   const server = await startServer();
@@ -502,6 +503,41 @@ async function main() {
   check(s21?.p2?.lastStandBuff === true && !s21?.p1?.lastStandBuff, "T21: buff má p2, p1 nie",
     `p1=${s21?.p1?.lastStandBuff} p2=${s21?.p2?.lastStandBuff}`);
   check(s21?.p1?.hp === 10, "T21: p1 HP nezmenené (žiadna golden mana cena)", `hp=${s21?.p1?.hp}`);
+
+  /* ---------- Test 24: démon útok — buffnutý hráč v poslednom kole zabije súpera (10 dmg mimo svojej bunky) ---------- */
+  await freshGameLS();
+  await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]); // kolo 1: p1 summon → buff, 10/10
+  c1.gameResult = null;
+  // kolo 2 (buffnuté, final): p1 vyvolá démon útok ako jednu z 3 akcií; p2 (na inej bunke) dostane 10 dmg
+  const tlDemon = await playRound(c1, c2, [DEMON, R, S], [R, S, M("down")]);
+  const demonSummon = tlDemon.flatMap(f => f.effects || []).filter(e => e.kind === "demon_summon" && e.from === "p1");
+  const demonAtk = tlDemon.flatMap(f => f.effects || []).filter(e => e.kind === "demon_attack" && e.from === "p1");
+  const demonHit = sumEffects(tlDemon).hits.find(h => h.target === "p2" && h.dmg === 10);
+  check(demonSummon.length === 1, "T24: demon_summon efekt v timeline", `fx=${demonSummon.length}`);
+  check(demonAtk.length >= 1 && Array.isArray(demonAtk[0].cells), "T24: demon_attack nesie zoznam buniek", `fx=${JSON.stringify(demonAtk[0]?.cells)}`);
+  check(!!demonHit, "T24: démon dal súperovi 10 dmg", `hits=${JSON.stringify(sumEffects(tlDemon).hits)}`);
+  check(tlDemon[tlDemon.length - 1].p2.hp === 0, "T24: p2 mŕtvy po démon útoku", `hp=${tlDemon[tlDemon.length - 1].p2.hp}`);
+  check(c1.gameResult?.gameWinner === "p1", "T24: démon útok = výhra buffnutého hráča", `gr=${JSON.stringify(c1.gameResult)}`);
+
+  /* ---------- Test 25: démon útok smie navoliť LEN buffnutý hráč (bežné kolo → lock odmietnutý) ---------- */
+  await freshGame(c1, c2);
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [DEMON, R, S]); // p1 nie je buffnutý → neplatné
+  c2.sock.emit("lock_in", [R, S, M("down")]);
+  let demonRejected = false;
+  try { await waitTimeline(c1, 1500); } catch { demonRejected = true; }
+  check(demonRejected, "T25: démon útok bez Last Stand buffu je odmietnutý");
+
+  /* ---------- Test 26: mirror na démon útok — démon zmizne (demon_center_out) PRED mirror animáciou ---------- */
+  await freshGameLS();
+  await playRound(c1, c2, [R, S, M("up"), LS], [R, S, M("up")]); // kolo 1: p1 summon
+  // kolo 2 (final, starter p2): p2 mirror sa vyhodnotí pred p1 démonom → odraz; démon má zmiznúť pred lúčom
+  const tlMir = await playRound(c1, c2, [DEMON, R, S], [MI, R, S]);
+  const flatMir = tlMir.flatMap(f => (f.effects || []).map(e => e.kind));
+  const idxOut = flatMir.indexOf("demon_center_out");
+  const idxMir = flatMir.indexOf("mirror");
+  check(idxOut !== -1 && idxMir !== -1 && idxOut < idxMir,
+    "T26: démon zmizne (demon_center_out) pred mirror odrazom", `out=${idxOut} mirror=${idxMir}`);
 
   /* ---------- Test 22: časovač po Last Stand summone = dur(timeline) + čas na ťah (dlhá animácia nezje čas) ---------- */
   c1.sock.emit("retry");
