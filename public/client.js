@@ -435,21 +435,34 @@ function actorFilter(slot, now) {
   return (alt + glow).trim();
 }
 
-// „Goku" nabíjacia aura pri recharge — naviazaná na postavu (offset pri zdieľanom políčku)
-function spawnChargeAura(slot, gold = false, red = false) {
+// umiestni nabíjaciu auru na postavu podľa jej AKTUÁLNEJ (interpolovanej) pozície sprite-u,
+// aby aura plynulo kĺzala s postavou počas pohybu (nie teleport na cieľové políčko)
+function placeChargeAura(cont, slot) {
   const p = state?.[slot];
-  if (!p) return;
+  if (!p || !p.char) return;
   const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
   const shift = same ? (slot === "p1" ? -22 : 22) : 0;
   // postava nie je v strede bunky — rovnaký horizontálny offset tela ako „YOU" vlajka (HEAD_CX + flip)
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
-  const { left, top } = cellToPx(p.x, p.y);
+  const actorEl = slot === "p1" ? actorP1 : actorP2;
+  const aLeft = parseFloat(getComputedStyle(actorEl).left) || 0; // interpolovaná hodnota počas CSS transition
+  const aTop  = parseFloat(getComputedStyle(actorEl).top)  || 0;
+  const cellLeft = aLeft + (ACTOR_W - TILE_W) / 2;
+  const cellTop  = aTop + (ACTOR_H - TILE_H);
+  cont.style.left = (cellLeft + TILE_W / 2 + shift + headDx) + "px";
+  cont.style.top  = (cellTop + TILE_H) + "px"; // päta postavy = spodok bunky
+}
+
+// „Goku" nabíjacia aura pri recharge — naviazaná na postavu (sleduje ju per-frame v rafe)
+function spawnChargeAura(slot, gold = false, red = false) {
+  const p = state?.[slot];
+  if (!p) return;
   const cont = document.createElement("div");
   // golden mana = rovnaká aura, len zlatá; Last Hope ultra mód = červená
   cont.className = red ? "charge-aura red" : gold ? "charge-aura gold" : "charge-aura";
-  cont.style.left = (left + TILE_W / 2 + shift + headDx) + "px";
-  cont.style.top  = (top + TILE_H) + "px"; // päta postavy = spodok bunky
+  cont.dataset.slot = slot;            // raf podľa toho auru drží na interpolovanej pozícii postavy
+  placeChargeAura(cont, slot);
   cont.innerHTML = '<span class="ca-core"></span><span class="ca-ring"></span>';
   for (let i = 0; i < 18; i++) {
     const s = document.createElement("span");
@@ -1871,10 +1884,11 @@ function schedulePlayTimeline(timeline) {
       // Last Hope: červená „hope" postava v strede → HP→1, mana→10 (HUD zo snapshotov) → zmizne, červený ultra mód ostáva
       if (e.kind === "last_hope_summon" && (e.from === "p1" || e.from === "p2")) {
         hopeCenterAppear();
+        spawnChargeAura(e.from, false, true); // červená aura hneď (HUD je už v červenom móde z lastHopeBuff)
       }
       if (e.kind === "last_hope_settle" && (e.from === "p1" || e.from === "p2")) {
         hopeCenterDisappear();
-        spawnChargeAura(e.from, false, true); // červený nábeh ultra módu
+        spawnChargeAura(e.from, false, true); // ďalší červený záblesk
       }
       if (e.kind === "last_stand_summon" && (e.from === "p1" || e.from === "p2")) {
         lsCenterAppear(); // démon sa vynorí v strede
@@ -2812,6 +2826,9 @@ function raf() {
       .catch(()=>{});
   });
 
+  // nabíjacie aury (golden Last Stand / červená Last Hope / bežný recharge) plynulo sledujú postavu počas pohybu
+  document.querySelectorAll(".charge-aura[data-slot]").forEach(cont => placeChargeAura(cont, cont.dataset.slot));
+
   // Last Stand — trvalý golden stav riadený serverom (state[slot].lastStandBuff):
   // žiara postavy (actorFilter) + zlatý HUD + recharge aura + priehľadný démon za postavou
   {
@@ -2862,16 +2879,16 @@ function raf() {
   // Last Hope — trvalý červený ultra mód (state[slot].lastHopeBuff): pulzujúci červený mana bar + periodická červená aura
   {
     const hopeSlot = state?.p1?.lastHopeBuff ? "p1" : state?.p2?.lastHopeBuff ? "p2" : null;
-    hudBoxP1.classList.toggle("mana-ultra", hopeSlot === "p1");
-    hudBoxP2.classList.toggle("mana-ultra", hopeSlot === "p2");
+    hudBoxP1.classList.toggle("hope-red", hopeSlot === "p1");
+    hudBoxP2.classList.toggle("hope-red", hopeSlot === "p2");
     if (hopeSlot) {
       _lhRealActive = true;
       const tgt = state[hopeSlot];
       if (tgt && tgt.char && !tgt.down && now - _lhAuraAt > 950) { spawnChargeAura(hopeSlot, false, true); _lhAuraAt = now; }
     } else if (_lhRealActive) {
       _lhRealActive = false;
-      hudBoxP1.classList.remove("mana-ultra");
-      hudBoxP2.classList.remove("mana-ultra");
+      hudBoxP1.classList.remove("hope-red");
+      hudBoxP2.classList.remove("hope-red");
       hideHopeCenter();
     }
   }

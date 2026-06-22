@@ -1317,22 +1317,28 @@ body {
     50%    { box-shadow: 0 0 0 2px #000, 0 0 16px 2px rgba(255,210,74,.95); }
   }
 
-  /* Last Hope ultra mód — len MANA: červená výplň + pulz baru + červené číslo a kvapka (analógia k zlatému Last Stand) */
-  .hud-box.mana-ultra .mana-bar .fill{
+  /* Last Hope ultra mód — celý widget hráča červený a pulzujúci (HP aj mana), analógia k zlatému Last Stand */
+  .hud-box.hope-red{
+    box-shadow: 0 0 0 2px #000, 0 0 24px 5px rgba(255,70,70,.8); /* statická červená žiara celého widgetu */
+  }
+  .hud-box.hope-red .hp-bar .fill,
+  .hud-box.hope-red .mana-bar .fill{
     background: linear-gradient(90deg,
       #ffd0d0 0 4px, #ff4d4d 4px calc(100% - 4px), #a30000 calc(100% - 4px) 100%) !important;
   }
-  .hud-box.mana-ultra .mana-bar{ animation: mana-ultra-pulse .7s ease-in-out infinite; }
-  /* červené mana číslo (prebije aj .me override) */
-  .hud-box.mana-ultra .bar-num.mana-num{
+  /* pulzujú HP aj mana bar */
+  .hud-box.hope-red .bar{ animation: hope-bar-pulse .7s ease-in-out infinite; }
+  /* červené HP aj mana číslo (prebije aj .me override) */
+  .hud-box.hope-red .bar-num.hp-num,
+  .hud-box.hope-red .bar-num.mana-num{
     color: #ff6b6b !important;
     text-shadow: 0 2px 0 rgba(0,0,0,.8), 0 0 8px rgba(255,80,80,.95);
   }
-  /* červená mana kvapka */
-  .hud-box.mana-ultra .bar-label .ico[data-pix="drop"]{
+  /* červené ikony HP (srdce) aj many (kvapka) */
+  .hud-box.hope-red .bar-label .pix-ico{
     filter: sepia(1) saturate(8) hue-rotate(-38deg) brightness(1.05) drop-shadow(0 0 4px rgba(255,80,80,.9));
   }
-  @keyframes mana-ultra-pulse{
+  @keyframes hope-bar-pulse{
     0%,100%{ box-shadow: 0 0 0 2px #000, 0 0 4px rgba(255,70,70,.5); }
     50%    { box-shadow: 0 0 0 2px #000, 0 0 16px 2px rgba(255,70,70,.95); }
   }
