@@ -55,13 +55,15 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 
 /* -------------------- Match / lobby config -------------------- */
 // koľko vyhratých hier treba na zisk série
-const MATCH_FORMATS = { single: 1, bo3: 2, bo5: 3 };
+// tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
+const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
+const TOURNAMENT_MAGES = ["fire", "lightning", "wanderer"];
 // časový limit na ťah — vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
 const TIMER_OPTIONS = new Set(["off", "10", "30", "60", "quickdraw"]);
 
 // predvolené nastavenia (predvyplnia lobby na klientovi)
 const DEFAULT_CONFIG = {
-  format: "single",                              // "single" | "bo3" | "bo5"
+  format: "single",                              // "single" | "bo3" | "tournament"
   tilesPerRound: 1,                              // 1 | 2 | 3 — koľko tiles sa spawne na konci kola
   tileWeights: { dmg: 75, heal: 12, mana: 8, ik: 5 }, // % šanca typu, spolu 100
   timer: "30",                                   // "off" | "10" | "30" | "60" | "quickdraw"
@@ -150,6 +152,8 @@ function newGame() {
     seats: { p1: "A", p2: "B" }, // ktorá osoba sedí v ktorom slote v aktuálnej hre
     seriesWins: { A: 0, B: 0 },
     series: { gameIndex: 1, needed: 1, firstStarter: "A", format: "single" },
+    // tournament: HP každého z 3 magov per osoba sa prenáša medzi hrami (null mimo tournamentu)
+    mageHp: null,
   };
 }
 newGame();
@@ -181,6 +185,8 @@ function emitYouAre() {
 // (inak rozmýšľajúci hráč vidí súperov pick a má výhodu). Po výbere oboch je stav už odhalený.
 function snapshotFor(person) {
   const base = snapshot();
+  // tournament: pridaj LEN vlastnú trojicu HP magov (súperove HP hráč nevidí)
+  base.mageHp = game.mageHp ? { ...game.mageHp[person] } : null;
   const mySlot = slotForPerson(person);
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   if (!game.players[mySlot]?.char && base[oppSlot]?.char) {
@@ -188,11 +194,14 @@ function snapshotFor(person) {
   }
   return base;
 }
-// pošli stav obom osobám, každej s vlastným maskovaním súperovej postavy (počas char-selectu)
+// pošli stav obom osobám, každej s vlastným maskovaním súperovej postavy + vlastnou trojicou HP magov
+// (počas char-selectu); divákom (ostatné sockety) pošli neutrálny snapshot bez mageHp
 function emitStateMasked() {
-  for (const person of ["A", "B"]) {
-    const sock = personSockets[person];
-    if (sock) sock.emit("state", snapshotFor(person));
+  const plain = snapshot();
+  for (const [, sock] of io.sockets.sockets) {
+    if (sock === personSockets.A) sock.emit("state", snapshotFor("A"));
+    else if (sock === personSockets.B) sock.emit("state", snapshotFor("B"));
+    else sock.emit("state", plain);
   }
 }
 
@@ -963,6 +972,15 @@ function resolveTurn() {
 function handleGameEnd(timelineDurationMs) {
   clearTurnTimer();
   const w = winnerNow(); // "p1" | "p2" | "draw"
+  // tournament: ulož aktuálne HP oboch nasadených magov (porazeného mág padne na 0 = trvalo mŕtvy)
+  if (game.mageHp) {
+    for (const slot of ["p1", "p2"]) {
+      const p = game.players[slot];
+      if (p?.char && game.mageHp[game.seats[slot]]) {
+        game.mageHp[game.seats[slot]][p.char] = Math.max(0, p.hp);
+      }
+    }
+  }
   let winnerPerson = null;
   if (w === "p1" || w === "p2") {
     winnerPerson = game.seats[w];
@@ -995,7 +1013,17 @@ function startMatch(config) {
     format: config.format,
   };
   game.seriesWins = { A: 0, B: 0 };
+  // tournament: každý hráč má 3 magov, ich HP sa prenáša medzi hrami (štart na plno)
+  game.mageHp = config.format === "tournament"
+    ? { A: fullMageHp(), B: fullMageHp() }
+    : null;
   startGame(1);
+}
+
+function fullMageHp() {
+  const m = {};
+  for (const k of TOURNAMENT_MAGES) m[k] = START_HP;
+  return m;
 }
 
 // pripraví novú hru v sérii: prehodí štartéra na ľavú stranu (slot p1), resetne hráčov,
@@ -1017,7 +1045,7 @@ function startGame(gameIndex) {
   game.phase = "playing";
 
   emitYouAre();
-  io.emit("state", snapshot());
+  emitStateMasked(); // char-select potrebuje per-osoba mageHp (tournament)
 }
 
 // očisti a zvaliduj nastavenia z lobby; pri nezmysle vráti null
@@ -1073,6 +1101,12 @@ io.on("connection", (socket) => {
     const slot = slotForPerson(person);
     const me = game.players[slot];
     if (me.char) return;                          // postava sa pre danú hru volí raz
+    // tournament: mŕtveho maga (HP 0) sa nedá zvoliť; HP sa prenáša z predošlej hry
+    if (game.mageHp) {
+      const hp = game.mageHp[person]?.[key] ?? 0;
+      if (hp <= 0) return;
+      me.hp = hp;
+    }
     me.char = key;
     // obaja vybrali -> začína 1. kolo, naštartuj časovač pred emitom (snapshot nesie timerMs pre refresh-sync)
     if (game.players.p1.char && game.players.p2.char) beginPlanningTimer(0);

@@ -258,6 +258,8 @@ let _finalRoundActive = false;    // „FINAL ROUND" sa zobrazí hore až keď p
 
 // preview loop
 let charPreviewRaf = 0;
+// tournament: HP magov vlastnej trojice ({fire,lightning,wanderer}) pre char-select; null mimo tournamentu
+let charSelectHp = null;
 
 // od kedy je postava v HUD widgete mŕtva — Dead anim sa prehrá raz od tohto času
 let hudDeadSince = { p1: 0, p2: 0 };
@@ -916,6 +918,17 @@ const PIX = {
     ".oooooo.",
     "........",
     "........",
+  ]},
+  // tournament — ešte neprehraná hra: len tlmený obrys lebky
+  skull_outline: { pal: { o: "#5a5a5a" }, rows: [
+    "..oooo..",
+    ".o....o.",
+    ".o.oo.o.",
+    ".o.oo.o.",
+    ".o....o.",
+    "..oooo..",
+    "..o..o..",
+    "..o..o..",
   ]},
 };
 function pixSvg(name) {
@@ -1988,6 +2001,32 @@ function clearActors() {
 }
 
 /* ---------- Char select (preview) ---------- */
+// tournament: zobraz HP každého maga vlastnej trojice + označ mŕtvych (karta dead + neklikateľná)
+function updateCharSelectHp(s) {
+  charSelectHp = (s && s.mageHp) ? s.mageHp : null;
+  selEl.querySelectorAll(".char-card").forEach((card) => {
+    const key = card.dataset.char;
+    const hpEl = card.querySelector(".char-hp");
+    if (!charSelectHp) { // single / bo3 — žiadne HP, žiadny dead stav
+      card.classList.remove("dead");
+      if (hpEl) hpEl.classList.add("hidden");
+      return;
+    }
+    const hp = charSelectHp[key] ?? 0;
+    const dead = hp <= 0;
+    card.classList.toggle("dead", dead);
+    if (hpEl) {
+      // mŕtvy mág: žiadne HP (len démon + dead póza); živý: červené číslo + srdiečko
+      hpEl.classList.toggle("hidden", dead);
+      if (!dead) hpEl.innerHTML = `<span>${hp}</span>${pixSvg("heart")}`;
+    }
+  });
+}
+
+function isMageDead(key) {
+  return !!charSelectHp && (charSelectHp[key] ?? 0) <= 0;
+}
+
 function drawCharSelectFrame(now) {
   const canvases = selEl.querySelectorAll("canvas.char-canvas");
   canvases.forEach((cvs) => {
@@ -1995,6 +2034,23 @@ function drawCharSelectFrame(now) {
     const dir = CHAR_META[key]?.dir;
     if (!dir) return;
     const ctx = cvs.getContext("2d");
+    // mŕtvy mág (tournament): dead póza mága + death démon prekrytý cez okno karty
+    if (isMageDead(key)) {
+      ensureSpriteMeta(dir, ANIM_DEF.dead.file)
+        .then(meta => {
+          drawSprite(ctx, meta, ANIM_DEF.dead, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52);
+          return ensureSpriteMeta(DEATH_DIR, DEATH_ANIM.file);
+        })
+        .then(meta => {
+          if (!meta) return;
+          ctx.save();
+          ctx.globalAlpha = 0.5; // semi-transparentný démon — dead póza mága ostáva dobre vidno pod ním
+          drawSprite(ctx, meta, DEATH_ANIM, now, cvs.width, cvs.height, 1.15, 0.5, false, 0, 0);
+          ctx.restore();
+        })
+        .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
+      return;
+    }
     // mág, ktorého abilitku pozeráme: cyklicky prehráva animáciu SPECIÁLU (efektový sprite, rovnako ako v hre),
     // v rovnakej veľkosti ako idle (centrovaný, nie zoomnutý)
     const fx = (key === abilityHoverChar) && SPECIAL_ANIMS[key];
@@ -2038,6 +2094,7 @@ selEl.addEventListener("click", (e) => {
   const card = e.target.closest(".char-card");
   if (!card) return;
   const key = card.dataset.char;
+  if (isMageDead(key)) return; // mŕtveho maga (tournament) sa nedá zvoliť
   chosenChar = key;
   socket.emit("choose_character", key);
 });
@@ -2090,7 +2147,10 @@ function clearAbilityPreview() {
   charAbilityEl?.classList.add("hidden");
 }
 selEl.querySelectorAll(".char-card").forEach(card => {
-  card.addEventListener("mouseenter", () => renderAbilityPreview(card.dataset.char));
+  card.addEventListener("mouseenter", () => {
+    if (isMageDead(card.dataset.char)) return; // mŕtvy mág nemá náhľad špeciálu
+    renderAbilityPreview(card.dataset.char);
+  });
 });
 selEl.querySelector(".char-cards")?.addEventListener("mouseleave", clearAbilityPreview);
 
@@ -2394,13 +2454,16 @@ function applyPhaseUI(s) {
 
   // char-select len v hernej fáze, kým nemám zvolenú postavu
   const needChar = phase === "playing" && !isSpectator && me && !s?.[me]?.char;
-  if (needChar) { hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); } // démon nesmie visieť cez výber
-  else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
+  if (needChar) {
+    updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom)
+    hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber
+  } else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
 
   if (controls && !isSpectator) controls.style.display = (phase === "playing") ? "" : "none";
 }
 
-// séria (BO3/BO5): v HUD boxe každého hráča rad placeholderov, ktoré sa po vyhratej hre menia na koruny
+// séria: v HUD boxe každého hráča rad placeholderov — BO3 = koruny za výhry,
+// tournament = lebky za PREHRY (lebku dostáva porazený = počet výhier súpera)
 function renderSeriesCrowns(ser) {
   const single = !ser || !ser.format || ser.format === "single";
   if (single) {
@@ -2409,12 +2472,17 @@ function renderSeriesCrowns(ser) {
     return;
   }
   const needed = ser.needed || 1;
-  // nezískaná hra -> obrys koruny; získaná -> plná pixel-art koruna
-  const build = (won) => Array.from({ length: needed },
-    (_, i) => `<span class="crown${i < won ? " won" : ""}">${pixSvg(i < won ? "crown" : "crown_outline")}</span>`).join("");
-  // koruny sú viazané na slot (ľavá/pravá strana); osoba si svoje výhry nesie na svoju aktuálnu stranu
-  crownsP1El.innerHTML = build(ser.winsP1 || 0);
-  crownsP2El.innerHTML = build(ser.winsP2 || 0);
+  const tournament = ser.format === "tournament";
+  const onIcon  = tournament ? "skull" : "crown";
+  const offIcon = tournament ? "skull_outline" : "crown_outline";
+  // neobsadený slot -> obrys; obsadený -> plná pixel-art ikona
+  const build = (filled) => Array.from({ length: needed },
+    (_, i) => `<span class="crown${tournament ? " skull" : ""}${i < filled ? " won" : ""}">${pixSvg(i < filled ? onIcon : offIcon)}</span>`).join("");
+  // koruny = výhry daného slotu; lebky = prehry daného slotu (= výhry súpera)
+  const fillP1 = tournament ? (ser.winsP2 || 0) : (ser.winsP1 || 0);
+  const fillP2 = tournament ? (ser.winsP1 || 0) : (ser.winsP2 || 0);
+  crownsP1El.innerHTML = build(fillP1);
+  crownsP2El.innerHTML = build(fillP2);
   crownsP1El.classList.remove("hidden"); crownsP2El.classList.remove("hidden");
 }
 function updateMatchScore(s) {
@@ -2545,14 +2613,22 @@ function showIntermission(gameWinner, series) {
     gameWinner === "draw" ? "TIE" : (mineWon ? "YOU WON THIS GAME!" : "YOU LOST THIS GAME");
 
   const needed = series?.needed || 1;
-  // placeholdery + koruny pre obe strany; práve získaná koruna (posledná na víťaznej strane) sa animuje
-  const renderSide = (won, isWinnerSide) => Array.from({ length: needed }, (_, i) => {
-    const isWon = i < (won || 0);
-    const isNew = isWinnerSide && i === (won || 0) - 1;
-    return `<span class="crown${isNew ? " new" : ""}">${pixSvg(isWon ? "crown" : "crown_outline")}</span>`;
+  const tournament = series?.format === "tournament";
+  const onIcon  = tournament ? "skull" : "crown";
+  const offIcon = tournament ? "skull_outline" : "crown_outline";
+  // placeholdery + ikony pre obe strany; práve pridaná (koruna víťazovi / lebka porazenému) sa animuje
+  const renderSide = (filled, isMarkSide) => Array.from({ length: needed }, (_, i) => {
+    const isOn = i < (filled || 0);
+    const isNew = isMarkSide && i === (filled || 0) - 1;
+    return `<span class="crown${tournament ? " skull" : ""}${isNew ? " new" : ""}">${pixSvg(isOn ? onIcon : offIcon)}</span>`;
   }).join("");
-  document.getElementById("im-crowns-l").innerHTML = renderSide(series?.winsP1, gameWinner === "p1");
-  document.getElementById("im-crowns-r").innerHTML = renderSide(series?.winsP2, gameWinner === "p2");
+  // BO3: koruna výhercovi; tournament: lebka porazenému (= výhra súpera na jeho strane skóre)
+  const fillL = tournament ? series?.winsP2 : series?.winsP1;
+  const fillR = tournament ? series?.winsP1 : series?.winsP2;
+  const markL = tournament ? (gameWinner === "p2") : (gameWinner === "p1");
+  const markR = tournament ? (gameWinner === "p1") : (gameWinner === "p2");
+  document.getElementById("im-crowns-l").innerHTML = renderSide(fillL, markL);
+  document.getElementById("im-crowns-r").innerHTML = renderSide(fillR, markR);
 
   // popisky strán — kde som ja (slot pred swapom), drží strany ako koruny v HUD
   const whoL = document.getElementById("im-who-l");
