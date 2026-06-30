@@ -1,5 +1,15 @@
 // public/client.js
-const socket = io();
+// trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
+// (inak by sa vrátený hráč stal divákom a server by prestal brať jeho lock_in)
+let arenaId = null;
+try {
+  arenaId = localStorage.getItem("arenaId");
+  if (!arenaId) {
+    arenaId = (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(16).slice(2));
+    localStorage.setItem("arenaId", arenaId);
+  }
+} catch { arenaId = null; } // localStorage zakázaný (napr. privátny režim) → bez reclaimu, len bežné pripojenie
+const socket = io({ auth: { id: arenaId } });
 
 const gridEl   = document.getElementById("grid");
 const actorsEl = document.getElementById("actors");
@@ -2409,6 +2419,21 @@ undoBtn.addEventListener("click", () => {
   myQueue.pop();
   renderQueue();
 });
+// pošli lock_in spoľahlivo: čakaj na ack od servera a pri strate packetu (timeout) zopakuj.
+// rieši „dal som LOCKED, ale súper/server ťah nezaznamenal" pri blikajúcej sieti.
+function emitLockIn(payload) {
+  let tries = 0;
+  const MAX_TRIES = 5;
+  const forTurn = state?.turn; // kolo, pre ktoré táto voľba platí — server zahodí zopakovanie, ak sa už posunulo
+  const send = () => {
+    tries++;
+    socket.timeout(1500).emit("lock_in", payload, forTurn, (err) => {
+      // err = timeout (žiadny ack) → packet sa zrejme stratil; skús znova, kým sme stále v locknutom kole
+      if (err && tries < MAX_TRIES && lockedIn && !playing) send();
+    });
+  };
+  send();
+}
 lockBtn.addEventListener("click", () => {
   if (playing) return; // počas prehrávania kola nelockuj
   if (uiLocked()) return;
@@ -2423,8 +2448,8 @@ lockBtn.addEventListener("click", () => {
   if (lastHopeArmed) payload.unshift({ type: "last_hope" }); // úplne prvý, ešte pred golden shield/mirror
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
   else if (lastStandArmed) payload.push({ type: "last_stand" });
-  socket.emit("lock_in", payload);
   lockedIn = true; // všetky tlačidlá idú do locked stavu až do konca kola
+  emitLockIn(payload); // (až po nastavení lockedIn — helper podľa neho rozhoduje o opakovaní)
   closePickers();
   lockBtn.classList.add("locked");
   lockBtn.classList.remove("ready");
@@ -2552,8 +2577,8 @@ function autoLockTimeout() {
   if (lastHopeArmed) payload.unshift({ type: "last_hope" }); // úplne prvý (gold akcie sa nedopĺňajú, navolený Last Hope sa zachová)
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
   else if (lastStandArmed) payload.push({ type: "last_stand" });
-  socket.emit("lock_in", payload);
   lockedIn = true;
+  emitLockIn(payload); // spoľahlivé poslanie aj pri auto-locku z časovača
   closePickers();
   renderQueue();
   lockBtn.classList.add("locked"); lockBtn.classList.remove("ready");
@@ -2722,6 +2747,9 @@ socket.on("state", (s) => {
     // finálny stav (vrátane nových tiles) nevykresľuj hneď — ukáže ho až posledný frame timeline
     schedulePlayTimeline(s.timeline);
   } else if (!playing) {
+    // čerstvý stav mimo prehrávania → stredový démon nemá čo visieť (objaví sa len počas timeline);
+    // toto ho po reconnecte/refreshi spoľahlivo schová bez nutnosti F5
+    hideDeathCenter();
     renderGrid(s);
     renderHUD();
     positionActors(s, true);

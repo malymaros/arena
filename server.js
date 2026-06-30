@@ -11,7 +11,11 @@ const __dirname  = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer);
+const io = new Server(httpServer, {
+  // preži krátke výpadky spojenia: po reconnecte server prehrá klientovi zmeškané packety
+  // (vrátane state+timeline) → animácie nevisia a netreba refresh ani pri blikajúcej sieti
+  connectionStateRecovery: { maxDisconnectionDuration: 2 * 60 * 1000, skipMiddlewares: true },
+});
 
 // no-store: prehliadač vždy načíta čerstvé statické súbory (žiadny tvrdý refresh po zmene client.js/index.html)
 app.use(express.static(path.join(__dirname, "public"), {
@@ -103,6 +107,11 @@ const LH_SETTLE_MS = 900;  // postava zmizne, červený ultra mód zostáva
 // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
 // ktorá sa medzi hrami série prehadzuje (štartér danej hry vždy sedí v p1 = vľavo)
 let personSockets = { A: null, B: null };
+// trvalá identita hráča: token z klientovho localStorage → po reconnecte mu vrátime jeho slot
+// (rieši „spadol mu socket, vrátil sa ako divák a server prestal brať jeho lock_in")
+let personIds = { A: null, B: null };       // token klienta priradený osobe A/B
+let personFreedAt = { A: 0, B: 0 };         // kedy sa slot uvoľnil (grace, počas ktorej ho cudzí klient neobsadí)
+const RECLAIM_GRACE_MS = 60 * 1000;         // koľko sekúnd drží slot pre pôvodného hráča po výpadku
 let game = null;
 
 function newPlayer(slot) {
@@ -320,6 +329,10 @@ function forceResetAll() {
   try { if (personSockets.B) personSockets.B.disconnect(true); } catch {}
   personSockets.A = null;
   personSockets.B = null;
+  personIds.A = null;
+  personIds.B = null;
+  personFreedAt.A = 0;
+  personFreedAt.B = 0;
   newGame();
   io.emit("reset");
   io.emit("state", snapshot());
@@ -1076,9 +1089,24 @@ app.get("/admin/reset-all", (req, res) => {
 /* -------------------- IO -------------------- */
 io.on("connection", (socket) => {
   // identita = osoba A/B (A = host); slot sa odvodí z aktuálnych seats a mení sa medzi hrami
+  const cid = socket.handshake.auth?.id || null; // trvalý token klienta (localStorage)
   let person = null;
-  if (!personSockets.A) { personSockets.A = socket; person = "A"; }
-  else if (!personSockets.B) { personSockets.B = socket; person = "B"; }
+  // 1) reclaim: tento token už patrí hráčovi → vráť mu jeho slot (aj keď ho ešte drží mŕtvy socket / beží grace)
+  if (cid && personIds.A === cid) person = "A";
+  else if (cid && personIds.B === cid) person = "B";
+  // 2) inak obsaď voľný slot — voľný = bez živého socketu A po uplynutí grace pôvodného hráča
+  if (!person) {
+    const now = Date.now();
+    const isFree = (p) => !personSockets[p] && (!personIds[p] || now - personFreedAt[p] > RECLAIM_GRACE_MS);
+    if (isFree("A")) person = "A";
+    else if (isFree("B")) person = "B";
+  }
+  if (person) {
+    const old = personSockets[person];
+    if (old && old !== socket) { try { old.disconnect(true); } catch {} } // odpoj mŕtvy/starý socket toho istého hráča
+    personSockets[person] = socket;
+    personIds[person] = cid; // zapamätaj token (pri reclaime ten istý, pri novom hráčovi nový)
+  }
   socket.data.person = person;
 
   if (person) socket.emit("you_are", { slot: slotForPerson(person), isHost: person === "A" });
@@ -1113,13 +1141,19 @@ io.on("connection", (socket) => {
     emitStateMasked(); // súperov pick sa odhalí až keď si vyberie aj druhý hráč (žiadna výhoda pre rozmýšľajúceho)
   });
 
-  socket.on("lock_in", (queue) => {
+  socket.on("lock_in", (queue, clientTurn, ack) => {
+    // spätná kompat.: starší klient/test volá lock_in(queue) alebo lock_in(queue, ack) bez čísla kola
+    if (typeof clientTurn === "function") { ack = clientTurn; clientTurn = undefined; }
     if (!person) return;
     if (game.phase !== "playing") return;
     const slot = slotForPerson(person);
     if (!game.players.p1.char || !game.players.p2.char) return; // ešte sa vyberajú postavy
-    if (!validQueue(queue, slot)) return;
     const me = game.players[slot];
+    // zopakovaný lock_in (stratený ack) pre už vyriešené kolo → zahoď, nech sa stará voľba nevloží do nového kola
+    if (clientTurn !== undefined && clientTurn !== game.turn) { if (typeof ack === "function") ack({ ok: true }); return; }
+    // idempotencia: v tomto kole už som locknutý (stratil sa len ack) → len potvrď, nereparsuj voľbu
+    if (me.locked) { if (typeof ack === "function") ack({ ok: true }); return; }
+    if (!validQueue(queue, slot)) { if (typeof ack === "function") ack({ ok: false }); return; }
     let q = queue;
     me.lastHope = q[0]?.type === "last_hope"; // úvodná akcia (pred golden) — validQueue už overil, že smie
     if (me.lastHope) q = q.slice(1);
@@ -1132,6 +1166,7 @@ io.on("connection", (socket) => {
     if (me.goldenMana || me.lastStand) q = q.slice(0, -1);
     me.queue = q.map(a => ({ ...a }));
     me.locked = true;
+    if (typeof ack === "function") ack({ ok: true }); // potvrď klientovi prijatie ťahu (klient inak opakuje)
 
     if (game.players.p1.locked && game.players.p2.locked) {
       resolveTurn();
@@ -1175,8 +1210,9 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     const wasPlayer = personSockets.A === socket || personSockets.B === socket;
-    if (personSockets.A === socket) personSockets.A = null;
-    if (personSockets.B === socket) personSockets.B = null;
+    // uvoľni len živý socket; personIds zámerne NEmažeme → hráč si po reconnecte (do grace) vyžiada svoj slot späť
+    if (personSockets.A === socket) { personSockets.A = null; personFreedAt.A = Date.now(); }
+    if (personSockets.B === socket) { personSockets.B = null; personFreedAt.B = Date.now(); }
     if (wasPlayer) clearTurnTimer(); // bez hráča nemá zmysel auto-resolve; odpojenie diváka časovač neruší
   });
 });
