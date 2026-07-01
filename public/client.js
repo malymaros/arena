@@ -2036,7 +2036,8 @@ function updateCharSelectHp(s) {
       if (!dead) {
         if (hpEl) hpEl.innerHTML = `<span>${hp}</span>${pixSvg("heart")}`;
         const mana = charSelectMana?.[key] ?? 0;
-        if (manaEl) manaEl.innerHTML = `<span>${mana}</span>${pixSvg("drop")}`;
+        // mana ako inde v hre — pixelizované emoji 💧 (plný pix-ico = ostrejší 20px render, nie mini)
+        if (manaEl) { manaEl.innerHTML = `<span>${mana}</span><span class="pix-ico" data-emoji="💧"></span>`; hydratePix(manaEl); }
       }
     }
   });

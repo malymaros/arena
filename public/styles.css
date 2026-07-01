@@ -656,7 +656,9 @@ body {
 .char-hp, .char-mana { display: inline-flex; align-items: center; gap: 5px; }
 .char-hp { color: #ff4d4d; }     /* prenesené HP — červená (srdiečko) */
 .char-mana { color: #4db6ff; }   /* prenesená mana — modrá (kvapka) */
-.char-stats svg { width: 15px; height: 15px; display: block; }
+.char-stats svg { width: 17px; height: 17px; display: block; }
+/* pixelizovaná kvapka (💧) — väčšia, dobre čitateľná (emoji má vnútorné okraje, tak radšej väčšie) */
+.char-stats .pix-ico { width: 26px; height: 26px; vertical-align: middle; margin: 0; }
 
 /* tournament: mŕtvy mág — nedá sa zvoliť, stlmený, démon prekrýva okno */
 .char-card.dead { cursor: default; filter: grayscale(.7) brightness(.7); }
