@@ -686,6 +686,26 @@ body {
 }
 .spectator.hidden{ display: none; }
 
+/* chyba spojenia pri odosielaní ťahu — červený varovný pruh hore, klikom sa dá zavrieť */
+.conn-error{
+  position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+  z-index: 60; max-width: 92vw;
+  padding: 12px 20px;
+  border-radius: 2px;
+  background: rgba(140,20,24,.95);
+  box-shadow: 0 0 0 2px #000, 0 6px 18px rgba(0,0,0,.5);
+  color: #fff;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 11px; line-height: 1.7; letter-spacing: .5px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,.6);
+  text-align: center;
+  cursor: pointer;
+  animation: connErrPulse 1.1s ease-in-out infinite;
+}
+.conn-error b{ color: #ffd54f; }
+.conn-error.hidden{ display: none; }
+@keyframes connErrPulse{ 0%,100%{ box-shadow: 0 0 0 2px #000, 0 6px 18px rgba(0,0,0,.5); } 50%{ box-shadow: 0 0 0 2px #000, 0 0 22px rgba(255,60,60,.9); } }
+
 /* game over neprekrýva plochu — len semi-transparentné tlačidlo v strede, verdikt ide do .hud-turn */
 .gameover { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
 .gameover.hidden { display: none; }

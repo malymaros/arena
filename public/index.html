@@ -221,6 +221,11 @@
   <!-- Tretí a ďalší pripojený hráč — hra je plná, len informačná hláška -->
   <div id="spectator" class="spectator hidden">Game in progress…</div>
 
+  <!-- Chyba spojenia pri odosielaní ťahu — server nepotvrdil prijatie, treba potvrdiť znova -->
+  <div id="conn-error" class="conn-error hidden">
+    ⚠ Ťah sa nepodarilo doručiť (chyba spojenia). Skontroluj sieť a <b>potvrď ťah znova</b>.
+  </div>
+
   <!-- Úvodná obrazovka — nastavenia zápasu (vidí len host = prvý pripojený) -->
   <div id="lobby" class="lobby hidden">
     <div class="lobby-card">

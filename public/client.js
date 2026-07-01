@@ -1741,6 +1741,7 @@ function schedulePlayTimeline(timeline) {
 
   const gen = ++playGen;
   playing = true;
+  hideConnError();  // kolo sa vyhodnotilo → prípadná hláška o chybe spojenia je už neaktuálna
   stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) — zhasni prípadný stale časovač
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
 
@@ -2419,17 +2420,38 @@ undoBtn.addEventListener("click", () => {
   myQueue.pop();
   renderQueue();
 });
+// hláška o chybe spojenia (server nepotvrdil prijatie ťahu)
+const connErrorEl = document.getElementById("conn-error");
+function showConnError() { connErrorEl?.classList.remove("hidden"); }
+function hideConnError() { connErrorEl?.classList.add("hidden"); }
+connErrorEl?.addEventListener("click", hideConnError); // klikom sa dá zavrieť
+
+// server nepotvrdil ťah ani po opakovaniach → odomkni ovládanie a nechaj usera potvrdiť znova
+function unlockAfterConnError() {
+  lockedIn = false;
+  lockBtn.classList.remove("locked");
+  lockBtn.classList.remove("ready");
+  lockBtn.textContent = "LOCK IN";
+  lockBtn.disabled = false;
+  updateUiLocks();
+  updateLockButton();
+  showConnError();
+}
+
 // pošli lock_in spoľahlivo: čakaj na ack od servera a pri strate packetu (timeout) zopakuj.
 // rieši „dal som LOCKED, ale súper/server ťah nezaznamenal" pri blikajúcej sieti.
+// ak ani po MAX_TRIES nepríde potvrdenie → odblokuj tlačidlá a oznám userovi chybu spojenia.
 function emitLockIn(payload) {
   let tries = 0;
-  const MAX_TRIES = 5;
+  const MAX_TRIES = 6; // ~9 s pokusov (6 × 1,5 s), potom to vyhlásime za chybu spojenia
   const forTurn = state?.turn; // kolo, pre ktoré táto voľba platí — server zahodí zopakovanie, ak sa už posunulo
   const send = () => {
     tries++;
     socket.timeout(1500).emit("lock_in", payload, forTurn, (err) => {
-      // err = timeout (žiadny ack) → packet sa zrejme stratil; skús znova, kým sme stále v locknutom kole
-      if (err && tries < MAX_TRIES && lockedIn && !playing) send();
+      if (!err) { hideConnError(); return; }   // server POTVRDIL prijatie ťahu → hotovo
+      if (!lockedIn || playing) return;         // kolo sa medzitým vyriešilo/odomklo → nič nerob
+      if (tries < MAX_TRIES) { send(); return; } // stratený packet → skús znova
+      unlockAfterConnError();                    // vyčerpané pokusy → odomkni + oznám chybu
     });
   };
   send();
@@ -2688,6 +2710,7 @@ socket.on("spectator", () => {
 socket.on("reset", () => {
   playGen++;        // zruš prípadné bežiace prehrávanie
   playing = false;
+  hideConnError();
 
   // reset game-over stavov ešte pred renderHUD — inak by guard nechal visieť GAME OVER text
   serverWinner = null;
