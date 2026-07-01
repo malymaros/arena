@@ -270,6 +270,7 @@ let _finalRoundActive = false;    // „FINAL ROUND" sa zobrazí hore až keď p
 let charPreviewRaf = 0;
 // tournament: HP magov vlastnej trojice ({fire,lightning,wanderer}) pre char-select; null mimo tournamentu
 let charSelectHp = null;
+let charSelectMana = null; // tournament: prenesená mana magov (per vlastná trojica)
 
 // od kedy je postava v HUD widgete mŕtva — Dead anim sa prehrá raz od tohto času
 let hudDeadSince = { p1: 0, p2: 0 };
@@ -2012,24 +2013,31 @@ function clearActors() {
 }
 
 /* ---------- Char select (preview) ---------- */
-// tournament: zobraz HP každého maga vlastnej trojice + označ mŕtvych (karta dead + neklikateľná)
+// tournament: zobraz HP a prenesenú manu každého maga vlastnej trojice + označ mŕtvych (karta dead + neklikateľná)
 function updateCharSelectHp(s) {
   charSelectHp = (s && s.mageHp) ? s.mageHp : null;
+  charSelectMana = (s && s.mageMana) ? s.mageMana : null;
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
+    const statsEl = card.querySelector(".char-stats");
     const hpEl = card.querySelector(".char-hp");
-    if (!charSelectHp) { // single / bo3 — žiadne HP, žiadny dead stav
+    const manaEl = card.querySelector(".char-mana");
+    if (!charSelectHp) { // single / bo3 — žiadne HP/mana, žiadny dead stav
       card.classList.remove("dead");
-      if (hpEl) hpEl.classList.add("hidden");
+      if (statsEl) statsEl.classList.add("hidden");
       return;
     }
     const hp = charSelectHp[key] ?? 0;
     const dead = hp <= 0;
     card.classList.toggle("dead", dead);
-    if (hpEl) {
-      // mŕtvy mág: žiadne HP (len démon + dead póza); živý: červené číslo + srdiečko
-      hpEl.classList.toggle("hidden", dead);
-      if (!dead) hpEl.innerHTML = `<span>${hp}</span>${pixSvg("heart")}`;
+    if (statsEl) {
+      // mŕtvy mág: žiadne staty (len démon + dead póza); živý: HP (srdiečko) + prenesená mana (kvapka)
+      statsEl.classList.toggle("hidden", dead);
+      if (!dead) {
+        if (hpEl) hpEl.innerHTML = `<span>${hp}</span>${pixSvg("heart")}`;
+        const mana = charSelectMana?.[key] ?? 0;
+        if (manaEl) manaEl.innerHTML = `<span>${mana}</span>${pixSvg("drop")}`;
+      }
     }
   });
 }

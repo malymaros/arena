@@ -645,15 +645,18 @@ body {
 .char-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
 
 /* tournament: HP maga — vycentrované hore, červené číslo + srdiečko */
-.char-hp {
+.char-stats {
   position: absolute; top: 8px; left: 0; right: 0; z-index: 2;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
-  font-size: 13px; line-height: 1; color: #ff4d4d; letter-spacing: 1px;
+  font-size: 13px; line-height: 1; letter-spacing: 1px;
   text-shadow: 2px 2px 0 rgba(0,0,0,.85);
 }
-.char-hp.hidden { display: none; }
-.char-hp svg { width: 15px; height: 15px; display: block; }
+.char-stats.hidden { display: none; }
+.char-hp, .char-mana { display: inline-flex; align-items: center; gap: 5px; }
+.char-hp { color: #ff4d4d; }     /* prenesené HP — červená (srdiečko) */
+.char-mana { color: #4db6ff; }   /* prenesená mana — modrá (kvapka) */
+.char-stats svg { width: 15px; height: 15px; display: block; }
 
 /* tournament: mŕtvy mág — nedá sa zvoliť, stlmený, démon prekrýva okno */
 .char-card.dead { cursor: default; filter: grayscale(.7) brightness(.7); }
