@@ -646,19 +646,22 @@ body {
 
 /* tournament: HP maga — vycentrované hore, červené číslo + srdiečko */
 .char-stats {
-  position: absolute; top: 8px; left: 0; right: 0; z-index: 2;
-  display: flex; align-items: center; justify-content: center; gap: 14px;
+  position: absolute; top: 6px; left: 0; right: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  /* pixel font ako inde v hre */
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
   font-size: 13px; line-height: 1; letter-spacing: 1px;
-  text-shadow: 2px 2px 0 rgba(0,0,0,.85);
+  /* plný čierny outline pre kontrast */
+  text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 2px rgba(0,0,0,.9);
 }
 .char-stats.hidden { display: none; }
+/* rovnaké rozloženie ako HUD widgety: ikona → číslo */
 .char-hp, .char-mana { display: inline-flex; align-items: center; gap: 5px; }
-.char-hp { color: #ff4d4d; }     /* prenesené HP — červená (srdiečko) */
-.char-mana { color: #4db6ff; }   /* prenesená mana — modrá (kvapka) */
-.char-stats svg { width: 17px; height: 17px; display: block; }
-/* pixelizovaná kvapka (💧) — väčšia, dobre čitateľná (emoji má vnútorné okraje, tak radšej väčšie) */
-.char-stats .pix-ico { width: 26px; height: 26px; vertical-align: middle; margin: 0; }
+.char-hp { color: #ff5a5a; }     /* prenesené HP — červená (srdiečko), jasnejšia ako HUD */
+.char-mana { color: #57a9ff; }   /* prenesená mana — modrá (kvapka), jasnejšia ako HUD */
+.char-stats svg { width: 14px; height: 14px; display: block; }
+/* pixel font sadá vysoko v riadku — čísla jemne nadol, nech sedia s ikonou (žiadne levitovanie) */
+.char-hp span, .char-mana span { position: relative; top: 1px; }
 
 /* tournament: mŕtvy mág — nedá sa zvoliť, stlmený, démon prekrýva okno */
 .char-card.dead { cursor: default; filter: grayscale(.7) brightness(.7); }

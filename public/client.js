@@ -2034,10 +2034,10 @@ function updateCharSelectHp(s) {
       // mŕtvy mág: žiadne staty (len démon + dead póza); živý: HP (srdiečko) + prenesená mana (kvapka)
       statsEl.classList.toggle("hidden", dead);
       if (!dead) {
-        if (hpEl) hpEl.innerHTML = `<span>${hp}</span>${pixSvg("heart")}`;
+        // rovnaké rozloženie ako hráčske widgety v HUD: ikona → číslo (srdiečko #, kvapka #)
         const mana = charSelectMana?.[key] ?? 0;
-        // mana ako inde v hre — pixelizované emoji 💧 (plný pix-ico = ostrejší 20px render, nie mini)
-        if (manaEl) { manaEl.innerHTML = `<span>${mana}</span><span class="pix-ico" data-emoji="💧"></span>`; hydratePix(manaEl); }
+        if (hpEl) hpEl.innerHTML = `${pixSvg("heart")}<span>${hp}</span>`;
+        if (manaEl) manaEl.innerHTML = `${pixSvg("drop")}<span>${mana}</span>`;
       }
     }
   });
