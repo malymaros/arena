@@ -608,7 +608,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 
 /* Char select */
 .char-select {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92); /* takmer nepriehľadné — aréna za výberom neruší */
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; z-index: 9999;
 }
 .char-select.hidden { display: none; }
@@ -651,7 +651,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 /* náhľad špeciálnej abilitky pri hoveri nad mágom */
 .char-ability {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  height: 330px; /* fixná výška od začiatku (rátaná na najdlhší popis — Minotaur) — nič pri hoveri neskáče */
+  height: 270px; /* fixná výška od začiatku — nič pri hoveri neskáče (text má vlastný pevný 4-riadkový blok) */
 }
 .char-ability.hidden { visibility: hidden; }
 .ca-title {
@@ -672,8 +672,11 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .ca-text {
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
   font-size: 11px; color: #cfd2d6; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6);
-  /* dlhé popisy (Medúza, Minotaur) zalamuj do bloku širokého ako jednoriadkové popisy mágov (~šírka mini-gridu) */
-  text-align: center; max-width: 250px; line-height: 1.7; margin: 0 auto;
+  text-align: center; max-width: 500px; line-height: 1.7; margin: 0 auto;
+  /* PEVNÝ blok presne na 4 riadky — popisy rôznych dĺžok (mágovia 1 riadok, Minotaur 4) nehýbu
+     efektom (dmg/petrify/bludisko) pod textom; kratší text sa v bloku vertikálne vycentruje */
+  height: calc(4 * 1.7em);
+  display: flex; align-items: center; justify-content: center;
 }
 /* dmg + mana, výraznejšie pod popisom útoku */
 .ca-stats {

@@ -2504,8 +2504,8 @@ const ABILITY_PREVIEW = {
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours" },
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
-  medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage — petrifies: target skips 2 actions" },
-  minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg — banishes the foe into the labyrinth until any hit lands. Their steps weave a thread; stepping on it reveals your silhouette" },
+  medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
+  minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands. Their steps weave a thread; stepping on it reveals your silhouette" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -3331,7 +3331,7 @@ socket.on("state", (s) => {
     if (mine.char === "medusa") {
       // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
       specialBtn.title = "Special (−5 mana) — petrifying gaze: choose a direction; a hit opponent skips their next 2 actions";
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🗿`; hydratePix(cost); }
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 2×🗿`; hydratePix(cost); }
     } else if (mine.char === "minotaur") {
       // Minotaur: žiadny dmg — celoplošný labyrint (trvá do vzájomného zásahu)
       specialBtn.title = "Special (−5 mana) — hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit";
