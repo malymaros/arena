@@ -237,6 +237,12 @@ const SPECIAL_ANIMS = {
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
 
+// Normalizácia veľkosti postavy v KARTÁCH výberu a HUD PORTRÉTE: mágovia vypĺňajú frame len z ~51 %
+// výšky (veľa vzduchu), Medúza 59 % a Minotaur 72 % — pri rovnakom fill preto pôsobia príliš veľkí.
+// Násobič ich zmenšuje na porovnateľnú výšku postavy; na BOARDE ostávajú zámerne väčší (bez násobiča).
+const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7 };
+const portraitFill = (char, base) => base * (PORTRAIT_SCALE[char] ?? 1);
+
 const CHAR_META = {
   fire:      { name: "Fire Wizard",      dir: "fire" },
   lightning: { name: "Lightning Mage",   dir: "lightning" },
@@ -656,7 +662,9 @@ function placeChargeAura(cont, slot) {
 // „Goku" nabíjacia aura pri recharge — naviazaná na postavu (sleduje ju per-frame v rafe)
 function spawnChargeAura(slot, gold = false, red = false) {
   const p = state?.[slot];
-  if (!p) return;
+  // labyrint: skrytý súper (x null) auru vôbec nedostane — placeChargeAura by ju nemal kam ukotviť
+  // a neumiestnená by svietila v rohu boardu (napr. červená Last Hope aura skrytého Minotaura)
+  if (!p || p.x == null) return;
   const cont = document.createElement("div");
   // golden mana = rovnaká aura, len zlatá; Last Hope ultra mód = červená
   cont.className = red ? "charge-aura red" : gold ? "charge-aura gold" : "charge-aura";
@@ -2443,9 +2451,10 @@ function drawCharSelectFrame(now) {
     const anim = fx ? { file: SPECIAL_ANIMS[key].file, fps: SPECIAL_FPS, loop: true } : ANIM_DEF.idle;
     // lightning efekt má obsah posunutý vľavo vo frame -> dorovnaj doprava
     const offX = fx ? (FX_OFFSET_X[key] || 0) * cvs.width : 0;
-    // canvas vypĺňa celú kartu; sprite väčší, mierne zdvihnutý hore (offsetY), orez je až na ráme karty
+    // canvas vypĺňa celú kartu; sprite väčší, mierne zdvihnutý hore (offsetY), orez je až na ráme karty;
+    // Medúza/Minotaur normalizovaní na výšku mágov (PORTRAIT_SCALE)
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height, 1.31, 0.98, true, offX, -52))
+      .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height, portraitFill(key, 1.31), 0.98, true, offX, -52))
       .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
   });
 
@@ -3481,8 +3490,11 @@ function raf() {
     } else {
       hudDeadSince[slot] = 0;
     }
+    // Medúza/Minotaur normalizovaní na výšku mágov (PORTRAIT_SCALE) + ukotvení k spodku,
+    // aby stáli na rovnakej línii ako mágovia (centrovanie by menšiu postavu nechalo plávať)
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, t, cvs.width, cvs.height))
+      .then(meta => drawSprite(ctx, meta, anim, t, cvs.width, cvs.height,
+        portraitFill(st.char, 0.95), PORTRAIT_SCALE[st.char] ? 0.92 : 0.5))
       .catch(() => {});
   });
 
@@ -3528,7 +3540,11 @@ function raf() {
       // takže sa kĺže spolu s ňou (nie teleport). Drží sa keď postava STOJÍ (server flag !st.down) — počas
       // summon/banish prechodov (st.down=true, resp. _lsBanishing) ho riadia efekty. State-driven = robustné.
       const tgt = state[buffSlot];
-      if (!_lsBanishing && tgt && tgt.char && !tgt.down) {
+      // labyrint: skrytý buffnutý hráč (x null) — priehľadný démon za postavou sa skryje,
+      // nemá ho kam sledovať (inak by ostal svietiť na starej/rohovej pozícii a prezradil buff)
+      if (tgt && tgt.x == null) {
+        deathBehind.style.opacity = "0";
+      } else if (!_lsBanishing && tgt && tgt.char && !tgt.down) {
         // pozícia sleduje postavu per-frame (bez transition); opacity 0.25 dotiahne CSS transition plynulo (z 1 po settle)
         const actorEl = buffSlot === "p1" ? actorP1 : actorP2;
         const aLeft = parseFloat(getComputedStyle(actorEl).left) || 0; // počas pohybu = interpolovaná hodnota (CSS transition)

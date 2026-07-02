@@ -1535,6 +1535,16 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     50%    { box-shadow: 0 0 0 2px #000, 0 0 16px 2px rgba(255,70,70,.95); }
   }
 
+  /* labyrint: widget prekrytý bludiskom nesmie ČERVENOU/ZLATOU žiarou prezradiť buff stav skrytého
+     súpera (Last Hope / Last Stand) — vonkajší glow sa vracia na základný rámik widgetu */
+  .hud-box.in-maze.hope-red,
+  .hud-box.in-maze.death-golden{
+    box-shadow:
+      0 0 0 2px #000,
+      inset 0 2px 0 rgba(255,255,255,.07),
+      inset 0 -2px 0 rgba(0,0,0,.55);
+  }
+
   /* mana polovica má 3 riadky (ruky / +6 mana / cena v srdiečkach) — zhutni padding+gap+font,
      nech jej výška ostane ≤ shield/mirror polovica → výška celého buttonu sa nezmení (1:1) */
   .golden-half.gm-half{ padding-top: 4px; padding-bottom: 4px; gap: 1px; }
