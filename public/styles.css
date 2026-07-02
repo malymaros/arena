@@ -1002,13 +1002,16 @@ body {
   }
   .hud-p2 .hud-char{ transform: scaleX(-1); } /* P2 pozerá doľava */
 
-  /* palette swap P2 pri zhodnej postave — vyblednutý „albino" variant (do biela) */
+  /* palette swap pravej strany (p2) — vyblednutý „albino" variant (do biela), fixný na celú sériu */
   .sprite-actor.alt-color,
   .special-center.alt-color,
-  .charge-canvas.alt-color{ filter: saturate(.22) brightness(1.4); }
+  .charge-canvas.alt-color,
+  .mage-head.alt-color{ filter: saturate(.22) brightness(1.4); }
   .sprite-ghost.alt-color{ filter: grayscale(35%) saturate(.22) brightness(1.4); }
   /* HUD portrét — len v zdravom stave; wounded/critical/dead degradácia má prednosť */
   .hud-char.alt-color:not(.wounded):not(.critical):not(.dead){ filter: saturate(.22) brightness(1.4); }
+  /* char-select hráča vpravo (p2) — náhľady magov v rovnakom alternatívnom vykreslení */
+  #char-select.p2-side canvas.char-canvas{ filter: saturate(.22) brightness(1.4); }
 
   /* glow postavy (zlatý „YOU" / pulzujúca obrana / alt-color) rieši JS: actorFilter() v rAF (inline filter) */
 

@@ -26,6 +26,8 @@ app.use(express.static(path.join(__dirname, "public"), {
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
+// prvý štartér série je náhodný; testy si ho vedia zafixovať cez env (A alebo B)
+const FORCE_FIRST_STARTER = ["A", "B"].includes(process.env.FORCE_FIRST_STARTER) ? process.env.FORCE_FIRST_STARTER : null;
 
 /* -------------------- Game constants -------------------- */
 const BOARD = { w: 4, h: 3 };
@@ -157,11 +159,11 @@ function newGame() {
     },
     arena: "bridge",
     turn: 1,
-    starter: "p1", // odd -> p1, even -> p2
+    starter: "p1", // slot, ktorý začína aktuálne kolo; medzi kolami sa preklápa (hru môže začínať aj p2)
     tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" } — pribúdajú od konca 1. kola
     iks: [],       // [{ x, y }] — insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
     // séria zápasov
-    seats: { p1: "A", p2: "B" }, // ktorá osoba sedí v ktorom slote v aktuálnej hre
+    seats: { p1: "A", p2: "B" }, // FIXNÉ: osoba A (host) vždy vľavo (p1), osoba B vždy vpravo (p2)
     seriesWins: { A: 0, B: 0 },
     series: { gameIndex: 1, needed: 1, firstStarter: "A", format: "single" },
     // tournament: HP a mana každého z 3 magov per osoba sa prenášajú medzi hrami (null mimo tournamentu)
@@ -186,7 +188,7 @@ function seriesSnapshot() {
   };
 }
 
-// pošli každej osobe jej aktuálny slot (mení sa medzi hrami) + či je host
+// pošli každej osobe jej slot (fixný na celú sériu: A=p1, B=p2) + či je host
 function emitYouAre() {
   for (const person of ["A", "B"]) {
     const sock = personSockets[person];
@@ -1010,7 +1012,7 @@ function resolveTurn() {
   if (!ended) {
     // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)
     const nextTurn    = game.turn + 1;
-    const nextStarter = nextTurn % 2 === 1 ? "p1" : "p2";
+    const nextStarter = game.starter === "p1" ? "p2" : "p1"; // preklop (hru mohol začínať aj p2)
     tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: [], delayMs: 10 });
     game.turn    = nextTurn;
     game.starter = nextStarter;
@@ -1044,7 +1046,7 @@ function resolveTurn() {
 }
 
 // koniec jednej hry: zapíš výhru do série; ak je séria rozhodnutá -> match_over,
-// inak po dohraní timeline (na klientovi) spusti ďalšiu hru (swap strán + nový char-select)
+// inak po dohraní timeline (na klientovi) spusti ďalšiu hru (strany ostávajú fixné, nový char-select)
 function handleGameEnd(timelineDurationMs) {
   clearTurnTimer();
   const w = winnerNow(); // "p1" | "p2" | "draw"
@@ -1087,7 +1089,7 @@ function startMatch(config) {
   game.series = {
     gameIndex: 0,
     needed: MATCH_FORMATS[config.format] || 1,
-    firstStarter: "A", // hru 1 začína host (osoba A); v BO3/BO5 sa štartér strieda
+    firstStarter: FORCE_FIRST_STARTER || (Math.random() < 0.5 ? "A" : "B"), // hru 1 začína náhodná osoba; v sérii sa štartér strieda
     format: config.format,
   };
   game.seriesWins = { A: 0, B: 0 };
@@ -1107,20 +1109,20 @@ function fullMage(value) {
   return m;
 }
 
-// pripraví novú hru v sérii: prehodí štartéra na ľavú stranu (slot p1), resetne hráčov,
-// vyčistí postavy (char-select pred každou hrou) a re-emitne sloty (osoba mohla zmeniť stranu)
+// pripraví novú hru v sérii: strany sú FIXNÉ (A=p1 vľavo, B=p2 vpravo), strieda sa len štartér hry,
+// resetne hráčov a vyčistí postavy (char-select pred každou hrou)
 function startGame(gameIndex) {
   clearTurnTimer();
   const starterPerson = (gameIndex % 2 === 1)
     ? game.series.firstStarter
     : otherPerson(game.series.firstStarter);
   game.series.gameIndex = gameIndex;
-  game.seats = { p1: starterPerson, p2: otherPerson(starterPerson) };
+  game.seats = { p1: "A", p2: "B" };
 
   game.players.p1 = newPlayer("p1");
   game.players.p2 = newPlayer("p2");
   game.turn = 1;
-  game.starter = "p1"; // štartér hry sedí v p1 a začína 1. kolo
+  game.starter = slotForPerson(starterPerson); // 1. kolo hry začína striedajúci sa štartér (hru 2 začína p2)
   game.tiles = [];
   game.iks = [];
   game.phase = "playing";
@@ -1156,7 +1158,7 @@ app.get("/admin/reset-all", (req, res) => {
 
 /* -------------------- IO -------------------- */
 io.on("connection", (socket) => {
-  // identita = osoba A/B (A = host); slot sa odvodí z aktuálnych seats a mení sa medzi hrami
+  // identita = osoba A/B (A = host); slot je fixný na celú sériu (A=p1, B=p2)
   const cid = socket.handshake.auth?.id || null; // trvalý token klienta (localStorage)
   let person = null;
   // 1) reclaim: tento token už patrí hráčovi → vráť mu jeho slot (aj keď ho ešte drží mŕtvy socket / beží grace)

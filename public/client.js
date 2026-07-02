@@ -484,7 +484,7 @@ function updateSpecialCenter(casts) {
     const px  = Math.round(TILE_H * SPECIAL_SCALE);
     cvs.width = px; cvs.height = px;
     cvs.className = "special-center";
-    if (sp.from === "p2" && sameCharNow()) cvs.classList.add("alt-color");
+    if (sp.from === "p2") cvs.classList.add("alt-color");
     cvs.dataset.dir  = dirKey;
     cvs.dataset.file = file;
     if (sp.fps) cvs.dataset.fps = sp.fps;
@@ -563,7 +563,7 @@ function pulseGlow(color, now) {
   // hrubý plný obrys (viac tesných vrstiev) + pulzujúca žiara
   return `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 ${b1}px ${c}) drop-shadow(0 0 ${b2}px ${c}) drop-shadow(0 0 ${b3}px ${c})`;
 }
-// filter postavy: alt-color (zhodný mág) + glow (obrana pulzuje > inak zlatý „YOU")
+// filter postavy: alt-color (pravá strana p2 vždy) + glow (obrana pulzuje > inak zlatý „YOU")
 function actorFilter(slot, now) {
   const st = state?.[slot];
   // golden recharge stav (death summon) — žiarivý zlatý pulz postavy, má prednosť pred ostatným
@@ -571,7 +571,7 @@ function actorFilter(slot, now) {
     const t = 0.5 + 0.5 * Math.sin(now / 110);
     return `brightness(${(1.15 + 0.45 * t).toFixed(2)}) saturate(1.5) ` + pulseGlow("#ffd24a", now);
   }
-  const alt = sameCharNow() && slot === "p2" ? "saturate(.22) brightness(1.4) " : "";
+  const alt = slot === "p2" ? "saturate(.22) brightness(1.4) " : "";
   let glow = "";
   if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
   else if (st?.mirror) glow = pulseGlow(st.mirrorGold ? GLOW_COL.mirrorGold : GLOW_COL.mirror, now);
@@ -1139,11 +1139,6 @@ function renderBar(el, value) {
   if (num) num.textContent = String(v);
 }
 
-// obaja hráči majú rovnakého mága → P2 dostane farebný posun (palette swap cez CSS hue-rotate)
-function sameCharNow() {
-  return !!(state?.p1?.char && state.p1.char === state?.p2?.char);
-}
-
 // banner pod ROUND textom: ja som locknutý a čaká sa na súpera / súper je locknutý a rad je na mne
 const turnStatusEl = document.getElementById("turn-status");
 function updateTurnStatus() {
@@ -1193,11 +1188,10 @@ function renderHUD() {
   hudBoxP2.classList.toggle("foe", me === "p1");
 
 
-  // rovnaká postava u oboch → P2 v alternatívnej farbe (postava na boarde, portrét aj ghost)
-  const same = sameCharNow();
-  actorP2.classList.toggle("alt-color", same);
-  hudCharP2.classList.toggle("alt-color", same);
-  actorGhost.classList.toggle("alt-color", same && me === "p2");
+  // pravá strana (p2) má VŽDY alternatívne vykreslenie (postava na boarde, portrét aj ghost)
+  actorP2.classList.add("alt-color");
+  hudCharP2.classList.add("alt-color");
+  actorGhost.classList.toggle("alt-color", me === "p2");
   updateGoldenButton();
 }
 
@@ -1367,7 +1361,7 @@ function renderGrid(s, effects = []) {
           const px  = Math.round(TILE_H * CHARGE_SCALE);
           cvs.width = px; cvs.height = px;
           cvs.className = "charge-canvas";
-          if (chargeHere.from === "p2" && sameCharNow()) cvs.classList.add("alt-color");
+          if (chargeHere.from === "p2") cvs.classList.add("alt-color");
           cvs.dataset.dir = dirKey;
           cvs.style.width  = px + "px";
           cvs.style.height = px + "px";
@@ -1568,8 +1562,8 @@ function positionActors(s, immediate = false) {
 }
 
 /* ---------- Queue + Lock ---------- */
-// ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove)
-function actionBadgeView(a) {
+// ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove); ownerSlot kvôli alt-color hláv p2
+function actionBadgeView(a, ownerSlot) {
   const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
   switch (a?.type) {
     case "move":          return { cls: "move",    text: `🚶${arrow[a.dir] || "?"}` };
@@ -1585,7 +1579,7 @@ function actionBadgeView(a) {
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
     case "last_stand":    return { cls: "golden",   html: LS_BADGE_IMG };
     case "demon":         return { cls: "demon",    html: LS_BADGE_IMG };
-    case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "") };
+    case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "", ownerSlot === "p2" ? "alt-color" : "") };
     case "last_hope":     return { cls: "lasthope", html: LH_BADGE_IMG };
     default:              return { cls: "",        text: a?.type || "" };
   }
@@ -1684,7 +1678,7 @@ function renderQueue() {
     }
 
     if (filled) {
-      const v = actionBadgeView(filled);
+      const v = actionBadgeView(filled, me);
       if (v.cls) el.classList.add(v.cls);
       if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
@@ -1723,7 +1717,7 @@ function highlightRoundBeat(from, action, counts, starterSlot) {
   if (!el) return null;
   // odhal súperovu akciu (moje sú už vyplnené z plánovania)
   if (el.classList.contains("opp")) {
-    const v = actionBadgeView(action);
+    const v = actionBadgeView(action, from);
     el.classList.remove("q-slot");
     el.classList.add("revealed");
     if (v.cls) el.classList.add(v.cls);
@@ -1900,7 +1894,7 @@ function schedulePlayTimeline(timeline) {
   state.tiles = first.tiles; state.iks = first.iks;
   renderHUD();
   const NEXT_TURN = (first.turn ?? state.turn) + 1;
-  const NEXT_STARTER = (NEXT_TURN % 2 === 1) ? "p1" : "p2";
+  const NEXT_STARTER = playStarter === "p1" ? "p2" : "p1"; // preklop (hru môže začínať aj p2)
   renderGrid(state, first.effects || []);
   positionActors(state, true);
 
@@ -2666,6 +2660,7 @@ function applyPhaseUI(s) {
   const needChar = phase === "playing" && !isSpectator && me && !s?.[me]?.char;
   if (needChar) {
     updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom)
+    selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
     hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber
   } else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
 
@@ -2732,7 +2727,7 @@ function renderMageHeads() {
       const statsHtml = st
         ? `<span class="mh-stats"><span class="mh-hp">${pixSvg("heart")}${st.hp ?? "?"}</span><span class="mh-mana">${pixSvg("drop")}${st.mana ?? "?"}</span></span>`
         : `<span class="mh-stats empty"></span>`;
-      const face = isDead ? pixSvg("skull") : mageHeadHtml(char, "mh-canvas");
+      const face = isDead ? pixSvg("skull") : mageHeadHtml(char, "mh-canvas" + (slot === "p2" ? " alt-color" : ""));
       return `<span class="${cls}" data-slot="${slot}" data-char="${char}" title="${CHAR_META[char]?.name || char}">${statsHtml}<span class="mh-face">${face}</span></span>`;
     }).join("");
   };
@@ -2903,7 +2898,7 @@ function showIntermission(gameWinner, series) {
   document.getElementById("im-crowns-l").innerHTML = renderSide(fillL, markL);
   document.getElementById("im-crowns-r").innerHTML = renderSide(fillR, markR);
 
-  // popisky strán — kde som ja (slot pred swapom), drží strany ako koruny v HUD
+  // popisky strán — kde som ja (sloty sú fixné na celú sériu), drží strany ako koruny v HUD
   const whoL = document.getElementById("im-who-l");
   const whoR = document.getElementById("im-who-r");
   whoL.textContent = me === "p1" ? "YOU" : "OPPONENT";
@@ -2916,7 +2911,7 @@ function showIntermission(gameWinner, series) {
 }
 
 /* ---------- Sockets ---------- */
-// you_are nesie slot (ľavá/pravá rola, mení sa medzi hrami série) aj či som host
+// you_are nesie slot (ľavá/pravá rola, fixná na celú sériu: host=p1) aj či som host
 socket.on("you_are", (info) => {
   if (info && typeof info === "object") { me = info.slot; isHost = !!info.isHost; }
   else { me = info; } // spätná kompat.

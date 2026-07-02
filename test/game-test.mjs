@@ -14,7 +14,9 @@ function check(cond, label, detail = "") {
 
 function startServer() {
   const proc = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, PORT: String(PORT) },
+    // FORCE_FIRST_STARTER: prvý štartér série je v produkcii náhodný — testy ho fixujú na A (host, p1),
+    // aby deterministické scenáre (golden akcie nestartéra, démon startera…) sedeli
+    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A" },
     stdio: "ignore",
   });
   return new Promise((resolve) => setTimeout(() => resolve(proc), 1200));
@@ -23,6 +25,8 @@ function startServer() {
 function connect() {
   return new Promise((resolve, reject) => {
     const sock = io(URL, { transports: ["websocket"] });
+    // pomalší boot servera nesmie zhodiť test — socket.io sa retryne samo; reject až po celkovom timeoute
+    const killer = setTimeout(() => { sock.close(); reject(new Error("connect timeout")); }, 15000);
     const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null };
     sock.on("you_are", (s) => { ctx.slot = s?.slot ?? s; ctx.isHost = !!s?.isHost; });
     sock.on("game_result", (g) => { ctx.gameResult = g; });
@@ -33,8 +37,7 @@ function connect() {
       if (s.timeline) ctx.lastTimeline = s.timeline;
     });
     sock.on("game_over", (g) => { ctx.gameOver = g; });
-    sock.on("connect", () => setTimeout(() => resolve(ctx), 300));
-    sock.on("connect_error", reject);
+    sock.on("connect", () => { clearTimeout(killer); setTimeout(() => resolve(ctx), 300); });
   });
 }
 
@@ -403,7 +406,7 @@ async function main() {
     `pos=${t14last.p1.x},${t14last.p1.y}`);
   invariantCheck(tl, "T14b");
 
-  /* ---------- Test 15: BO3 séria — skóre, swap strán, game_over až pri rozhodnutí ---------- */
+  /* ---------- Test 15: BO3 séria — skóre, fixné strany + striedanie štartéra, game_over až pri rozhodnutí ---------- */
   // mana-only tiles (žiadne dmg/heal/ik) => HP sa mení len cez akcie => kill je deterministický
   c1.sock.emit("retry");
   await new Promise(r => setTimeout(r, 150));
@@ -426,12 +429,13 @@ async function main() {
     "T15: game_result hlási víťaza hry a matchOver=false", `gr=${JSON.stringify(c1.gameResult)}`);
   check(c1.gameResult?.series?.winsP1 === 1 && c1.gameResult?.series?.winsP2 === 0,
     "T15: skóre série 1:0 pre p1", `series=${JSON.stringify(c1.gameResult?.series)}`);
-  // počkaj na new_game + swap strán (server čaká na dohranie timeline na klientovi)
+  // počkaj na new_game (server čaká na dohranie timeline na klientovi); strany sa NEprehadzujú
   const t0 = Date.now();
-  while (c1.slot !== "p2" && Date.now() - t0 < 20000) await new Promise(r => setTimeout(r, 100));
-  check(c1.slot === "p2", "T15: v hre 2 sa strany prehodili — host je teraz vpravo (p2)", `slot=${c1.slot}`);
+  while (c1.lastState?.series?.gameIndex !== 2 && Date.now() - t0 < 20000) await new Promise(r => setTimeout(r, 100));
   check(c1.lastState?.series?.gameIndex === 2, "T15: séria postúpila na hru 2",
     `gameIndex=${c1.lastState?.series?.gameIndex}`);
+  check(c1.slot === "p1", "T15: strany sú fixné — host ostáva vľavo (p1) aj v hre 2", `slot=${c1.slot}`);
+  check(c1.lastState?.starter === "p2", "T15: hru 2 začína druhý hráč (starter=p2)", `starter=${c1.lastState?.starter}`);
 
   // tiles bez dmg/IK — aby náhodný tile nezabil hráča a nepokazil deterministické last-stand scenáre
   async function freshGameLS() {
