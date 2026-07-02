@@ -323,6 +323,9 @@ body {
 #dir-picker  .arrow{ background: #757575; }
 #aim-picker  .arrow{ background: #b71c1c; }
 #dash-picker .arrow{ background: #616161; }
+#special-picker .arrow{ background: #6a1b9a; } /* Medúzin smer pohľadu — fialová ako special */
+/* special picker má len ←/→ — jednoriadková mriežka bez prázdnych oblastí kríža */
+.dir-picker.special-picker{ grid-template-areas: "left right"; }
 
 /* Colors */
 .btn.mana    { background: #1565c0; } /* Recharge (+4) — modrá ako mana bar */
@@ -517,6 +520,7 @@ body {
 .q-badge.shield  { background: #00606b; }
 .q-badge.mirror  { background: #00525b; }
 .q-badge.special { background: #5e1387; }
+.q-badge.stoned  { background: #4a4d55; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(190,195,205,.4); filter: grayscale(.3); } /* skamenený pass ťah */
 .q-badge.golden  { background: #8a6d00; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,213,79,.55); }
 /* démon „end" banishment bunka (pos 7) — červený okraj; platí pri každej šírke */
 .q-badge.demon   { background: #2a0d12; overflow: hidden; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,90,90,.6), 0 0 12px rgba(255,60,60,.55); }
@@ -1012,6 +1016,11 @@ body {
   .hud-char.alt-color:not(.wounded):not(.critical):not(.dead){ filter: saturate(.22) brightness(1.4); }
   /* char-select hráča vpravo (p2) — náhľady magov v rovnakom alternatívnom vykreslení */
   #char-select.p2-side canvas.char-canvas{ filter: saturate(.22) brightness(1.4); }
+  /* Medúza má pre p2 natívnu tmavú paletu (Medusa2) — filter sa na ňu neaplikuje */
+  #char-select.p2-side canvas.char-canvas[data-char="medusa"]{ filter: none; }
+
+  /* skamenený HUD portrét — sivá socha; smrť (dead) má prednosť */
+  .hud-char.stoned:not(.dead){ filter: grayscale(.92) brightness(.82) contrast(1.12) !important; }
 
   /* glow postavy (zlatý „YOU" / pulzujúca obrana / alt-color) rieši JS: actorFilter() v rAF (inline filter) */
 
@@ -1514,6 +1523,18 @@ body {
     white-space: nowrap;
     animation: floatUp .9s ease-out forwards;
     color: #ffca28;
+  }
+  /* skamenenie (Medúzin special) — STONED / PETRIFIED bublina */
+  .stone-float {
+    position: absolute;
+    z-index: 5;
+    font-weight: 900;
+    font-size: 18px;
+    text-shadow: 0 2px 0 rgba(0,0,0,.45);
+    pointer-events: none;
+    white-space: nowrap;
+    animation: floatUp .9s ease-out forwards;
+    color: #c3c8d2;
   }
   @keyframes lowmana-flash {
     0%, 100% { box-shadow: inset 0 0 0 1px rgba(0,0,0,.55), inset 0 2px 6px rgba(0,0,0,.45); }

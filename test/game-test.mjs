@@ -136,6 +136,9 @@ const GMI = { type: "golden_mirror" };
 const GM = { type: "golden_mana" };
 const LS = { type: "last_stand" };
 const SP = { type: "special" };
+const SPR = { type: "special", dir: "right" }; // Medúzin special so smerom pohľadu
+const SPL = { type: "special", dir: "left" };
+const STONED = { type: "stoned" };             // skamenený pass ťah (predvyplnený slot)
 const DEMON = { type: "demon" };
 const LHOPE = { type: "last_hope" };
 
@@ -610,6 +613,123 @@ async function main() {
   await new Promise(r => setTimeout(r, 200));
   check(c2.lastState?.p1?.char === "fire" && c2.lastState?.p2?.char === "lightning",
     "T23: po vlastnom výbere sa súperov pick odhalí", `p1=${c2.lastState?.p1?.char} p2=${c2.lastState?.p2?.char}`);
+
+  /* ---------- Medúza: pomocný fresh game (p1 = medusa, p2 = fire; mana-only tiles = deterministické HP) ---------- */
+  async function freshMedusa() {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "medusa");
+    c2.sock.emit("choose_character", "fire");
+    await new Promise(r => setTimeout(r, 200));
+  }
+  const fxOf = (timeline, kind) => timeline.flatMap(f => (f.effects || []).filter(e => e.kind === kind));
+
+  /* ---------- Test 29: Medúzin special — zóna, petrify, preskočenie 2 akcií v tom istom kole ---------- */
+  await freshMedusa();
+  // p1 (0,1) special doprava zasiahne celý zvyšok boardu vrátane p2 (3,1) → petrify;
+  // p2 move aj recharge sa preskočia (stone 2→0), attack v ťahu 3 už prebehne
+  tl = await playRound(c1, c2, [SPR, R, A("right")], [M("left"), R, A("left")]);
+  const spFx = fxOf(tl, "special").filter(e => e.from === "p1");
+  check(spFx.length === 3 && Array.isArray(spFx[0].cells), "T29: special efekt nesie zoznam buniek", `fx=${JSON.stringify(spFx[0])}`);
+  const cellKey = new Set((spFx[0].cells || []).map(([x, y]) => `${x},${y}`));
+  check(cellKey.has("0,1") && cellKey.has("3,1") && !cellKey.has("0,0") && !cellKey.has("0,2"),
+    "T29: zóna = vlastné políčko + všetko doprava (bez rohov za chrbtom)", `cells=${JSON.stringify(spFx[0].cells)}`);
+  check(fxOf(tl, "petrify").filter(e => e.target === "p2").length === 1, "T29: petrify efekt na p2");
+  const stonedP2 = fxOf(tl, "stoned").filter(e => e.target === "p2");
+  check(stonedP2.length === 2, "T29: p2 preskočil presne 2 akcie (stoned ×2)", `count=${stonedP2.length}`);
+  const t29last = tl[tl.length - 1];
+  check(t29last.p2.x === 3 && t29last.p2.y === 1, "T29: preskočený move — p2 sa nepohol", `p2=(${t29last.p2.x},${t29last.p2.y})`);
+  check(t29last.p2.stone === 0, "T29: kameň skončil posledným skameneným ťahom", `stone=${t29last.p2.stone}`);
+  check(t29last.p2.mana === 5, "T29: preskočený recharge nič nedal a nič nestál (6−1 za attack)", `mana=${t29last.p2.mana}`);
+  const t29hits = sumEffects(tl).hits;
+  check(t29hits.some(h => h.target === "p2" && h.dmg === 1) && t29hits.some(h => h.target === "p1" && h.dmg === 1),
+    "T29: petrify nedáva dmg — jediné zásahy sú 2 basic strely po 1", `hits=${JSON.stringify(t29hits)}`);
+  invariantCheck(tl, "T29");
+
+  /* ---------- Test 30: kameň sa prenáša do ďalšieho kola + golden mana skamenenému prepadne ---------- */
+  await freshMedusa();
+  // petrify padne až po VŠETKÝCH p2 akciách okrem a3 → p2 preskočí len a3 (stone 2→1);
+  // golden mana p2 po konci kola sa skamenenému nevykoná a kameň NEuberá → stone=1 do ďalšieho kola
+  tl = await playRound(c1, c2, [M("right"), R, SPR], [R, M("up"), A("left"), GM]);
+  check(fxOf(tl, "petrify").filter(e => e.target === "p2").length === 1, "T30: petrify efekt na p2");
+  check(fxOf(tl, "golden_mana").length === 0, "T30: golden mana sa skamenenému nevykonala");
+  const t30last = tl[tl.length - 1];
+  check(t30last.p2.stone === 1, "T30: kameň sa prenáša do ďalšieho kola (stone=1)", `stone=${t30last.p2.stone}`);
+  check(t30last.p2.hp === 10, "T30: prepadnutá golden mana nestála HP", `hp=${t30last.p2.hp}`);
+  invariantCheck(tl, "T30");
+  // kolo 2: lock bez stone passu na začiatku fronty je odmietnutý
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [R, S, M("left")]);
+  c2.sock.emit("lock_in", [R, S, M("down")]); // chýba úvodný stoned pass → neplatné
+  let stoneRejected = false;
+  try { await waitTimeline(c1, 1500); } catch { stoneRejected = true; }
+  check(stoneRejected, "T30: lock skameneného bez stoned passu je odmietnutý");
+  // správny lock so stoned passom prejde a prvá akcia sa preskočí
+  c2.sock.emit("lock_in", [STONED, R, A("left")]);
+  tl = await waitTimeline(c1, 5000);
+  await new Promise(r => setTimeout(r, 150));
+  check(fxOf(tl, "stoned").filter(e => e.target === "p2").length === 1, "T30: v ďalšom kole sa preskočil 1 ťah");
+  check(tl[tl.length - 1].p2.stone === 0, "T30: po odžití passu je kameň preč", `stone=${tl[tl.length - 1].p2.stone}`);
+  invariantCheck(tl, "T30b");
+
+  /* ---------- Test 31: shield blokuje petrify ---------- */
+  await freshMedusa();
+  // p2 štít v ťahu 1 kryje p1 ťah 2 = special → block, žiadny petrify
+  tl = await playRound(c1, c2, [R, SPR, M("right")], [S, R, M("up")]);
+  check(fxOf(tl, "block").filter(e => e.target === "p2").length === 1, "T31: štít zablokoval petrify");
+  check(fxOf(tl, "petrify").length === 0 && tl[tl.length - 1].p2.stone === 0,
+    "T31: p2 neskamenel", `stone=${tl[tl.length - 1].p2.stone}`);
+  invariantCheck(tl, "T31");
+
+  /* ---------- Test 32: mirror odrazí petrify — skamenie samotná Medúza ---------- */
+  await freshMedusa();
+  tl = await playRound(c1, c2, [R, SPR, A("right")], [MI, R, M("up")]);
+  const mirFx = fxOf(tl, "mirror").filter(e => e.target === "p2");
+  check(mirFx.length === 1 && mirFx[0].atk === "special" && mirFx[0].dmg === 0,
+    "T32: mirror efekt na odrazený special (dmg 0)", `fx=${JSON.stringify(mirFx)}`);
+  check(fxOf(tl, "petrify").filter(e => e.target === "p1").length === 1, "T32: odraz skamenil Medúzu (p1)");
+  check(fxOf(tl, "stoned").filter(e => e.target === "p1").length === 1, "T32: Medúze sa preskočil zvyšný ťah kola");
+  check(tl[tl.length - 1].p1.stone === 1, "T32: zvyšok kameňa sa Medúze prenáša (stone=1)", `stone=${tl[tl.length - 1].p1.stone}`);
+  invariantCheck(tl, "T32");
+
+  /* ---------- Test 33: special na už skamenenú postavu = bez efektu, žiadny refresh ---------- */
+  await freshMedusa();
+  // kolo 1: neutrálne (p1 sa priblíži), kolo 2 (starter p2): p1 special ako ÚPLNE posledná akcia kola
+  // → p2 skamenie s plnými 2 ťahmi do kola 3
+  tl = await playRound(c1, c2, [R, S, M("right")], [R, S, M("up")]);
+  tl = await playRound(c1, c2, [R, M("right"), SPR], [R, M("down"), A("left")]);
+  check(tl[tl.length - 1].p2.stone === 2, "T33: petrify poslednou akciou kola → plné 2 ťahy do ďalšieho kola", `stone=${tl[tl.length - 1].p2.stone}`);
+  // kolo 3 (starter p1=medúza): special na stále skamenenú p2 → invalid already_stone, kameň bez refreshu
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [SPR, R, S]);
+  c2.sock.emit("lock_in", [STONED, STONED, R]);
+  tl = await waitTimeline(c1, 8000);
+  await new Promise(r => setTimeout(r, 150));
+  const invStone = fxOf(tl, "invalid").filter(e => e.target === "p1" && e.reason === "already_stone");
+  check(invStone.length === 1, "T33: opakovaný special na sochu = invalid already_stone", `inv=${JSON.stringify(fxOf(tl, "invalid"))}`);
+  check(fxOf(tl, "petrify").length === 0, "T33: žiadny nový petrify (bez refreshu)");
+  check(fxOf(tl, "stoned").filter(e => e.target === "p2").length === 2, "T33: p2 odžil presne 2 stone passy");
+  check(tl[tl.length - 1].p2.stone === 0, "T33: po odžití passov je kameň preč", `stone=${tl[tl.length - 1].p2.stone}`);
+  invariantCheck(tl, "T33");
+
+  /* ---------- Test 34: Medúzin melee — vlastné políčko + diagonály, 4 dmg; ortogonál mimo dosah ---------- */
+  await freshMedusa();
+  // p1 dash → (2,1); p2 move up → (3,0) = diagonálne od p1 → melee zasiahne za 4
+  tl = await playRound(c1, c2, [D("right"), R, ML], [M("up"), R, S]);
+  const t34melee = fxOf(tl, "melee");
+  check(t34melee.length === 3 && Array.isArray(t34melee[0].cells) && t34melee[0].cells.length === 5,
+    "T34: melee efekt nesie 5 buniek (vlastná + 4 diagonály)", `cells=${JSON.stringify(t34melee[0]?.cells)}`);
+  const t34hits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t34hits.length === 1 && t34hits[0].dmg === 4, "T34: diagonálny melee dáva 4 dmg", `hits=${JSON.stringify(t34hits)}`);
+  invariantCheck(tl, "T34");
+  // kolo 2 (starter p2): p2 zíde na (3,1) = ortogonálne vedľa p1 (2,1) → melee minie
+  tl = await playRound(c1, c2, [R, ML, S], [M("down"), R, S]);
+  check(fxOf(tl, "melee").length === 3, "T34: švih prebehne aj pri minutí");
+  check(sumEffects(tl).hits.filter(h => h.target === "p2").length === 0,
+    "T34: ortogonálne susedné políčko je mimo dosahu", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "T34b");
 
   c1.sock.close(); c2.sock.close();
   server.kill();

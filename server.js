@@ -41,9 +41,11 @@ const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: vedľa 3, ďalej 2, na
 
 const MELEE_COST = 4;
 const MELEE_DMG  = 8;  // úder zblízka — zasiahne len súpera na rovnakom políčku
+const MEDUSA_MELEE_DMG = 4; // Medúzin melee má širší dosah (vlastné políčko + diagonály) za nižší dmg
 const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECIAL_BEAT_MS)
 
 const SPECIAL_COST = 5;
+const STONE_ACTIONS = 2; // Medúzin special: zasiahnutý súper preskočí najbližšie 2 základné akcie (kameň)
 const RECHARGE_GAIN = 4;
 const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
 const MIRROR_COST = 4; // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
@@ -63,7 +65,8 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // koľko vyhratých hier treba na zisk série
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
-const TOURNAMENT_MAGES = ["fire", "lightning", "wanderer"];
+const CHARS = ["fire", "lightning", "wanderer", "medusa"];
+const TOURNAMENT_MAGES = [...CHARS];
 // časový limit na ťah — vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
 const TIMER_OPTIONS = new Set(["off", "10", "30", "60", "quickdraw"]);
 
@@ -126,7 +129,8 @@ function newPlayer(slot) {
     x: pos.x, y: pos.y,
     hp: START_HP,
     mana: START_MANA,
-    char: null,        // "fire" | "lightning" | "wanderer"
+    char: null,        // "fire" | "lightning" | "wanderer" | "medusa"
+    stone: 0,          // koľko najbližších základných akcií hráč preskočí skamenený (Medúzin special)
     shield: false,     // zruší celý dmg najbližšej súperovej akcie
     shieldGold: false, // aktívny shield pochádza z golden shieldu (zlaté vizuály)
     mirror: false,     // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
@@ -224,8 +228,8 @@ function emitStateMasked() {
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
-  return { slot, x, y, hp, mana, char, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
+  const { slot, x, y, hp, mana, char, stone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
+  return { slot, x, y, hp, mana, char, stone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
 }
 function snapshot() {
   return {
@@ -278,6 +282,18 @@ function other(slot) { return slot === "p1" ? "p2" : "p1"; }
 function isDiagAdjacent(a, b) {
   return Math.abs(a.x - b.x) === 1 && Math.abs(a.y - b.y) === 1;
 }
+// Medúzin special: vlastné políčko + VŠETKY políčka striktne vo zvolenom smere (left/right)
+// v jej riadku a v riadkoch bezprostredne susedných (±1) — zo stredného radu tak pokryje všetky 3 riadky.
+// Musí sedieť s cellsForSpecialPreview v client.js (udržiavané paralelne).
+function medusaCells(me, dir) {
+  const sgn = dir === "left" ? -1 : 1;
+  const cells = [[me.x, me.y]];
+  for (let y = me.y - 1; y <= me.y + 1; y++) {
+    if (y < 0 || y >= game.board.h) continue;
+    for (let x = me.x + sgn; x >= 0 && x < game.board.w; x += sgn) cells.push([x, y]);
+  }
+  return cells;
+}
 function specialDamageAndHit(players, slot) {
   const me   = players[slot];
   const foeS = slot === "p1" ? "p2" : "p1";
@@ -321,15 +337,21 @@ function validQueue(queue, slot) {
   }
   if (q.length !== 3) return false;
   const types = q.map(a => a && a.type);
+  // skamenený hráč: presne prvých `stone` akcií musí byť pass ("stoned"), inde sa vyskytovať nesmie
+  const stone = Math.min(3, game.players[slot]?.stone || 0);
+  for (let i = 0; i < q.length; i++) {
+    if ((i < stone) !== (types[i] === "stoned")) return false;
+  }
   // démon útok je platný typ len pre buffnutého hráča (posledné kolo) a je bez smeru
   const canDemon = !!game.players[slot]?.lastStandBuff;
   // swap (výmena maga) je platný typ len v turnaji; smie byť vo fronte až 2× (výnimka z „každý typ raz za kolo")
   const isTournament = !!game.mageHp && game.config?.format === "tournament";
   if (types.some(t => !ACTION_TYPES.has(t)
+        && t !== "stoned"
         && !(t === "demon" && canDemon)
         && !(t === "swap" && isTournament))) return false;
-  // každý NE-swap typ najviac 1×; swapov najviac 2 (ciele sa overia nižšie)
-  const nonSwap = types.filter(t => t !== "swap");
+  // každý NE-swap typ najviac 1×; swapov najviac 2 (ciele sa overia nižšie); stoned passov môže byť viac
+  const nonSwap = types.filter(t => t !== "swap" && t !== "stoned");
   if (new Set(nonSwap).size !== nonSwap.length) return false;
   const swaps = q.filter(a => a.type === "swap");
   if (swaps.length > 2) return false;
@@ -462,13 +484,22 @@ function doMelee(slot, tl) {
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
 
-  // úder sa švihne vždy (mana je preč aj pri minutí), zasiahne len súpera na rovnakom políčku
+  // úder sa švihne vždy (mana je preč aj pri minutí); bežne zasiahne len súpera na rovnakom políčku,
+  // Medúza šľahá chvostom širšie — vlastné políčko + 1 diagonálne na všetky strany, za nižší dmg.
+  // Zasahované bunky idú v efekte (klient ich zvýrazní a nemusí zrkadliť logiku).
+  const medusa = me.char === "medusa";
+  const cells = [[me.x, me.y]];
+  if (medusa) {
+    for (const [dx, dy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+      if (inBounds(me.x + dx, me.y + dy)) cells.push([me.x + dx, me.y + dy]);
+    }
+  }
   // rovnaká dramaturgia ako special: opakované švihy v beatoch, dmg padne až po nich
   for (let r = 0; r < MELEE_REPEAT; r++) {
-    pushStateFrame(tl, [{ kind: "melee", from: slot }], SPECIAL_BEAT_MS);
+    pushStateFrame(tl, [{ kind: "melee", from: slot, cells }], SPECIAL_BEAT_MS);
   }
-  if (op && op.x === me.x && op.y === me.y) {
-    applyHit(opS, MELEE_DMG * dealMul(slot), tl, "melee");
+  if (op && cells.some(([x, y]) => op.x === x && op.y === y)) {
+    applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot), tl, "melee");
   }
 }
 
@@ -502,6 +533,27 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
   pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
 }
 
+// skamenenie cez obrany obrancu — zrkadlí applyHit: shield ho zablokuje (a spotrebuje sa),
+// mirror ho odrazí na Medúzu (surovo — odrazený kameň sa už nedá blokovať ani znova odraziť)
+function applyPetrify(targetSlot, tl) {
+  const t = game.players[targetSlot];
+  if (t.shield) {
+    pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
+    return;
+  }
+  if (t.mirror) {
+    const atkSlot = other(targetSlot);
+    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: 0, atk: "special", gold: !!t.mirrorGold }], MIRROR_BEAM_MS);
+    petrify(atkSlot, tl);
+    return;
+  }
+  petrify(targetSlot, tl);
+}
+function petrify(slot, tl) {
+  game.players[slot].stone = STONE_ACTIONS;
+  pushStateFrame(tl, [{ kind: "petrify", target: slot }], SMALL_DELAY_MS);
+}
+
 function doShield(slot, tl) {
   const a = game.players[slot];
   if (a.mana < SHIELD_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
@@ -520,13 +572,34 @@ function doMirror(slot, tl) {
   pushStateFrame(tl, [{ kind: "mirror_on", from: slot }], SMALL_DELAY_MS);
 }
 
-function doSpecial(slot, tl) {
+function doSpecial(slot, tl, dir = null) {
   const actor = game.players[slot];
   if (!actor) return;
 
   // Bez many -> len spätná väzba (Hurt na klientovi + low mana výstraha), žiadna special animácia
   if (actor.mana < SPECIAL_COST) {
     pushInvalid(tl, slot, SMALL_DELAY_MS, "mana");
+    return;
+  }
+
+  // Medúza: special nedáva dmg — súpera v zóne SKAMENÍ (preskočí najbližšie 2 základné akcie).
+  // Zóna má smer (left/right); zásah ide cez obrany (shield blokuje, mirror odrazí kameň na Medúzu).
+  if (actor.char === "medusa") {
+    if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
+    actor.mana -= SPECIAL_COST;
+    const cells = medusaCells(actor, dir);
+    for (let r = 0; r < SPECIAL_REPEAT; r++) {
+      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
+    }
+    const foeS = other(slot);
+    const foe  = game.players[foeS];
+    if (!foe || !cells.some(([x, y]) => x === foe.x && y === foe.y)) {
+      pushStateFrame(tl, [], SMALL_DELAY_MS);
+      return;
+    }
+    // už skamenený súper: útok bez efektu, žiadny refresh countera
+    if (foe.stone > 0) { pushInvalid(tl, slot, SMALL_DELAY_MS, "already_stone"); return; }
+    applyPetrify(foeS, tl);
     return;
   }
 
@@ -612,7 +685,7 @@ function doAction(slot, action, tl) {
     case "recharge": return doRecharge(slot, tl);
     case "attack":   return doBasic(slot, action.dir, tl);
     case "melee":    return doMelee(slot, tl);
-    case "special":  return doSpecial(slot, tl);
+    case "special":  return doSpecial(slot, tl, action.dir); // dir má len Medúza (left/right)
     case "shield":   return doShield(slot, tl);
     case "mirror":   return doMirror(slot, tl);
     case "demon":    return doDemon(slot, tl);
@@ -635,14 +708,18 @@ function pickCell(filterFn) {
   return cells.length ? cells[Math.floor(Math.random() * cells.length)] : null;
 }
 
-// koniec ťahu: pickupy (heal/mana) a damage políčka (dmg/IK); štít tile damage neblokuje
-function endOfStepTileEffects(tl) {
+// koniec ťahu: pickupy (heal/mana) a damage políčka (dmg/IK); štít tile damage neblokuje.
+// stonedStep = kto bol skamenený na začiatku kroku — skamenená postava sa berie, akoby na políčku nikto nestál
+// (žiadny pickup, žiadny dmg/IK), a to aj v kroku, v ktorom jej kameň práve skončil
+function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
   const order = game.starter === "p1" ? ["p1", "p2"] : ["p2", "p1"];
+  const stoned = (slot) => stonedStep[slot] || game.players[slot].stone > 0;
 
   // heal/mana — pri oboch hráčoch na rovnakom tile berie ten, kto kolo začína
   for (const slot of order) {
     const p = game.players[slot];
     if (p.hp <= 0) continue;
+    if (stoned(slot)) continue;    // skamenený nezbiera
     if (hasIK(p.x, p.y)) continue; // IK prekrýva => pickup neaktívny
     const idx = game.tiles.findIndex(t => (t.type === "heal" || t.type === "mana") && t.x === p.x && t.y === p.y);
     if (idx === -1) continue;
@@ -673,6 +750,7 @@ function endOfStepTileEffects(tl) {
   for (const slot of order) {
     const p = game.players[slot];
     if (p.hp <= 0) continue;
+    if (stoned(slot)) continue; // na skamenenú postavu sa tile dmg/IK nevyhodnocuje
     let dmg = 0, tileType = null;
     if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
     else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) { dmg = 1; tileType = "dmg"; }
@@ -759,10 +837,10 @@ function validBasicAction(a, used, allowDemon = false) {
 // hráč, ktorý sa nestihol locknúť: zachová svoju rozpracovanú frontu (draft) a chýbajúce do 3 doplní náhodne
 // exclude = typy, ktoré už pokrýva golden predťah (shield pri golden_shield, mirror pri golden_mirror) —
 // nesmú sa pridať ani z draftu, ani z náhodného doplnenia (inak by sa akcia zahrala 2× za kolo)
-function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false) {
+function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limit = 3, char = null) {
   const q = [], used = new Set(exclude);
   for (const a of (Array.isArray(draftQueue) ? draftQueue : [])) {
-    if (q.length >= 3) break;
+    if (q.length >= limit) break;
     if (!validBasicAction(a, used, allowDemon)) continue;
     q.push({ type: a.type, dir: a.dir || null });
     used.add(a.type);
@@ -770,9 +848,11 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false) {
   const pool = [...ACTION_TYPES].filter(t => !used.has(t));
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const dirs = [...MOVE_DIRS];
-  while (q.length < 3 && pool.length) {
+  while (q.length < limit && pool.length) {
     const t = pool.shift();
-    q.push((t === "move" || t === "attack" || t === "dash") ? { type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] } : { type: t });
+    if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] });
+    else if (t === "special" && char === "medusa") q.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin special potrebuje smer
+    else q.push({ type: t });
   }
   return q;
 }
@@ -815,7 +895,12 @@ function onTurnTimeout() {
     const exclude = new Set();
     if (p.golden) exclude.add("shield");
     if (p.goldenMirror) exclude.add("mirror");
-    p.queue = fillFromDraft(p.draft?.queue, exclude, !!p.lastStandBuff);
+    // skamenené sloty na začiatku kola sú pevné pass ťahy — dopĺňa sa len zvyšok
+    const stone = Math.min(3, p.stone || 0);
+    p.queue = [
+      ...Array.from({ length: stone }, () => ({ type: "stoned" })),
+      ...fillFromDraft(p.draft?.queue, exclude, !!p.lastStandBuff, 3 - stone, p.char),
+    ];
     p.locked = true;
   }
   if (game.players.p1.locked && game.players.p2.locked) resolveTurn();
@@ -890,6 +975,8 @@ function resolveTurn() {
       if (p.lastHope) {
         p.lastHope = false;
         pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "last_hope", dir: null } }], 250);
+        // skamenený hráč: zlaté akcie sa nevykonajú (bez ceny) a kameň NEuberajú
+        if (p.stone > 0) { pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS); continue; }
         resolveLastHopeSummon(slot, tl);
       } else {
         pushStateFrame(tl, [{ kind: "beat_empty", from: slot, beat: "lhope" }], ACTION_GAP_MS);
@@ -905,7 +992,10 @@ function resolveTurn() {
     const cost = isMirror ? GOLDEN_MIRROR_COST : GOLDEN_COST;
     const type = isMirror ? "golden_mirror" : "golden_shield";
     pushStateFrame(tl, [{ kind: "action", from: second, action: { type, dir: null } }], 250);
-    if (gp.mana >= cost) {
+    if (gp.stone > 0) {
+      // skamenený hráč: zlatý predťah sa nevykoná (mana ostáva) a kameň NEuberá
+      pushStateFrame(tl, [{ kind: "stoned", target: second }], SMALL_DELAY_MS);
+    } else if (gp.mana >= cost) {
       gp.mana -= cost;
       if (isMirror) {
         gp.mirror = true;
@@ -929,12 +1019,24 @@ function resolveTurn() {
 
   outer:
   for (let i = 0; i < 3; i++) {
+    // skamenenie chráni pred tile efektmi počas CELÉHO kroku, v ktorom padol aj posledný skamenený ťah
+    // (odkamenenie je „na konci ťahu" — tiles sa začnú vyhodnocovať až od nasledujúceho kroku)
+    const stonedStep = { p1: game.players.p1.stone > 0, p2: game.players.p2.stone > 0 };
     for (const slot of order) {
+      const meP = game.players[slot];
+      if (meP.stone > 0) {
+        // skamenený ťah: akcia sa preskočí (bez many) a NEspotrebuje súperovu obranu; posledný skip = koniec kameňa
+        pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "stoned", dir: null, to: null } }], 250);
+        meP.stone--;
+        pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS);
+        pushStateFrame(tl, [], ACTION_GAP_MS);
+        continue;
+      }
       const foe = other(slot);
       // obrany kryjú práve túto (najbližšiu) súperovu akciu — spotrebujú sa ňou aj bez zásahu
       const foeShieldArmed = game.players[foe].shield;
       const foeMirrorArmed = game.players[foe].mirror;
-      const act = game.players[slot].queue[i];
+      const act = meP.queue[i];
       // ohlás akciu klientovi (záznam kola pod HUD widgetom)
       if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null, to: act.to || null } }], 250);
       doAction(slot, act, tl);
@@ -949,7 +1051,7 @@ function resolveTurn() {
     }
 
     // koniec ťahu — efekty špeciálnych políčok (pickupy, dmg, IK)
-    endOfStepTileEffects(tl);
+    endOfStepTileEffects(tl, stonedStep);
     if (winnerNow()) { ended = true; break outer; }
   }
 
@@ -975,6 +1077,8 @@ function resolveTurn() {
       if (p.lastStand) {
         p.lastStand = false;
         pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "last_stand", dir: null } }], 250);
+        // skamenený hráč: zlatá akcia sa nevykoná (bez ceny) a kameň NEuberá
+        if (p.stone > 0) { pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS); continue; }
         if (demonUsed) { pushInvalid(tl, slot, SMALL_DELAY_MS, "no_demon"); continue; }
         demonUsed = true;
         resolveLastStandSummon(slot, tl); // démon zabije + oživí na plno, nastaví buff + doom na ďalšie kolo
@@ -989,6 +1093,8 @@ function resolveTurn() {
       p.goldenMana = false;
       const cost = p.manaRefills + 1;
       pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "golden_mana", dir: null } }], 250);
+      // skamenený hráč: zlatá akcia sa nevykoná (bez ceny) a kameň NEuberá
+      if (p.stone > 0) { pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS); continue; }
       // refill nesmie hráča zabiť a pri plnej mane je naprázdno -> neplatný
       if (p.hp > cost && p.mana < MAX_MANA) {
         p.hp -= cost;
@@ -1195,7 +1301,7 @@ io.on("connection", (socket) => {
   socket.on("choose_character", (key) => {
     if (!person) return;
     if (game.phase !== "playing") return;       // postava sa volí len v hernej fáze (pred kolami)
-    if (!["fire","lightning","wanderer"].includes(key)) return;
+    if (!CHARS.includes(key)) return;
     const slot = slotForPerson(person);
     const me = game.players[slot];
     if (me.char) return;                          // postava sa pre danú hru volí raz

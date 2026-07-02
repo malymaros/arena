@@ -177,7 +177,10 @@ youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
 // horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
-const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47 };
+const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47 };
+// vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
+// ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
+const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40 };
 
 // zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -200,6 +203,7 @@ const INVALID_MSG = {
   hp_low:    ["🙏 LOW HP",     "lowmana-float"],
   offboard:  ["🚫 OFF-BOARD",  "lowmana-float"],
   no_demon:  ["✗ DEMON TAKEN", "dmg-float"], // druhý Last Stand v kole — démon je len jeden
+  already_stone: ["🗿 ALREADY STONE", "lowmana-float"], // Medúzin special na už skamenenú postavu — bez efektu
 };
 const INVALID_MSG_DEFAULT = ["🚫 NO EFFECT", "lowmana-float"];
 const NEW_ROUND_MS = 1900; // „ROUND N" animácia medzi kolami (musí sedieť s CSS .round-banner.show)
@@ -216,6 +220,7 @@ const SPECIAL_ANIMS = {
   fire:      { file: "Flame_jet.png",    fps: SPECIAL_FPS, loop: true },
   lightning: { file: "Light_charge.png", fps: SPECIAL_FPS, loop: true },
   wanderer:  { file: "Magic_sphere.png", fps: SPECIAL_FPS, loop: true },
+  medusa:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true },
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
@@ -223,8 +228,17 @@ const FX_OFFSET_X = { lightning: 0.18 };
 const CHAR_META = {
   fire:      { name: "Fire Wizard",      dir: "fire" },
   lightning: { name: "Lightning Mage",   dir: "lightning" },
-  wanderer:  { name: "Wanderer Magician",dir: "wanderer" }
+  wanderer:  { name: "Wanderer Magician",dir: "wanderer" },
+  // Medúza: pravá strana (p2) má NATÍVNU tmavú paletu (Medusa2) namiesto CSS alt-color filtra;
+  // Charge.png = prefarbený fire fireball (zeleno-žltý / fialový) vygenerovaný per paleta
+  medusa:    { name: "Medusa",           dir: "medusa/Medusa", dirP2: "medusa/Medusa2" }
 };
+// sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
+function charDirFor(char, slot) {
+  const m = CHAR_META[char];
+  return (slot === "p2" && m?.dirP2) ? m.dirP2 : m?.dir;
+}
+function usesAltColor(char, slot) { return slot === "p2" && !CHAR_META[char]?.dirP2; }
 const ANIM_DEF = {
   idle:    { file: "Idle.png",     fps: 6,  loop: true  },
   run:     { file: "Run.png",      fps: 12, loop: true  },
@@ -233,6 +247,7 @@ const ANIM_DEF = {
   // looping variant pre melee — malá postava sa seká súbežne s veľkým sprite-om (inak by zamrzla na poslednom frame).
   // special nemá vlastný key: malá postava kreslí svoj efektový sprite (SPECIAL_ANIMS) cez key "casting" priamo v raf.
   attack2_loop: { file: "Attack_2.png", fps: 10, loop: true },
+  attack1_loop: { file: "Attack_1.png", fps: 10, loop: true }, // melee Medúzy — šľah celým telom (Attack_1)
   hurt:    { file: "Hurt.png",     fps: 10, loop: false },
   dead:    { file: "Dead.png",     fps: 7,  loop: false },
   victory: { file: "Idle.png", fps: 6, loop: true } // placeholder — raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
@@ -372,8 +387,7 @@ function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
     const { left, top } = cellToPx(x, y);
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
-    const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
-    const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+    const shift = pairShift(slot);
     const bodyDx = (computeFacing(state?.p1, state?.p2)[slot] || 1) * ACTOR_W * ((HEAD_CX[char] ?? 0.5) - 0.5);
     const cx = px + ACTOR_W / 2 + shift + bodyDx; // stred tela postavy
     cvs.style.left = Math.round(cx - boxW / 2) + "px";
@@ -417,11 +431,12 @@ const HEAD_CROP = {
   fire:      { cx: 0.40, cy: 0.55, size: 0.26 },
   lightning: { cx: 0.41, cy: 0.58, size: 0.26 },
   wanderer:  { cx: 0.47, cy: 0.56, size: 0.27 },
+  medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
 };
-const mageHeadHtml = (char, cls = "") => `<canvas class="mage-head ${cls}" data-char="${char}" width="52" height="52"></canvas>`;
+const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
 function drawMageHeadAnim(cvs, char, now) {
-  const dir = CHAR_META[char]?.dir;
+  const dir = charDirFor(char, cvs.dataset.slot || null); // p2 hlava Medúzy = natívna tmavá paleta
   const c = HEAD_CROP[char];
   if (!dir || !c) return;
   ensureSpriteMeta(dir, ANIM_DEF.idle.file).then(meta => {
@@ -477,14 +492,14 @@ function updateSpecialCenter(casts) {
   for (const sp of casts) {
     const caster = state?.[sp.from];
     if (!caster || !caster.char) continue;
-    const dirKey = CHAR_META[caster.char].dir;
+    const dirKey = charDirFor(caster.char, sp.from);
     const file   = sp.file || SPECIAL_ANIMS[caster.char].file;
 
     const cvs = document.createElement("canvas");
     const px  = Math.round(TILE_H * SPECIAL_SCALE);
     cvs.width = px; cvs.height = px;
     cvs.className = "special-center";
-    if (sp.from === "p2") cvs.classList.add("alt-color");
+    if (usesAltColor(caster.char, sp.from)) cvs.classList.add("alt-color");
     cvs.dataset.dir  = dirKey;
     cvs.dataset.file = file;
     if (sp.fps) cvs.dataset.fps = sp.fps;
@@ -563,7 +578,7 @@ function pulseGlow(color, now) {
   // hrubý plný obrys (viac tesných vrstiev) + pulzujúca žiara
   return `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 ${b1}px ${c}) drop-shadow(0 0 ${b2}px ${c}) drop-shadow(0 0 ${b3}px ${c})`;
 }
-// filter postavy: alt-color (pravá strana p2 vždy) + glow (obrana pulzuje > inak zlatý „YOU")
+// filter postavy: alt-color (pravá strana p2, ak nemá natívnu paletu) + kameň (sivá socha) + glow
 function actorFilter(slot, now) {
   const st = state?.[slot];
   // golden recharge stav (death summon) — žiarivý zlatý pulz postavy, má prednosť pred ostatným
@@ -571,12 +586,14 @@ function actorFilter(slot, now) {
     const t = 0.5 + 0.5 * Math.sin(now / 110);
     return `brightness(${(1.15 + 0.45 * t).toFixed(2)}) saturate(1.5) ` + pulseGlow("#ffd24a", now);
   }
-  const alt = slot === "p2" ? "saturate(.22) brightness(1.4) " : "";
+  const alt = usesAltColor(st?.char, slot) ? "saturate(.22) brightness(1.4) " : "";
+  // skamenená postava — kamenná sivá (prekryje aj alt filter, socha je socha)
+  const stone = (st?.stone || 0) > 0 && (st?.hp ?? 1) > 0 ? "grayscale(.92) brightness(.82) contrast(1.12) " : "";
   let glow = "";
   if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
   else if (st?.mirror) glow = pulseGlow(st.mirrorGold ? GLOW_COL.mirrorGold : GLOW_COL.mirror, now);
   else if (slot === me) glow = YOU_GOLD_GLOW;
-  return (alt + glow).trim();
+  return (stone + alt + glow).trim();
 }
 
 // umiestni nabíjaciu auru na postavu podľa jej AKTUÁLNEJ (interpolovanej) pozície sprite-u,
@@ -584,8 +601,7 @@ function actorFilter(slot, now) {
 function placeChargeAura(cont, slot) {
   const p = state?.[slot];
   if (!p || !p.char) return;
-  const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
-  const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+  const shift = pairShift(slot);
   // postava nie je v strede bunky — rovnaký horizontálny offset tela ako „YOU" vlajka (HEAD_CX + flip)
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
@@ -629,8 +645,7 @@ function computeDeathBound(slot) {
   const tgt = state?.[slot];
   if (!tgt) return { left: 0, top: 0 };
   const { left, top } = cellToPx(tgt.x, tgt.y);
-  const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
-  const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+  const shift = pairShift(slot);
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[tgt.char] ?? 0.5) - 0.5);
   const bodyCx = left + TILE_W / 2 + shift + headDx;
@@ -762,8 +777,7 @@ function placeDeathBehind(slot) {
 function spawnShieldBlock(slot, gold) {
   const p = state?.[slot];
   if (!p) return;
-  const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
-  const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+  const shift = pairShift(slot);
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
   const { left, top } = cellToPx(p.x, p.y);
@@ -1188,10 +1202,11 @@ function renderHUD() {
   hudBoxP2.classList.toggle("foe", me === "p1");
 
 
-  // pravá strana (p2) má VŽDY alternatívne vykreslenie (postava na boarde, portrét aj ghost)
-  actorP2.classList.add("alt-color");
-  hudCharP2.classList.add("alt-color");
-  actorGhost.classList.toggle("alt-color", me === "p2");
+  // pravá strana (p2) má VŽDY alternatívne vykreslenie (postava na boarde, portrét aj ghost);
+  // výnimka: postava s natívnou p2 paletou (Medúza) — triedy priebežne prepína raf podľa aktuálneho chara
+  actorP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
+  hudCharP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
+  actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
   updateGoldenButton();
 }
 
@@ -1210,7 +1225,8 @@ function actionIcon(action) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return "✨";
+    case "special":  return `✨${arrow[action.dir] || ""}`; // smer má len Medúza
+    case "stoned":   return "🗿";
     case "swap":     return "🌀";
     default:         return "?";
   }
@@ -1300,12 +1316,14 @@ function renderGrid(s, effects = []) {
     if (e?.kind === "special")   specials.push(e);
     if (e?.kind === "hit")       hitTarget = e.target;
     if (e?.kind === "tile_proc") procs.push(e);
-    // melee úder — zvýrazni zasahovanú bunku (bunku útočníka)
+    // melee úder — zvýrazni zasahované bunky (server ich posiela v efekte; Medúza má aj diagonály)
     // + zväčšená postava v strede so sekacou animáciou (analógia special overlay)
     if (e?.kind === "melee") {
       const caster = s?.[e.from];
-      if (caster) previewSet.add(`${caster.x},${caster.y}`);
-      meleeCasts.push({ from: e.from, file: ANIM_DEF.attack2.file, fps: ANIM_DEF.attack2.fps });
+      const cells = Array.isArray(e.cells) ? e.cells : (caster ? [[caster.x, caster.y]] : []);
+      cells.forEach(([x, y]) => previewSet.add(`${x},${y}`));
+      const atk = caster?.char === "medusa" ? ANIM_DEF.attack1_loop : ANIM_DEF.attack2_loop; // Medúza seká Attack_1
+      meleeCasts.push({ from: e.from, file: atk.file, fps: atk.fps });
     }
     // démon útok — blikajú zasahované bunky (všetky okrem kasterovej)
     if (e?.kind === "demon_attack" && Array.isArray(e.cells)) {
@@ -1317,7 +1335,8 @@ function renderGrid(s, effects = []) {
     const caster = s?.[sp.from];
     if (!caster || !caster.char) continue;
     castingNow[sp.from] = true;
-    const cells = cellsForSpecialPreview(caster);
+    // Medúzin special posiela zasahované bunky priamo v efekte (majú smer); ostatné sa dopočítajú
+    const cells = Array.isArray(sp.cells) ? sp.cells : cellsForSpecialPreview(caster, sp.dir);
     cells.forEach(([x,y]) => previewSet.add(`${x},${y}`));
   }
 
@@ -1355,13 +1374,13 @@ function renderGrid(s, effects = []) {
       const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
       if (chargeHere) {
         const charKey = s?.[chargeHere.from]?.char;
-        const dirKey  = charKey ? CHAR_META[charKey].dir : null;
+        const dirKey  = charKey ? (CHAR_META[charKey].chargeDir || charDirFor(charKey, chargeHere.from)) : null;
         if (dirKey) {
           const cvs = document.createElement("canvas");
           const px  = Math.round(TILE_H * CHARGE_SCALE);
           cvs.width = px; cvs.height = px;
           cvs.className = "charge-canvas";
-          if (chargeHere.from === "p2") cvs.classList.add("alt-color");
+          if (usesAltColor(charKey, chargeHere.from)) cvs.classList.add("alt-color"); // Medúza má projektil natívne prefarbený
           cvs.dataset.dir = dirKey;
           cvs.style.width  = px + "px";
           cvs.style.height = px + "px";
@@ -1387,11 +1406,20 @@ function renderGrid(s, effects = []) {
 }
 
 /* ---------- Special preview (hover) ---------- */
-function cellsForSpecialPreview(meState){
+// dir sa týka len Medúzy (left/right) — ostatné speciály smer nemajú
+function cellsForSpecialPreview(meState, dir){
   if (!meState || !meState.char) return [];
   const { x, y, char } = meState;
   const cells = [];
-  if (char === "fire"){
+  if (char === "medusa"){
+    // vlastné políčko + všetko striktne zvoleným smerom v riadku ±1 — zrkadlí server (medusaCells)
+    const sgn = dir === "left" ? -1 : 1;
+    cells.push([x, y]);
+    for (let cy = y - 1; cy <= y + 1; cy++){
+      if (cy < 0 || cy >= board.h) continue;
+      for (let cx = x + sgn; cx >= 0 && cx < board.w; cx += sgn) cells.push([cx, cy]);
+    }
+  } else if (char === "fire"){
     for (let cx=0; cx<board.w; cx++) cells.push([cx, y]);
   } else if (char === "lightning"){
     // všetky políčka opačnej "šachovej" farby než na ktorej stojí
@@ -1405,6 +1433,16 @@ function cellsForSpecialPreview(meState){
       if (cx>=0 && cy>=0 && cx<board.w && cy<board.h) cells.push([cx,cy]);
     });
   }
+  return cells;
+}
+// dosah melee — vlastné políčko; Medúza navyše 1 diagonálne na všetky strany (zrkadlí doMelee na serveri)
+function cellsForMeleePreview(p, char){
+  if (!p) return [];
+  const cells = [[p.x, p.y]];
+  if (char === "medusa") [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy])=>{
+    const cx = p.x + dx, cy = p.y + dy;
+    if (cx >= 0 && cy >= 0 && cx < board.w && cy < board.h) cells.push([cx, cy]);
+  });
   return cells;
 }
 // dosah démon útoku — všetky políčka okrem toho, na ktorom kaster (ghost) stojí
@@ -1489,6 +1527,16 @@ function computeFacing(p1, p2) {
   if (p1.x <= p2.x) return { p1: 1, p2: -1 };
   return { p1: -1, p2: 1 };
 }
+// horizontálny rozostup postáv na ZDIEĽANOM políčku (p1 doľava, p2 doprava) — veľké postavy (Medúza)
+// potrebujú väčší, pokojne aj s presahom do susedných políčok, inak sa sprity škaredo prekrývajú
+const PAIR_SHIFT_DEFAULT = 22;
+const PAIR_SHIFT = { medusa: 80 };
+function pairShift(slot, s = state) {
+  const p1 = s?.p1, p2 = s?.p2;
+  if (!p1 || !p2 || p1.x !== p2.x || p1.y !== p2.y) return 0;
+  const mag = PAIR_SHIFT[s?.[slot]?.char] ?? PAIR_SHIFT_DEFAULT;
+  return slot === "p1" ? -mag : mag;
+}
 // pri horizontálnom útoku sa mág otočí v smere streľby, aj keď súper stojí inde
 let facingOverride = { p1: { sx: 0, until: 0 }, p2: { sx: 0, until: 0 } };
 function currentFacing(slot, facing) {
@@ -1520,7 +1568,7 @@ function positionActors(s, immediate = false) {
       el.style.top  = py + "px";
     }
 
-    const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+    const shift = pairShift(slot, s);
     const scale = currentFacing(slot, facing);
     el.style.transform = `translateX(${shift}px) scaleX(${scale})`;
 
@@ -1534,10 +1582,10 @@ function positionActors(s, immediate = false) {
     const { left, top } = cellToPx(meData.x, meData.y);
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
-    const shift = same ? (me === "p1" ? -22 : 22) : 0;
-    // vertikálne: hlava je ~48 % pod vrchom rámu (zmerané, hlava na riadku ~62/128) —
+    const shift = pairShift(me, s);
+    // vertikálne: vrch hlavy per-mág (HEAD_TOP; mágovia ~48 % rámu, Medúza vyššie) —
     // značku kotvíme jej spodkom (chevron) tesne nad hlavu cez translateY(-100%)
-    const headY = py + ACTOR_H * 0.48 - 2;
+    const headY = py + ACTOR_H * (HEAD_TOP[meData.char] ?? 0.48) - 2;
     // horizontálne: postava nie je v strede rámca; stred hlavy + flip podľa smeru otočenia
     const headCx = HEAD_CX[meData.char] ?? 0.5;
     const headDx = facing[me] * ACTOR_W * (headCx - 0.5);
@@ -1571,7 +1619,7 @@ function actionBadgeView(a, ownerSlot) {
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${arrow[a.dir] || ""}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
-    case "special":       return { cls: "special", text: "✨" };
+    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` };
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
@@ -1579,7 +1627,8 @@ function actionBadgeView(a, ownerSlot) {
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
     case "last_stand":    return { cls: "golden",   html: LS_BADGE_IMG };
     case "demon":         return { cls: "demon",    html: LS_BADGE_IMG };
-    case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "", ownerSlot === "p2" ? "alt-color" : "") };
+    case "stoned":        return { cls: "stoned",   text: "🗿" };
+    case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "", usesAltColor(a.to, ownerSlot) ? "alt-color" : "", ownerSlot) };
     case "last_hope":     return { cls: "lasthope", html: LH_BADGE_IMG };
     default:              return { cls: "",        text: a?.type || "" };
   }
@@ -1591,10 +1640,10 @@ function attachQueueHover(el, a, idx) {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForAimPreview(p, a.dir)); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special") {
-    el.addEventListener("mouseenter", () => { const char = ghostCharAt(idx); const p = ghostPos(idx); if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char })); });
+    el.addEventListener("mouseenter", () => { const char = ghostCharAt(idx); const p = ghostPos(idx); if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }, a.dir)); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
-    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells([[p.x, p.y]]); });
+    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForMeleePreview(p, ghostCharAt(idx))); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "demon") {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForDemonPreview(p)); });
@@ -1606,7 +1655,22 @@ function attachQueueHover(el, a, idx) {
 // [golden shield] | a1(štartér) a1(nestartér) | a2 a2 | a3 a3 | golden mana(š) golden mana(n)
 // moje sloty vypĺňam (zlatý lining), súperove sú "?" placeholdery (odhalia sa počas animácie)
 let qBeatEls = []; // sloty podľa pozície 0..8 (pre kurzor + odhalenie súpera počas animácie)
+
+// skamenené ťahy nového kola sú vopred zamknuté ako pass (🗿) — predvyplnia sa na začiatok fronty
+// a nedajú sa odobrať (undo poistka); hráč plánuje len zvyšné sloty
+function ensureStonePrefix() {
+  if (!me || isSpectator || playing || lockedIn) return;
+  const mine = state?.[me];
+  if (!mine || !mine.char || mine.locked || state?.phase !== "playing") return;
+  const need = Math.min(3, mine.stone || 0);
+  const have = myQueue.filter(a => a.type === "stoned").length;
+  if (have === need && myQueue.slice(0, need).every(a => a.type === "stoned")) return;
+  const rest = myQueue.filter(a => a.type !== "stoned");
+  myQueue = [...Array.from({ length: need }, () => ({ type: "stoned" })), ...rest].slice(0, 3);
+}
+
 function renderQueue() {
+  ensureStonePrefix();
   queueEl.innerHTML = "";
   qBeatEls = [];
 
@@ -1758,6 +1822,10 @@ function updateActionButtons() {
   const dashUsed = myQueue.some(a => a.type === "dash");
   dashBtn.disabled = dashUsed;
   if (dashUsed) dashPicker.classList.add("hidden");
+  // special už nemá data-act (kvôli Medúzinmu pickeru) — zneaktívni ho rovnako ako move/attack/dash
+  const specialUsed = myQueue.some(a => a.type === "special");
+  specialBtn.disabled = specialUsed;
+  if (specialUsed) specialPicker.classList.add("hidden");
 }
 function updateLockButton() {
   const locked = !!state?.[me]?.locked;
@@ -1975,8 +2043,13 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "charge" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
         facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
+      // Medúzin special má smer — počas castu je otočená v smere pohľadu, nie na súpera
+      if (e.kind === "special" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
+        facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
+      }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, "attack2_loop", frameHold); // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat)
+        // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
+        setAnim(e.from, state?.[e.from]?.char === "medusa" ? "attack1_loop" : "attack2_loop", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
@@ -2009,6 +2082,19 @@ function schedulePlayTimeline(timeline) {
         const amt = (typeof e.amount === "number" ? e.amount : 4);
         spawnManaFloat(e.from, amt);
         spawnChargeAura(e.from); // „Goku" nabíjacia aura na postave
+      }
+      // skamenený ťah — akcia sa nevykonala: prečiarkni práve zaznamenaný badge/beat + STONED float
+      if (e.kind === "stoned" && (e.target === "p1" || e.target === "p2")) {
+        const acted = lastActed[e.target];
+        if (acted) {
+          acted.logEl?.classList.add("act-invalid");
+          acted.beatEl?.classList.add("act-invalid");
+        }
+        spawnFloat(e.target, "🗿 STONED", "stone-float");
+      }
+      // zásah Medúziným specialom — postava skamenie (sivú sochu kreslí raf zo state.stone)
+      if (e.kind === "petrify" && (e.target === "p1" || e.target === "p2")) {
+        spawnFloat(e.target, "🗿 PETRIFIED", "stone-float");
       }
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🛡️ SHIELD", "shield-float");
@@ -2134,7 +2220,8 @@ function schedulePlayTimeline(timeline) {
     }
     for (const s of ["p1", "p2"]) {
       if (casters.has(s))       { setAnim(s, "casting", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; } // special: malá postava hrá svoj efektový sprite (nie úder)
-      else if (shooters.has(s)) { setAnim(s, "attack",  frameHold); lastAttackEndAt[s] = performance.now() + frameHold; }
+      // Medúza strieľa s Attack_2 (krátky úder) — Attack_1 má vyhradený pre melee šľah
+      else if (shooters.has(s)) { setAnim(s, state?.[s]?.char === "medusa" ? "attack2" : "attack", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; }
     }
 
     renderGrid(state, frame.effects || []);
@@ -2199,7 +2286,7 @@ function drawCharSelectFrame(now) {
   const canvases = selEl.querySelectorAll("canvas.char-canvas");
   canvases.forEach((cvs) => {
     const key = cvs.dataset.char;
-    const dir = CHAR_META[key]?.dir;
+    const dir = charDirFor(key, me); // hráč vpravo vidí Medúzu v natívnej tmavej palete (Medusa2)
     if (!dir) return;
     const ctx = cvs.getContext("2d");
     // mŕtvy mág (tournament): dead póza mága + death démon prekrytý cez okno karty
@@ -2233,7 +2320,7 @@ function drawCharSelectFrame(now) {
 
   // malý castiaci mág v bunke castera mini-dosky — tiež animácia špeciálu (efektový sprite)
   if (abilityHoverChar && abilityCasterCanvas && SPECIAL_ANIMS[abilityHoverChar]) {
-    const dir = CHAR_META[abilityHoverChar]?.dir;
+    const dir = charDirFor(abilityHoverChar, me);
     const fxAnim = { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
     const offX = (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
     if (dir) ensureSpriteMeta(dir, fxAnim.file)
@@ -2275,13 +2362,15 @@ const ABILITY_PREVIEW = {
   fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row" },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours" },
+  // dmg: null = bez dmg — stats ukážu kameň (2 preskočené akcie); zóna sa kreslí pre smer doprava
+  medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", desc: "Own cell + everything one way (row ±1). No damage — petrifies: target skips 2 actions" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
   if (!def || !charAbilityEl) return;
   abilityHoverChar = char; // preview loop prepne tohto mága na cyklický cast špeciálu
   const w = board.w || 4, h = board.h || 3;
-  const hit = new Set(cellsForSpecialPreview({ x: def.caster.x, y: def.caster.y, char }).map(([x, y]) => `${x},${y}`));
+  const hit = new Set(cellsForSpecialPreview({ x: def.caster.x, y: def.caster.y, char }, def.dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
   grid.innerHTML = "";
@@ -2305,7 +2394,9 @@ function renderAbilityPreview(char) {
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   document.getElementById("ca-text").textContent = def.desc;
   const stats = document.getElementById("ca-stats");
-  stats.innerHTML = `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span></span>`;
+  stats.innerHTML = def.dmg != null
+    ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span></span>`
+    : `<span class="ca-dmg"><span class="ca-num">2×</span><span class="pix-ico" data-emoji="🗿"></span></span>`; // Medúza: kameň namiesto dmg
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
@@ -2329,6 +2420,8 @@ const attackBtn  = document.getElementById("attack-btn");
 const aimPicker  = document.getElementById("aim-picker");
 const dashBtn    = document.getElementById("dash-btn");
 const dashPicker = document.getElementById("dash-picker");
+const specialBtn    = document.getElementById("special-btn");
+const specialPicker = document.getElementById("special-picker"); // smer pohľadu — používa len Medúza
 
 function shakeBtn(btn) {
   btn.classList.add("shake");
@@ -2337,9 +2430,9 @@ function shakeBtn(btn) {
 
 // otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
 // odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
-let openPicker = null; // null | "move" | "attack" | "dash"
-const PICKERS = { move: dirPicker, attack: aimPicker, dash: dashPicker };
-const PICKER_BTNS = { move: moveBtn, attack: attackBtn, dash: dashBtn };
+let openPicker = null; // null | "move" | "attack" | "dash" | "special"
+const PICKERS = { move: dirPicker, attack: aimPicker, dash: dashPicker, special: specialPicker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, dash: dashBtn, special: specialBtn };
 
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
@@ -2352,7 +2445,7 @@ function actionButtonsAll() {
   const generic = [...document.querySelectorAll(".controls .actions button[data-act]")]
     .filter(b => !b.closest(".dir-picker"));
   return [
-    moveBtn, attackBtn, dashBtn,
+    moveBtn, attackBtn, dashBtn, specialBtn,
     document.getElementById("golden-btn"),
     document.getElementById("gold-dual-btn"),
     document.getElementById("demon-btn"),
@@ -2392,6 +2485,15 @@ function togglePicker(kind, btn, usedType) {
 moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"));
 attackBtn.addEventListener("click", () => togglePicker("attack", attackBtn, "attack"));
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
+// Special: Medúza si najprv vyberie smer pohľadu (←/→), ostatní mágovia pridajú akciu priamo
+specialBtn.addEventListener("click", () => {
+  if (ghostCharAt() === "medusa") { togglePicker("special", specialBtn, "special"); return; }
+  if (uiLocked()) return;
+  if (openPicker) { shakeBtn(specialBtn); return; }
+  if (myQueue.length >= 3 || myQueue.some(a => a.type === "special")) { shakeBtn(specialBtn); return; }
+  myQueue.push({ type: "special" });
+  renderQueue();
+});
 
 // Golden predťah: jedno tlačidlo predelené na 2 rovnako široké polovice — ŠTÍT (−3) | MIRROR (−5).
 // Vzájomne výlučné; rozsvieti sa vždy len zvolená polovica. Starterovi zamknuté (vizuálny zámok).
@@ -2564,7 +2666,7 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     if (type === "recharge")  myQueue.push({ type: "recharge" });
     if (type === "attack")    myQueue.push({ type: "attack", dir: arg });
     if (type === "melee")     myQueue.push({ type: "melee" });
-    if (type === "special")   myQueue.push({ type: "special" });
+    if (type === "special")   myQueue.push(arg ? { type: "special", dir: arg } : { type: "special" }); // smer (←/→) volí len Medúza
     if (type === "shield")    myQueue.push({ type: "shield" });
     if (type === "mirror")    myQueue.push({ type: "mirror" });
 
@@ -2574,6 +2676,7 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
 });
 undoBtn.addEventListener("click", () => {
   if (uiLocked()) return;
+  if (myQueue[myQueue.length - 1]?.type === "stoned") return; // skamenený pass sa nedá odobrať
   myQueue.pop();
   renderQueue();
 });
@@ -2697,7 +2800,7 @@ function updateMatchScore(s) {
 
 // tournament: 3 hlavy magov v HUD boxe každého hráča na mieste placeholderov (predtým lebky).
 // mŕtvy mág = lebka (nesie info o prehrách), aktuálny = zvýraznený, ostatní živí = klikateľní (len moja strana) na výmenu.
-const MAGE_ORDER = ["fire", "lightning", "wanderer"];
+const MAGE_ORDER = ["fire", "lightning", "wanderer", "medusa"];
 // aktuálne HP/mana maga pre daný slot (VEREJNÉ pre oba sloty): nasadený mág = živý stav z boardu (p1/p2),
 // lavička = prenesené hodnoty z verejného rosteru (rosterHp/rosterMana)
 function headStats(slot, char, isCurrent) {
@@ -2727,7 +2830,7 @@ function renderMageHeads() {
       const statsHtml = st
         ? `<span class="mh-stats"><span class="mh-hp">${pixSvg("heart")}${st.hp ?? "?"}</span><span class="mh-mana">${pixSvg("drop")}${st.mana ?? "?"}</span></span>`
         : `<span class="mh-stats empty"></span>`;
-      const face = isDead ? pixSvg("skull") : mageHeadHtml(char, "mh-canvas" + (slot === "p2" ? " alt-color" : ""));
+      const face = isDead ? pixSvg("skull") : mageHeadHtml(char, "mh-canvas" + (usesAltColor(char, slot) ? " alt-color" : ""), slot);
       return `<span class="${cls}" data-slot="${slot}" data-char="${char}" title="${CHAR_META[char]?.name || char}">${statsHtml}<span class="mh-face">${face}</span></span>`;
     }).join("");
   };
@@ -2815,6 +2918,7 @@ function autoLockTimeout() {
   while (myQueue.length < 3 && pool.length) {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
     if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
+    else if (t === "special" && ghostCharAt() === "medusa") myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin special potrebuje smer
     else myQueue.push({ type: t });
   }
   const payload = [...myQueue];
@@ -3002,14 +3106,33 @@ socket.on("state", (s) => {
   }
   // počas prehrávania snapshot bez timeline nevykresľuj — framy bežiacej timeline majú prednosť
 
+  // label melee podľa mága — Medúza má širší dosah (diagonály) za nižší dmg
+  const mineMelee = s[me];
+  if (mineMelee?.char && meleeBtn) {
+    const mCost = meleeBtn.querySelector(".cost");
+    if (mineMelee.char === "medusa") {
+      meleeBtn.title = "Melee (−4 mana, 4 dmg, hits your cell + all diagonal neighbours)";
+      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(mCost); }
+    } else {
+      meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
+      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
+    }
+  }
   // label special podľa mága (len cost badge + tooltip, ikonu nechaj)
   const mine = s[me];
-  const dmg = mine?.char ? { fire:5, lightning:3, wanderer:8 }[mine.char] : null;
-  const specialBtn = document.getElementById("special-btn");
-  if (dmg != null && specialBtn) {
-    specialBtn.title = `Special (−5 mana, ${dmg} dmg)`;
+  if (mine?.char && specialBtn) {
     const cost = specialBtn.querySelector(".cost");
-    if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
+    if (mine.char === "medusa") {
+      // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
+      specialBtn.title = "Special (−5 mana) — petrifying gaze: choose a direction; a hit opponent skips their next 2 actions";
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🗿`; hydratePix(cost); }
+    } else {
+      const dmg = { fire:5, lightning:3, wanderer:8 }[mine.char];
+      if (dmg != null) {
+        specialBtn.title = `Special (−5 mana, ${dmg} dmg)`;
+        if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
+      }
+    }
   }
 
   setServerTimer(s.timerMs ?? null); // synchronizuj odpočet so serverom (drží aj po refreshi)
@@ -3081,9 +3204,10 @@ function raf() {
       return;
     }
     cvs.style.display = "block";
+    cvs.classList.toggle("alt-color", usesAltColor(st.char, slot)); // Medúza p2 = natívna paleta, bez filtra
     cvs.style.filter = actorFilter(slot, now); // glow: obrana (pulz) > zlatý „YOU", + alt-color
 
-    const dir  = CHAR_META[st.char].dir;
+    const dir  = charDirFor(st.char, slot);
     // victory aj casting (special) = slučka efektového sprite daného mága priamo na malej postave (nie úderový švih)
     const aSt = animState[slot];
     if (aSt.key === "casting" && aSt.until && now > aSt.until) { aSt.key = "idle"; aSt.until = 0; } // special dohral → späť do idle
@@ -3092,11 +3216,15 @@ function raf() {
     const lyingDead = (st.hp ?? 1) <= 0 || st.down;
     if (lyingDead && aSt.key !== "dead") { aSt.key = "dead"; aSt.until = 0; }
     else if (!lyingDead && aSt.key === "dead") { aSt.key = "idle"; aSt.until = 0; }
-    const anim = (aSt.key === "victory" || aSt.key === "casting")
-      ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
-      : currentAnim(slot);
+    // skamenená postava = zamrznutá socha (fixný idle frame; sivý nádych rieši actorFilter); smrť má prednosť
+    const stoned = (st.stone || 0) > 0 && !lyingDead;
+    const anim = stoned
+      ? ANIM_DEF.idle
+      : (aSt.key === "victory" || aSt.key === "casting")
+        ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
+        : currentAnim(slot);
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, now, ACTOR_W, ACTOR_H))
+      .then(meta => drawSprite(ctx, meta, anim, stoned ? 0 : now, ACTOR_W, ACTOR_H))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
@@ -3120,7 +3248,9 @@ function raf() {
       actorGhost.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
       // rovnaký flip ako hráčov sprite — postava je vo frame mimo stredu, bez flipu vyzerá posunutá
       actorGhost.style.transform = `scaleX(${computeFacing(state.p1, state.p2)[me]})`;
-      const dir = CHAR_META[ghostCharAt() || mine.char].dir;
+      const ghostChar = ghostCharAt() || mine.char;
+      actorGhost.classList.toggle("alt-color", usesAltColor(ghostChar, me));
+      const dir = charDirFor(ghostChar, me);
       ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(() => {});
@@ -3140,10 +3270,14 @@ function raf() {
     cvs.classList.toggle("wounded",  hp > 3 && hp <= 6);
     cvs.classList.toggle("critical", hp > 0 && hp <= 3);
     cvs.classList.toggle("dead",     hp <= 0);
+    cvs.classList.toggle("alt-color", usesAltColor(st.char, slot)); // Medúza p2 = natívna paleta
+    // skamenený: portrét zamrzne na fixnom idle frame + sivý filter (CSS .stoned)
+    const stonedHud = (st.stone || 0) > 0 && hp > 0;
+    cvs.classList.toggle("stoned", stonedHud);
 
     // mŕtvy: prehraj Dead raz od momentu úmrtia a zamrzni na poslednom frame
-    const dir = CHAR_META[st.char].dir;
-    let anim = ANIM_DEF.idle, t = now;
+    const dir = charDirFor(st.char, slot);
+    let anim = ANIM_DEF.idle, t = stonedHud ? 0 : now;
     if (hp <= 0) {
       if (!hudDeadSince[slot]) hudDeadSince[slot] = now;
       anim = ANIM_DEF.dead;
@@ -3205,8 +3339,7 @@ function raf() {
         const aTop  = parseFloat(getComputedStyle(actorEl).top)  || 0;
         const facing = computeFacing(state.p1, state.p2);
         const headDx = (facing[buffSlot] || 1) * ACTOR_W * ((HEAD_CX[tgt.char] ?? 0.5) - 0.5);
-        const same = state.p1 && state.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
-        const shift = same ? (buffSlot === "p1" ? -22 : 22) : 0; // aktér nesie shift v transforme, nie v left
+        const shift = pairShift(buffSlot); // aktér nesie shift v transforme, nie v left
         deathBehind.style.left = (aLeft + shift + headDx + DEATH_SEQ.behindOffsetX) + "px";
         deathBehind.style.top  = (aTop + DEATH_SEQ.behindOffsetY) + "px";
         deathBehind.style.transform = `scale(${DEATH_SEQ.behindRatio})`;
@@ -3268,25 +3401,35 @@ renderHUD();
 renderQueue();
 clearActionLogs(); // skeleton placeholderov v zázname kola od začiatku
 
-// hover preview pre special
-const specialBtn = document.getElementById("special-btn");
+// hover preview pre special (const specialBtn je deklarovaný pri controls)
 if (specialBtn){
   // preview z ghost pozície — special by sa vykonal po už naplánovaných akciách
   specialBtn.addEventListener("mouseenter", ()=>{
     const char = ghostCharAt();   // po prípadnom swape vo fronte = nový mág
     const p = ghostPos();
     if (!char || !p) return;
+    if (char === "medusa") return; // Medúza potrebuje smer — preview ukazujú až šípky pickeru
     showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
 }
+// hover preview zóny Medúzinho specialu na šípkach pickeru (←/→) — z ghost pozície
+specialPicker?.querySelectorAll("button[data-act]").forEach(btn => {
+  const dir = btn.dataset.act.split(":")[1];
+  btn.addEventListener("mouseenter", () => {
+    const char = ghostCharAt();
+    const p = ghostPos();
+    if (char === "medusa" && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }, dir));
+  });
+  btn.addEventListener("mouseleave", clearPreviewCells);
+});
 
 // hover preview zásahovej bunky melee — vlastná bunka z ghost pozície po naplánovaných akciách
 const meleeBtn = document.querySelector('.controls button[data-act="melee"]');
 if (meleeBtn) {
   meleeBtn.addEventListener("mouseenter", () => {
     const p = ghostPos();
-    if (p) showPreviewCells([[p.x, p.y]]);
+    if (p) showPreviewCells(cellsForMeleePreview(p, ghostCharAt()));
   });
   meleeBtn.addEventListener("mouseleave", clearPreviewCells);
 }
