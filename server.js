@@ -26,7 +26,8 @@ app.use(express.static(path.join(__dirname, "public"), {
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
-// prvý štartér série je náhodný; testy si ho vedia zafixovať cez env (A alebo B)
+// biely (p1, vľavo) začína hru 1 (v sérii sa štartér hier strieda) — losuje sa, KTO z osôb A/B
+// je biely (startMatch); testy si osobu na slote p1 vedia zafixovať cez env (A alebo B)
 const FORCE_FIRST_STARTER = ["A", "B"].includes(process.env.FORCE_FIRST_STARTER) ? process.env.FORCE_FIRST_STARTER : null;
 
 /* -------------------- Game constants -------------------- */
@@ -172,13 +173,13 @@ function newGame() {
     },
     arena: "bridge",
     turn: 1,
-    starter: "p1", // slot, ktorý začína aktuálne kolo; medzi kolami sa preklápa (hru môže začínať aj p2)
+    starter: "p1", // slot, ktorý začína aktuálne kolo; hru 1 otvára p1 (biely), v sérii sa štartér hier strieda, medzi kolami sa preklápa
     tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" } — pribúdajú od konca 1. kola
     iks: [],       // [{ x, y }] — insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
     // séria zápasov
-    seats: { p1: "A", p2: "B" }, // FIXNÉ: osoba A (host) vždy vľavo (p1), osoba B vždy vpravo (p2)
+    seats: { p1: "A", p2: "B" }, // kto sedí na ktorom slote — LOSUJE sa v startMatch (p1 = biely, začína); fixné na celú sériu
     seriesWins: { A: 0, B: 0 },
-    series: { gameIndex: 1, needed: 1, firstStarter: "A", format: "single" },
+    series: { gameIndex: 1, needed: 1, format: "single" },
     // tournament: HP a mana každého z 3 magov per osoba sa prenášajú medzi hrami (null mimo tournamentu)
     mageHp: null,
     mageMana: null,
@@ -201,7 +202,7 @@ function seriesSnapshot() {
   };
 }
 
-// pošli každej osobe jej slot (fixný na celú sériu: A=p1, B=p2) + či je host
+// pošli každej osobe jej slot (vylosovaný v startMatch, fixný na celú sériu) + či je host (host = osoba A)
 function emitYouAre() {
   for (const person of ["A", "B"]) {
     const sock = personSockets[person];
@@ -1424,10 +1425,15 @@ function handleGameEnd(timelineDurationMs) {
 /* -------------------- Match / game start -------------------- */
 function startMatch(config) {
   game.config = config;
+  // BIELY (p1, vľavo) začína hru 1 — náhodné je, KTO je biely: osoby A/B sa vylosujú na sloty
+  // ešte PRED animáciou ruletky na klientovi (color_roll nižšie je už len divadlo s hotovým výsledkom).
+  // FORCE_FIRST_STARTER=A|B pripne osobu na p1/bieleho (testy). Sloty sú fixné na celú sériu;
+  // v sérii (bo3/tournament) sa štartér jednotlivých hier strieda (viď startGame).
+  const white = FORCE_FIRST_STARTER || (Math.random() < 0.5 ? "A" : "B");
+  game.seats = { p1: white, p2: otherPerson(white) };
   game.series = {
     gameIndex: 0,
     needed: MATCH_FORMATS[config.format] || 1,
-    firstStarter: FORCE_FIRST_STARTER || (Math.random() < 0.5 ? "A" : "B"), // hru 1 začína náhodná osoba; v sérii sa štartér strieda
     format: config.format,
   };
   game.seriesWins = { A: 0, B: 0 };
@@ -1439,6 +1445,9 @@ function startMatch(config) {
     ? { A: fullMage(START_MANA), B: fullMage(START_MANA) }
     : null;
   startGame(1);
+  // ruleta farieb: pridelenie slotov je hotové (you_are už odišlo zo startGame) — klient len prehrá
+  // točiacu sa strelku na yin-yang kruhu, ktorá skončí na farbe hráča (p1 = biely, p2 = čierny)
+  io.emit("color_roll", {});
 }
 
 function fullMage(value) {
@@ -1447,20 +1456,17 @@ function fullMage(value) {
   return m;
 }
 
-// pripraví novú hru v sérii: strany sú FIXNÉ (A=p1 vľavo, B=p2 vpravo), strieda sa len štartér hry,
-// resetne hráčov a vyčistí postavy (char-select pred každou hrou)
+// pripraví novú hru v sérii: strany sú FIXNÉ na celú sériu (vylosované v startMatch; p1 = biely vľavo).
+// Hru 1 začína VŽDY biely (p1); v sérii (bo3/tournament) sa štartér hier strieda — hru 2 otvára čierny (p2).
+// Resetne hráčov a vyčistí postavy (char-select pred každou hrou).
 function startGame(gameIndex) {
   clearTurnTimer();
-  const starterPerson = (gameIndex % 2 === 1)
-    ? game.series.firstStarter
-    : otherPerson(game.series.firstStarter);
   game.series.gameIndex = gameIndex;
-  game.seats = { p1: "A", p2: "B" };
 
   game.players.p1 = newPlayer("p1");
   game.players.p2 = newPlayer("p2");
   game.turn = 1;
-  game.starter = slotForPerson(starterPerson); // 1. kolo hry začína striedajúci sa štartér (hru 2 začína p2)
+  game.starter = (gameIndex % 2 === 1) ? "p1" : "p2"; // nepárne hry otvára biely, párne čierny; v rámci hry sa štartér kola preklápa
   game.tiles = [];
   game.iks = [];
   game.phase = "playing";

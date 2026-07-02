@@ -2512,7 +2512,11 @@ function renderAbilityPreview(char) {
   if (!def || !charAbilityEl) return;
   abilityHoverChar = char; // preview loop prepne tohto mága na cyklický cast špeciálu
   const w = board.w || 4, h = board.h || 3;
-  const hit = new Set(cellsForSpecialPreview({ x: def.caster.x, y: def.caster.y, char }, def.dir).map(([x, y]) => `${x},${y}`));
+  // hráč vpravo (p2): náhľad zrkadlovo — caster pri pravom okraji, smerový special (Medúza) mieri doľava
+  const mirror = me === "p2";
+  const caster = mirror ? { x: w - 1 - def.caster.x, y: def.caster.y } : def.caster;
+  const dir = (mirror && def.dir) ? (def.dir === "right" ? "left" : "right") : def.dir;
+  const hit = new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
   grid.innerHTML = "";
@@ -2520,7 +2524,7 @@ function renderAbilityPreview(char) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const c = document.createElement("div");
     c.className = "mini-cell";
-    if (def.caster.x === x && def.caster.y === y) {
+    if (caster.x === x && caster.y === y) {
       c.classList.add("caster");
       // malý castiaci mág priamo v bunke castera (rAF ho cyklicky kreslí)
       const mini = document.createElement("canvas");
@@ -3184,6 +3188,43 @@ function showIntermission(gameWinner, series) {
 socket.on("you_are", (info) => {
   if (info && typeof info === "object") { me = info.slot; isHost = !!info.isHost; }
   else { me = info; } // spätná kompat.
+});
+
+/* ---------- Losovanie farieb (po configure_match) ---------- */
+// Server už osoby vylosoval na sloty (p1 = BIELY vľavo a začína každú hru, p2 = ČIERNY vpravo)
+// a poslal you_are — tu sa výsledok len ZINSCENUJE: strelka na yin-yang kruhu sa roztočí
+// a dobehne na polovici hráčovej farby (biela vľavo 270°, čierna vpravo 90°). Overlay leží
+// NAD char-selectom, takže výber postavy čaká, kým ruleta dobehne.
+const colorRollEl = document.getElementById("color-roll");
+const crArrowEl   = document.getElementById("cr-arrow");
+const crResultEl  = document.getElementById("cr-result");
+socket.on("color_roll", () => {
+  if (!colorRollEl || (me !== "p1" && me !== "p2")) return; // divák ruletu nepotrebuje
+  const white = me === "p1";
+  colorRollEl.classList.remove("hidden");
+  colorRollEl.style.opacity = "";
+  crResultEl.classList.add("hidden");
+  crResultEl.innerHTML = "";
+  // 4 celé otáčky + dobeh na cieľovú farbu ± rozptyl (len vizuálny — výsledok je daný)
+  const target = (white ? 270 : 90) + (Math.random() * 40 - 20);
+  crArrowEl.getAnimations().forEach(a => a.cancel());
+  const spin = crArrowEl.animate(
+    [{ transform: "rotate(0deg)" }, { transform: `rotate(${4 * 360 + target}deg)` }],
+    { duration: 3400, easing: "cubic-bezier(.12,.68,.18,1)", fill: "forwards" }
+  );
+  spin.onfinish = () => {
+    crResultEl.innerHTML = white
+      ? `YOU PLAY <span class="cr-white">⚪ WHITE</span> — YOU GO FIRST!`
+      : `YOU PLAY <span class="cr-black">⚫ BLACK</span> — YOU GO SECOND`;
+    crResultEl.classList.remove("hidden");
+    setTimeout(() => {
+      const fade = colorRollEl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: "ease-in", fill: "forwards" });
+      fade.onfinish = () => {
+        colorRollEl.classList.add("hidden");
+        fade.cancel(); // fill:forwards by inak držal opacity 0 aj pri ďalšom zápase
+      };
+    }, 1700);
+  };
 });
 
 // hra je plná — divák hru sleduje, ale nemá výber postavy ani ovládanie (box s hláškou dole)

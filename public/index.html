@@ -251,6 +251,30 @@
     </div>
   </div>
 
+  <!-- Losovanie farieb po nastavení zápasu — točiaca sa strelka na yin-yang kruhu skončí na farbe hráča.
+       Pridelenie urobil server ešte pred animáciou (p1 = biely vľavo a začína, p2 = čierny vpravo). -->
+  <div id="color-roll" class="color-roll hidden">
+    <div class="cr-title">DRAWING SIDES…</div>
+    <div class="cr-wheel">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <!-- čierny podklad + biela polovica vľavo s klasickým yin-yang esíčkom + bodky -->
+        <circle cx="100" cy="100" r="97" fill="#16171b"/>
+        <path d="M100,197 A97,97 0 0 1 100,3 A48.5,48.5 0 0 1 100,100 A48.5,48.5 0 0 0 100,197 Z" fill="#f1f1ec"/>
+        <circle cx="100" cy="51.5" r="15" fill="#16171b"/>
+        <circle cx="100" cy="148.5" r="15" fill="#f1f1ec"/>
+        <circle cx="100" cy="100" r="97" fill="none" stroke="#000" stroke-width="5"/>
+      </svg>
+      <div class="cr-arrow" id="cr-arrow">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <polygon points="100,16 88,44 112,44" fill="#ffb300" stroke="#000" stroke-width="4"/>
+          <rect x="96" y="42" width="8" height="62" fill="#ffb300" stroke="#000" stroke-width="3"/>
+        </svg>
+      </div>
+      <div class="cr-knob"></div>
+    </div>
+    <div class="cr-result hidden" id="cr-result"></div>
+  </div>
+
   <!-- Tretí a ďalší pripojený hráč — hra je plná, len informačná hláška -->
   <div id="spectator" class="spectator hidden">Game in progress…</div>
 

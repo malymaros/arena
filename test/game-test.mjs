@@ -14,8 +14,8 @@ function check(cond, label, detail = "") {
 
 function startServer() {
   const proc = spawn(process.execPath, ["server.js"], {
-    // FORCE_FIRST_STARTER: prvý štartér série je v produkcii náhodný — testy ho fixujú na A (host, p1),
-    // aby deterministické scenáre (golden akcie nestartéra, démon startera…) sedeli
+    // FORCE_FIRST_STARTER: v produkcii sa osoby losujú na sloty (p1 = biely, začína každú hru) —
+    // testy fixujú osobu A (host) na p1, aby deterministické scenáre (golden akcie nestartéra, démon startera…) sedeli
     env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A" },
     stdio: "ignore",
   });
@@ -27,8 +27,9 @@ function connect() {
     const sock = io(URL, { transports: ["websocket"] });
     // pomalší boot servera nesmie zhodiť test — socket.io sa retryne samo; reject až po celkovom timeoute
     const killer = setTimeout(() => { sock.close(); reject(new Error("connect timeout")); }, 15000);
-    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null };
+    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0 };
     sock.on("you_are", (s) => { ctx.slot = s?.slot ?? s; ctx.isHost = !!s?.isHost; });
+    sock.on("color_roll", () => { ctx.colorRolls++; }); // ruleta farieb po configure_match (klient ju animuje)
     sock.on("game_result", (g) => { ctx.gameResult = g; });
     sock.on("turn_timer", (t) => { ctx.lastTimer = t; });
     sock.on("new_game", () => { /* séria: ďalšia hra — sloty prídu cez you_are */ });
@@ -409,16 +410,21 @@ async function main() {
     `pos=${t14last.p1.x},${t14last.p1.y}`);
   invariantCheck(tl, "T14b");
 
-  /* ---------- Test 15: BO3 séria — skóre, fixné strany + striedanie štartéra, game_over až pri rozhodnutí ---------- */
+  /* ---------- Test 15: BO3 séria — skóre, vylosované fixné strany (p1=biely začína každú hru), game_over až pri rozhodnutí ---------- */
   // mana-only tiles (žiadne dmg/heal/ik) => HP sa mení len cez akcie => kill je deterministický
   c1.sock.emit("retry");
   await new Promise(r => setTimeout(r, 150));
+  const rollsBefore = { c1: c1.colorRolls, c2: c2.colorRolls };
   configureMatch(c1, { format: "bo3", tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
   await new Promise(r => setTimeout(r, 150));
   c1.gameOver = null; c1.gameResult = null;
   check(c1.slot === "p1" && c1.lastState?.series?.format === "bo3" && c1.lastState?.series?.needed === 2,
-    "T15: BO3 nakonfigurované, host hru 1 začína vľavo (p1)",
+    "T15: BO3 nakonfigurované, vylosovaný biely (FORCE=A) hru 1 začína vľavo (p1)",
     `slot=${c1.slot}, series=${JSON.stringify(c1.lastState?.series)}`);
+  check(c1.colorRolls === rollsBefore.c1 + 1 && c2.colorRolls === rollsBefore.c2 + 1,
+    "T15: color_roll (ruleta farieb) odišiel obom hráčom po konfigurácii",
+    `c1=${c1.colorRolls - rollsBefore.c1}, c2=${c2.colorRolls - rollsBefore.c2}`);
+  check(c1.lastState?.starter === "p1", "T15: hru 1 začína biely (p1)", `starter=${c1.lastState?.starter}`);
   c1.sock.emit("choose_character", "fire");
   c2.sock.emit("choose_character", "lightning");
   await new Promise(r => setTimeout(r, 200));
@@ -437,8 +443,8 @@ async function main() {
   while (c1.lastState?.series?.gameIndex !== 2 && Date.now() - t0 < 20000) await new Promise(r => setTimeout(r, 100));
   check(c1.lastState?.series?.gameIndex === 2, "T15: séria postúpila na hru 2",
     `gameIndex=${c1.lastState?.series?.gameIndex}`);
-  check(c1.slot === "p1", "T15: strany sú fixné — host ostáva vľavo (p1) aj v hre 2", `slot=${c1.slot}`);
-  check(c1.lastState?.starter === "p2", "T15: hru 2 začína druhý hráč (starter=p2)", `starter=${c1.lastState?.starter}`);
+  check(c1.slot === "p1", "T15: strany sú fixné — vylosovaný biely ostáva vľavo (p1) aj v hre 2", `slot=${c1.slot}`);
+  check(c1.lastState?.starter === "p2", "T15: hru 2 v sérii začína čierny (p2) — štartér hier sa strieda", `starter=${c1.lastState?.starter}`);
 
   // tiles bez dmg/IK — aby náhodný tile nezabil hráča a nepokazil deterministické last-stand scenáre
   async function freshGameLS() {
