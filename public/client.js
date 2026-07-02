@@ -343,14 +343,16 @@ function ensureTeleportFrames(char) {
   return (_teleFrames[char] = Promise.all(proms).then(() => imgs));
 }
 // per-mág: veľkosť explózie (× rozmer políčka) + kotvenie ("feet" = od nôh nahor, "torso" = na stred torza)
+// bottomTrim = zlomok výšky PNG, ktorý je pod viditeľným obsahom priehľadný (obsah vo frame nesiaha po spodok)
+// dy = dodatočný posun celej explózie NADOL (× výška políčka) — ručné doladenie per mág
 const TELEPORT_FX = {
   fire:      { scale: 1.0, anchor: "feet" },   // oheň horí od zeme, zmestí sa do políčka
-  lightning: { scale: 1.6, anchor: "torso" },
-  wanderer:  { scale: 1.6, anchor: "torso" },
+  lightning: { scale: 1.6, anchor: "feet", bottomTrim: 0.17, dy: 0.20 }, // blesk šľahá od nôh nahor
+  wanderer:  { scale: 1.6, anchor: "torso", dy: 0.12 },
 };
 const TORSO_FRAC = 0.66; // stred torza ako zlomok výšky actor boxu (0 = hore, 1 = päty)
 // prehraj explóziu CENTROVANÚ na POSTAVU daného slotu (char = ktorého maga framy); durationMs = trvanie (= frame.delayMs)
-// opacity: 0.75 keď je pred viditeľným mágom (out), 1.0 keď mág nie je viditeľný (in)
+// opacity: vždy 0.75 (obe fázy teleportu rovnako semi-transparentné)
 function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
   const st = state?.[slot];
   if (!st) { onDone && onDone(); return; }
@@ -365,20 +367,23 @@ function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
     cvs.width = boxW; cvs.height = boxH;
     cvs.className = "teleport-fx";
     cvs.style.opacity = String(opacity ?? 1);
-    // horizontálne = STRED POSTAVY; vertikálne = SPODOK spritu pri NOHÁCH (oheň horí od zeme nahor)
+    // horizontálne = stred TELA postavy (sprite je vo frame mimo stredu — rovnaký HEAD_CX + flip vzor
+    // ako „YOU" vlajka a anjel); vertikálne = kotvenie feet/torso + per-mág dy posun nadol
     const { left, top } = cellToPx(x, y);
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
     const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
     const shift = same ? (slot === "p1" ? -22 : 22) : 0;
-    const cx = px + ACTOR_W / 2 + shift; // stred postavy
+    const bodyDx = (computeFacing(state?.p1, state?.p2)[slot] || 1) * ACTOR_W * ((HEAD_CX[char] ?? 0.5) - 0.5);
+    const cx = px + ACTOR_W / 2 + shift + bodyDx; // stred tela postavy
     cvs.style.left = Math.round(cx - boxW / 2) + "px";
+    const dyPx = Math.round(TILE_H * (fx.dy || 0));
     if (anchorBottom) {
-      const feetY = py + ACTOR_H;                       // päty postavy (= spodok bunky)
-      cvs.style.top = Math.round(feetY - boxH) + "px";  // spodok canvasu = päty (oheň od zeme)
+      const feetY = py + ACTOR_H;                              // päty postavy (= spodok bunky)
+      cvs.style.top = Math.round(feetY - boxH + dyPx) + "px";  // spodok canvasu = päty (oheň od zeme)
     } else {
-      const torsoY = py + ACTOR_H * TORSO_FRAC;          // stred torza
-      cvs.style.top = Math.round(torsoY - boxH / 2) + "px";
+      const torsoY = py + ACTOR_H * TORSO_FRAC;                // stred torza
+      cvs.style.top = Math.round(torsoY - boxH / 2 + dyPx) + "px";
     }
     // vlož NA KONIEC #actors (DOM poradie) → explózia je PRED mágom (navrchu)
     actorsEl.appendChild(cvs);
@@ -395,7 +400,8 @@ function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
         const sc = Math.min(cvs.width / img.naturalWidth, cvs.height / img.naturalHeight);
         const dw = img.naturalWidth * sc, dh = img.naturalHeight * sc;
         // horizontálne centrovať; vertikálne: "feet" ukotviť dole (oheň od zeme), "torso" centrovať
-        const dy = anchorBottom ? (cvs.height - dh) : (cvs.height - dh) / 2;
+        // bottomTrim posunie kresbu nižšie o priehľadný spodný okraj PNG, aby viditeľný obsah sadol na päty
+        const dy = anchorBottom ? (cvs.height - dh + dh * (fx.bottomTrim || 0)) : (cvs.height - dh) / 2;
         ctx.drawImage(img, (cvs.width - dw) / 2, dy, dw, dh);
       }
       if (t < dur) requestAnimationFrame(stepFx);
@@ -2044,15 +2050,15 @@ function schedulePlayTimeline(timeline) {
         demonCenterDisappear();
       }
       // Teleport (výmena maga) — dvojfázovo, postava fade-uje plynulo (ako démon):
-      // OUT: starý mág plynulo MIZNE (1→0), explózia PRED ním semi-transparentne (0.75, vidno maga cez ňu).
-      // IN:  nový mág sa plynulo OBJAVUJE (0→1), explózia plná (1.0 — mág pod ňou nie je viditeľný).
+      // OUT: starý mág plynulo MIZNE (1→0), IN: nový sa plynulo OBJAVUJE (0→1).
+      // Explózia je v OBOCH fázach rovnako semi-transparentná (0.75), nech pôsobí konzistentne.
       if (e.kind === "teleport_out" && (e.from === "p1" || e.from === "p2")) {
         fadeActor(e.from, 1, 0, frameHold);
         playTeleportExplosion(e.from, e.char, frameHold, 0.75);
       }
       if (e.kind === "teleport_in" && (e.from === "p1" || e.from === "p2")) {
         fadeActor(e.from, 0, 1, frameHold);
-        playTeleportExplosion(e.from, e.char, frameHold, 1.0);
+        playTeleportExplosion(e.from, e.char, frameHold, 0.75);
       }
       // Last Hope: červená „hope" postava v strede → HP→1, mana→10 (HUD zo snapshotov) → zmizne, červený ultra mód ostáva
       if (e.kind === "last_hope_summon" && (e.from === "p1" || e.from === "p2")) {
@@ -2883,20 +2889,17 @@ function showIntermission(gameWinner, series) {
     gameWinner === "draw" ? "TIE" : (mineWon ? "YOU WON THIS GAME!" : "YOU LOST THIS GAME");
 
   const needed = series?.needed || 1;
-  const tournament = series?.format === "tournament";
-  const onIcon  = tournament ? "skull" : "crown";
-  const offIcon = tournament ? "skull_outline" : "crown_outline";
-  // placeholdery + ikony pre obe strany; práve pridaná (koruna víťazovi / lebka porazenému) sa animuje
+  // placeholdery + ikony pre obe strany; práve pridaná koruna víťazovi sa animuje
+  // (aj v tournamente koruny víťazovi — lebky mŕtvych magov nesie HUD v hre, nie tento prechod)
   const renderSide = (filled, isMarkSide) => Array.from({ length: needed }, (_, i) => {
     const isOn = i < (filled || 0);
     const isNew = isMarkSide && i === (filled || 0) - 1;
-    return `<span class="crown${tournament ? " skull" : ""}${isNew ? " new" : ""}">${pixSvg(isOn ? onIcon : offIcon)}</span>`;
+    return `<span class="crown${isNew ? " new" : ""}">${pixSvg(isOn ? "crown" : "crown_outline")}</span>`;
   }).join("");
-  // BO3: koruna výhercovi; tournament: lebka porazenému (= výhra súpera na jeho strane skóre)
-  const fillL = tournament ? series?.winsP2 : series?.winsP1;
-  const fillR = tournament ? series?.winsP1 : series?.winsP2;
-  const markL = tournament ? (gameWinner === "p2") : (gameWinner === "p1");
-  const markR = tournament ? (gameWinner === "p1") : (gameWinner === "p2");
+  const fillL = series?.winsP1;
+  const fillR = series?.winsP2;
+  const markL = gameWinner === "p1";
+  const markR = gameWinner === "p2";
   document.getElementById("im-crowns-l").innerHTML = renderSide(fillL, markL);
   document.getElementById("im-crowns-r").innerHTML = renderSide(fillR, markR);
 
