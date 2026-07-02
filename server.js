@@ -46,6 +46,7 @@ const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECI
 
 const SPECIAL_COST = 5;
 const STONE_ACTIONS = 2; // Medúzin special: zasiahnutý súper preskočí najbližšie 2 základné akcie (kameň)
+// Minotaurov special (labyrint) nemá číselnú konštantu — trvá, kým jeden hráč nezasiahne druhého (viď endLabyrinths)
 const RECHARGE_GAIN = 4;
 const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
 const MIRROR_COST = 4; // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
@@ -65,9 +66,9 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // koľko vyhratých hier treba na zisk série
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
-const CHARS = ["fire", "lightning", "wanderer", "medusa"];
-// tournament zatiaľ len základní magovia — experimentálne postavy (medusa) až po návrhu výberu tímu.
-// Medúza tým pádom nie je v mageHp/mageMana → choose_character aj swap ju v tournamente odmietnu.
+const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur"];
+// tournament zatiaľ len základní magovia — experimentálne postavy (medusa, minotaur) až po návrhu výberu tímu.
+// Experimentálne postavy tým pádom nie sú v mageHp/mageMana → choose_character aj swap ich v tournamente odmietnu.
 const TOURNAMENT_MAGES = ["fire", "lightning", "wanderer"];
 // časový limit na ťah — vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
 const TIMER_OPTIONS = new Set(["off", "10", "30", "60", "quickdraw"]);
@@ -92,6 +93,8 @@ const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS 
 // Teleport (výmena maga v turnaji) — dvojfázová animácia: (1) starý mág zmizne, (2) nový sa objaví
 const TELEPORT_OUT_MS  = Math.round(650 * ANIM_SLOW);
 const TELEPORT_IN_MS   = Math.round(650 * ANIM_SLOW);
+// Labyrint: odhalenie PRED zásahom, ktorý ho určite ukončí — skrytý súper sa zjaví (fade ako démon/teleport)
+const LAB_REVEAL_MS    = Math.round(700 * ANIM_SLOW);
 
 // Last Stand (duálne tlačidlo s golden mana) — démon zabije hráča a oživí ho na plno; ďalšie kolo je posledné
 // Last Stand sa prehráva FRAME-DRIVEN: každá fáza je samostatný frame (timeline prehrávač = jediný zdroj času),
@@ -131,8 +134,12 @@ function newPlayer(slot) {
     x: pos.x, y: pos.y,
     hp: START_HP,
     mana: START_MANA,
-    char: null,        // "fire" | "lightning" | "wanderer" | "medusa"
+    char: null,        // "fire" | "lightning" | "wanderer" | "medusa" | "minotaur"
     stone: 0,          // koľko najbližších základných akcií hráč preskočí skamenený (Medúzin special)
+    labyrinth: false,  // blúdi v labyrinte (Minotaurov special) — nevidí board, kým nepadne vzájomný zásah
+    labReveal: false,  // labyrint sa v tomto ťahu isto skončí zásahom — redakcia/hmla padli už PRED animáciou akcie
+    thread: [],        // Ariadnina niť: [x,y] políčka, na ktoré prekliaty vstúpil (prvé = kde stál pri zakliatí)
+    threadMark: null,  // [x,y] posledného súperovho vstupu na niť — prekliaty tam vidí jeho obrys
     shield: false,     // zruší celý dmg najbližšej súperovej akcie
     shieldGold: false, // aktívny shield pochádza z golden shieldu (zlaté vizuály)
     mirror: false,     // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
@@ -204,34 +211,111 @@ function emitYouAre() {
 
 // snapshot pre konkrétnu OSOBU — počas výberu postáv skry súperovu voľbu, kým si TÁTO osoba nevyberie
 // (inak rozmýšľajúci hráč vidí súperov pick a má výhodu). Po výbere oboch je stav už odhalený.
+// Labyrint (Minotaurov special): prekliata osoba nedostane súperovu pozíciu/obrany ani tiles ANI V DÁTACH
+// (anti-cheat — klientská hmla by sa dala obísť cez devtools).
 function snapshotFor(person) {
-  const base = snapshot();
+  let base = snapshot();
   // tournament: pridaj LEN vlastnú trojicu HP a many magov (súperove hodnoty hráč nevidí)
   base.mageHp = game.mageHp ? { ...game.mageHp[person] } : null;
   base.mageMana = game.mageMana ? { ...game.mageMana[person] } : null;
   const mySlot = slotForPerson(person);
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   if (!game.players[mySlot]?.char && base[oppSlot]?.char) {
-    return { ...base, [oppSlot]: { ...base[oppSlot], char: null } };
+    base = { ...base, [oppSlot]: { ...base[oppSlot], char: null } };
   }
+  if (base[mySlot]?.labyrinth && !base[mySlot].labReveal) base = redactSnapshotFor(mySlot, base);
+  else if (base[oppSlot]?.labyrinth && !base[oppSlot].labReveal) base = { ...base, [oppSlot]: redactHunterActor(base[oppSlot]) };
   return base;
 }
-// pošli stav obom osobám, každej s vlastným maskovaním súperovej postavy + vlastnou trojicou HP magov
-// (počas char-selectu); divákom (ostatné sockety) pošli neutrálny snapshot bez mageHp
-function emitStateMasked() {
+
+/* ---- Labyrint: redakcia dát pre OBE strany ---- */
+// prekliaty nevidí súperovu pozíciu, obrany ani MANU (nemá prehľad, kedy Minotaur dosiahne na special/melee);
+// niť/obrys súpera (mirror match dvoch Minotaurov) tiež skry. HP ostáva — zásah labyrint aj tak končí.
+function redactActor(a) {
+  if (!a) return a;
+  return { ...a, x: null, y: null, mana: null, shield: false, shieldGold: false, mirror: false, mirrorGold: false, thread: [], threadMark: null };
+}
+// LOVEC (Minotaur) zas nevidí Ariadninu niť ani obrys (nemôže sa jej cielene vyhýbať — šliapne na ňu
+// nevedomky) a nevidí ani manu prekliateho — počas labyrintu ani jeden nemá prehľad o mane súpera
+function redactHunterActor(a) {
+  if (!a) return a;
+  return { ...a, mana: null, thread: [], threadMark: null };
+}
+// tiles/IK sa NEredigujú — slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
+function redactSnapshotFor(mySlot, snap) {
+  const oppSlot = mySlot === "p1" ? "p2" : "p1";
+  return { ...snap, [oppSlot]: redactActor(snap[oppSlot]) };
+}
+// efekt vo frame, v ktorom je príjemca prekliaty: súperove akcie sa maskujú na "unknown" (beat kvôli
+// pozícii v lište), všetko ostatné od/na súpera aj cudzie tile efekty sa zahodia — úplná tma
+function redactEffect(mySlot, oppSlot, e, frame) {
+  if (!e) return null;
+  if (e.kind === "action" && e.from === oppSlot) {
+    const t = e.action?.type;
+    const beat = (t === "golden_shield" || t === "golden_mirror") ? "gpre"
+               : (t === "golden_mana" || t === "last_stand") ? "gmana"
+               : (t === "last_hope") ? "lhope" : "act";
+    return { kind: "action", from: oppSlot, action: { type: "unknown", dir: null, to: null, beat } };
+  }
+  if (e.from === oppSlot && e.kind !== "beat_empty") return null; // charge/special/melee/recharge/gold/demon… prezrádzajú pozíciu alebo úmysel
+  if (e.target === oppSlot) return null;                          // hit/heal/invalid na súperovi (napr. tile dmg) = pozícia
+  if (e.kind === "tile_proc") {
+    // tiles samotné prekliaty vidí, ale PROC blik cudzej bunky = súper na nej stojí → len vlastná bunka
+    const p = frame[mySlot];
+    if (!p || !Array.isArray(e.cell) || e.cell[0] !== p.x || e.cell[1] !== p.y) return null;
+  }
+  return e;
+}
+// timeline pre daný slot: framy, v ktorých je príjemca v labyrinte, dostanú redigovaný snapshot aj efekty;
+// framy, v ktorých je v labyrinte SÚPER, skryjú príjemcovi (lovcovi) niť/obrys/manu + thread_mark efekty.
+// Frame, v ktorom labyrint končí (labyrinth=false), už redigovaný nie je → odhalenie sa prehrá prirodzene.
+// labReveal (istý zásah v tomto ťahu): redakcia padá už od reveal frame-u — akcia sa odohrá odhalená.
+function redactTimelineFor(mySlot, tl) {
+  const oppSlot = mySlot === "p1" ? "p2" : "p1";
+  return tl.map(f => {
+    if (f?.[mySlot]?.labyrinth && !f[mySlot].labReveal) {
+      return {
+        ...f,
+        [oppSlot]: redactActor(f[oppSlot]),
+        effects: (f.effects || []).map(e => redactEffect(mySlot, oppSlot, e, f)).filter(Boolean),
+      };
+    }
+    if (f?.[oppSlot]?.labyrinth && !f[oppSlot].labReveal) {
+      return {
+        ...f,
+        [oppSlot]: redactHunterActor(f[oppSlot]),
+        effects: (f.effects || []).filter(e => !(e.kind === "thread_mark" && e.target === oppSlot)),
+      };
+    }
+    return f;
+  });
+}
+
+// pošli stav (voliteľne s timeline) obom osobám, každej s vlastným maskovaním (char-select pick,
+// labyrint redakcia, vlastná trojica HP magov); divákom (ostatné sockety) neutrálny plný snapshot
+function emitStateMasked(timeline = null) {
   const plain = snapshot();
   for (const [, sock] of io.sockets.sockets) {
-    if (sock === personSockets.A) sock.emit("state", snapshotFor("A"));
-    else if (sock === personSockets.B) sock.emit("state", snapshotFor("B"));
-    else sock.emit("state", plain);
+    let payload;
+    if (sock === personSockets.A || sock === personSockets.B) {
+      const person = sock === personSockets.A ? "A" : "B";
+      payload = snapshotFor(person);
+      if (timeline) payload = { ...payload, timeline: redactTimelineFor(slotForPerson(person), timeline) };
+    } else {
+      payload = timeline ? { ...plain, timeline } : plain;
+    }
+    sock.emit("state", payload);
   }
 }
 
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, stone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
-  return { slot, x, y, hp, mana, char, stone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
+  const { slot, x, y, hp, mana, char, stone, labyrinth, labReveal, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
+  // niť treba hlboko kopírovať — server do nej pushuje, plytká referencia by menila už uložené timeline framy
+  const thread = (a.thread || []).map(c => [...c]);
+  const threadMark = a.threadMark ? [...a.threadMark] : null;
+  return { slot, x, y, hp, mana, char, stone, labyrinth, labReveal, thread, threadMark, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
 }
 function snapshot() {
   return {
@@ -411,7 +495,7 @@ function doMove(slot, dir, tl) {
   const nx = a.x + delta[0], ny = a.y + delta[1];
   if (!inBounds(nx, ny)) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
   a.x = nx; a.y = ny;
-  pushStateFrame(tl, [], MOVE_DELAY_MS);
+  pushStateFrame(tl, trackSteps(slot, [[nx, ny]]), MOVE_DELAY_MS); // labyrint: niť / obrys na nití
 }
 
 function doDash(slot, dir, tl) {
@@ -422,14 +506,15 @@ function doDash(slot, dir, tl) {
 
   // posun až o 2 políčka zvoleným smerom; na okraji sa skráti na 1, bez možného pohybu je neplatný
   let nx = a.x, ny = a.y, steps = 0;
+  const path = []; // aj medzibunka — labyrintná niť/obrys sa počíta na každom prejdenom políčku
   for (let s = 0; s < 2; s++) {
-    if (inBounds(nx + delta[0], ny + delta[1])) { nx += delta[0]; ny += delta[1]; steps++; }
+    if (inBounds(nx + delta[0], ny + delta[1])) { nx += delta[0]; ny += delta[1]; steps++; path.push([nx, ny]); }
   }
   if (!steps) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
 
   a.mana -= DASH_COST;
   a.x = nx; a.y = ny;
-  pushStateFrame(tl, [], MOVE_DELAY_MS);
+  pushStateFrame(tl, trackSteps(slot, path), MOVE_DELAY_MS);
 }
 
 function doRecharge(slot, tl) {
@@ -464,6 +549,15 @@ function doBasic(slot, dir, tl) {
   if (!inBounds(me.x + delta[0], me.y + delta[1])) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
   me.mana -= BASIC_COST;
 
+  // dráha strely je deterministická — ak zásah padne, prípadný labyrint sa odhalí ešte PRED letom strely
+  {
+    let hx = me.x, hy = me.y;
+    while (inBounds(hx + delta[0], hy + delta[1])) {
+      hx += delta[0]; hy += delta[1];
+      if (op && op.x === hx && op.y === hy) { revealLabyrinths(tl); break; }
+    }
+  }
+
   // strela letí zvoleným smerom; zastaví sa na prvom súperovi v dráhe alebo na okraji boardu
   // dmg klesá so vzdialenosťou (3/2/1); vlastné políčko nezasahuje (na to je melee)
   let x = me.x, y = me.y, dist = 0;
@@ -496,11 +590,14 @@ function doMelee(slot, tl) {
       if (inBounds(me.x + dx, me.y + dy)) cells.push([me.x + dx, me.y + dy]);
     }
   }
+  // zásah je istý už pred švihmi (pozície sa nemenia) — prípadný labyrint sa odhalí PRED animáciou
+  const willHit = !!(op && cells.some(([x, y]) => op.x === x && op.y === y));
+  if (willHit) revealLabyrinths(tl);
   // rovnaká dramaturgia ako special: opakované švihy v beatoch, dmg padne až po nich
   for (let r = 0; r < MELEE_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "melee", from: slot, cells }], SPECIAL_BEAT_MS);
   }
-  if (op && cells.some(([x, y]) => op.x === x && op.y === y)) {
+  if (willHit) {
     applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot), tl, "melee");
   }
 }
@@ -510,11 +607,47 @@ function doMelee(slot, tl) {
 function dealMul(slot)      { const p = game.players[slot]; return p.lastHopeBuff ? 4 : p.lastStandBuff ? 2 : 1; }
 function recvDmg(slot, dmg) { const p = game.players[slot]; return (p.lastStandBuff || p.lastHopeBuff) ? Math.floor(dmg / 2) : dmg; }
 
+// akýkoľvek zásah AKCIOU medzi hráčmi ukončí labyrint (oboch pri mirror matchi) — počíta sa aj
+// zablokovaný/odrazený zásah (applyHit/applyPetrify/applyLabyrinth sa volajú len keď akcia trafila);
+// tile damage ide mimo applyHit, takže labyrint neukončuje. Volá sa až PO zásahových frame-och
+// (block/odraz/hit + úbytok HP) — ESCAPED a rozsvietenie arény prídu po dohratí zásahu; odhalenie
+// súpera prebehlo už pred animáciou akcie (revealLabyrinths), vtedy zanikla aj niť s obrysom.
+function endLabyrinths(tl) {
+  for (const slot of ["p1", "p2"]) {
+    const p = game.players[slot];
+    if (!p.labyrinth) continue;
+    p.labyrinth = false;
+    p.labReveal = false;
+    p.thread = [];
+    p.threadMark = null;
+    pushStateFrame(tl, [{ kind: "labyrinth_end", target: slot }], SMALL_DELAY_MS);
+  }
+}
+
+// Ak akcia labyrint ISTO ukončí (zásah padne — počíta sa aj do štítu/zrkadla), odhalenie prebehne
+// ešte PRED jej animáciou: labReveal zruší redakciu aj hmlu (klient zjaví skrytého súpera fade-om
+// a odkryje jeho widget — HP/mana sú opäť viditeľné), samotný labyrinth flag ale beží ďalej,
+// takže aréna ostáva stmavená až po labyrinth_end. Niť a obrys zanikajú už pri odhalení,
+// aby ich lovec nevidel ani na okamih. Zásah je deterministický — pozície sa počas animácie nemenia.
+function revealLabyrinths(tl) {
+  for (const slot of ["p1", "p2"]) {
+    const p = game.players[slot];
+    if (!p.labyrinth || p.labReveal) continue;
+    p.labReveal = true;
+    p.thread = [];
+    p.threadMark = null;
+    pushStateFrame(tl, [{ kind: "labyrinth_reveal", target: slot }], LAB_REVEAL_MS);
+  }
+}
+
 // aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, mirror ho odrazí do útočníka)
+// labyrint končí až PO dohratí zásahovej animácie (block/odraz/hit + úbytok HP) — odhalenie súpera
+// už predtým zabezpečil revealLabyrinths (labReveal), takže tieto framy sa hrajú neredigované
 function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
   const t = game.players[targetSlot];
   if (t.shield) {
     pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
+    endLabyrinths(tl); // aj zablokovaný zásah ukončuje labyrint
     return;
   }
   if (t.mirror) {
@@ -528,11 +661,13 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic") {
     pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: rawDmg, atk: kind, gold: !!t.mirrorGold }], MIRROR_BEAM_MS);
     atk.hp = Math.max(0, atk.hp - d);
     pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: d }], SMALL_DELAY_MS);
+    endLabyrinths(tl); // odrazený zásah ukončuje labyrint — až po dopade odrazu
     return;
   }
   const d = recvDmg(targetSlot, rawDmg); // ½ ak má obranca last stand buff
   t.hp = Math.max(0, t.hp - d);
   pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
+  endLabyrinths(tl); // labyrint končí až po dopade zásahu a úbytku HP
 }
 
 // skamenenie cez obrany obrancu — zrkadlí applyHit: shield ho zablokuje (a spotrebuje sa),
@@ -541,19 +676,83 @@ function applyPetrify(targetSlot, tl) {
   const t = game.players[targetSlot];
   if (t.shield) {
     pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
+    endLabyrinths(tl); // zasahujúci (hoci zablokovaný) petrify je tiež zásah — labyrint končí po block animácii
     return;
   }
   if (t.mirror) {
     const atkSlot = other(targetSlot);
     pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: 0, atk: "special", gold: !!t.mirrorGold }], MIRROR_BEAM_MS);
     petrify(atkSlot, tl);
+    endLabyrinths(tl); // labyrint končí až po dopade odrazeného skamenenia
     return;
   }
   petrify(targetSlot, tl);
+  endLabyrinths(tl); // labyrint končí až po dohratí skamenenia
 }
 function petrify(slot, tl) {
   game.players[slot].stone = STONE_ACTIONS;
   pushStateFrame(tl, [{ kind: "petrify", target: slot }], SMALL_DELAY_MS);
+}
+
+// labyrint cez obrany obrancu — zrkadlí applyPetrify: shield ho zablokuje (a spotrebuje sa),
+// mirror ho odrazí na Minotaura (v labyrinte skončí sám kaster — oslepne a niť ťahá on)
+function applyLabyrinth(targetSlot, tl) {
+  const t = game.players[targetSlot];
+  if (t.shield) {
+    pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
+    endLabyrinths(tl); // zasahujúci (hoci zablokovaný) labyrint je tiež zásah — prípadný bežiaci labyrint kastera končí
+    return;
+  }
+  // starý labyrint musí skončiť PRED novým zakliatím (nikdy nebežia dva naraz) — až po prípadnej odrazovej animácii
+  if (t.mirror) {
+    const atkSlot = other(targetSlot);
+    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: 0, atk: "special", gold: !!t.mirrorGold }], MIRROR_BEAM_MS);
+    endLabyrinths(tl);
+    loseInLabyrinth(atkSlot, tl);
+    return;
+  }
+  endLabyrinths(tl);
+  loseInLabyrinth(targetSlot, tl);
+}
+function loseInLabyrinth(slot, tl) {
+  const p = game.players[slot];
+  p.labyrinth = true;
+  p.thread = [[p.x, p.y]]; // niť začína tam, kde postava stála pri zakliatí
+  p.threadMark = null;
+  pushStateFrame(tl, [{ kind: "labyrinth", target: slot }], SMALL_DELAY_MS);
+}
+
+// labyrint: prekliaty necháva niť na každom políčku, na ktoré vstúpi (dash aj cez medzibunku).
+// threadMark = POSLEDNÉ políčko, kde sa niť a Minotaur stretli — vznikne oboma smermi:
+// (a) Minotaur vstúpi na niť (aj prebehnutím dashom), (b) prekliaty dorastie niťou na bunku,
+// kde Minotaur práve stojí. Prekliaty tam vidí jeho obrys. Vracia efekty k pohybovému frame-u.
+function trackSteps(slot, cells) {
+  const fx = [];
+  const p = game.players[slot];
+  const foeS = other(slot);
+  const foe = game.players[foeS];
+  if (p.labyrinth) {
+    let mark = null;
+    for (const [x, y] of cells) {
+      if (!p.thread.some(([tx, ty]) => tx === x && ty === y)) p.thread.push([x, y]);
+      if (foe && !foe.labyrinth && foe.x === x && foe.y === y) mark = [x, y]; // niť dorástla na Minotaurovu bunku
+    }
+    if (mark) {
+      p.threadMark = mark;
+      fx.push({ kind: "thread_mark", cell: mark, target: slot });
+    }
+  }
+  if (foe?.labyrinth) {
+    let mark = null;
+    for (const [x, y] of cells) {
+      if (foe.thread.some(([tx, ty]) => tx === x && ty === y)) mark = [x, y];
+    }
+    if (mark) {
+      foe.threadMark = mark;
+      fx.push({ kind: "thread_mark", cell: mark, target: foeS }); // target = kto obrys uvidí
+    }
+  }
+  return fx;
 }
 
 function doShield(slot, tl) {
@@ -590,12 +789,15 @@ function doSpecial(slot, tl, dir = null) {
     if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
     const cells = medusaCells(actor, dir);
+    const foeS = other(slot);
+    const foe  = game.players[foeS];
+    const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
+    // istý zásah (aj do štítu/zrkadla) — prípadný labyrint sa odhalí ešte PRED nádychmi
+    if (inZone && !(foe.stone > 0)) revealLabyrinths(tl);
     for (let r = 0; r < SPECIAL_REPEAT; r++) {
       pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
     }
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    if (!foe || !cells.some(([x, y]) => x === foe.x && y === foe.y)) {
+    if (!inZone) {
       pushStateFrame(tl, [], SMALL_DELAY_MS);
       return;
     }
@@ -605,15 +807,40 @@ function doSpecial(slot, tl, dir = null) {
     return;
   }
 
+  // Minotaur: special nedáva dmg — CELOPLOŠNÝ (zasiahne súpera vždy), prenesie ho do LABYRINTU:
+  // súper nevidí board (len vlastnú bunku + svoju niť), kým jeden hráč nezasiahne druhého.
+  // Ide cez obrany ako petrify (shield blokuje, mirror odrazí — v labyrinte skončí sám Minotaur).
+  if (actor.char === "minotaur") {
+    actor.mana -= SPECIAL_COST;
+    const cells = [];
+    for (let y = 0; y < game.board.h; y++)
+      for (let x = 0; x < game.board.w; x++) cells.push([x, y]);
+    const foeS = other(slot);
+    const foe  = game.players[foeS];
+    // istý zásah — kasterov prípadný VLASTNÝ labyrint (mirror match) sa odhalí ešte pred nádychmi
+    if (foe && !foe.labyrinth) revealLabyrinths(tl);
+    for (let r = 0; r < SPECIAL_REPEAT; r++) {
+      pushStateFrame(tl, [{ kind: "special", from: slot, cells }], SPECIAL_BEAT_MS);
+    }
+    if (!foe) { pushStateFrame(tl, [], SMALL_DELAY_MS); return; }
+    // súper už blúdi v labyrinte: útok bez efektu, niť sa neresetuje
+    if (foe.labyrinth) { pushInvalid(tl, slot, SMALL_DELAY_MS, "already_lost"); return; }
+    applyLabyrinth(foeS, tl);
+    return;
+  }
+
   actor.mana -= SPECIAL_COST;
+
+  // vyhodnotenie zásahu je deterministické už pred nádychmi (pozície sa počas nich nemenia) —
+  // istý zásah odhalí prípadný labyrint ešte PRED animáciou špeciálu
+  const { dmg, hit } = specialDamageAndHit(game.players, slot);
+  if (dmg > 0 && hit) revealLabyrinths(tl);
 
   // 3× „nádych“ (caster animuje špeciál; klient bliká rozsah)
   for (let r = 0; r < SPECIAL_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "special", from: slot }], SPECIAL_BEAT_MS);
   }
 
-  // vyhodnotenie zásahu
-  const { dmg, hit } = specialDamageAndHit(game.players, slot);
   if (dmg > 0 && hit) {
     applyHit(hit, dmg * dealMul(slot), tl, "special");
   } else {
@@ -637,14 +864,17 @@ function doDemon(slot, tl) {
     for (let x = 0; x < game.board.w; x++)
       if (!(x === me.x && y === me.y)) cells.push([x, y]);
 
+  // zásah: súper dostane dmg, ak NESTOJÍ na kasterovej bunke; cez shield/mirror (applyHit) — bez 2× buffu (10 = istá smrť)
+  const inRange = op && !(op.x === me.x && op.y === me.y);
+  // istý zásah — prípadný labyrint sa odhalí ešte pred vynorením démona
+  if (inRange) revealLabyrinths(tl);
+
   // démon sa vynorí veľký v strede + bliká cieľové bunky v rovnakej kadencii ako special (ultimatka)
   pushStateFrame(tl, [{ kind: "demon_summon", from: slot }], LS_APPEAR_MS);
   for (let r = 0; r < SPECIAL_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "demon_attack", from: slot, cells }], SPECIAL_BEAT_MS);
   }
 
-  // zásah: súper dostane dmg, ak NESTOJÍ na kasterovej bunke; cez shield/mirror (applyHit) — bez 2× buffu (10 = istá smrť)
-  const inRange = op && !(op.x === me.x && op.y === me.y);
   // ak súper bráni (shield alebo mirror), démon nech najprv zmizne zo stredu, nech je block/odraz animácia viditeľná
   const defended = inRange && (op.shield || op.mirror);
   if (defended) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS);
@@ -906,7 +1136,7 @@ function onTurnTimeout() {
     p.locked = true;
   }
   if (game.players.p1.locked && game.players.p2.locked) resolveTurn();
-  else io.emit("state", snapshot());
+  else emitStateMasked(); // labyrint: prekliaty nesmie dostať súperovu pozíciu ani tu
 }
 
 /* -------------------- Last Stand (frame-driven) -------------------- */
@@ -1126,7 +1356,7 @@ function resolveTurn() {
     game.starter = nextStarter;
   }
 
-  io.emit("state", { ...snapshot(), timeline: tl }); // roster HP/mana je verejné → plný snapshot stačí obom
+  emitStateMasked(tl); // per-osoba: labyrintová redakcia snapshotu AJ timeline (roster HP/mana je verejné)
 
   // príprava na ďalšie plánovanie (lokálny stav; vizuálne odomkne až klient po dohraní timeline)
   game.players.p1.locked = false;
@@ -1352,7 +1582,7 @@ io.on("connection", (socket) => {
     } else {
       // quick-draw: hneď ako sa jeden locklne, druhý má QUICKDRAW_MS na ťah
       if (game.config?.timer === "quickdraw") armTurnTimer(QUICKDRAW_MS);
-      io.emit("state", snapshot());
+      emitStateMasked(); // labyrint: prekliaty nesmie dostať súperovu pozíciu ani tu
     }
   });
 

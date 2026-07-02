@@ -91,6 +91,15 @@ actorGhost.style.width = ACTOR_W + "px"; actorGhost.style.height = ACTOR_H + "px
 actorGhost.style.display = "none";
 actorsEl.appendChild(actorGhost);
 
+// obrys súpera na Ariadninej nití (labyrint) — čierna silueta na bunke posledného vstupu na niť
+const actorSilhouette = document.createElement("canvas");
+actorSilhouette.id = "actor-silhouette";
+actorSilhouette.className = "sprite-actor sprite-silhouette";
+actorSilhouette.width = ACTOR_W; actorSilhouette.height = ACTOR_H;
+actorSilhouette.style.width = ACTOR_W + "px"; actorSilhouette.style.height = ACTOR_H + "px";
+actorSilhouette.style.display = "none";
+actorsEl.appendChild(actorSilhouette);
+
 // DEATH summon — screen-space overlay (fixed, mimo stacking contextu .stage, aby bolo vidno v každej fáze).
 // Veľkosť medzi fázami riešime CSS transformom scale(); canvas má základnú „stredovú" veľkosť.
 const deathCenter = document.createElement("canvas");
@@ -177,10 +186,11 @@ youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
 // horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
-const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47 };
+const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46 };
 // vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
 // ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
-const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40 };
+// Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128)
+const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29 };
 
 // zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -204,6 +214,7 @@ const INVALID_MSG = {
   offboard:  ["🚫 OFF-BOARD",  "lowmana-float"],
   no_demon:  ["✗ DEMON TAKEN", "dmg-float"], // druhý Last Stand v kole — démon je len jeden
   already_stone: ["🗿 ALREADY STONE", "lowmana-float"], // Medúzin special na už skamenenú postavu — bez efektu
+  already_lost: ["🌀 ALREADY LOST", "lowmana-float"],   // Minotaurov special na už blúdiaceho — bez efektu
 };
 const INVALID_MSG_DEFAULT = ["🚫 NO EFFECT", "lowmana-float"];
 const NEW_ROUND_MS = 1900; // „ROUND N" animácia medzi kolami (musí sedieť s CSS .round-banner.show)
@@ -221,6 +232,7 @@ const SPECIAL_ANIMS = {
   lightning: { file: "Light_charge.png", fps: SPECIAL_FPS, loop: true },
   wanderer:  { file: "Magic_sphere.png", fps: SPECIAL_FPS, loop: true },
   medusa:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true },
+  minotaur:  { file: "Walk.png",         fps: SPECIAL_FPS, loop: true }, // bez vlastného fx spritu — cast = veľký kráčajúci Minotaur (blúdenie labyrintom)
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
@@ -231,7 +243,9 @@ const CHAR_META = {
   wanderer:  { name: "Wanderer Magician",dir: "wanderer" },
   // Medúza: pravá strana (p2) má NATÍVNU tmavú paletu (Medusa2) namiesto CSS alt-color filtra;
   // Charge.png = prefarbený fire fireball (zeleno-žltý / fialový) vygenerovaný per paleta
-  medusa:    { name: "Medusa",           dir: "medusa/Medusa", dirP2: "medusa/Medusa2" }
+  medusa:    { name: "Medusa",           dir: "medusa/Medusa", dirP2: "medusa/Medusa2" },
+  // Minotaur: natívna p2 paleta (Minotaur_2, hnedý so sekerou); Charge.png = prefarbený fire fireball per paleta
+  minotaur:  { name: "Minotaur",         dir: "minotaur/Minotaur_1", dirP2: "minotaur/Minotaur_2" }
 };
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
@@ -307,7 +321,19 @@ let charSelectMana = null; // tournament: prenesená mana magov (per vlastná tr
 let hudDeadSince = { p1: 0, p2: 0 };
 
 /* ---------- sprite helpers ---------- */
+// Minotaur nemá Run/Attack_1/Attack_2 súbory — jeho sheet používa Walk/Attack; alias per priečinok,
+// nech všetky ANIM_DEF/SPECIAL cesty fungujú bez per-char výnimiek v kóde
+const SPRITE_FILE_ALIAS = {
+  "minotaur/": { "Run.png": "Walk.png", "Attack_1.png": "Attack.png", "Attack_2.png": "Attack.png" },
+};
+function spriteFileFor(charDir, file) {
+  for (const pfx in SPRITE_FILE_ALIAS) {
+    if (charDir.startsWith(pfx) && SPRITE_FILE_ALIAS[pfx][file]) return SPRITE_FILE_ALIAS[pfx][file];
+  }
+  return file;
+}
 function ensureSpriteMeta(charDir, file) {
+  file = spriteFileFor(charDir, file);
   SPRITES[charDir] ||= {};
   if (SPRITES[charDir][file]) return Promise.resolve(SPRITES[charDir][file]);
   return new Promise((resolve, reject) => {
@@ -432,6 +458,7 @@ const HEAD_CROP = {
   lightning: { cx: 0.41, cy: 0.58, size: 0.26 },
   wanderer:  { cx: 0.47, cy: 0.56, size: 0.27 },
   medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
+  minotaur:  { cx: 0.46, cy: 0.40, size: 0.30 }, // namerané z Idle.png (rohy+hlava riadky ~36–74)
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
@@ -528,7 +555,7 @@ function floatOffsetFor(slot) {
 
 function spawnDamageFloat(slot, dmg) {
   const target = state?.[slot];
-  if (!target) return;
+  if (!target || target.x == null) return; // labyrint: súper so skrytou pozíciou nemá kde floatovať
   const { left, top } = cellToPx(target.x, target.y);
 
   const el = document.createElement("div");
@@ -541,7 +568,7 @@ function spawnDamageFloat(slot, dmg) {
 }
 function spawnFloat(slot, text, className) {
   const target = state?.[slot];
-  if (!target) return;
+  if (!target || target.x == null) return;
   const { left, top } = cellToPx(target.x, target.y);
 
   const el = document.createElement("div");
@@ -555,7 +582,7 @@ function spawnFloat(slot, text, className) {
 
 function spawnManaFloat(slot, amount = 4, gold = false) {
   const target = state?.[slot];
-  if (!target) return;
+  if (!target || target.x == null) return;
   const { left, top } = cellToPx(target.x, target.y);
 
   const el = document.createElement("div");
@@ -563,6 +590,18 @@ function spawnManaFloat(slot, amount = 4, gold = false) {
   el.textContent = `+${amount} MANA`;
   el.style.left = (left + TILE_W / 2) + "px";
   el.style.top  = (top + 8 - floatOffsetFor(slot)) + "px";
+  actorsEl.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+// float na konkrétnej bunke (bez väzby na hráča) — napr. stopa na Ariadninej nití
+function spawnCellFloat(cell, text, className) {
+  const { left, top } = cellToPx(cell[0], cell[1]);
+  const el = document.createElement("div");
+  el.className = className;
+  el.textContent = text;
+  el.style.left = (left + TILE_W / 2) + "px";
+  el.style.top  = (top + 8) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
 }
@@ -600,7 +639,7 @@ function actorFilter(slot, now) {
 // aby aura plynulo kĺzala s postavou počas pohybu (nie teleport na cieľové políčko)
 function placeChargeAura(cont, slot) {
   const p = state?.[slot];
-  if (!p || !p.char) return;
+  if (!p || !p.char || p.x == null) return;
   const shift = pairShift(slot);
   // postava nie je v strede bunky — rovnaký horizontálny offset tela ako „YOU" vlajka (HEAD_CX + flip)
   const facing = computeFacing(state?.p1, state?.p2);
@@ -643,7 +682,7 @@ let _deathGoldenSlot = null;   // slot v golden stave (číta actorFilter pre ž
 // podľa toho-ktorého slotu, nie napevno p1), päty na spodok bunky; canvas je ACTOR-veľký, scale z transform-origin center
 function computeDeathBound(slot) {
   const tgt = state?.[slot];
-  if (!tgt) return { left: 0, top: 0 };
+  if (!tgt || tgt.x == null) return { left: 0, top: 0 };
   const { left, top } = cellToPx(tgt.x, tgt.y);
   const shift = pairShift(slot);
   const facing = computeFacing(state?.p1, state?.p2);
@@ -776,7 +815,7 @@ function placeDeathBehind(slot) {
 // efektný náraz do štítu pri úspešnom bloku — hexagonálna bariéra flashne, rázové prstence + iskry
 function spawnShieldBlock(slot, gold) {
   const p = state?.[slot];
-  if (!p) return;
+  if (!p || p.x == null) return;
   const shift = pairShift(slot);
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
@@ -816,7 +855,7 @@ function spawnShieldBlock(slot, gold) {
 // stred bunky hráča v súradniciach actorsEl
 function centerOf(slot) {
   const p = state?.[slot];
-  if (!p) return null;
+  if (!p || p.x == null) return null;
   const { left, top } = cellToPx(p.x, p.y);
   return { x: left + TILE_W / 2, y: top + TILE_H / 2 };
 }
@@ -1131,7 +1170,10 @@ function renderBar(el, value) {
   if (!el.querySelector(".fill")) {
     el.innerHTML = '<div class="fill-trail"></div><div class="fill"></div>';
   }
-  const v = Math.max(0, Math.min(10, Number(value) || 0));
+  // labyrint: server hodnotu skryl (mana súpera = null) → prázdny bar s "?" namiesto čísla
+  const hidden = value == null;
+  el.classList.toggle("masked", hidden);
+  const v = hidden ? 0 : Math.max(0, Math.min(10, Number(value) || 0));
   const prev = el.dataset.prev === undefined ? v : Number(el.dataset.prev);
   el.dataset.prev = String(v);
 
@@ -1148,9 +1190,9 @@ function renderBar(el, value) {
     fill.addEventListener("animationend", () => fill.classList.remove("gain"), { once: true });
   }
 
-  // presná hodnota pod barom — bez počítania dielikov
+  // presná hodnota pod barom — bez počítania dielikov; skrytá hodnota (labyrint) = "?"
   const num = el.closest(".hud-stat")?.querySelector(".bar-num");
-  if (num) num.textContent = String(v);
+  if (num) num.textContent = hidden ? "?" : String(v);
 }
 
 // banner pod ROUND textom: ja som locknutý a čaká sa na súpera / súper je locknutý a rad je na mne
@@ -1228,6 +1270,7 @@ function actionIcon(action) {
     case "special":  return `✨${arrow[action.dir] || ""}`; // smer má len Medúza
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
+    case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
     default:         return "?";
   }
 }
@@ -1258,20 +1301,21 @@ function appendActionLog(slot, action) {
   if (!log) return null;
   if (!log.children.length) buildActionLogSkeleton(log);
 
-  if (action?.type === "golden_shield" || action?.type === "golden_mirror") {
+  const maskedBeat = action?.type === "unknown" ? (action.beat || "act") : null; // labyrint — redigovaná akcia
+  if (action?.type === "golden_shield" || action?.type === "golden_mirror" || maskedBeat === "gpre") {
     const el = log.querySelector(".a-slot.slot-pre");
     if (el) {
       const mirror = action.type === "golden_mirror";
-      el.className = "a-badge " + action.type;
-      el.innerHTML = mirror ? '<span class="g-ico mirror">🪞</span>' : '<span class="g-ico">🛡️</span>';
+      el.className = "a-badge " + (maskedBeat ? "unknown" : action.type);
+      el.innerHTML = maskedBeat ? '<span class="g-ico">❓</span>' : mirror ? '<span class="g-ico mirror">🪞</span>' : '<span class="g-ico">🛡️</span>';
     }
     return el;
   }
-  if (action?.type === "golden_mana" || action?.type === "last_stand") {
+  if (action?.type === "golden_mana" || action?.type === "last_stand" || maskedBeat === "gmana") {
     const el = log.querySelector(".a-slot.slot-post");
     if (el) {
-      el.className = "a-badge " + action.type;
-      el.innerHTML = action.type === "last_stand" ? LS_BADGE_IMG : '<span class="g-ico">🙏</span>';
+      el.className = "a-badge " + (maskedBeat ? "unknown" : action.type);
+      el.innerHTML = maskedBeat ? '<span class="g-ico">❓</span>' : action.type === "last_stand" ? LS_BADGE_IMG : '<span class="g-ico">🙏</span>';
     }
     return el;
   }
@@ -1295,6 +1339,28 @@ function renderGrid(s, effects = []) {
   boardEl.style.width  = (board.w * TILE_W + (board.w - 1) * GAP) + "px";
   boardEl.style.height = (board.h * TILE_H + (board.h - 1) * GAP) + "px";
   gridEl.innerHTML = "";
+
+  // labyrint (Minotaurov special): prekliaty hráč vidí len vlastnú bunku, svoju niť, obrys na nití
+  // a špeciálne tiles; dáta o súperovi už rediguje server — hmla je len vizuál nad tým.
+  // Aréna sa stmaví OBOM hráčom (aj Minotaurovi), nech je očividné, že hra beží v labyrinte.
+  const anyLab = !!(s?.p1?.labyrinth || s?.p2?.labyrinth);
+  document.body.classList.toggle("labyrinth-mode", anyLab); // stmavenie arény za boardom — obaja hráči
+  const mineLab = me ? s?.[me] : null;
+  // labReveal: istý zásah v tomto ťahu — hmla padá už PRED animáciou akcie (aréna ostáva stmavená do labyrinth_end)
+  const fogged = !!(mineLab && mineLab.labyrinth && !mineLab.labReveal);
+  boardEl.classList.toggle("labyrinth", fogged);
+  const fogVisible = new Set();
+  if (fogged) {
+    if (mineLab.x != null) fogVisible.add(`${mineLab.x},${mineLab.y}`);
+    (mineLab.thread || []).forEach(([x, y]) => fogVisible.add(`${x},${y}`));
+    if (mineLab.threadMark) fogVisible.add(`${mineLab.threadMark[0]},${mineLab.threadMark[1]}`);
+    // špeciálne tiles svietia cez tmu — slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
+    (s?.tiles || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
+    (s?.iks || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
+  }
+  // Ariadnina niť — bunky s niťou (vlastná niť prekliateho; lovec vidí súperovu, server mu ju posiela)
+  const threadSet = new Set();
+  for (const sl of ["p1", "p2"]) (s?.[sl]?.thread || []).forEach(([x, y]) => threadSet.add(`${x},${y}`));
 
   castingNow.p1 = false;
   castingNow.p2 = false;
@@ -1349,6 +1415,8 @@ function renderGrid(s, effects = []) {
 
       const key = `${x},${y}`;
       if (previewSet.has(key)) cell.classList.add("preview-red");
+      if (fogged && !fogVisible.has(key)) cell.classList.add("fogged"); // labyrint: tma mimo vlastnej bunky a nite
+      if (threadSet.has(key)) cell.classList.add("thread-cell");
 
       // tile podfarbenie + ikona; IK prekrýva všetko
       const tileType = tileMap.get(key);
@@ -1402,7 +1470,33 @@ function renderGrid(s, effects = []) {
     }
   }
 
+  renderThreadLines(s);
   updateSpecialCenter(specials.concat(meleeCasts));
+}
+
+// Ariadnina niť ako súvislá čiara cez stredy navštívených buniek (+ uzlík na začiatku);
+// kreslí sa pre oboch hráčov — komu ju server neredigoval, ten ju vidí
+function renderThreadLines(s) {
+  actorsEl.querySelectorAll(".thread-svg").forEach(n => n.remove());
+  const W = board.w * TILE_W + (board.w - 1) * GAP;
+  const H = board.h * TILE_H + (board.h - 1) * GAP;
+  for (const sl of ["p1", "p2"]) {
+    const th = s?.[sl]?.thread;
+    if (!Array.isArray(th) || !th.length) continue;
+    const pts = th.map(([x, y]) => {
+      const { left, top } = cellToPx(x, y);
+      return [left + TILE_W / 2, top + TILE_H / 2];
+    });
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "thread-svg");
+    svg.setAttribute("width", W);
+    svg.setAttribute("height", H);
+    const poly = pts.length > 1
+      ? `<polyline points="${pts.map(p => p.join(",")).join(" ")}" fill="none" stroke="#e8b23c" stroke-width="5" stroke-dasharray="14 10" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>`
+      : "";
+    svg.innerHTML = `${poly}<circle cx="${pts[0][0]}" cy="${pts[0][1]}" r="9" fill="#e8b23c" opacity=".9"/>`;
+    actorsEl.appendChild(svg);
+  }
 }
 
 /* ---------- Special preview (hover) ---------- */
@@ -1432,6 +1526,9 @@ function cellsForSpecialPreview(meState, dir){
       const cx=x+dx, cy=y+dy;
       if (cx>=0 && cy>=0 && cx<board.w && cy<board.h) cells.push([cx,cy]);
     });
+  } else if (char === "minotaur"){
+    // celoplošný — zrkadlí server (labyrint zasiahne súpera kdekoľvek)
+    for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
   }
   return cells;
 }
@@ -1522,7 +1619,7 @@ function clearPreviewCells(){
 
 /* ---------- Facing + umiestnenie ---------- */
 function computeFacing(p1, p2) {
-  if (!p1 || !p2) return { p1: 1, p2: -1 };
+  if (!p1 || !p2 || p1.x == null || p2.x == null) return { p1: 1, p2: -1 }; // skrytý súper (labyrint) → default
   if (p1.x === p2.x && p1.y === p2.y) return { p1: 1, p2: -1 };
   if (p1.x <= p2.x) return { p1: 1, p2: -1 };
   return { p1: -1, p2: 1 };
@@ -1530,7 +1627,9 @@ function computeFacing(p1, p2) {
 // horizontálny rozostup postáv na ZDIEĽANOM políčku (p1 doľava, p2 doprava) — veľké postavy (Medúza)
 // potrebujú väčší, pokojne aj s presahom do susedných políčok, inak sa sprity škaredo prekrývajú
 const PAIR_SHIFT_DEFAULT = 22;
-const PAIR_SHIFT = { medusa: 80 };
+// pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
+// vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
+const PAIR_SHIFT = { medusa: 80, minotaur: 70 };
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2 || p1.x !== p2.x || p1.y !== p2.y) return 0;
@@ -1550,14 +1649,17 @@ function positionActors(s, immediate = false) {
   const facing = computeFacing(p1, p2);
 
   [["p1", actorP1, p1], ["p2", actorP2, p2]].forEach(([slot, el, data]) => {
-    if (!data || !data.char) { el.style.display = "none"; return; }
+    // labyrint: súper so skrytou pozíciou (x null) sa nekreslí vôbec
+    if (!data || !data.char || data.x == null) { el.style.display = "none"; return; }
+    const wasHidden = el.style.display === "none";
     el.style.display = "block";
     const { left, top } = cellToPx(data.x, data.y);
     // canvas je väčší než bunka — horizontálne centrovať, vertikálne ukotviť na spodok bunky
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
 
-    if (immediate || !actorsInitialized) {
+    // wasHidden: odhalenie po labyrinte nesmie doslidovať zo starej pozície — umiestni sa okamžite
+    if (immediate || !actorsInitialized || wasHidden) {
       el.style.transition = "none";
       el.style.left = px + "px";
       el.style.top  = py + "px";
@@ -1630,6 +1732,7 @@ function actionBadgeView(a, ownerSlot) {
     case "stoned":        return { cls: "stoned",   text: "🗿" };
     case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "", usesAltColor(a.to, ownerSlot) ? "alt-color" : "", ownerSlot) };
     case "last_hope":     return { cls: "lasthope", html: LH_BADGE_IMG };
+    case "unknown":       return { cls: "unknown",  text: "❓" }; // labyrint — redigovaná akcia súpera
     default:              return { cls: "",        text: a?.type || "" };
   }
 }
@@ -1771,9 +1874,11 @@ function renderQueue() {
 // počas animácie: posuň kurzor na práve vyhodnocovaný beat a odhal súperovu akciu
 function highlightRoundBeat(from, action, counts, starterSlot) {
   let pos;
-  if (action.type === "last_hope") pos = 9;
-  else if (action.type === "golden_shield" || action.type === "golden_mirror") pos = 0;
-  else if (action.type === "golden_mana" || action.type === "last_stand") pos = (from === starterSlot) ? 7 : 8;
+  // labyrint: redigovaná akcia ("unknown") nesie beat, aby padla na správny slot lišty (gold pre/post vs. bežná)
+  const maskedBeat = action.type === "unknown" ? (action.beat || "act") : null;
+  if (action.type === "last_hope" || maskedBeat === "lhope") pos = 9;
+  else if (action.type === "golden_shield" || action.type === "golden_mirror" || maskedBeat === "gpre") pos = 0;
+  else if (action.type === "golden_mana" || action.type === "last_stand" || maskedBeat === "gmana") pos = (from === starterSlot) ? 7 : 8;
   else { const k = counts[from]++; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
   if (pos == null) return null;
   qBeatEls.forEach(e => e && e.classList.remove("q-now"));
@@ -2037,6 +2142,9 @@ function schedulePlayTimeline(timeline) {
     const shooters = new Set(); // basic strela — jednorazová póza
     const casters  = new Set(); // special — looping, malá postava sa animuje súbežne s veľkým sprite-om
     for (const e of frame.effects || []) {
+      // poistka: výnimka v JEDNOM efekte nesmie zaseknúť prehrávanie celého kola (step() beží cez setTimeout —
+      // neodchytený throw by reťaz natrvalo prerušil a UI by ostalo zamknuté uprostred kola)
+      try {
       if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
       if (e.kind === "special" && e.from) casters.add(e.from);
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení)
@@ -2095,6 +2203,24 @@ function schedulePlayTimeline(timeline) {
       // zásah Medúziným specialom — postava skamenie (sivú sochu kreslí raf zo state.stone)
       if (e.kind === "petrify" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, "🗿 PETRIFIED", "stone-float");
+      }
+      // Minotaurov special — zasiahnutý blúdi v labyrinte (hmlu/niť kreslí renderGrid zo state.labyrinth/thread)
+      if (e.kind === "labyrinth" && (e.target === "p1" || e.target === "p2")) {
+        spawnFloat(e.target, "🌀 LOST IN THE LABYRINTH", "maze-float");
+      }
+      // vzájomný zásah — labyrint končí, board sa prekliatemu odhalí (stav to už nesie, float len ohlási)
+      if (e.kind === "labyrinth_end" && (e.target === "p1" || e.target === "p2")) {
+        spawnFloat(e.target, "🌀 ESCAPED THE LABYRINTH", "maze-float");
+      }
+      // istý zásah ukončí labyrint — server odhalil všetko už PRED animáciou akcie (frame nesie plné dáta):
+      // skrytý súper sa prekliatemu zjaví z tmy (fade ako démon/teleport), widget sa odkryl cez state.labReveal
+      if (e.kind === "labyrinth_reveal" && (e.target === "p1" || e.target === "p2")) {
+        if (me === e.target) fadeActor(otherSlot(), 0, 1, frameHold);
+        spawnFloat(e.target, "🌀 REVEALED!", "maze-float");
+      }
+      // súper vstúpil na Ariadninu niť — stopa na bunke (obrys kreslí raf zo state.threadMark)
+      if (e.kind === "thread_mark" && Array.isArray(e.cell)) {
+        spawnCellFloat(e.cell, "👣", "maze-float");
       }
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🛡️ SHIELD", "shield-float");
@@ -2217,6 +2343,7 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "heal" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
       }
+      } catch (err) { console.error("effect handler zlyhal", e?.kind, err); }
     }
     for (const s of ["p1", "p2"]) {
       if (casters.has(s))       { setAnim(s, "casting", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; } // special: malá postava hrá svoj efektový sprite (nie úder)
@@ -2367,8 +2494,9 @@ const ABILITY_PREVIEW = {
   fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row" },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours" },
-  // dmg: null = bez dmg — stats ukážu kameň (2 preskočené akcie); zóna sa kreslí pre smer doprava
-  medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", desc: "Own cell + everything one way (row ±1). No damage — petrifies: target skips 2 actions" },
+  // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
+  medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage — petrifies: target skips 2 actions" },
+  minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg — banishes the foe into the labyrinth until any hit lands. Their steps weave a thread; stepping on it reveals your silhouette" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -2401,7 +2529,7 @@ function renderAbilityPreview(char) {
   const stats = document.getElementById("ca-stats");
   stats.innerHTML = def.dmg != null
     ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span></span>`
-    : `<span class="ca-dmg"><span class="ca-num">2×</span><span class="pix-ico" data-emoji="🗿"></span></span>`; // Medúza: kameň namiesto dmg
+    : `<span class="ca-dmg"><span class="ca-num">${def.effect?.num ?? ""}</span><span class="pix-ico" data-emoji="${def.effect?.emoji ?? "✨"}"></span></span>`; // bez dmg — ikona efektu (kameň/labyrint)
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
@@ -3154,6 +3282,10 @@ socket.on("state", (s) => {
       // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
       specialBtn.title = "Special (−5 mana) — petrifying gaze: choose a direction; a hit opponent skips their next 2 actions";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🗿`; hydratePix(cost); }
+    } else if (mine.char === "minotaur") {
+      // Minotaur: žiadny dmg — celoplošný labyrint (trvá do vzájomného zásahu)
+      specialBtn.title = "Special (−5 mana) — hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit";
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🌀`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[mine.char];
       if (dmg != null) {
@@ -3226,7 +3358,7 @@ function raf() {
     const st  = state?.[slot];
     const ctx = cvs.getContext("2d");
 
-    if (!st || !st.char) {
+    if (!st || !st.char || st.x == null) { // labyrint: skrytý súper sa nekreslí
       ctx.clearRect(0, 0, cvs.width, cvs.height);
       cvs.style.display = "none";
       return;
@@ -3285,13 +3417,49 @@ function raf() {
     }
   }
 
+  // labyrint: obrys súpera na bunke posledného vstupu na moju niť (fixný idle frame, čierna silueta cez CSS)
+  {
+    const ctx = actorSilhouette.getContext("2d");
+    const mine = me ? state?.[me] : null;
+    const oppS = otherSlot();
+    const oppChar = oppS ? state?.[oppS]?.char : null;
+    const mark = mine?.labyrinth ? mine.threadMark : null;
+    if (!mark || !oppChar) {
+      ctx.clearRect(0, 0, actorSilhouette.width, actorSilhouette.height);
+      actorSilhouette.style.display = "none";
+    } else {
+      actorSilhouette.style.display = "block";
+      const { left, top } = cellToPx(mark[0], mark[1]);
+      // obrys na MOJEJ bunke (prekliaty vošiel na Minotaura / Minotaur na mňa) — uhni nabok ako pairShift
+      const onMe = mine.x === mark[0] && mine.y === mark[1];
+      const dodge = onMe ? (me === "p1" ? 70 : -70) : 0;
+      actorSilhouette.style.left = (left - (ACTOR_W - TILE_W) / 2 + dodge) + "px";
+      actorSilhouette.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
+      const dir = charDirFor(oppChar, oppS);
+      ensureSpriteMeta(dir, ANIM_DEF.idle.file)
+        .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, 0, ACTOR_W, ACTOR_H))
+        .catch(() => {});
+    }
+  }
+
   // HUD náhľady vybraných postáv + degradácia portrétu podľa HP (Doom-style)
-  [["p1", hudCharP1], ["p2", hudCharP2]].forEach(([slot, cvs]) => {
+  [["p1", hudCharP1, hudBoxP1], ["p2", hudCharP2, hudBoxP2]].forEach(([slot, cvs, box]) => {
     const st  = state?.[slot];
     const ctx = cvs.getContext("2d");
     if (!st || !st.char) {
       ctx.clearRect(0, 0, cvs.width, cvs.height);
       cvs.classList.remove("wounded", "critical", "dead");
+      box.classList.remove("in-maze");
+      return;
+    }
+    // labyrint: CELÝ súperov widget prekrýva bludisko (assets/minotaur/labyrint.png cez CSS .in-maze) —
+    // blúdiaci (labyrinth) aj skrytý Minotaur (x null): obaja si navzájom vidia len bludisko.
+    // labReveal (istý zásah v tomto ťahu) widget odkryje ešte pred animáciou akcie — HP/mana sú späť.
+    const inMaze = slot !== me && ((st.labyrinth && !st.labReveal) || st.x == null);
+    box.classList.toggle("in-maze", inMaze);
+    if (inMaze) {
+      cvs.classList.remove("wounded", "critical", "dead", "stoned", "alt-color");
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
       return;
     }
     const hp = st.hp ?? 10;

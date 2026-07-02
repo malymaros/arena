@@ -53,6 +53,8 @@
       </div>
       <div class="series-crowns hidden" id="crowns-p1" title="Games won"></div>
       <div class="action-log" id="log-p1"></div>
+      <!-- labyrint: bludisko prekryje CELÝ widget súpera (jediné, čo o ňom hráč počas labyrintu vidí) -->
+      <img class="maze-cover" src="/assets/minotaur/labyrint.png" alt="" />
     </div>
 
     <!-- Vpravo: P2 -->
@@ -86,6 +88,8 @@
       </div>
       <div class="series-crowns hidden" id="crowns-p2" title="Games won"></div>
       <div class="action-log" id="log-p2"></div>
+      <!-- labyrint: bludisko prekryje CELÝ widget súpera (jediné, čo o ňom hráč počas labyrintu vidí) -->
+      <img class="maze-cover" src="/assets/minotaur/labyrint.png" alt="" />
     </div>
 
   <main class="stage">
@@ -226,9 +230,10 @@
           <div class="char-stats hidden" data-char="medusa"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Medusa</div>
         </div>
-        <div class="char-card soon">
-          <div class="soon-mark">?</div>
-          <div class="char-name">Coming soon</div>
+        <div class="char-card" data-char="minotaur">
+          <canvas class="char-canvas" width="220" height="240" data-char="minotaur"></canvas>
+          <div class="char-stats hidden" data-char="minotaur"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Minotaur</div>
         </div>
         <div class="char-card soon">
           <div class="soon-mark">?</div>
