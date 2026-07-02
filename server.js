@@ -82,6 +82,9 @@ const SPECIAL_REPEAT   = 3;
 const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
 const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za bunku — rýchla strela, aby ani 3-bunkový let nebol pomalší než iné akcie
 const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
+// Teleport (výmena maga v turnaji) — dvojfázová animácia: (1) starý mág zmizne, (2) nový sa objaví
+const TELEPORT_OUT_MS  = Math.round(650 * ANIM_SLOW);
+const TELEPORT_IN_MS   = Math.round(650 * ANIM_SLOW);
 
 // Last Stand (duálne tlačidlo s golden mana) — démon zabije hráča a oživí ho na plno; ďalšie kolo je posledné
 // Last Stand sa prehráva FRAME-DRIVEN: každá fáza je samostatný frame (timeline prehrávač = jediný zdroj času),
@@ -237,7 +240,21 @@ function snapshot() {
     // duálny gold button (golden mana + last stand) je v poslednom (buffnutom) kole zamknutý pre oboch
     goldLocked: !!(game.players.p1.lastStandBuff || game.players.p2.lastStandBuff),
     tiles: game.tiles.map(t => ({ ...t })),
-    iks: game.iks.map(t => ({ ...t }))
+    iks: game.iks.map(t => ({ ...t })),
+    // tournament: mŕtvi magovia (HP 0) per slot — pre HUD hlavy (mŕtvy = lebka); historické info (= počet prehier),
+    // nie tajná voľba, preto ide obom stranám aj v bežnom snapshote
+    mageDead: game.mageHp ? {
+      p1: TOURNAMENT_MAGES.filter(k => (game.mageHp[game.seats.p1]?.[k] ?? 1) <= 0),
+      p2: TOURNAMENT_MAGES.filter(k => (game.mageHp[game.seats.p2]?.[k] ?? 1) <= 0),
+    } : null,
+    // tournament: prenesené HP a mana všetkých 3 magov per slot — VEREJNÉ (vidí ich aj súper) pre HUD hlavy.
+    // Pozn.: pre práve nasadeného maga je tu uložená (nie živá) hodnota — klient pri ňom berie živé hp/mana z p1/p2.
+    rosterHp: game.mageHp ? {
+      p1: { ...game.mageHp[game.seats.p1] }, p2: { ...game.mageHp[game.seats.p2] }
+    } : null,
+    rosterMana: game.mageMana ? {
+      p1: { ...game.mageMana[game.seats.p1] }, p2: { ...game.mageMana[game.seats.p2] }
+    } : null
   };
 }
 
@@ -304,8 +321,29 @@ function validQueue(queue, slot) {
   const types = q.map(a => a && a.type);
   // démon útok je platný typ len pre buffnutého hráča (posledné kolo) a je bez smeru
   const canDemon = !!game.players[slot]?.lastStandBuff;
-  if (types.some(t => !ACTION_TYPES.has(t) && !(t === "demon" && canDemon))) return false;
-  if (new Set(types).size !== 3) return false;
+  // swap (výmena maga) je platný typ len v turnaji; smie byť vo fronte až 2× (výnimka z „každý typ raz za kolo")
+  const isTournament = !!game.mageHp && game.config?.format === "tournament";
+  if (types.some(t => !ACTION_TYPES.has(t)
+        && !(t === "demon" && canDemon)
+        && !(t === "swap" && isTournament))) return false;
+  // každý NE-swap typ najviac 1×; swapov najviac 2 (ciele sa overia nižšie)
+  const nonSwap = types.filter(t => t !== "swap");
+  if (new Set(nonSwap).size !== nonSwap.length) return false;
+  const swaps = q.filter(a => a.type === "swap");
+  if (swaps.length > 2) return false;
+  if (swaps.length) {
+    if (!isTournament) return false;
+    const person = game.seats[slot];
+    const startChar = game.players[slot]?.char; // aktuálny mág na začiatku kola
+    const seen = new Set();
+    for (const a of swaps) {
+      if (!TOURNAMENT_MAGES.includes(a.to)) return false;         // neznámy mág
+      if (a.to === startChar) return false;                        // návrat na východiskového maga nie je dovolený
+      if ((game.mageHp[person]?.[a.to] ?? 0) <= 0) return false;   // mŕtveho maga nemožno nasadiť
+      if (seen.has(a.to)) return false;                            // každý cieľ najviac raz
+      seen.add(a.to);
+    }
+  }
   // golden shield/mirror sa vzájomne vylučuje s príslušnou bežnou akciou — nemôžeš ju zahrať 2× za kolo
   if (goldenPre === "golden_shield" && types.includes("shield")) return false;
   if (goldenPre === "golden_mirror" && types.includes("mirror")) return false;
@@ -541,9 +579,32 @@ function doDemon(slot, tl) {
   if (!defended) pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS); // inak démon zmizne až po zásahu
 }
 
+// Výmena maga (len turnaj): na svojom kroku uloží živý stav odchádzajúceho maga, prehrá dvojfázový teleport
+// (starý mág zmizne → nový sa objaví) a nasadí nového maga s jeho prenesenými HP/manou. Pozícia (x,y) ostáva.
+// Nasledujúce akcie v tom istom kole už vykonáva nový mág (číta sa game.players[slot]).
+function doSwap(slot, to, tl) {
+  const me = game.players[slot];
+  const person = game.seats[slot];
+  const from = me.char;
+  if (!game.mageHp || !TOURNAMENT_MAGES.includes(to) || to === from) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
+  if ((game.mageHp[person]?.[to] ?? 0) <= 0) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
+  // ulož živý stav odchádzajúceho maga (nesie sa do ďalších kôl / char-selectu ďalšej hry)
+  game.mageHp[person][from] = Math.max(0, me.hp);
+  game.mageMana[person][from] = Math.max(0, Math.min(MAX_MANA, me.mana));
+  // (1) starý mág zmizne
+  pushStateFrame(tl, [{ kind: "teleport_out", from: slot, char: from }], TELEPORT_OUT_MS);
+  // prepni identitu + nasaď HP/manu nového maga
+  me.char = to;
+  me.hp = game.mageHp[person][to];
+  me.mana = game.mageMana[person][to];
+  // (2) nový mág sa objaví
+  pushStateFrame(tl, [{ kind: "teleport_in", from: slot, char: to }], TELEPORT_IN_MS);
+}
+
 function doAction(slot, action, tl) {
   if (!action) return;
   switch (action.type) {
+    case "swap":     return doSwap(slot, action.to, tl);
     case "move":     return doMove(slot, action.dir, tl);
     case "dash":     return doDash(slot, action.dir, tl);
     case "recharge": return doRecharge(slot, tl);
@@ -873,7 +934,7 @@ function resolveTurn() {
       const foeMirrorArmed = game.players[foe].mirror;
       const act = game.players[slot].queue[i];
       // ohlás akciu klientovi (záznam kola pod HUD widgetom)
-      if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null } }], 250);
+      if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null, to: act.to || null } }], 250);
       doAction(slot, act, tl);
       if (foeShieldArmed) { game.players[foe].shield = false; game.players[foe].shieldGold = false; }
       if (foeMirrorArmed) { game.players[foe].mirror = false; game.players[foe].mirrorGold = false; }
@@ -955,7 +1016,7 @@ function resolveTurn() {
     game.starter = nextStarter;
   }
 
-  io.emit("state", { ...snapshot(), timeline: tl });
+  io.emit("state", { ...snapshot(), timeline: tl }); // roster HP/mana je verejné → plný snapshot stačí obom
 
   // príprava na ďalšie plánovanie (lokálny stav; vizuálne odomkne až klient po dohraní timeline)
   game.players.p1.locked = false;

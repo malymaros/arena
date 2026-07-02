@@ -255,6 +255,22 @@ let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyk
 
 // počas special castu skryjeme bežný actor sprite
 let castingNow = { p1:false, p2:false };
+// teleport (výmena maga): postava fade-uje plynulo (WAAPI, inšpirované démonom) — ref na bežiacu fade animáciu
+let _teleAnim = { p1:null, p2:null };
+function fadeActor(slot, from, to, dur) {
+  const el = slot === "p1" ? actorP1 : actorP2;
+  if (_teleAnim[slot]) { try { _teleAnim[slot].cancel(); } catch {} }
+  _teleAnim[slot] = el.animate(
+    [{ opacity: from }, { opacity: to }],
+    { duration: Math.max(150, dur || 600), easing: to > from ? "ease-out" : "ease-in", fill: "forwards" }
+  );
+}
+function resetActorFade() {
+  for (const slot of ["p1", "p2"]) {
+    if (_teleAnim[slot]) { try { _teleAnim[slot].cancel(); } catch {} _teleAnim[slot] = null; }
+    (slot === "p1" ? actorP1 : actorP2).style.opacity = "";
+  }
+}
 
 let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
 const SPRITES = {};
@@ -306,6 +322,115 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
   if (clear) ctx.clearRect(0, 0, dstW, dstH); // clear=false -> vrstvenie (efekt navrch mága)
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(meta.img, sx, 0, fw, meta.fh, dx, dy, dw, dh);
+}
+
+/* ---------- Teleport (výmena maga v turnaji) — dvojfázová explózia ---------- */
+// framy sú JEDNOTLIVÉ číslované PNG (nie horizontálny strip ako ostatné sprity) → vlastný loader/prehrávač
+const TELEPORT_DIR   = { fire: "Fire", lightning: "Lightning", wanderer: "Wanderer" };
+const TELEPORT_COUNT = { fire: 6, lightning: 10, wanderer: 10 };
+const _teleFrames = {}; // char -> Promise<HTMLImageElement[]>
+function ensureTeleportFrames(char) {
+  if (_teleFrames[char]) return _teleFrames[char];
+  const dir = TELEPORT_DIR[char], n = TELEPORT_COUNT[char] || 0;
+  if (!dir || !n) return (_teleFrames[char] = Promise.resolve([]));
+  const imgs = [], proms = [];
+  for (let i = 1; i <= n; i++) {
+    const img = new Image();
+    proms.push(new Promise(res => { img.onload = res; img.onerror = res; }));
+    img.src = `/assets/Teleport/${dir}/Explosion_${i}.png`;
+    imgs.push(img);
+  }
+  return (_teleFrames[char] = Promise.all(proms).then(() => imgs));
+}
+// per-mág: veľkosť explózie (× rozmer políčka) + kotvenie ("feet" = od nôh nahor, "torso" = na stred torza)
+const TELEPORT_FX = {
+  fire:      { scale: 1.0, anchor: "feet" },   // oheň horí od zeme, zmestí sa do políčka
+  lightning: { scale: 1.6, anchor: "torso" },
+  wanderer:  { scale: 1.6, anchor: "torso" },
+};
+const TORSO_FRAC = 0.66; // stred torza ako zlomok výšky actor boxu (0 = hore, 1 = päty)
+// prehraj explóziu CENTROVANÚ na POSTAVU daného slotu (char = ktorého maga framy); durationMs = trvanie (= frame.delayMs)
+// opacity: 0.75 keď je pred viditeľným mágom (out), 1.0 keď mág nie je viditeľný (in)
+function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
+  const st = state?.[slot];
+  if (!st) { onDone && onDone(); return; }
+  const { x, y } = st;
+  ensureTeleportFrames(char).then(imgs => {
+    if (!imgs.length) { onDone && onDone(); return; }
+    const fx = TELEPORT_FX[char] || { scale: 1.3, anchor: "torso" };
+    const scale = fx.scale;
+    const anchorBottom = fx.anchor === "feet";
+    const boxW = Math.round(TILE_W * scale), boxH = Math.round(TILE_H * scale);
+    const cvs = document.createElement("canvas");
+    cvs.width = boxW; cvs.height = boxH;
+    cvs.className = "teleport-fx";
+    cvs.style.opacity = String(opacity ?? 1);
+    // horizontálne = STRED POSTAVY; vertikálne = SPODOK spritu pri NOHÁCH (oheň horí od zeme nahor)
+    const { left, top } = cellToPx(x, y);
+    const px = left - (ACTOR_W - TILE_W) / 2;
+    const py = top  - (ACTOR_H - TILE_H);
+    const same = state?.p1 && state?.p2 && state.p1.x === state.p2.x && state.p1.y === state.p2.y;
+    const shift = same ? (slot === "p1" ? -22 : 22) : 0;
+    const cx = px + ACTOR_W / 2 + shift; // stred postavy
+    cvs.style.left = Math.round(cx - boxW / 2) + "px";
+    if (anchorBottom) {
+      const feetY = py + ACTOR_H;                       // päty postavy (= spodok bunky)
+      cvs.style.top = Math.round(feetY - boxH) + "px";  // spodok canvasu = päty (oheň od zeme)
+    } else {
+      const torsoY = py + ACTOR_H * TORSO_FRAC;          // stred torza
+      cvs.style.top = Math.round(torsoY - boxH / 2) + "px";
+    }
+    // vlož NA KONIEC #actors (DOM poradie) → explózia je PRED mágom (navrchu)
+    actorsEl.appendChild(cvs);
+    const ctx = cvs.getContext("2d");
+    const start = performance.now();
+    const dur = Math.max(200, durationMs || 600);
+    (function stepFx() {
+      const t = performance.now() - start;
+      const idx = Math.min(imgs.length - 1, Math.floor(t / dur * imgs.length));
+      const img = imgs[idx];
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      ctx.imageSmoothingEnabled = false;
+      if (img && img.naturalWidth) {
+        const sc = Math.min(cvs.width / img.naturalWidth, cvs.height / img.naturalHeight);
+        const dw = img.naturalWidth * sc, dh = img.naturalHeight * sc;
+        // horizontálne centrovať; vertikálne: "feet" ukotviť dole (oheň od zeme), "torso" centrovať
+        const dy = anchorBottom ? (cvs.height - dh) : (cvs.height - dh) / 2;
+        ctx.drawImage(img, (cvs.width - dw) / 2, dy, dw, dh);
+      }
+      if (t < dur) requestAnimationFrame(stepFx);
+      else { cvs.remove(); onDone && onDone(); }
+    })();
+  }).catch(() => onDone && onDone());
+}
+
+/* ---------- Mage head ikona (HUD hlavy + swap badge) — ANIMOVANÝ výrez hlavy z Idle sprite ---------- */
+// per-mág výrez hlavy z framu (cx,cy = stred výrezu ako zlomok šírky/výšky framu; size = strana štvorca ako zlomok výšky).
+// Hodnoty vylaď cez /head-cropper.html a nahraď ich sem.
+const HEAD_CROP = {
+  fire:      { cx: 0.40, cy: 0.55, size: 0.26 },
+  lightning: { cx: 0.41, cy: 0.58, size: 0.26 },
+  wanderer:  { cx: 0.47, cy: 0.56, size: 0.27 },
+};
+const mageHeadHtml = (char, cls = "") => `<canvas class="mage-head ${cls}" data-char="${char}" width="52" height="52"></canvas>`;
+// vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
+function drawMageHeadAnim(cvs, char, now) {
+  const dir = CHAR_META[char]?.dir;
+  const c = HEAD_CROP[char];
+  if (!dir || !c) return;
+  ensureSpriteMeta(dir, ANIM_DEF.idle.file).then(meta => {
+    const ctx = cvs.getContext("2d");
+    const fps = ANIM_DEF.idle.fps || 6;
+    const idx = Math.floor((now / (1000 / fps)) % meta.frames); // aktuálny idle frame
+    const fw = meta.fw, fh = meta.fh, side = fh * c.size;
+    let sx = idx * fw + fw * c.cx - side / 2;
+    let sy = fh * c.cy - side / 2;
+    sx = Math.max(idx * fw, Math.min(idx * fw + fw - side, sx)); // udrž výrez v rámci TOHTO framu
+    sy = Math.max(0, Math.min(fh - side, sy));
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(meta.img, sx, sy, side, side, 0, 0, cvs.width, cvs.height);
+  }).catch(() => {});
 }
 
 /* ---------- animation state ---------- */
@@ -1086,6 +1211,7 @@ function actionIcon(action) {
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
     case "special":  return "✨";
+    case "swap":     return "🌀";
     default:         return "?";
   }
 }
@@ -1322,6 +1448,14 @@ function ghostPos(idx = myQueue.length){
   if (!sims.length) return { x: mine.x, y: mine.y };
   return sims[Math.min(idx, sims.length) - 1];
 }
+// mág aktívny pred akciou s indexom idx — po prejdení swapov vo fronte 0..idx-1 (kvôli special/ghost náhľadu po výmene)
+function ghostCharAt(idx = myQueue.length) {
+  let char = state?.[me]?.char || null;
+  for (let i = 0; i < Math.min(idx, myQueue.length); i++) {
+    if (myQueue[i]?.type === "swap" && myQueue[i].to) char = myQueue[i].to;
+  }
+  return char;
+}
 
 // dráha basic útoku zvoleným smerom z danej pozície (po okraj boardu)
 function cellsForAimPreview(meState, dir){
@@ -1445,6 +1579,7 @@ function actionBadgeView(a) {
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
     case "last_stand":    return { cls: "golden",   html: LS_BADGE_IMG };
     case "demon":         return { cls: "demon",    html: LS_BADGE_IMG };
+    case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "") };
     case "last_hope":     return { cls: "lasthope", html: LH_BADGE_IMG };
     default:              return { cls: "",        text: a?.type || "" };
   }
@@ -1456,7 +1591,7 @@ function attachQueueHover(el, a, idx) {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForAimPreview(p, a.dir)); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special") {
-    el.addEventListener("mouseenter", () => { const mine = state?.[me]; const p = ghostPos(idx); if (mine?.char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: mine.char })); });
+    el.addEventListener("mouseenter", () => { const char = ghostCharAt(idx); const p = ghostPos(idx); if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char })); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells([[p.x, p.y]]); });
@@ -1561,6 +1696,7 @@ function renderQueue() {
   qCursor.classList.remove("show"); // počas plánovania skrytá; zobrazí ju až animácia
   queueEl.appendChild(qCursor);     // zelená šípka (mimo flex flow, absolútna)
 
+  if (state?.series?.format === "tournament") renderMageHeads(); // drž „armed" stav hláv v HUD v sync s frontou (hlavy animuje raf)
   updateActionButtons();
   syncGoldenHalves(); // drž zamknutie zlatých polovíc v sync s frontou (shield/mirror ↔ golden)
   updateGoldenButton(); // drž démon tlačidlo (armed/disabled podľa fronty) v sync aj pri úprave fronty
@@ -1586,7 +1722,7 @@ function highlightRoundBeat(from, action, counts, starterSlot) {
     el.classList.add("revealed");
     if (v.cls) el.classList.add(v.cls);
     if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
-    el.title = "Opponent";
+    el.title = "Opponent"; // swap badge hlavu animuje raf (canvas.mage-head)
   }
   el.classList.add("q-now");
   // zelená šípka pod lištou sa presunie pod aktuálny beat
@@ -1802,6 +1938,7 @@ function schedulePlayTimeline(timeline) {
         lastStandArmed = false;
         lastHopeArmed = false;
         lockedIn = false; // kolo dobehlo — odomkni ovládanie
+        resetActorFade(); // po teleporte vráť plnú viditeľnosť postáv pre ďalšie kolo
         syncGoldenHalves();
         syncGoldDualHalves();
         renderQueue(); // až teraz vyčisti round-script pre ďalšie kolo
@@ -1905,6 +2042,17 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "demon_center_out" && (e.from === "p1" || e.from === "p2")) {
         demonCenterDisappear();
+      }
+      // Teleport (výmena maga) — dvojfázovo, postava fade-uje plynulo (ako démon):
+      // OUT: starý mág plynulo MIZNE (1→0), explózia PRED ním semi-transparentne (0.75, vidno maga cez ňu).
+      // IN:  nový mág sa plynulo OBJAVUJE (0→1), explózia plná (1.0 — mág pod ňou nie je viditeľný).
+      if (e.kind === "teleport_out" && (e.from === "p1" || e.from === "p2")) {
+        fadeActor(e.from, 1, 0, frameHold);
+        playTeleportExplosion(e.from, e.char, frameHold, 0.75);
+      }
+      if (e.kind === "teleport_in" && (e.from === "p1" || e.from === "p2")) {
+        fadeActor(e.from, 0, 1, frameHold);
+        playTeleportExplosion(e.from, e.char, frameHold, 1.0);
       }
       // Last Hope: červená „hope" postava v strede → HP→1, mana→10 (HUD zo snapshotov) → zmizne, červený ultra mód ostáva
       if (e.kind === "last_hope_summon" && (e.from === "p1" || e.from === "p2")) {
@@ -2519,7 +2667,7 @@ function applyPhaseUI(s) {
 }
 
 // séria: v HUD boxe každého hráča rad placeholderov — BO3 = koruny za výhry,
-// tournament = lebky za PREHRY (lebku dostáva porazený = počet výhier súpera)
+// tournament = hlavy 3 magov (mŕtvy = lebka, aktuálny = zvýraznený, živí ostatní = klikateľní na výmenu)
 function renderSeriesCrowns(ser) {
   const single = !ser || !ser.format || ser.format === "single";
   if (single) {
@@ -2527,8 +2675,9 @@ function renderSeriesCrowns(ser) {
     crownsP1El.innerHTML = ""; crownsP2El.innerHTML = "";
     return;
   }
+  if (ser.format === "tournament") { renderMageHeads(); return; }
   const needed = ser.needed || 1;
-  const tournament = ser.format === "tournament";
+  const tournament = false;
   const onIcon  = tournament ? "skull" : "crown";
   const offIcon = tournament ? "skull_outline" : "crown_outline";
   // neobsadený slot -> obrys; obsadený -> plná pixel-art ikona
@@ -2544,6 +2693,71 @@ function renderSeriesCrowns(ser) {
 function updateMatchScore(s) {
   renderSeriesCrowns(s?.phase === "lobby" ? null : s?.series);
 }
+
+// tournament: 3 hlavy magov v HUD boxe každého hráča na mieste placeholderov (predtým lebky).
+// mŕtvy mág = lebka (nesie info o prehrách), aktuálny = zvýraznený, ostatní živí = klikateľní (len moja strana) na výmenu.
+const MAGE_ORDER = ["fire", "lightning", "wanderer"];
+// aktuálne HP/mana maga pre daný slot (VEREJNÉ pre oba sloty): nasadený mág = živý stav z boardu (p1/p2),
+// lavička = prenesené hodnoty z verejného rosteru (rosterHp/rosterMana)
+function headStats(slot, char, isCurrent) {
+  const st = state?.[slot];
+  if (isCurrent) return { hp: st?.hp, mana: st?.mana };
+  const rh = state?.rosterHp?.[slot], rm = state?.rosterMana?.[slot];
+  if (rh) return { hp: rh[char], mana: rm?.[char] };
+  return null;
+}
+function renderMageHeads() {
+  const buildSide = (slot) => {
+    const dead = state?.mageDead?.[slot] || [];
+    const cur = state?.[slot]?.char || null;
+    const mineSlot = slot === me;
+    return MAGE_ORDER.map(char => {
+      const isDead = dead.includes(char);
+      const isCurrent = cur === char;
+      const armed = mineSlot && myQueue.some(a => a.type === "swap" && a.to === char);
+      const clickable = mineSlot && !!cur && !isDead && !isCurrent && !uiLocked();
+      let cls = "mhead";
+      if (isDead) cls += " dead";
+      if (isCurrent) cls += " current";
+      if (armed) cls += " armed";
+      if (clickable) cls += " clickable";
+      // HP/mana nad hlavou (mŕtvy mág ich nemá; súperova lavička je skrytá → prázdny riadok pre zarovnanie)
+      const st = isDead ? null : headStats(slot, char, isCurrent);
+      const statsHtml = st
+        ? `<span class="mh-stats"><span class="mh-hp">${pixSvg("heart")}${st.hp ?? "?"}</span><span class="mh-mana">${pixSvg("drop")}${st.mana ?? "?"}</span></span>`
+        : `<span class="mh-stats empty"></span>`;
+      const face = isDead ? pixSvg("skull") : mageHeadHtml(char, "mh-canvas");
+      return `<span class="${cls}" data-slot="${slot}" data-char="${char}" title="${CHAR_META[char]?.name || char}">${statsHtml}<span class="mh-face">${face}</span></span>`;
+    }).join("");
+  };
+  crownsP1El.innerHTML = buildSide("p1");
+  crownsP2El.innerHTML = buildSide("p2");
+  crownsP1El.classList.remove("hidden"); crownsP2El.classList.remove("hidden");
+  crownsP1El.classList.add("mage-heads"); crownsP2El.classList.add("mage-heads");
+  // hlavy (canvas.mage-head) animuje raf
+}
+
+// klik na hlavu (moja strana, živý ne-aktuálny mág) = toggle swap akcie vo fronte — presne ako démon button
+function toggleSwap(char) {
+  if (uiLocked()) return;
+  if (openPicker) return;
+  if (!me || state?.phase !== "playing" || !state?.[me]?.char) return;
+  if (state?.series?.format !== "tournament") return;
+  if ((state?.mageDead?.[me] || []).includes(char)) return; // mŕtveho maga nemožno nasadiť
+  if (state?.[me]?.char === char) return;                    // aktuálneho maga nemožno vymeniť za seba
+  const idx = myQueue.findIndex(a => a.type === "swap" && a.to === char);
+  if (idx >= 0) { myQueue.splice(idx, 1); }                  // opätovný klik = odober z fronty
+  else {
+    if (myQueue.length >= 3) return;                         // plná fronta
+    if (myQueue.filter(a => a.type === "swap").length >= 2) return; // max 2 výmeny za kolo
+    myQueue.push({ type: "swap", to: char });
+  }
+  renderQueue();
+}
+[crownsP1El, crownsP2El].forEach(el => el.addEventListener("click", (ev) => {
+  const span = ev.target.closest(".mhead.clickable");
+  if (span) toggleSwap(span.dataset.char);
+}));
 
 /* ---------- Turn timer (server-riadený displej + auto-lock) ---------- */
 // server posiela zostávajúci čas (event `turn_timer` aj `state.timerMs`), takže displej sedí so serverom
@@ -2720,6 +2934,7 @@ socket.on("reset", () => {
   playGen++;        // zruš prípadné bežiace prehrávanie
   playing = false;
   hideConnError();
+  resetActorFade();
 
   // reset game-over stavov ešte pred renderHUD — inak by guard nechal visieť GAME OVER text
   serverWinner = null;
@@ -2821,6 +3036,7 @@ socket.on("new_game", () => {
   serverWinner = null; serverGameResult = null; gameOverShown = false;
   lastAttackEndAt = { p1:0, p2:0 };
   hideDeathCenter(); // démon zo summon/banish nesmie prejsť do ďalšej hry
+  resetActorFade();  // teleport fade nesmie prejsť do ďalšej hry
   stopTurnTimer();
   intermissionEl.classList.add("hidden");
   goOverlay.classList.add("hidden");
@@ -2906,7 +3122,7 @@ function raf() {
       actorGhost.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
       // rovnaký flip ako hráčov sprite — postava je vo frame mimo stredu, bez flipu vyzerá posunutá
       actorGhost.style.transform = `scaleX(${computeFacing(state.p1, state.p2)[me]})`;
-      const dir = CHAR_META[mine.char].dir;
+      const dir = CHAR_META[ghostCharAt() || mine.char].dir;
       ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(() => {});
@@ -2950,6 +3166,9 @@ function raf() {
       .then(meta => drawSprite(ctx, meta, CHARGE_ANIM, now, cvs.width, cvs.height))
       .catch(() => {});
   });
+
+  // HUD hlavy magov + swap badge hlavy — animovaný výrez hlavy z idle spritu
+  document.querySelectorAll("canvas.mage-head[data-char]").forEach(cvs => drawMageHeadAnim(cvs, cvs.dataset.char, now));
 
   // specials v strede
   document.querySelectorAll("canvas.special-center").forEach(cvs => {
@@ -3056,10 +3275,10 @@ const specialBtn = document.getElementById("special-btn");
 if (specialBtn){
   // preview z ghost pozície — special by sa vykonal po už naplánovaných akciách
   specialBtn.addEventListener("mouseenter", ()=>{
-    const mine = state?.[me];
+    const char = ghostCharAt();   // po prípadnom swape vo fronte = nový mág
     const p = ghostPos();
-    if (!mine?.char || !p) return;
-    showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: mine.char }));
+    if (!char || !p) return;
+    showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
 }

@@ -521,6 +521,13 @@ body {
 /* démon „end" banishment bunka (pos 7) — červený okraj; platí pri každej šírke */
 .q-badge.demon   { background: #2a0d12; overflow: hidden; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,90,90,.6), 0 0 12px rgba(255,60,60,.55); }
 .q-badge.demon .ls-badge{ width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+/* swap (výmena maga) — modrastý badge s hlavou cieľového maga */
+.q-badge.swap  { position: relative; background: #12203c; overflow: hidden; box-shadow: 0 0 0 1px #000, 0 0 12px rgba(90,150,255,.45); }
+/* object-fit: cover → štvorcová hlava vyplní obdĺžnik bez deformácie (žiadne „čapaté" roztiahnutie) */
+.q-badge.swap canvas.mage-head{ width: 100%; height: 100%; display: block; object-fit: cover; image-rendering: pixelated; }
+/* rám NAD hlavou (hlava je za okrajom, neprelieza cezeň) */
+.q-badge.swap::after{ content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 2px rgba(120,170,255,.6); }
+.q-badge.main.swap::after{ box-shadow: inset 0 0 0 2px rgba(120,170,255,.9); }
 /* démon ÚTOK navolený ako ťah (má .main) — zlatá obruba (ako tlačidlo), odlíšenie od červeného banishmentu */
 .q-badge.main.demon{ box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,210,74,.9), 0 0 12px rgba(255,200,60,.55); }
 /* Last Hope bunka v lište — veľkosť ako banishment démon bunka, žiarivo červená; placeholder kým sa nenavolí */
@@ -764,6 +771,47 @@ body {
 .series-crowns .crown{ width: 78px; height: 78px; display: inline-block; filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
 .series-crowns .crown svg{ display: block; width: 100%; height: 100%; }
 .series-crowns .crown.won{ filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
+/* tournament: hlavy 3 magov namiesto lebiek — vyššie pod HUD boxom, väčšie, s HP/manou nad hlavou */
+.series-crowns.mage-heads{
+  top: calc(100% + 360px);   /* pod žrďou vlajky, o kúsok vyššie */
+  gap: 12px;
+}
+/* mág na pravej strane (p2) pozerá doľava na súpera — zrkadli hlavu ako na boarde (.hud-p2 .hud-char) */
+.hud-p2 .series-crowns .mh-face canvas{ transform: scaleX(-1); }
+.series-crowns .mhead{
+  display: inline-flex; flex-direction: column; align-items: center; gap: 4px;
+  box-sizing: border-box; transition: transform .1s ease;
+}
+.series-crowns .mh-face{
+  position: relative; width: 77px; height: 77px; border-radius: 8px; box-sizing: border-box;
+  overflow: hidden; background: rgba(12,14,18,.72);
+  filter: drop-shadow(0 2px 0 rgba(0,0,0,.6));
+}
+.series-crowns .mh-face svg,
+.series-crowns .mh-face canvas{ width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+/* rám okienka NAD sprite-om → mág pôsobí, že je ZA rámom (rám prekrýva okraje) */
+.series-crowns .mh-face::after{
+  content: ""; position: absolute; inset: 0; border-radius: 10px; pointer-events: none;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #000, inset 0 0 0 5px rgba(255,255,255,.12);
+}
+/* HP/mana riadok nad hlavou */
+.series-crowns .mh-stats{
+  display: flex; gap: 7px; align-items: center; justify-content: center; min-height: 18px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 12px; line-height: 1;
+  color: #f0f0f0; text-shadow: 2px 2px 0 rgba(0,0,0,.7);
+}
+.series-crowns .mh-stats.empty{ visibility: hidden; }
+.series-crowns .mh-hp, .series-crowns .mh-mana{ display: inline-flex; align-items: center; gap: 3px; }
+.series-crowns .mh-hp svg, .series-crowns .mh-mana svg{ width: 12px; height: 12px; display: block; }
+.series-crowns .mhead.dead .mh-face{ opacity: .92; }          /* lebka — mág je mŕtvy (= prehra) */
+.series-crowns .mhead.current .mh-face::after{ box-shadow: 0 0 0 2px #000, inset 0 0 0 4px rgba(255,213,79,.95), 0 0 14px rgba(255,200,60,.55); } /* aktuálne nasadený */
+.series-crowns .mhead.clickable{ pointer-events: auto; cursor: pointer; }
+.series-crowns .mhead.clickable .mh-face::after{ box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #000, inset 0 0 0 5px rgba(120,170,255,.6); }
+.series-crowns .mhead.clickable:hover{ transform: scale(1.07); }
+.series-crowns .mhead.clickable:hover .mh-face::after{ box-shadow: 0 0 0 2px #000, inset 0 0 0 4px rgba(120,170,255,.95), 0 0 16px rgba(90,150,255,.6); }
+.series-crowns .mhead.armed .mh-face::after{ box-shadow: 0 0 0 2px #000, inset 0 0 0 4px #2ecc71, 0 0 16px rgba(46,204,113,.75); } /* navolená výmena v tomto kole */
+/* teleport (výmena maga) — explózia centrovaná na postavu, PRED mágom; opacity riadi JS (0.75 out / 1.0 in) */
+.teleport-fx{ position: absolute; pointer-events: none; image-rendering: pixelated; }
 .turn-timer{
   position: fixed; top: 78px; left: 50%; transform: translateX(-50%);
   z-index: 4;
