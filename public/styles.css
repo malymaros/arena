@@ -597,6 +597,38 @@ body {
 }
 .char-select.hidden { display: none; }
 .char-cards { display: flex; align-items: center; justify-content: center; gap: 28px; }
+.char-cards.hidden { display: none; }
+
+/* veľký nadpis aktuálnej stránky výberu (Mages / Experimental) */
+.char-page-title {
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 30px; color: #ffb300; letter-spacing: 4px;
+  text-shadow: 4px 4px 0 rgba(0,0,0,.75);
+}
+
+/* riadok kariet so šípkami stránkovania po bokoch */
+.char-pager { display: flex; align-items: center; justify-content: center; gap: 26px; }
+.char-arrow {
+  width: 54px; height: 78px; border: none; cursor: pointer; border-radius: 2px;
+  background: #5a6473; color: #ffb300;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 20px; line-height: 1;
+  box-shadow:
+    0 0 0 3px #ffb300,
+    0 0 0 5px #000,
+    inset 0 3px 0 rgba(255,255,255,.06),
+    inset 0 -4px 0 rgba(0,0,0,.5);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.char-arrow:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 3px #ffc333,
+    0 0 0 5px #000,
+    0 0 16px rgba(255,179,0,.55);
+}
+/* neaktívna šípka: neviditeľná, ale drží miesto — karty neskáču pri prepnutí stránky */
+.char-arrow.off { visibility: hidden; }
 
 /* náhľad špeciálnej abilitky pri hoveri nad mágom */
 .char-ability {
@@ -677,6 +709,22 @@ body {
 /* tournament: mŕtvy mág — nedá sa zvoliť, stlmený, démon prekrýva okno */
 .char-card.dead { cursor: default; filter: grayscale(.7) brightness(.7); }
 .char-card.dead:hover { transform: none; box-shadow: 0 0 0 3px #7a2b2b, 0 0 0 5px #000; }
+
+/* placeholder karta "Coming soon" — neaktívna, stlmený šedý rám */
+.char-card.soon {
+  cursor: default; background: #3b4149;
+  box-shadow: 0 0 0 3px #6b7480, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.04), inset 0 -4px 0 rgba(0,0,0,.5);
+}
+.char-card.soon:hover {
+  transform: none;
+  box-shadow: 0 0 0 3px #6b7480, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.04), inset 0 -4px 0 rgba(0,0,0,.5);
+}
+.char-card.soon .soon-mark {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 52px; color: #6b7480; text-shadow: 4px 4px 0 rgba(0,0,0,.6);
+}
+.char-card.soon .char-name { color: #8f97a3; }
 
 .char-name {
   position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 8px;

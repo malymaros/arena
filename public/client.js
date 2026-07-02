@@ -2254,6 +2254,7 @@ function updateCharSelectHp(s) {
   charSelectMana = (s && s.mageMana) ? s.mageMana : null;
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
+    if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
     const statsEl = card.querySelector(".char-stats");
     const hpEl = card.querySelector(".char-hp");
     const manaEl = card.querySelector(".char-mana");
@@ -2349,6 +2350,7 @@ selEl.addEventListener("click", (e) => {
   const card = e.target.closest(".char-card");
   if (!card) return;
   const key = card.dataset.char;
+  if (!key) return; // placeholder "Coming soon" nie je voliteľný
   if (isMageDead(key)) return; // mŕtveho maga (tournament) sa nedá zvoliť
   chosenChar = key;
   socket.emit("choose_character", key);
@@ -2405,13 +2407,33 @@ function clearAbilityPreview() {
   abilityCasterCanvas = null;
   charAbilityEl?.classList.add("hidden");
 }
-selEl.querySelectorAll(".char-card").forEach(card => {
+selEl.querySelectorAll(".char-card[data-char]").forEach(card => {
   card.addEventListener("mouseenter", () => {
     if (isMageDead(card.dataset.char)) return; // mŕtvy mág nemá náhľad špeciálu
     renderAbilityPreview(card.dataset.char);
   });
 });
-selEl.querySelector(".char-cards")?.addEventListener("mouseleave", clearAbilityPreview);
+selEl.querySelectorAll(".char-cards").forEach(el => el.addEventListener("mouseleave", clearAbilityPreview));
+
+/* ---------- Stránkovanie výberu postáv ---------- */
+// str. 0 = základní magovia (Mages), str. 1 = experimentálne postavy (Experimental)
+const CHAR_PAGES = [{ title: "Mages" }, { title: "Experimental" }];
+let charPage = 0;
+const charPrevBtn = document.getElementById("char-page-prev");
+const charNextBtn = document.getElementById("char-page-next");
+const charPageTitle = document.getElementById("char-page-title");
+function setCharPage(p) {
+  charPage = Math.max(0, Math.min(CHAR_PAGES.length - 1, p));
+  selEl.querySelectorAll(".char-cards").forEach(el =>
+    el.classList.toggle("hidden", Number(el.dataset.page) !== charPage));
+  if (charPageTitle) charPageTitle.textContent = CHAR_PAGES[charPage].title;
+  // krajné šípky sú neviditeľné (visibility) — layout kariet sa pri prepnutí nehýbe
+  charPrevBtn?.classList.toggle("off", charPage === 0);
+  charNextBtn?.classList.toggle("off", charPage === CHAR_PAGES.length - 1);
+  clearAbilityPreview(); // náhľad špeciálu patrí karte z predošlej stránky
+}
+charPrevBtn?.addEventListener("click", () => setCharPage(charPage - 1));
+charNextBtn?.addEventListener("click", () => setCharPage(charPage + 1));
 
 /* ---------- Controls ---------- */
 const moveBtn    = document.getElementById("move-btn");
@@ -2764,6 +2786,7 @@ function applyPhaseUI(s) {
   if (needChar) {
     updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom)
     selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
+    if (selEl.classList.contains("hidden")) setCharPage(0); // nové otvorenie výberu — vždy od stránky Mages
     hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber
   } else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
 
