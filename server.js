@@ -66,7 +66,9 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
 const CHARS = ["fire", "lightning", "wanderer", "medusa"];
-const TOURNAMENT_MAGES = [...CHARS];
+// tournament zatiaľ len základní magovia — experimentálne postavy (medusa) až po návrhu výberu tímu.
+// Medúza tým pádom nie je v mageHp/mageMana → choose_character aj swap ju v tournamente odmietnu.
+const TOURNAMENT_MAGES = ["fire", "lightning", "wanderer"];
 // časový limit na ťah — vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
 const TIMER_OPTIONS = new Set(["off", "10", "30", "60", "quickdraw"]);
 

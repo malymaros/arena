@@ -629,6 +629,8 @@ body {
 }
 /* neaktívna šípka: neviditeľná, ale drží miesto — karty neskáču pri prepnutí stránky */
 .char-arrow.off { visibility: hidden; }
+/* tournament: stránkovanie vypnuté — obe šípky preč, k dispozícii sú len základní magovia */
+.char-select.no-paging .char-arrow { visibility: hidden; }
 
 /* náhľad špeciálnej abilitky pri hoveri nad mágom */
 .char-ability {

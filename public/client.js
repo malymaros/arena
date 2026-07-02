@@ -2252,6 +2252,9 @@ function clearActors() {
 function updateCharSelectHp(s) {
   charSelectHp = (s && s.mageHp) ? s.mageHp : null;
   charSelectMana = (s && s.mageMana) ? s.mageMana : null;
+  // tournament: experimentálna stránka je zatiaľ vypnutá — hráč vyberá len z 3 magov
+  selEl.classList.toggle("no-paging", !!charSelectHp);
+  if (charSelectHp && charPage !== 0) setCharPage(0);
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
     if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
@@ -2423,6 +2426,7 @@ const charPrevBtn = document.getElementById("char-page-prev");
 const charNextBtn = document.getElementById("char-page-next");
 const charPageTitle = document.getElementById("char-page-title");
 function setCharPage(p) {
+  if (selEl.classList.contains("no-paging")) p = 0; // tournament — len stránka Mages
   charPage = Math.max(0, Math.min(CHAR_PAGES.length - 1, p));
   selEl.querySelectorAll(".char-cards").forEach(el =>
     el.classList.toggle("hidden", Number(el.dataset.page) !== charPage));
@@ -2823,7 +2827,8 @@ function updateMatchScore(s) {
 
 // tournament: 3 hlavy magov v HUD boxe každého hráča na mieste placeholderov (predtým lebky).
 // mŕtvy mág = lebka (nesie info o prehrách), aktuálny = zvýraznený, ostatní živí = klikateľní (len moja strana) na výmenu.
-const MAGE_ORDER = ["fire", "lightning", "wanderer", "medusa"];
+// tournament zatiaľ len základní magovia (musí sedieť so serverovým TOURNAMENT_MAGES)
+const MAGE_ORDER = ["fire", "lightning", "wanderer"];
 // aktuálne HP/mana maga pre daný slot (VEREJNÉ pre oba sloty): nasadený mág = živý stav z boardu (p1/p2),
 // lavička = prenesené hodnoty z verejného rosteru (rosterHp/rosterMana)
 function headStats(slot, char, isCurrent) {
