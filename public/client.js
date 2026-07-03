@@ -3066,7 +3066,8 @@ function renderMageHeads() {
       const isDead = dead.includes(char);
       const isCurrent = cur === char;
       const armed = mineSlot && myQueue.some(a => a.type === "swap" && a.to === char);
-      const clickable = mineSlot && !!cur && !isDead && !isCurrent && !uiLocked();
+      // Last Stand pakt: buffnutý hráč vo final kole nestrieda — jeho lavička nie je klikateľná
+      const clickable = mineSlot && !!cur && !isDead && !isCurrent && !uiLocked() && !state?.[slot]?.lastStandBuff;
       let cls = "mhead";
       if (isDead) cls += " dead";
       if (isCurrent) cls += " current";
@@ -3095,6 +3096,7 @@ function toggleSwap(char) {
   if (!me || state?.phase !== "playing" || !state?.[me]?.char) return;
   if (state?.series?.format !== "tournament") return;
   if (state?.p1?.labyrinth || state?.p2?.labyrinth) return;  // počas labyrintu je výmena zakázaná (hlavy sú skryté)
+  if (state?.[me]?.lastStandBuff) return;                    // Last Stand pakt: vo final kole sa nestrieda
   if ((state?.mageDead?.[me] || []).includes(char)) return; // mŕtveho maga nemožno nasadiť
   if (state?.[me]?.char === char) return;                    // aktuálneho maga nemožno vymeniť za seba
   const idx = myQueue.findIndex(a => a.type === "swap" && a.to === char);

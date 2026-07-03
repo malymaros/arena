@@ -473,6 +473,9 @@ function validQueue(queue, slot) {
     // počas aktívneho labyrintu (ktorejkoľvek strany) je výmena maga zakázaná — hlavy sú skryté,
     // swap sa odmieta už pri plánovaní (aj keby kliatba skončila zásahom uprostred kola)
     if (game.players.p1.labyrinth || game.players.p2.labyrinth) return false;
+    // hráč s Last Stand paktom nesmie vo final kole swapnúť — inak by si zabankoval démonov
+    // full-heal do rosteru (10/10 uložených pri swape) a doom by zabil náhradníka namiesto neho
+    if (game.players[slot]?.lastStandBuff) return false;
     const person = game.seats[slot];
     const startChar = game.players[slot]?.char; // aktuálny mág na začiatku kola
     const seen = new Set();
@@ -928,6 +931,9 @@ function doSwap(slot, to, tl) {
   // labyrint mohol padnúť v tomto kole PO naplánovaní swapu (Minotaurov special skôr v poradí) —
   // počas kliatby je výmena zakázaná pre obe strany, naplánovaný swap prepadne ako invalid
   if (game.players.p1.labyrinth || game.players.p2.labyrinth) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
+  // poistka k validQueue: hráč s Last Stand buffom vo final kole nesmie swapnúť (buff sa zapína
+  // až na konci aktivačného kola, takže mid-round race nehrozí — guard drží pravidlo aj do budúcna)
+  if (me.lastStandBuff) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
   // ulož živý stav odchádzajúceho maga (nesie sa do ďalších kôl / char-selectu ďalšej hry)
   game.mageHp[person][from] = Math.max(0, me.hp);
   game.mageMana[person][from] = Math.max(0, Math.min(MAX_MANA, me.mana));

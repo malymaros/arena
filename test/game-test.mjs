@@ -438,9 +438,10 @@ async function main() {
     "T15: game_result hlási víťaza hry a matchOver=false", `gr=${JSON.stringify(c1.gameResult)}`);
   check(c1.gameResult?.series?.winsP1 === 1 && c1.gameResult?.series?.winsP2 === 0,
     "T15: skóre série 1:0 pre p1", `series=${JSON.stringify(c1.gameResult?.series)}`);
-  // počkaj na new_game (server čaká na dohranie timeline na klientovi); strany sa NEprehadzujú
+  // počkaj na new_game (server ho plánuje až po timelineDuration + 6,5 s — kolo s 2 špeciálmi a melee
+  // má timeline ~15 s, takže 20 s strop bol tesný a na pomalšom stroji občas nestihol)
   const t0 = Date.now();
-  while (c1.lastState?.series?.gameIndex !== 2 && Date.now() - t0 < 20000) await new Promise(r => setTimeout(r, 100));
+  while (c1.lastState?.series?.gameIndex !== 2 && Date.now() - t0 < 35000) await new Promise(r => setTimeout(r, 100));
   check(c1.lastState?.series?.gameIndex === 2, "T15: séria postúpila na hru 2",
     `gameIndex=${c1.lastState?.series?.gameIndex}`);
   check(c1.slot === "p1", "T15: strany sú fixné — vylosovaný biely ostáva vľavo (p1) aj v hre 2", `slot=${c1.slot}`);
@@ -1024,6 +1025,27 @@ async function main() {
   check(fxOf(tl, "teleport_out").length === 0, "T43: žiadny teleport neprebehol");
   check(tl[tl.length - 1].p2.char === "fire", "T43: p2 ostáva fire", `char=${tl[tl.length - 1].p2.char}`);
   invariantCheck(tl, "T43");
+
+  /* ---------- Test 44: Last Stand pakt — vo final kole je swap zakázaný ---------- */
+  // inak by si hráč zabankoval démonov full-heal do rosteru (swap ukladá živých 10/10)
+  // a doom by zabil náhradníka namiesto mága, ktorý pakt uzavrel
+  await freshTournament(); // p1 = minotaur (tím minotaur/fire/medusa), p2 = fire
+  // kolo 1 (starter p1): p1 aktivuje Last Stand (trailing) — démon ho zabije a oživí na 10/10
+  tl = await playRound(c1, c2, [R, S, M("right"), LS], [R, S, M("up")]);
+  check(tl[tl.length - 1].p1.lastStandBuff === true, "T44: po summone má p1 buff (final kolo)");
+  // final kolo (starter p2): lock buffnutého hráča so swapom je odmietnutý
+  c1.lastTimeline = null; c2.lastTimeline = null; c1.gameResult = null;
+  c1.sock.emit("lock_in", [SW("medusa"), R, A("right")]);
+  c2.sock.emit("lock_in", [R, S, M("down")]);
+  let lsSwapRejected = false;
+  try { await waitTimeline(c1, 1500); } catch { lsSwapRejected = true; }
+  check(lsSwapRejected, "T44: swap hráča s paktom vo final kole je odmietnutý");
+  // bez swapu final kolo prebehne; p1 nevyhrá → banish zabije mága, ktorý pakt uzavrel
+  c1.sock.emit("lock_in", [R, M("left"), S]);
+  tl = await waitTimeline(c1, 8000);
+  await new Promise(r => setTimeout(r, 150));
+  check(tl[tl.length - 1].p1.hp === 0, "T44: doom — banish zabil mága s paktom", `hp=${tl[tl.length - 1].p1.hp}`);
+  check(c1.gameResult?.gameWinner === "p2", "T44: hru berie p2", `res=${JSON.stringify(c1.gameResult)}`);
 
   c1.sock.close(); c2.sock.close();
   server.kill();
