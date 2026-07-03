@@ -1076,6 +1076,126 @@ async function main() {
   check(c2reveal >= 0 && c2banish, "T45: prekliaty vidí banish choreografiu (reveal zrušil redakciu)",
     `reveal=${c2reveal}, banishSeen=${c2banish}`);
 
+  /* ---------- Naruto: pomocný fresh game (p1 = naruto, p2 = fire; mana-only tiles = deterministické HP) ---------- */
+  async function freshNaruto(p2char = "fire") {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "naruto");
+    c2.sock.emit("choose_character", p2char);
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  /* ---------- Test 46: Narutov special — summon klona + inverzný vertikálny pohyb ---------- */
+  await freshNaruto();
+  // p1 (0,1): summon (klon na vlastnej bunke) → move up (p1 hore, klon INVERZNE dole) → recharge
+  tl = await playRound(c1, c2, [SP, M("up"), R], [R, S, M("down")]);
+  check(fxOf(tl, "clone_summon").length === 1, "T46: clone_summon efekt v timeline");
+  check(fxOf(tl, "clone_born").length === 1, "T46: clone_born efekt v timeline");
+  const t46sp = fxOf(tl, "special").filter(e => e.from === "p1");
+  check(t46sp.length === 3 && JSON.stringify(t46sp[0].cells) === "[[0,1]]",
+    "T46: special zóna = vlastná bunka", `cells=${JSON.stringify(t46sp[0]?.cells)}`);
+  const t46last = tl[tl.length - 1];
+  check(t46last.p1.x === 0 && t46last.p1.y === 0, "T46: Naruto skončil na (0,0)", `p1=(${t46last.p1.x},${t46last.p1.y})`);
+  check(t46last.p1.clone?.x === 0 && t46last.p1.clone?.y === 2,
+    "T46: klon kopíruje pohyb s inverznou vertikálou → (0,2)", `clone=${JSON.stringify(t46last.p1.clone)}`);
+  check(t46last.p1.mana === 5, "T46: special stál 5 many (6−5+4=5)", `mana=${t46last.p1.mana}`);
+  invariantCheck(tl, "T46");
+
+  /* ---------- Test 47: klon absorbuje strelu (bait) a zmizne; strela preletí naprázdno ďalej ---------- */
+  // stav z T46: p1 (0,0), klon (0,2), p2 (3,2). Kolo 2: klon sa posunie na (1,2), kolo 3: p2 strieľa doľava
+  tl = await playRound(c1, c2, [M("right"), R, S], [R, ML, S]);       // klon → (1,2)
+  tl = await playRound(c1, c2, [R, S, M("down")], [A("left"), R, S]); // strela v rade 2 trafí klona na (1,2)
+  check(fxOf(tl, "clone_die").length === 1, "T47: klon zmizol po zásahu (clone_die)");
+  check(sumEffects(tl).hits.filter(h => h.target === "p1").length === 0, "T47: Naruto nedostal žiadny dmg (klon strelu zožral)");
+  check(tl[tl.length - 1].p1.clone === null, "T47: klon je preč zo stavu");
+  check(tl[tl.length - 1].p1.hp === 10, "T47: p1 HP netknuté", `hp=${tl[tl.length - 1].p1.hp}`);
+  // strela po zabití klona letí naprázdno až po okraj (dym) — charge efekt aj v bunke ZA klonom (0,2)
+  const t47charges = fxOf(tl, "charge").filter(e => e.from === "p2").map(e => e.cell);
+  check(t47charges.some(c => c[0] === 0 && c[1] === 2), "T47: strela preletela cez klona po okraj", `cells=${JSON.stringify(t47charges)}`);
+  invariantCheck(tl, "T47");
+
+  /* ---------- Test 48: klonov útok dáva vždy plochý 1 dmg (bez falloffu) ---------- */
+  await freshNaruto();
+  tl = await playRound(c1, c2, [SP, M("up"), R], [R, S, M("down")]); // p1 (0,0), klon (0,2), p2 (3,2)
+  // kolo 2 (starter p2): dash priblíži klona na (2,2), strela: Naruto (rad 0) minie, klon dist 1 → 1 dmg
+  tl = await playRound(c1, c2, [D("right"), A("right"), R], [R, ML, S]);
+  const t48hits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t48hits.length === 1 && t48hits[0].dmg === 1, "T48: klonova strela = plochý 1 dmg (žiadny falloff)", `hits=${JSON.stringify(t48hits)}`);
+  check(tl[tl.length - 1].p1.clone?.x === 2 && tl[tl.length - 1].p1.clone?.y === 2,
+    "T48: klon prežil (nikto ho netrafil)", `clone=${JSON.stringify(tl[tl.length - 1].p1.clone)}`);
+  invariantCheck(tl, "T48");
+
+  /* ---------- Test 49: súperov mirror — odraz klonovej strely zničí KLONA (nie HP Naruta) ---------- */
+  await freshNaruto();
+  tl = await playRound(c1, c2, [SP, M("up"), R], [R, S, M("down")]); // p1 (0,0), klon (0,2), p2 (3,2)
+  tl = await playRound(c1, c2, [A("right"), R, S], [MI, R, ML]);
+  // p2 mirror kryje p1 útok: Narutova strela (rad 0) minie, klonova (rad 2, dist 3) trafí → odraz rozplynie klona
+  const t49mirror = fxOf(tl, "mirror").filter(e => e.target === "p2");
+  check(t49mirror.length === 1 && t49mirror[0].dmg === 1, "T49: mirror odrazil klonovú strelu (dmg 1)", `fx=${JSON.stringify(t49mirror)}`);
+  check(fxOf(tl, "clone_die").length === 1, "T49: odraz zničil klona");
+  const t49last = tl[tl.length - 1];
+  check(t49last.p1.hp === 10 && t49last.p2.hp === 10, "T49: HP oboch hráčov netknuté (odraz šiel do klona)",
+    `p1=${t49last.p1.hp}, p2=${t49last.p2.hp}`);
+  check(t49last.p1.clone === null, "T49: klon je preč zo stavu");
+  invariantCheck(tl, "T49");
+
+  /* ---------- Test 50: recast specialu — starý klon najprv zmizne; summon na zdieľanej bunke = not_alone ---------- */
+  await freshNaruto();
+  tl = await playRound(c1, c2, [SP, M("up"), R], [R, S, M("down")]); // p1 (0,0), klon (0,2); mana 6−5+4=5
+  tl = await playRound(c1, c2, [SP, R, S], [R, ML, M("up")]);
+  const t50die = tl.findIndex(f => (f.effects || []).some(e => e.kind === "clone_die"));
+  const t50born = tl.findIndex(f => (f.effects || []).some(e => e.kind === "clone_born"));
+  check(t50die >= 0 && t50born > t50die, "T50: recast — starý klon zmizol PRED novým summonom", `die=${t50die}, born=${t50born}`);
+  check(tl[tl.length - 1].p1.clone?.x === 0 && tl[tl.length - 1].p1.clone?.y === 0,
+    "T50: nový klon na Narutovej bunke (0,0)", `clone=${JSON.stringify(tl[tl.length - 1].p1.clone)}`);
+  invariantCheck(tl, "T50");
+  // not_alone: p2 sa priblíži, Naruto mu vstúpi na bunku a skúsi summon — invalid, mana sa neminie
+  await freshNaruto();
+  tl = await playRound(c1, c2, [M("right"), R, S], [M("left"), R, S]); // p1 (1,1), p2 (2,1); mana p1 = 8
+  tl = await playRound(c1, c2, [M("right"), SP, R], [R, S, MI]);       // p1 vstúpi na (2,1) k p2 → summon invalid
+  const t50inv = fxOf(tl, "invalid").filter(e => e.target === "p1" && e.reason === "not_alone");
+  check(t50inv.length === 1, "T50: summon na zdieľanej bunke = invalid not_alone", `inv=${JSON.stringify(fxOf(tl, "invalid"))}`);
+  check(tl[tl.length - 1].p1.clone === null, "T50: klon nevznikol");
+  check(tl[tl.length - 1].p1.mana === 10, "T50: neplatný summon nestál manu (8+4 cap 10)", `mana=${tl[tl.length - 1].p1.mana}`);
+  invariantCheck(tl, "T50b");
+
+  /* ---------- Test 51: zónový special (fire riadok) zničí klona aj bez zásahu hráča ---------- */
+  await freshNaruto();
+  tl = await playRound(c1, c2, [SP, M("up"), R], [R, S, M("down")]); // p1 (0,0), klon (0,2), p2 fire (3,2)
+  tl = await playRound(c1, c2, [R, S, M("right")], [SP, R, S]);      // fire special riadok 2: Naruto mimo, klon vnútri
+  check(fxOf(tl, "clone_die").length === 1, "T51: zónový special zničil klona");
+  check(sumEffects(tl).hits.length === 0, "T51: žiadny dmg nepadol (Naruto mimo zóny)", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tl[tl.length - 1].p1.clone === null, "T51: klon je preč zo stavu");
+  invariantCheck(tl, "T51");
+
+  /* ---------- Test 52: klon × labyrint — mirror match (Naruto lovec s klonom, Minotaur prekliaty) ---------- */
+  await freshNaruto("minotaur");
+  // p1 summon + mirror; p2 (minotaur) sa priblíži a kolo zavŕši specialom → odraz: prekliaty je Minotaur,
+  // klon (krytý tým istým mirrorom) prežije
+  tl = await playRound(c1, c2, [SP, R, MI], [R, M("left"), SP]);
+  let t52last = tl[tl.length - 1];
+  check(t52last.p2.labyrinth === true, "T52: odrazený labyrint zaklial Minotaura");
+  check(t52last.p1.clone?.x === 0 && t52last.p1.clone?.y === 1, "T52: klon krytý mirrorom prežil (stojí na Narutovej bunke)",
+    `clone=${JSON.stringify(t52last.p1.clone)}`);
+  // redakcia: prekliaty (c2) nesmie vidieť pozíciu Naruta ANI jeho klona
+  check(c2.lastState.p1.x === null && c2.lastState.p1.clone === null,
+    "T52: prekliaty nevidí Naruta ani klona v dátach", `p1=${JSON.stringify({ x: c2.lastState.p1.x, clone: c2.lastState.p1.clone })}`);
+  // kolo 2 (starter p2): slepá strela doľava v rade 1 trafí KLONA na (0,1) — absorbuje ho (stacked bait);
+  // zásah klona labyrint NEUKONČÍ a prekliaty sa o ňom nesmie dozvedieť
+  c2.lastTimeline = null;
+  tl = await playRound(c1, c2, [R, S, M("right")], [A("left"), R, S]);
+  t52last = tl[tl.length - 1];
+  check(fxOf(tl, "clone_die").length === 1, "T52: slepá strela trafila klona (bait na zdieľanej bunke)");
+  check(t52last.p1.hp === 10, "T52: Naruto na tej istej bunke nedostal nič (klon absorboval)", `hp=${t52last.p1.hp}`);
+  check(t52last.p2.labyrinth === true, "T52: zásah klona labyrint NEukončil");
+  check(fxOf(tl, "labyrinth_reveal").length === 0, "T52: zásah klona labyrint ani neodhalil");
+  const c2fx = (c2.lastTimeline || []).flatMap(f => f.effects || []);
+  check(!c2fx.some(e => e.kind === "clone_die"), "T52: prekliaty strelec sa o zničení klona nedozvedel (redakcia)");
+  check(c2fx.some(e => e.kind === "charge" && e.from === "p2"), "T52: vlastnú strelu prekliaty vidí");
+  invariantCheck(tl, "T52");
+
   c1.sock.close(); c2.sock.close();
   server.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);

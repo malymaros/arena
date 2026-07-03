@@ -1192,9 +1192,10 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .hud-char.alt-color:not(.wounded):not(.critical):not(.dead){ filter: saturate(.22) brightness(1.4); }
   /* char-select hráča vpravo (p2) — náhľady magov v rovnakom alternatívnom vykreslení */
   #char-select.p2-side canvas.char-canvas{ filter: saturate(.22) brightness(1.4); }
-  /* Medúza a Minotaur majú pre p2 natívnu paletu (Medusa2/Minotaur_2) — filter sa na ne neaplikuje */
+  /* Medúza, Minotaur a Naruto majú pre p2 natívnu paletu (…_2 priečinky) — filter sa na ne neaplikuje */
   #char-select.p2-side canvas.char-canvas[data-char="medusa"]{ filter: none; }
   #char-select.p2-side canvas.char-canvas[data-char="minotaur"]{ filter: none; }
+  #char-select.p2-side canvas.char-canvas[data-char="naruto"]{ filter: none; }
   /* hráč vpravo (p2): celý výber orientovaný na opačnú stranu — postavy v kartách aj mini-caster
      v náhľade špeciálu hľadia doľava (zrkadlovo k ľavému hráčovi); zónu zrkadlí renderAbilityPreview */
   #char-select.p2-side canvas.char-canvas{ transform: scaleX(-1); }

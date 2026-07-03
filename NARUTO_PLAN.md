@@ -1,8 +1,13 @@
 # Plán: pridanie Naruta ako 6. postavy
 
+> **STAV: ZREALIZOVANÉ.** Naruto je v hre vrátane specialu (tieňový klon) — plná špecifikácia
+> mechaniky je v sekcii [5](#5-special-tieňový-klon-implementované) a technický popis v `CLAUDE.md`
+> (odsek „Shadow clone"). Testy: T46–T52 v `test/game-test.mjs`. Dokument ostáva ako záznam
+> rozhodnutí. `Special_2.png` je zapojený v summon choreografii; prípadný „special 2" ako
+> samostatná schopnosť je stále otvorený.
+
 Handoff dokument — assety sú hotové a v repe, tento plán popisuje kroky integrácie do servera
-a klienta. **Mechanika špeciálnej schopnosti tu zámerne nie je definovaná** — dodá ju zadávateľ;
-sekcia [5](#5-special--doplní-zadávateľ) hovorí, čo všetko treba od neho zistiť a kam sa to napája.
+a klienta.
 
 Pred začatím si prečítaj `CLAUDE.md` (architektúra: server-authoritative timeline, dva súbory
 `server.js` + `public/client.js`, žiadny build step). Testy: `npm test`.
@@ -107,23 +112,32 @@ Zvyšok (hover preview, klik, mirrored p2 pohľad, tournament roster-mode ktorý
 `display: contents`) je generický cez `data-char` — netreba nič dopisovať. Turnajové mage-heads
 v HUD (`renderMageHeads`) sú tiež generické cez `CHAR_META`.
 
-## 5. Special — doplní zadávateľ
+## 5. Special: tieňový klon (implementované)
 
-Zadávateľ vysvetlí mechaniku osobne. Otázky, ktoré treba mať zodpovedané, kým sa začne kódiť
-(určujú, ktorá cesta v sekcii 2/3 platí):
+Finálna špecifikácia od zadávateľa (rozhodnutia potvrdené v Q&A):
 
-1. **Zóna zásahu** — ktoré bunky? (riadok / vzor / celoplošné / smerové left-right?)
-2. **Účinok** — dmg (koľko?) alebo status/board efekt (čo presne, ako dlho trvá, čo ho ukončí)?
-3. **Cena** — zdieľaná `SPECIAL_COST = 5` alebo vlastná?
-4. **Interakcie** (pri status efekte nutné explicitne):
-   - shield/mirror — blokuje/odráža sa efekt ako pri petrify/labyrinte?
-   - súbeh s labyrintom, petrify, Last Standom, tournament swapom;
-   - čo pri opakovanom caste na už postihnutého (vzor `already_stone`/`already_lost`).
-5. **Special 2** — na čo je `Special_2.png` (druhá schopnosť? iný idle stav?) a či sa rieši teraz
-   alebo v ďalšej iterácii.
-
-Ak special zavádza nový stav hráča (ako `stone`/`labyrinth`), nezabudni na redakciu v
-`snapshotFor`/`redactTimelineFor`, ak má byť pred niektorou stranou skrytý.
+- **Cast:** range self, cena `SPECIAL_COST = 5`, nedá sa blokovať ani odraziť. Naruto musí stáť
+  na bunke **sám** (bez súpera) — inak `not_alone` invalid a mana sa neminie. Recast s aktívnym
+  klonom: starý klon najprv zmizne (ako po zásahu), potom bežný summon. Choreografia: pečate
+  (`Special.png`, 3 nádychy) → `clone_summon` (Naruto + 2 kópie po bokoch hrajú `Special_2.png`)
+  → klon vzniká na Narutovej bunke (`clone_born`).
+- **Správanie klona:** kopíruje všetky základné akcie paralelne s Narutom; jediná inverzia je
+  vertikálny pohyb (hore↔dole, dash s vlastným clampom). Ak je Narutov ťah neplatný, klon nespraví
+  nič. Na zdieľanej bunke s Narutom sa kreslí len jedna postava. Mana je jeden zdieľaný pool.
+- **Ofenzíva klona:** čokoľvek klon spôsobí = plochý **1 dmg** (`CLONE_DMG`, bez falloffu a buffov)
+  — strela, melee, aj odraz jeho mirrorom.
+- **Obrany:** klon zdieľa Narutove shield/mirror flagy (armujú sa aj spotrebúvajú spolu, glow na
+  oboch — pár je nerozoznateľný). Súperova obrana kryje Narutovu + klonovu strelu ako JEDNU akciu;
+  odraz klonovej strely mirrorem zničí klona (HP Naruta netknuté).
+- **Zánik:** klon nemá HP — zmizne pri akomkoľvek zásahu: strela (klon v dráhe absorbuje skôr než
+  Naruto na tej istej bunke — čerstvý klon je jednorazový bait), melee, zónové specialy (zasiahnu
+  hráča aj klona naraz), petrify/labyrint (status ho zničí, ak nebol krytý obranou), démon, IK tile.
+  Ďalej pri recaste, smrti/swape Naruta a na konci hry. Dmg tile ho nezabíja (len kozmetický −1);
+  heal/mana pickupy neberie (nespotrebovaný pickup ho prezrádza).
+- **Labyrint:** zásah NA klona labyrint neodhalí ani neukončí a prekliaty strelec sa oň nedozvie
+  (strela preletí cez dym po okraj, `clone_die` sa mu rediguje; klon je v redakcii skrytý ako
+  Naruto). Zásah SPÔSOBENÝ klonom je bežný action hit (labyrint končí). Klon sa ráta do pretínania
+  Ariadninej nite (silueta na mieste stretnutia — bait).
 
 ## 6. Testy a overenie
 
