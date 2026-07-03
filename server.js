@@ -145,6 +145,8 @@ function newPlayer(slot) {
     // armujú sa aj spotrebúvajú spolu, sú to tie isté shield/mirror flagy)
     clone: null,
     labyrinth: false,  // blúdi v labyrinte (Minotaurov special) — nevidí board, kým nepadne vzájomný zásah
+    mazeBuff: false,   // hráč ÚSPEŠNE zaklial súpera do labyrintu (len priamym castom, nie cez odraz) → 2× výstupný
+                       // dmg + imunita na Damage/IK dlaždice, kým labyrint trvá. Cielené na toho, kto hrá Minotaura.
     labReveal: false,  // labyrint sa v tomto ťahu isto skončí zásahom — redakcia/hmla padli už PRED animáciou akcie
     thread: [],        // Ariadnina niť: [x,y] políčka, na ktoré prekliaty vstúpil (prvé = kde stál pri zakliatí)
     threadMark: null,  // [x,y] posledného súperovho vstupu na niť — prekliaty tam vidí jeho obrys
@@ -260,10 +262,17 @@ function redactHunterActor(a) {
   if (!a) return a;
   return { ...a, mana: null, thread: [], threadMark: null };
 }
-// tiles/IK sa NEredigujú — slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
+// prekliaty vidí len Damage dlaždice + IK (IK/`iks` sa neredigujú vôbec); heal/mana dlaždice LEN keď na
+// nich priamo stojí (inak by mu prezradili, kde sú pickupy). IK vždy (sú to overlaye v `iks`, mimo `tiles`).
+function redactTilesFor(mySlot, snap) {
+  if (!Array.isArray(snap.tiles)) return snap;
+  const me = snap[mySlot];
+  const onMyCell = (t) => me && me.x != null && t.x === me.x && t.y === me.y;
+  return { ...snap, tiles: snap.tiles.filter(t => t.type === "dmg" || onMyCell(t)) };
+}
 function redactSnapshotFor(mySlot, snap) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
-  return { ...snap, [oppSlot]: redactActor(snap[oppSlot]) };
+  return redactTilesFor(mySlot, { ...snap, [oppSlot]: redactActor(snap[oppSlot]) });
 }
 // tournament × labyrint: počas kliatby nevidí ANI JEDNA strana manu súperovho tímu — roster nesie
 // uložené hodnoty magov (lavička + posledný uložený stav nasadeného), rediguje sa obojsmerne ako živá mana
@@ -299,11 +308,11 @@ function redactTimelineFor(mySlot, tl) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   return tl.map(f => {
     if (f?.[mySlot]?.labyrinth && !f[mySlot].labReveal) {
-      return redactRosterMana(oppSlot, {
+      return redactRosterMana(oppSlot, redactTilesFor(mySlot, {
         ...f,
         [oppSlot]: redactActor(f[oppSlot]),
         effects: (f.effects || []).map(e => redactEffect(mySlot, oppSlot, e, f)).filter(Boolean),
-      });
+      }));
     }
     if (f?.[oppSlot]?.labyrinth && !f[oppSlot].labReveal) {
       return redactRosterMana(oppSlot, {
@@ -780,9 +789,9 @@ function doBasic(slot, dir, tl) {
     }
     if (fx.length) pushStateFrame(tl, fx, CHARGE_STEP_MS);
     for (const h of hits) {
-      // klonova strela dostáva rovnaký buff násobič ako majiteľ (Last Stand ×2 / Last Hope ×4)
-      // (Minotaurov 2× v labyrinte rieši applyHit — len keď dmg naozaj DOPADNE na cursed súpera, nie pri odraze)
-      const raw = h.shot.clone ? CLONE_DMG * dealMul(slot) : Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot);
+      // klonova strela dostáva rovnaký buff násobič ako majiteľ (Last Stand ×2 / Last Hope ×4);
+      // Minotaurov vlastný útok navyše ×2 počas jeho labyrintu (maze buff, výstupné — odraz vráti doubled)
+      const raw = h.shot.clone ? CLONE_DMG * dealMul(slot) : Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
       if (h.target === "player") {
         applyHit(opS, raw, tl, "basic", h.shot.clone);
       } else if (h.target === "stacked") {
@@ -843,7 +852,7 @@ function doMelee(slot, tl) {
   for (let r = 0; r < MELEE_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "melee", from: slot, cells: cells.concat(cloneCells) }], SPECIAL_BEAT_MS);
   }
-  if (hitFoeByMe) applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot), tl, "melee"); // 2× v labyrinte rieši applyHit (len pri dopade)
+  if (hitFoeByMe) applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) * labyrinthMul(slot), tl, "melee"); // maze buff: 2× počas labyrintu
   // klonov dmg dostáva rovnaký buff násobič ako majiteľ (Last Stand ×2 / Last Hope ×4)
   if (hitFoeByClone && !winnerNow()) applyHit(opS, CLONE_DMG * dealMul(slot), tl, "melee", true);
   if ((hitFoeCloneByMe || hitFoeCloneByClone) && !winnerNow()) {
@@ -857,13 +866,10 @@ function doMelee(slot, tl) {
 // Prijatý dmg sa zaokrúhľuje na floor(½) pri Last Stand aj Last Hope (½ chráni 1-HP Last Hope hráča pred dmg tile).
 function dealMul(slot)      { const p = game.players[slot]; return p.lastHopeBuff ? 4 : p.lastStandBuff ? 2 : 1; }
 function recvDmg(slot, dmg) { const p = game.players[slot]; return (p.lastStandBuff || p.lastHopeBuff) ? Math.floor(dmg / 2) : dmg; }
-// Minotaur dáva 2× dmg súperovi, kým ho drží vo svojom labyrinte. Platí LEN keď je útočník naozaj Minotaur
-// (char === "minotaur") — nie postava, ktorá sa do „úlohy lovca" dostala odrazom (napr. mág), to by bolo prisilné.
-function labyrinthMul(slot) {
-  const me = game.players[slot];
-  const foe = game.players[other(slot)];
-  return (me?.char === "minotaur" && foe?.labyrinth) ? 2 : 1;
-}
+// 2× VÝSTUPNÝ dmg pre hráča s maze buffom (ten, čo úspešne priamym castom zaklial súpera do labyrintu).
+// Aplikuje sa na raw pred applyHit → ak je Minotaurov útok odrazený, doubled dmg sa vráti späť naňho.
+// mazeBuff nezíska mirror-lovec (labyrint cez odraz) ani prekliaty Minotaur → presne cielené na hráča Minotaura.
+function labyrinthMul(slot) { return game.players[slot]?.mazeBuff ? 2 : 1; }
 
 // akýkoľvek zásah AKCIOU medzi hráčmi ukončí labyrint (oboch pri mirror matchi) — počíta sa aj
 // zablokovaný/odrazený zásah (applyHit/applyPetrify/applyLabyrinth sa volajú len keď akcia trafila);
@@ -878,6 +884,7 @@ function endLabyrinths(tl) {
     p.labReveal = false;
     p.thread = [];
     p.threadMark = null;
+    game.players[other(slot)].mazeBuff = false; // labyrint skončil → kaster stráca 2× dmg + imunitu na dlaždice
     pushStateFrame(tl, [{ kind: "labyrinth_end", target: slot }], SMALL_DELAY_MS);
   }
 }
@@ -930,9 +937,7 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
     endLabyrinths(tl); // odrazený zásah ukončuje labyrint — až po dopade odrazu
     return;
   }
-  // Minotaur dáva 2× dmg cursed súperovi — aplikuje sa TU (dmg naozaj dopadol na cursed hráča),
-  // nie pri odraze/bloku (tam zásah na cursed nedopadol) ani na strane, ktorá nie je Minotaur
-  const d = recvDmg(targetSlot, rawDmg * labyrinthMul(other(targetSlot))); // ½ ak má obranca last stand buff
+  const d = recvDmg(targetSlot, rawDmg); // ½ ak má obranca last stand buff (2× maze buff je už v rawDmg)
   t.hp = Math.max(0, t.hp - d);
   pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
   endLabyrinths(tl); // labyrint končí až po dopade zásahu a úbytku HP
@@ -1025,6 +1030,9 @@ function applyLabyrinth(targetSlot, tl) {
   }
   endLabyrinths(tl);
   loseInLabyrinth(targetSlot, tl);
+  // priamy (neodrazený) cast → KASTER (ten, čo hrá Minotaura) získa maze buff: 2× dmg + imunita na Damage/IK
+  // dlaždice, kým labyrint trvá. Pri odraze/štíte sa sem nedostaneme, takže mirror-lovec buff nezíska.
+  game.players[other(targetSlot)].mazeBuff = true;
 }
 function loseInLabyrinth(slot, tl) {
   const p = game.players[slot];
@@ -1348,6 +1356,7 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     const p = game.players[slot];
     if (p.hp <= 0) continue;
     if (stoned(slot)) continue; // na skamenenú postavu sa tile dmg/IK nevyhodnocuje
+    if (p.mazeBuff) continue;   // Minotaur je počas svojho labyrintu imúnny na Damage aj IK dlaždice (heal/mana zbiera ďalej)
     let dmg = 0, tileType = null;
     if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
     else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) { dmg = 1; tileType = "dmg"; }

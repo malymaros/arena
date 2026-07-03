@@ -765,8 +765,13 @@ async function main() {
   // redakcia: prekliaty (c2) nedostane pozíciu Minotaura ani tiles — ani v snapshote, ani v timeline
   check(c2.lastState?.p1?.x === null && c2.lastState?.p1?.y === null,
     "T35: prekliaty nevidí pozíciu Minotaura v dátach", `p1=(${c2.lastState?.p1?.x},${c2.lastState?.p1?.y})`);
-  check((c2.lastState?.tiles || []).length === (c1.lastState?.tiles || []).length && (c1.lastState?.tiles || []).length > 0,
-    "T35: prekliaty VIDÍ špeciálne tiles (neredigujú sa)", `c2 tiles=${JSON.stringify(c2.lastState?.tiles)}`);
+  // prekliaty vidí len Damage/IK dlaždice + heal/mana na VLASTNEJ bunke; lovec (c1) vidí všetky
+  const c1tiles35 = c1.lastState?.tiles || [], c2tiles35 = c2.lastState?.tiles || [];
+  const c2pos35 = c2.lastState?.p2;
+  check(c1tiles35.length > 0 &&
+        c2tiles35.every(t => t.type === "dmg" || (c2pos35 && t.x === c2pos35.x && t.y === c2pos35.y)),
+    "T35: prekliaty vidí len Damage/IK + heal/mana na vlastnej bunke (mana mimo bunky redigovaná)",
+    `c1=${c1tiles35.length}, c2=${JSON.stringify(c2tiles35)}, pos=(${c2pos35?.x},${c2pos35?.y})`);
   const c2lastFrame = c2.lastTimeline[c2.lastTimeline.length - 1];
   check(c2lastFrame.p1.x === null, "T35: redakcia platí aj vo frame-och timeline");
   check(c2.lastTimeline.some(f => (f.effects || []).some(e => e.kind === "action" && e.from === "p1" && e.action?.type === "unknown")),
@@ -838,11 +843,11 @@ async function main() {
   check(fxOf(tl, "labyrinth_end").filter(e => e.target === "p2").length === 1,
     "T39: odrazený zásah ukončil labyrint");
   const t39mir = fxOf(tl, "mirror").filter(e => e.target === "p2");
-  check(t39mir.length === 1 && t39mir[0].atk === "basic" && t39mir[0].dmg === 1,
-    "T39: mirror efekt odrazil basic (dmg 1)", `fx=${JSON.stringify(t39mir)}`);
+  check(t39mir.length === 1 && t39mir[0].atk === "basic" && t39mir[0].dmg === 2,
+    "T39: mirror odrazil Minotaurov útok — maze buff 2× (base 1 → 2)", `fx=${JSON.stringify(t39mir)}`);
   const t39hits = sumEffects(tl).hits;
-  check(t39hits.length === 1 && t39hits[0].target === "p1" && t39hits[0].dmg === 1,
-    "T39: jediný zásah kola je odraz do Minotaura", `hits=${JSON.stringify(t39hits)}`);
+  check(t39hits.length === 1 && t39hits[0].target === "p1" && t39hits[0].dmg === 2,
+    "T39: odrazený 2× dmg dopadol späť na Minotaura", `hits=${JSON.stringify(t39hits)}`);
   const t39last = tl[tl.length - 1];
   check(t39last.p2.labyrinth === false && t39last.p2.thread.length === 0 && t39last.p2.threadMark === null,
     "T39: labyrint aj niť zanikli odrazom");
@@ -880,13 +885,13 @@ async function main() {
   // kolo 3 (starter p1): p2 (nestartér) golden mirror; Minotaur strieľa doprava → odraz, labyrint končí
   tl = await playRound(c1, c2, [A("right"), R, S], [GMI, R, S, M("right")]);
   const t39bmir = fxOf(tl, "mirror").filter(e => e.target === "p2");
-  check(t39bmir.length === 1 && t39bmir[0].gold === true && t39bmir[0].dmg === 2,
-    "T39b: golden mirror odrazil basic (dist 2 → dmg 2, zlatý)", `fx=${JSON.stringify(t39bmir)}`);
+  check(t39bmir.length === 1 && t39bmir[0].gold === true && t39bmir[0].dmg === 4,
+    "T39b: golden mirror odrazil Minotaurov útok — maze buff 2× (dist 2, base 2 → 4, zlatý)", `fx=${JSON.stringify(t39bmir)}`);
   check(fxOf(tl, "labyrinth_end").filter(e => e.target === "p2").length === 1,
     "T39b: aj golden mirror odraz ukončil labyrint");
   const t39bhits = sumEffects(tl).hits;
-  check(t39bhits.length === 1 && t39bhits[0].target === "p1" && t39bhits[0].dmg === 2,
-    "T39b: odraz dal Minotaurovi 2 dmg", `hits=${JSON.stringify(t39bhits)}`);
+  check(t39bhits.length === 1 && t39bhits[0].target === "p1" && t39bhits[0].dmg === 4,
+    "T39b: odrazený 2× dmg dal Minotaurovi 4", `hits=${JSON.stringify(t39bhits)}`);
   check(tl[tl.length - 1].p2.labyrinth === false, "T39b: labyrint skončil");
   invariantCheck(tl, "T39b");
 
