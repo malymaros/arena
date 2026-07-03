@@ -1196,6 +1196,30 @@ async function main() {
   check(c2fx.some(e => e.kind === "charge" && e.from === "p2"), "T52: vlastnú strelu prekliaty vidí");
   invariantCheck(tl, "T52");
 
+  /* ---------- Test 53: Minotaur dáva 2× dmg súperovi, kým ho drží v labyrinte ---------- */
+  await freshMinotaur(); // p1 = minotaur (0,1), p2 = fire (3,1); mana-only tiles (bez dmg dlaždíc)
+  // kolo 1: p1 zaklaje p2 do labyrintu a posunie sa k nemu na (1,1); p2 ostáva na (3,1)
+  tl = await playRound(c1, c2, [SP, M("right"), R], [R, A("up"), ML]);
+  check(tl[tl.length - 1].p2.labyrinth === true, "T53: p2 zakliaty v labyrinte");
+  // kolo 2 (starter p2): Minotaur dôjde na (2,1) a strelí doprava na cursed p2 (3,1), dist 1 → 3 dmg × 2 = 6
+  tl = await playRound(c1, c2, [M("right"), A("right"), R], [R, A("up"), ML]);
+  const t53hit = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t53hit.length === 1 && t53hit[0].dmg === 6, "T53: Minotaurov útok v labyrinte = 2× dmg (3→6)", `hits=${JSON.stringify(t53hit)}`);
+  check(tl[tl.length - 1].p2.hp === 4, "T53: p2 HP 10−6=4", `hp=${tl[tl.length - 1].p2.hp}`);
+  check(fxOf(tl, "labyrinth_end").filter(e => e.target === "p2").length === 1, "T53: zásah ukončil labyrint");
+  invariantCheck(tl, "T53");
+
+  /* ---------- Test 53b: postava v úlohe lovca po ODRAZE (mág) NEdostáva 2× (bolo by prisilné) ---------- */
+  await freshMinotaur();
+  // kolo 1: p1 special, p2 (fire, nestartér) golden mirror → labyrint sa odrazí, prekliaty je MINOTAUR (p1); p2 sa posunie k nemu na (2,1)
+  tl = await playRound(c1, c2, [SP, R, S], [GMI, M("left"), R, S]); // golden_mirror (predťah) + 3 akcie
+  check(tl[tl.length - 1].p1.labyrinth === true, "T53b: odrazený labyrint zaklial Minotaura (p1)");
+  // kolo 2 (starter p2): fire-lovec dôjde na (1,1) a strelí doľava na cursed Minotaura (0,1), dist 1 → 3 dmg × 1 (nie je Minotaur) = 3
+  tl = await playRound(c1, c2, [R, A("up"), ML], [M("left"), A("left"), R]);
+  const t53bhit = sumEffects(tl).hits.filter(h => h.target === "p1");
+  check(t53bhit.length === 1 && t53bhit[0].dmg === 3, "T53b: mág v úlohe lovca dáva normálny dmg (3, nie 6)", `hits=${JSON.stringify(t53bhit)}`);
+  invariantCheck(tl, "T53b");
+
   c1.sock.close(); c2.sock.close();
   server.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);

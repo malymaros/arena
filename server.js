@@ -781,6 +781,7 @@ function doBasic(slot, dir, tl) {
     if (fx.length) pushStateFrame(tl, fx, CHARGE_STEP_MS);
     for (const h of hits) {
       // klonova strela dostáva rovnaký buff násobič ako majiteľ (Last Stand ×2 / Last Hope ×4)
+      // (Minotaurov 2× v labyrinte rieši applyHit — len keď dmg naozaj DOPADNE na cursed súpera, nie pri odraze)
       const raw = h.shot.clone ? CLONE_DMG * dealMul(slot) : Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot);
       if (h.target === "player") {
         applyHit(opS, raw, tl, "basic", h.shot.clone);
@@ -842,7 +843,7 @@ function doMelee(slot, tl) {
   for (let r = 0; r < MELEE_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "melee", from: slot, cells: cells.concat(cloneCells) }], SPECIAL_BEAT_MS);
   }
-  if (hitFoeByMe) applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot), tl, "melee");
+  if (hitFoeByMe) applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot), tl, "melee"); // 2× v labyrinte rieši applyHit (len pri dopade)
   // klonov dmg dostáva rovnaký buff násobič ako majiteľ (Last Stand ×2 / Last Hope ×4)
   if (hitFoeByClone && !winnerNow()) applyHit(opS, CLONE_DMG * dealMul(slot), tl, "melee", true);
   if ((hitFoeCloneByMe || hitFoeCloneByClone) && !winnerNow()) {
@@ -856,6 +857,13 @@ function doMelee(slot, tl) {
 // Prijatý dmg sa zaokrúhľuje na floor(½) pri Last Stand aj Last Hope (½ chráni 1-HP Last Hope hráča pred dmg tile).
 function dealMul(slot)      { const p = game.players[slot]; return p.lastHopeBuff ? 4 : p.lastStandBuff ? 2 : 1; }
 function recvDmg(slot, dmg) { const p = game.players[slot]; return (p.lastStandBuff || p.lastHopeBuff) ? Math.floor(dmg / 2) : dmg; }
+// Minotaur dáva 2× dmg súperovi, kým ho drží vo svojom labyrinte. Platí LEN keď je útočník naozaj Minotaur
+// (char === "minotaur") — nie postava, ktorá sa do „úlohy lovca" dostala odrazom (napr. mág), to by bolo prisilné.
+function labyrinthMul(slot) {
+  const me = game.players[slot];
+  const foe = game.players[other(slot)];
+  return (me?.char === "minotaur" && foe?.labyrinth) ? 2 : 1;
+}
 
 // akýkoľvek zásah AKCIOU medzi hráčmi ukončí labyrint (oboch pri mirror matchi) — počíta sa aj
 // zablokovaný/odrazený zásah (applyHit/applyPetrify/applyLabyrinth sa volajú len keď akcia trafila);
@@ -922,7 +930,9 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
     endLabyrinths(tl); // odrazený zásah ukončuje labyrint — až po dopade odrazu
     return;
   }
-  const d = recvDmg(targetSlot, rawDmg); // ½ ak má obranca last stand buff
+  // Minotaur dáva 2× dmg cursed súperovi — aplikuje sa TU (dmg naozaj dopadol na cursed hráča),
+  // nie pri odraze/bloku (tam zásah na cursed nedopadol) ani na strane, ktorá nie je Minotaur
+  const d = recvDmg(targetSlot, rawDmg * labyrinthMul(other(targetSlot))); // ½ ak má obranca last stand buff
   t.hp = Math.max(0, t.hp - d);
   pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
   endLabyrinths(tl); // labyrint končí až po dopade zásahu a úbytku HP
