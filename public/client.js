@@ -342,6 +342,9 @@ let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
 // klonový flinch (tile zásah na klonovi) — čas štartu; klon sa strhne rovnako ako pravý Naruto pri zásahu,
 // aby „nezraniteľne" nestál a neprezradil sa. Nezávislé od animState (to zdieľa s majiteľom).
 let cloneFlinch = { p1: 0, p2: 0 };
+// klon je „mŕtvy" (puffol) — positionActors ho drží skrytého, aby po puffe už nepreblikol späť.
+// Reset pri novom summone (clone_born) a v clearActors.
+let cloneDead = { p1: false, p2: false };
 const SPRITES = {};
 let actorsInitialized = false;
 
@@ -656,6 +659,52 @@ function spawnCellFloat(cell, text, className) {
   el.style.top  = (top + 8) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
+}
+
+// zánik klona — poriadny oblak dymu (kage bunshin puff): niekoľko dymových gúľ vyletí do strán a nahor,
+// stredové jadro sa roztiahne. Čisto kozmetické, self-remove; puffne raz (späť už nepreblikne — cloneDead).
+function spawnClonePuff(cell) {
+  if (!Array.isArray(cell)) return;
+  const { left, top } = cellToPx(cell[0], cell[1]);
+  const cx = left + TILE_W / 2, cy = top + TILE_H * 0.55;
+  const mk = (size, z) => {
+    const el = document.createElement("div");
+    el.className = "clone-puff";
+    el.style.position = "absolute";
+    el.style.left = cx + "px"; el.style.top = cy + "px";
+    el.style.width = size + "px"; el.style.height = size + "px";
+    el.style.marginLeft = (-size / 2) + "px"; el.style.marginTop = (-size / 2) + "px";
+    el.style.borderRadius = "50%";
+    el.style.pointerEvents = "none";
+    el.style.zIndex = String(z);
+    el.style.background = "radial-gradient(circle, rgba(240,240,245,.95), rgba(190,192,200,.6) 55%, rgba(160,162,172,0) 72%)";
+    actorsEl.appendChild(el);
+    return el;
+  };
+  // stredové jadro — rýchly veľký záblesk dymu
+  const core = mk(Math.round(TILE_W * 1.15), 6);
+  core.animate(
+    [{ transform: "scale(.35)", opacity: .9 }, { transform: "scale(1.5)", opacity: 0 }],
+    { duration: 520, easing: "ease-out", fill: "forwards" }
+  );
+  setTimeout(() => core.remove(), 600);
+  // dymové gule do strán + nahor
+  const N = 12;
+  for (let i = 0; i < N; i++) {
+    const size = Math.round(TILE_W * (0.34 + (i % 3) * 0.14));
+    const el = mk(size, 7);
+    const ang = (Math.PI * 2 * i / N) + i * 0.5;
+    const dist = TILE_W * (0.32 + (i % 4) * 0.14);
+    const dx = Math.cos(ang) * dist;
+    const dy = Math.sin(ang) * dist - TILE_H * 0.22; // celkovo mierne stúpa (dym)
+    const dur = 560 + (i % 5) * 60;
+    el.animate(
+      [{ transform: "translate(0,0) scale(.3)", opacity: .95 },
+       { transform: `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) scale(1.7)`, opacity: 0 }],
+      { duration: dur, easing: "ease-out", fill: "forwards" }
+    );
+    setTimeout(() => el.remove(), dur + 80);
+  }
 }
 
 // float aj nad VIDITEĽNÝM tieňovým klonom — obranné/mana hlášky nesmú prezradiť, ktorá postava je pravá
@@ -1865,7 +1914,8 @@ function positionActors(s, immediate = false) {
   // pri rozdelení sa obe figúry rozbehnú SÚBEŽNE zo spoločnej bunky (klon vždy KĹŽE — nikdy nezmizne na mieste).
   [["p1", cloneEls.p1, p1, p2], ["p2", cloneEls.p2, p2, p1]].forEach(([slot, el, data, opp]) => {
     const c = data?.clone;
-    if (!data || !data.char || data.x == null || !c) {
+    // klon už puffol (clone_die) — drž ho skrytého, aj keď ho snapshot toho istého framu ešte nesie (žiadny problik)
+    if (cloneDead[slot] || !data || !data.char || data.x == null || !c) {
       el.style.display = "none";
       el._logCell = null;
       return;
@@ -2489,18 +2539,15 @@ function schedulePlayTimeline(timeline) {
         spawnCloneSummonFx(e.from, e.cell, frameHold);
       }
       if (e.kind === "clone_born" && (e.from === "p1" || e.from === "p2") && Array.isArray(e.cell)) {
+        cloneDead[e.from] = false; // nový klon žije — zruš „mŕtvy" príznak
         spawnCellFloat(e.cell, "👥 SHADOW CLONE", "maze-float");
       }
-      // klon zasiahnutý — rozplynie sa (fade); die frame ho ešte nesie v snapshote, ďalší už nie
+      // klon zasiahnutý — puffne v OBLAKU DYMU a natrvalo zmizne (žiadny problik späť)
       if (e.kind === "clone_die" && (e.target === "p1" || e.target === "p2")) {
+        cloneDead[e.target] = true;           // positionActors ho odteraz drží skrytého
         const cEl = cloneEls[e.target];
-        if (cEl && cEl.style.display !== "none") {
-          cEl.getAnimations().forEach(a => a.cancel());
-          const fade = cEl.animate([{ opacity: 1 }, { opacity: 0 }],
-            { duration: Math.max(250, Math.round(frameHold * 0.8)), easing: "ease-out", fill: "forwards" });
-          fade.onfinish = () => fade.cancel(); // opacity späť na 1 — display medzitým vypol positionActors
-        }
-        if (Array.isArray(e.cell)) spawnCellFloat(e.cell, "💨", "maze-float");
+        if (cEl) { cEl.getAnimations().forEach(a => a.cancel()); cEl.style.display = "none"; } // sprite hneď preč (dym ho prekryje)
+        if (Array.isArray(e.cell)) spawnClonePuff(e.cell);
       }
       // kozmetický tile dmg na klonovi (dmg tile klona nezabíja) — klon sa MUSÍ strhnúť a floatnúť ako pravý,
       // inak by „nezraniteľná" figúrka prezradila, ktorý je klon. Súperovi ukáž „-N HP" (bluff = ako pravý zásah),
@@ -2662,8 +2709,10 @@ function clearActors() {
     clearTimeout(el._hideT); clearTimeout(el._fadeT); el._logCell = null; // reset sledovania klonovej pozície
   });
   actorsEl.querySelectorAll(".sprite-clone-summon").forEach(n => n.remove());
+  actorsEl.querySelectorAll(".clone-puff").forEach(n => n.remove());
   cloneSummonFx = [];
   cloneSummonPose = { p1: null, p2: null };
+  cloneDead = { p1: false, p2: false };
   youMarker.style.display = "none";
   actorsInitialized = false;
 }
