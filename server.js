@@ -68,9 +68,9 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
 const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur"];
-// tournament zatiaľ len základní magovia — experimentálne postavy (medusa, minotaur) až po návrhu výberu tímu.
-// Experimentálne postavy tým pádom nie sú v mageHp/mageMana → choose_character aj swap ich v tournamente odmietnu.
-const TOURNAMENT_MAGES = ["fire", "lightning", "wanderer"];
+// tournament: každý hráč si pred hrou 1 naslepo draftne vlastný tím TEAM_SIZE postáv z celého poolu CHARS
+// (choose_team vo fáze team_select); tím je fixný na celú sériu a určuje kľúče mageHp/mageMana danej osoby.
+const TEAM_SIZE = 3;
 // časový limit na ťah — vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
 const TIMER_OPTIONS = new Set(["off", "10", "30", "60", "quickdraw"]);
 
@@ -164,7 +164,7 @@ function newPlayer(slot) {
 
 function newGame() {
   game = {
-    phase: "lobby",   // "lobby" | "playing" | "match_over"
+    phase: "lobby",   // "lobby" | "team_select" | "playing" | "match_over"
     config: null,     // nastaví host cez configure_match
     board: { ...BOARD },
     players: {
@@ -180,6 +180,9 @@ function newGame() {
     seats: { p1: "A", p2: "B" }, // kto sedí na ktorom slote — LOSUJE sa v startMatch (p1 = biely, začína); fixné na celú sériu
     seriesWins: { A: 0, B: 0 },
     series: { gameIndex: 1, needed: 1, format: "single" },
+    // tournament: draftnutý tím TEAM_SIZE postáv per osoba (fáza team_select; null mimo tournamentu,
+    // pole null kým daná osoba nepotvrdí) — kľúče mageHp/mageMana a poradie HUD hláv
+    roster: null,     // { A: [char×3] | null, B: [char×3] | null }
     // tournament: HP a mana každého z 3 magov per osoba sa prenášajú medzi hrami (null mimo tournamentu)
     mageHp: null,
     mageMana: null,
@@ -190,6 +193,8 @@ newGame();
 function otherPerson(p) { return p === "A" ? "B" : "A"; }
 function slotForPerson(person) { return game.seats.p1 === person ? "p1" : "p2"; }
 function socketForSlot(slot) { return personSockets[game.seats[slot]]; }
+// draftnutý tím osoby sediacej na slote (prázdny mimo turnaja / pred potvrdením)
+function rosterFor(slot) { return game.roster?.[game.seats[slot]] || []; }
 
 // séria zhrnutá pre klienta — výhry namapované na aktuálne sloty (osoba si nesie skóre na svoju stranu)
 function seriesSnapshot() {
@@ -221,11 +226,16 @@ function snapshotFor(person) {
   base.mageMana = game.mageMana ? { ...game.mageMana[person] } : null;
   const mySlot = slotForPerson(person);
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
+  // slepý draft: súperov tím vidím, až keď potvrdia obaja (fáza sa vtedy prepne na playing);
+  // rosterReady ostáva verejné — klient z neho ukazuje „opponent is picking / ready"
+  if (game.phase === "team_select" && base.roster) {
+    base = { ...base, roster: { ...base.roster, [oppSlot]: null } };
+  }
   if (!game.players[mySlot]?.char && base[oppSlot]?.char) {
     base = { ...base, [oppSlot]: { ...base[oppSlot], char: null } };
   }
-  if (base[mySlot]?.labyrinth && !base[mySlot].labReveal) base = redactSnapshotFor(mySlot, base);
-  else if (base[oppSlot]?.labyrinth && !base[oppSlot].labReveal) base = { ...base, [oppSlot]: redactHunterActor(base[oppSlot]) };
+  if (base[mySlot]?.labyrinth && !base[mySlot].labReveal) base = redactRosterMana(oppSlot, redactSnapshotFor(mySlot, base));
+  else if (base[oppSlot]?.labyrinth && !base[oppSlot].labReveal) base = redactRosterMana(oppSlot, { ...base, [oppSlot]: redactHunterActor(base[oppSlot]) });
   return base;
 }
 
@@ -246,6 +256,12 @@ function redactHunterActor(a) {
 function redactSnapshotFor(mySlot, snap) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   return { ...snap, [oppSlot]: redactActor(snap[oppSlot]) };
+}
+// tournament × labyrint: počas kliatby nevidí ANI JEDNA strana manu súperovho tímu — roster nesie
+// uložené hodnoty magov (lavička + posledný uložený stav nasadeného), rediguje sa obojsmerne ako živá mana
+function redactRosterMana(oppSlot, snap) {
+  if (!snap.rosterMana) return snap;
+  return { ...snap, rosterMana: { ...snap.rosterMana, [oppSlot]: null } };
 }
 // efekt vo frame, v ktorom je príjemca prekliaty: súperove akcie sa maskujú na "unknown" (beat kvôli
 // pozícii v lište), všetko ostatné od/na súpera aj cudzie tile efekty sa zahodia — úplná tma
@@ -275,18 +291,18 @@ function redactTimelineFor(mySlot, tl) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   return tl.map(f => {
     if (f?.[mySlot]?.labyrinth && !f[mySlot].labReveal) {
-      return {
+      return redactRosterMana(oppSlot, {
         ...f,
         [oppSlot]: redactActor(f[oppSlot]),
         effects: (f.effects || []).map(e => redactEffect(mySlot, oppSlot, e, f)).filter(Boolean),
-      };
+      });
     }
     if (f?.[oppSlot]?.labyrinth && !f[oppSlot].labReveal) {
-      return {
+      return redactRosterMana(oppSlot, {
         ...f,
         [oppSlot]: redactHunterActor(f[oppSlot]),
         effects: (f.effects || []).filter(e => !(e.kind === "thread_mark" && e.target === oppSlot)),
-      };
+      });
     }
     return f;
   });
@@ -334,11 +350,21 @@ function snapshot() {
     goldLocked: !!(game.players.p1.lastStandBuff || game.players.p2.lastStandBuff),
     tiles: game.tiles.map(t => ({ ...t })),
     iks: game.iks.map(t => ({ ...t })),
+    // tournament: draftnuté tímy per slot — po skončení draftu VEREJNÉ (HUD hlavy oboch strán, poradie
+    // = poradie výberu); počas fázy team_select snapshotFor súperov tím maskuje (slepý draft).
+    roster: game.roster ? {
+      p1: game.roster[game.seats.p1] ? [...game.roster[game.seats.p1]] : null,
+      p2: game.roster[game.seats.p2] ? [...game.roster[game.seats.p2]] : null,
+    } : null,
+    // kto už potvrdil tím (verejné aj počas draftu — „súper vyberá / je pripravený")
+    rosterReady: game.roster ? {
+      p1: !!game.roster[game.seats.p1], p2: !!game.roster[game.seats.p2],
+    } : null,
     // tournament: mŕtvi magovia (HP 0) per slot — pre HUD hlavy (mŕtvy = lebka); historické info (= počet prehier),
     // nie tajná voľba, preto ide obom stranám aj v bežnom snapshote
     mageDead: game.mageHp ? {
-      p1: TOURNAMENT_MAGES.filter(k => (game.mageHp[game.seats.p1]?.[k] ?? 1) <= 0),
-      p2: TOURNAMENT_MAGES.filter(k => (game.mageHp[game.seats.p2]?.[k] ?? 1) <= 0),
+      p1: rosterFor("p1").filter(k => (game.mageHp[game.seats.p1]?.[k] ?? 1) <= 0),
+      p2: rosterFor("p2").filter(k => (game.mageHp[game.seats.p2]?.[k] ?? 1) <= 0),
     } : null,
     // tournament: prenesené HP a mana všetkých 3 magov per slot — VEREJNÉ (vidí ich aj súper) pre HUD hlavy.
     // Pozn.: pre práve nasadeného maga je tu uložená (nie živá) hodnota — klient pri ňom berie živé hp/mana z p1/p2.
@@ -444,11 +470,14 @@ function validQueue(queue, slot) {
   if (swaps.length > 2) return false;
   if (swaps.length) {
     if (!isTournament) return false;
+    // počas aktívneho labyrintu (ktorejkoľvek strany) je výmena maga zakázaná — hlavy sú skryté,
+    // swap sa odmieta už pri plánovaní (aj keby kliatba skončila zásahom uprostred kola)
+    if (game.players.p1.labyrinth || game.players.p2.labyrinth) return false;
     const person = game.seats[slot];
     const startChar = game.players[slot]?.char; // aktuálny mág na začiatku kola
     const seen = new Set();
     for (const a of swaps) {
-      if (!TOURNAMENT_MAGES.includes(a.to)) return false;         // neznámy mág
+      if (!rosterFor(slot).includes(a.to)) return false;           // mág mimo draftnutého tímu
       if (a.to === startChar) return false;                        // návrat na východiskového maga nie je dovolený
       if ((game.mageHp[person]?.[a.to] ?? 0) <= 0) return false;   // mŕtveho maga nemožno nasadiť
       if (seen.has(a.to)) return false;                            // každý cieľ najviac raz
@@ -894,8 +923,11 @@ function doSwap(slot, to, tl) {
   const me = game.players[slot];
   const person = game.seats[slot];
   const from = me.char;
-  if (!game.mageHp || !TOURNAMENT_MAGES.includes(to) || to === from) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
+  if (!game.mageHp || !rosterFor(slot).includes(to) || to === from) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
   if ((game.mageHp[person]?.[to] ?? 0) <= 0) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
+  // labyrint mohol padnúť v tomto kole PO naplánovaní swapu (Minotaurov special skôr v poradí) —
+  // počas kliatby je výmena zakázaná pre obe strany, naplánovaný swap prepadne ako invalid
+  if (game.players.p1.labyrinth || game.players.p2.labyrinth) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
   // ulož živý stav odchádzajúceho maga (nesie sa do ďalších kôl / char-selectu ďalšej hry)
   game.mageHp[person][from] = Math.max(0, me.hp);
   game.mageMana[person][from] = Math.max(0, Math.min(MAX_MANA, me.mana));
@@ -988,11 +1020,17 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
     else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) { dmg = 1; tileType = "dmg"; }
     if (dmg > 0) {
+      const d = recvDmg(slot, dmg);
+      // tile dmg labyrint bežne NEkončí — výnimka je smrteľný zásah: pred finálnym dmg sa prehrá
+      // rovnaká postupnosť ako pri akciovom zásahu (reveal PRED animáciou, koniec labyrintu po hite),
+      // aby smrť nepadla v hmle a hra neskončila s aktívnou redakciou
+      const lethalInLab = d >= p.hp && (game.players.p1.labyrinth || game.players.p2.labyrinth);
+      if (lethalInLab) revealLabyrinths(tl);
       // najprv zvýrazni vyhodnocované políčko, potom zásah (½ ak má hráč last stand buff — platí aj na tile/IK)
       pushStateFrame(tl, [{ kind: "tile_proc", tile: tileType, cell: [p.x, p.y] }], 600);
-      const d = recvDmg(slot, dmg);
       p.hp = Math.max(0, p.hp - d);
       pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d }], SMALL_DELAY_MS);
+      if (lethalInLab) endLabyrinths(tl);
       // prvý mŕtvy okamžite ukončuje hru — druhý tile zásah sa už nevyhodnotí (remíza nemôže nastať)
       if (winnerNow()) return;
     }
@@ -1437,22 +1475,36 @@ function startMatch(config) {
     format: config.format,
   };
   game.seriesWins = { A: 0, B: 0 };
-  // tournament: každý hráč má 3 magov, ich HP aj mana sa prenášajú medzi hrami (štart na plno / na START_MANA)
-  game.mageHp = config.format === "tournament"
-    ? { A: fullMage(START_HP), B: fullMage(START_HP) }
-    : null;
-  game.mageMana = config.format === "tournament"
-    ? { A: fullMage(START_MANA), B: fullMage(START_MANA) }
-    : null;
-  startGame(1);
-  // ruleta farieb: pridelenie slotov je hotové (you_are už odišlo zo startGame) — klient len prehrá
-  // točiacu sa strelku na yin-yang kruhu, ktorá skončí na farbe hráča (p1 = biely, p2 = čierny)
+  game.roster = null;
+  game.mageHp = null;
+  game.mageMana = null;
+  if (config.format === "tournament") {
+    // slepý draft tímov: pred hrou 1 si každý vyberie TEAM_SIZE postáv z celého poolu (choose_team);
+    // mageHp/mageMana vzniknú až po potvrdení oboch (finishTeamSelect → startGame(1))
+    game.roster = { A: null, B: null };
+    game.phase = "team_select";
+    emitYouAre();
+    emitStateMasked();
+  } else {
+    startGame(1);
+  }
+  // ruleta farieb: pridelenie slotov je hotové (you_are už odišlo) — klient len prehrá točiacu sa
+  // strelku na yin-yang kruhu, ktorá skončí na farbe hráča (p1 = biely, p2 = čierny); v turnaji
+  // sa točí NAD team-selectom (draft čaká pod ňou, kým dobehne)
   io.emit("color_roll", {});
 }
 
-function fullMage(value) {
+// oba tímy potvrdené → HP a mana každého draftnutého maga štartujú na plno / na START_MANA
+// a prenášajú sa medzi hrami série
+function finishTeamSelect() {
+  game.mageHp = { A: fullMage(START_HP, game.roster.A), B: fullMage(START_HP, game.roster.B) };
+  game.mageMana = { A: fullMage(START_MANA, game.roster.A), B: fullMage(START_MANA, game.roster.B) };
+  startGame(1);
+}
+
+function fullMage(value, roster) {
   const m = {};
-  for (const k of TOURNAMENT_MAGES) m[k] = value;
+  for (const k of roster) m[k] = value;
   return m;
 }
 
@@ -1534,6 +1586,21 @@ io.on("connection", (socket) => {
     const config = sanitizeConfig(raw);
     if (!config) return;
     startMatch(config);
+  });
+
+  // turnajový draft: hráč naslepo potvrdí tím TEAM_SIZE unikátnych postáv z poolu CHARS (raz za zápas);
+  // súperov výber je maskovaný v snapshotFor, kým nepotvrdia obaja — potom finishTeamSelect → hra 1
+  socket.on("choose_team", (keys) => {
+    if (!person) return;
+    if (game.phase !== "team_select") return;
+    if (!game.roster || game.roster[person]) return; // tím sa potvrdzuje raz
+    if (!Array.isArray(keys) || keys.length !== TEAM_SIZE) return;
+    const team = keys.map(String);
+    if (new Set(team).size !== TEAM_SIZE) return;    // bez duplicít v tíme
+    if (!team.every(k => CHARS.includes(k))) return; // len známe postavy
+    game.roster[person] = team;
+    if (game.roster.A && game.roster.B) finishTeamSelect();
+    else emitStateMasked(); // súper uvidí rosterReady („opponent is ready"), nie samotný tím
   });
 
   socket.on("choose_character", (key) => {

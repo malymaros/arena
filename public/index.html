@@ -242,6 +242,10 @@
       </div>
       <button id="char-page-next" class="char-arrow" title="Experimental">&#9654;</button>
     </div>
+    <!-- turnajový draft: potvrdenie tímu 3 postáv — viditeľné len v team-mode (fáza team_select) -->
+    <div class="team-bar">
+      <button id="team-confirm" class="team-confirm" disabled>PICK YOUR TEAM (0/3)</button>
+    </div>
     <!-- náhľad špeciálnej abilitky mága, na ktorom je kurzor -->
     <div id="char-ability" class="char-ability hidden">
       <div class="ca-title" id="ca-title"></div>
@@ -339,6 +343,9 @@
 
   <!-- Druhý hráč čaká, kým host nastaví zápas -->
   <div id="lobby-wait" class="lobby-wait hidden">Waiting for host to set up the match…</div>
+
+  <!-- Turnajový draft: tím potvrdený, čaká sa na súperov výber -->
+  <div id="team-wait" class="lobby-wait hidden">TEAM LOCKED<br />Waiting for opponent's team…</div>
 
   <!-- Medzihra medzi hrami série -->
   <div id="intermission" class="intermission hidden">

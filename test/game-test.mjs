@@ -916,6 +916,115 @@ async function main() {
   check(fxOf(tl, "thread_mark").length === 0, "T40: lovec o obryse nevie (efekt redigovaný)");
   invariantCheck(tl, "T40");
 
+  /* ---------- Test 41: turnajový draft — choose_team validácia, maskovanie, štart hry ---------- */
+  const SW = (to) => ({ type: "swap", to });
+  c1.sock.emit("retry");
+  await new Promise(r => setTimeout(r, 150));
+  configureMatch(c1, { format: "tournament", tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+  await new Promise(r => setTimeout(r, 200));
+  check(c1.lastState?.phase === "team_select", "T41: turnaj začína fázou team_select", `phase=${c1.lastState?.phase}`);
+  // nevalidné tímy sa odmietnu (duplicita / zlý počet / neznáma postava)
+  c1.sock.emit("choose_team", ["fire", "fire", "wanderer"]);
+  c1.sock.emit("choose_team", ["fire", "lightning"]);
+  c1.sock.emit("choose_team", ["fire", "lightning", "unicorn"]);
+  await new Promise(r => setTimeout(r, 200));
+  check(c1.lastState?.rosterReady?.p1 === false, "T41: nevalidné tímy odmietnuté", `ready=${JSON.stringify(c1.lastState?.rosterReady)}`);
+  // p1 potvrdí tím vrátane experimentálnych postáv
+  c1.sock.emit("choose_team", ["minotaur", "fire", "medusa"]);
+  await new Promise(r => setTimeout(r, 200));
+  check(c1.lastState?.rosterReady?.p1 === true && c1.lastState?.phase === "team_select",
+    "T41: tím p1 potvrdený, čaká sa na p2");
+  check(JSON.stringify(c1.lastState?.roster?.p1) === JSON.stringify(["minotaur", "fire", "medusa"]),
+    "T41: vlastný tím vidím hneď (v poradí výberu)", `roster=${JSON.stringify(c1.lastState?.roster?.p1)}`);
+  check(c2.lastState?.roster?.p1 === null, "T41: súperov tím je počas draftu maskovaný", `vidí=${JSON.stringify(c2.lastState?.roster?.p1)}`);
+  check(c2.lastState?.rosterReady?.p1 === true, "T41: rosterReady súpera je verejné (opponent is ready)");
+  // opakovaný choose_team sa ignoruje
+  c1.sock.emit("choose_team", ["fire", "lightning", "wanderer"]);
+  await new Promise(r => setTimeout(r, 150));
+  check(JSON.stringify(c1.lastState?.roster?.p1) === JSON.stringify(["minotaur", "fire", "medusa"]),
+    "T41: tím sa potvrdzuje len raz");
+  // p2 potvrdí → oba tímy verejné, hra 1 (char-select)
+  c2.sock.emit("choose_team", ["fire", "lightning", "wanderer"]);
+  await new Promise(r => setTimeout(r, 200));
+  check(c1.lastState?.phase === "playing", "T41: oba tímy potvrdené → hra 1", `phase=${c1.lastState?.phase}`);
+  check(JSON.stringify(c1.lastState?.roster?.p2) === JSON.stringify(["fire", "lightning", "wanderer"]),
+    "T41: po drafte sú tímy verejné", `roster.p2=${JSON.stringify(c1.lastState?.roster?.p2)}`);
+  check(!!c1.lastState?.mageHp && Object.keys(c1.lastState.mageHp).sort().join() === "fire,medusa,minotaur",
+    "T41: mageHp = presne vlastný tím", `keys=${Object.keys(c1.lastState?.mageHp || {}).join()}`);
+  // postava mimo tímu sa nedá zvoliť; postava z tímu áno
+  c1.sock.emit("choose_character", "wanderer");
+  await new Promise(r => setTimeout(r, 150));
+  check(!c1.lastState?.p1?.char, "T41: postava mimo tímu sa nedá zvoliť", `char=${c1.lastState?.p1?.char}`);
+  c1.sock.emit("choose_character", "minotaur");
+  c2.sock.emit("choose_character", "fire");
+  await new Promise(r => setTimeout(r, 200));
+  check(c1.lastState?.p1?.char === "minotaur", "T41: postava z tímu zvolená", `char=${c1.lastState?.p1?.char}`);
+
+  /* ---------- Test 42: swap podľa tímu + zákaz swapu počas labyrintu + roster mana redakcia ---------- */
+  // pokračovanie hry z T41: p1 = minotaur (tím minotaur/fire/medusa), p2 = fire (tím fire/lightning/wanderer)
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [SW("wanderer"), R, S]); // wanderer NIE JE v tíme p1
+  c2.sock.emit("lock_in", [R, S, M("up")]);
+  let swapRejected = false;
+  try { await waitTimeline(c1, 1500); } catch { swapRejected = true; }
+  check(swapRejected, "T42: swap na maga mimo tímu je odmietnutý pri locku");
+  // valídny swap na maga z tímu prejde (teleport out/in), p1 dohrá kolo ako medusa
+  c1.sock.emit("lock_in", [SW("medusa"), R, S]);
+  tl = await waitTimeline(c1, 8000);
+  await new Promise(r => setTimeout(r, 150));
+  check(fxOf(tl, "teleport_out").length === 1 && fxOf(tl, "teleport_in").length === 1,
+    "T42: swap prehráva teleport out/in");
+  check(tl[tl.length - 1].p1.char === "medusa", "T42: p1 hrá po swape medusu", `char=${tl[tl.length - 1].p1.char}`);
+  invariantCheck(tl, "T42");
+  // kolo 2 (starter p2): p1 sa vráti na minotaura a zakleje p2 do labyrintu; p2 nesmie trafiť (S kryje R)
+  tl = await playRound(c1, c2, [SW("minotaur"), SP, R], [R, M("down"), S]);
+  check(fxOf(tl, "labyrinth").filter(e => e.target === "p2").length === 1, "T42: p2 skončil v labyrinte");
+  check(tl[tl.length - 1].p2.labyrinth === true, "T42: labyrint trvá na konci kola");
+  // roster mana redakcia — obojsmerná: prekliaty nevidí manu tímu lovca a naopak; HP tímov ostávajú
+  check(c1.lastState?.rosterMana?.p2 === null && c2.lastState?.rosterMana?.p1 === null,
+    "T42: počas labyrintu ani jeden nevidí manu súperovho tímu",
+    `c1 vidí p2=${JSON.stringify(c1.lastState?.rosterMana?.p2)}, c2 vidí p1=${JSON.stringify(c2.lastState?.rosterMana?.p1)}`);
+  check(!!c1.lastState?.rosterMana?.p1 && !!c2.lastState?.rosterMana?.p2, "T42: vlastný roster mana ostáva viditeľný");
+  check(!!c1.lastState?.rosterHp?.p2 && !!c2.lastState?.rosterHp?.p1, "T42: roster HP sa nereďiguje (ako živé HP)");
+  // kolo 3 (starter p1): počas labyrintu je swap odmietnutý OBOM stranám už pri locku
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  c1.sock.emit("lock_in", [SW("medusa"), R, S]);
+  c2.sock.emit("lock_in", [SW("lightning"), R, S]);
+  let labSwapRejected = 0;
+  try { await waitTimeline(c1, 1500); } catch { labSwapRejected++; }
+  check(labSwapRejected === 1, "T42: swap počas labyrintu je odmietnutý (lovec aj prekliaty)");
+  // valídne locky bez swapu kolo normálne dohrajú, labyrint beží ďalej
+  c1.sock.emit("lock_in", [R, S, M("right")]);
+  c2.sock.emit("lock_in", [R, S, M("left")]);
+  tl = await waitTimeline(c1, 8000);
+  await new Promise(r => setTimeout(r, 150));
+  check(tl[tl.length - 1].p2.labyrinth === true, "T42: kolo bez swapu prebehlo, labyrint trvá");
+  invariantCheck(tl, "T42b");
+
+  /* ---------- Test 43: kliatba uprostred kola zneplatní už naplánovaný swap (doSwap guard) ---------- */
+  async function freshTournament() {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { format: "tournament", tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_team", ["minotaur", "fire", "medusa"]);
+    c2.sock.emit("choose_team", ["fire", "lightning", "wanderer"]);
+    await new Promise(r => setTimeout(r, 200));
+    c1.sock.emit("choose_character", "minotaur");
+    c2.sock.emit("choose_character", "fire");
+    await new Promise(r => setTimeout(r, 200));
+  }
+  await freshTournament();
+  // kolo 1 (starter p1): p1a1 = special (kliatba na p2), p2a1 = swap → v momente vykonania už beží
+  // labyrint → swap prepadne ako invalid, p2 ostáva fire
+  tl = await playRound(c1, c2, [SP, R, S], [SW("lightning"), R, S]);
+  check(fxOf(tl, "labyrinth").filter(e => e.target === "p2").length === 1, "T43: kliatba padla prvou akciou kola");
+  check(fxOf(tl, "invalid").filter(e => e.target === "p2").length === 1,
+    "T43: naplánovaný swap prekliateho prepadol ako invalid", `inv=${JSON.stringify(fxOf(tl, "invalid"))}`);
+  check(fxOf(tl, "teleport_out").length === 0, "T43: žiadny teleport neprebehol");
+  check(tl[tl.length - 1].p2.char === "fire", "T43: p2 ostáva fire", `char=${tl[tl.length - 1].p2.char}`);
+  invariantCheck(tl, "T43");
+
   c1.sock.close(); c2.sock.close();
   server.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);

@@ -319,9 +319,12 @@ let _finalRoundActive = false;    // „FINAL ROUND" sa zobrazí hore až keď p
 
 // preview loop
 let charPreviewRaf = 0;
-// tournament: HP magov vlastnej trojice ({fire,lightning,wanderer}) pre char-select; null mimo tournamentu
+// tournament: HP magov vlastného draftnutého tímu pre char-select; null mimo tournamentu
 let charSelectHp = null;
-let charSelectMana = null; // tournament: prenesená mana magov (per vlastná trojica)
+let charSelectMana = null; // tournament: prenesená mana magov (per vlastný tím)
+// turnajový draft (fáza team_select): lokálne rozpracovaný výber tímu v poradí klikov; potvrdí choose_team
+let teamPick = [];
+const TEAM_SIZE = 3; // musí sedieť so serverovým TEAM_SIZE
 
 // od kedy je postava v HUD widgete mŕtva — Dead anim sa prehrá raz od tohto času
 let hudDeadSince = { p1: 0, p2: 0 };
@@ -458,13 +461,14 @@ function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
 
 /* ---------- Mage head ikona (HUD hlavy + swap badge) — ANIMOVANÝ výrez hlavy z Idle sprite ---------- */
 // per-mág výrez hlavy z framu (cx,cy = stred výrezu ako zlomok šírky/výšky framu; size = strana štvorca ako zlomok výšky).
-// Hodnoty vylaď cez /head-cropper.html a nahraď ich sem.
+// Hodnoty vylaď cez /head-cropper.html a nahraď ich sem. cxP2 = korekcia pre natívny p2 sheet (dirP2),
+// keď v ňom figúra sedí inde než v p1 sheete (Minotaur_2 je o ~0.05 šírky framu vpravo oproti Minotaur_1).
 const HEAD_CROP = {
   fire:      { cx: 0.40, cy: 0.55, size: 0.26 },
   lightning: { cx: 0.41, cy: 0.58, size: 0.26 },
   wanderer:  { cx: 0.47, cy: 0.56, size: 0.27 },
   medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
-  minotaur:  { cx: 0.46, cy: 0.40, size: 0.30 }, // namerané z Idle.png (rohy+hlava riadky ~36–74)
+  minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2 z alfa centroidu Minotaur_2
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
@@ -472,12 +476,14 @@ function drawMageHeadAnim(cvs, char, now) {
   const dir = charDirFor(char, cvs.dataset.slot || null); // p2 hlava Medúzy = natívna tmavá paleta
   const c = HEAD_CROP[char];
   if (!dir || !c) return;
+  // natívny p2 sheet môže mať figúru posunutú inde — použi jeho vlastný stred výrezu
+  const cx = (dir === CHAR_META[char]?.dirP2 && c.cxP2 != null) ? c.cxP2 : c.cx;
   ensureSpriteMeta(dir, ANIM_DEF.idle.file).then(meta => {
     const ctx = cvs.getContext("2d");
     const fps = ANIM_DEF.idle.fps || 6;
     const idx = Math.floor((now / (1000 / fps)) % meta.frames); // aktuálny idle frame
     const fw = meta.fw, fh = meta.fh, side = fh * c.size;
-    let sx = idx * fw + fw * c.cx - side / 2;
+    let sx = idx * fw + fw * cx - side / 2;
     let sy = fh * c.cy - side / 2;
     sx = Math.max(idx * fw, Math.min(idx * fw + fw - side, sx)); // udrž výrez v rámci TOHTO framu
     sy = Math.max(0, Math.min(fh - side, sy));
@@ -1251,6 +1257,14 @@ function renderHUD() {
   hudBoxP1.classList.toggle("foe", me === "p2");
   hudBoxP2.classList.toggle("foe", me === "p1");
 
+
+  // tournament × labyrint: hlavy magov skryté u oboch, kým kliatba beží — renderHUD beží per frame,
+  // takže skrytie/odkrytie sadne aj na labyrint začatý či ukončený uprostred prehrávania kola
+  if (state?.series?.format === "tournament") {
+    const labActive = !!(state?.p1?.labyrinth || state?.p2?.labyrinth);
+    crownsP1El.classList.toggle("lab-hidden", labActive);
+    crownsP2El.classList.toggle("lab-hidden", labActive);
+  }
 
   // pravá strana (p2) má VŽDY alternatívne vykreslenie (postava na boarde, portrét aj ghost);
   // výnimka: postava s natívnou p2 paletou (Medúza) — triedy priebežne prepína raf podľa aktuálneho chara
@@ -2387,12 +2401,15 @@ function clearActors() {
 function updateCharSelectHp(s) {
   charSelectHp = (s && s.mageHp) ? s.mageHp : null;
   charSelectMana = (s && s.mageMana) ? s.mageMana : null;
-  // tournament: experimentálna stránka je zatiaľ vypnutá — hráč vyberá len z 3 magov
+  // tournament: char-select ukazuje LEN draftnutý tím — roster-mode zlúči obe stránky (display:contents)
+  // a skryje karty mimo tímu + placeholder; kľúče mageHp = presne vlastný tím
   selEl.classList.toggle("no-paging", !!charSelectHp);
+  selEl.classList.toggle("roster-mode", !!charSelectHp);
   if (charSelectHp && charPage !== 0) setCharPage(0);
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
     if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
+    card.classList.toggle("off-roster", !!charSelectHp && !(key in charSelectHp));
     const statsEl = card.querySelector(".char-stats");
     const hpEl = card.querySelector(".char-hp");
     const manaEl = card.querySelector(".char-mana");
@@ -2490,9 +2507,46 @@ selEl.addEventListener("click", (e) => {
   if (!card) return;
   const key = card.dataset.char;
   if (!key) return; // placeholder "Coming soon" nie je voliteľný
+  if (selEl.classList.contains("team-mode")) { toggleTeamPick(key); return; } // draft: klik = toggle výberu
   if (isMageDead(key)) return; // mŕtveho maga (tournament) sa nedá zvoliť
   chosenChar = key;
   socket.emit("choose_character", key);
+});
+
+/* ---------- Turnajový draft (fáza team_select) ---------- */
+// char-select v team-mode: klik na kartu prepína výber (max TEAM_SIZE), potvrdí sa tlačidlom;
+// server odhalí súperov tím, až keď potvrdia obaja (dovtedy „TEAM LOCKED" čakačka #team-wait)
+const teamConfirmBtn = document.getElementById("team-confirm");
+const teamWaitEl = document.getElementById("team-wait");
+function toggleTeamPick(key) {
+  const i = teamPick.indexOf(key);
+  if (i >= 0) teamPick.splice(i, 1);
+  else if (teamPick.length < TEAM_SIZE) teamPick.push(key);
+  syncTeamUi();
+}
+function syncTeamUi() {
+  selEl.querySelectorAll(".char-card").forEach(card => {
+    const key = card.dataset.char;
+    const idx = key ? teamPick.indexOf(key) : -1;
+    card.classList.toggle("picked", idx >= 0);
+    card.querySelector(".pick-badge")?.remove();
+    if (idx >= 0) { // poradové číslo výberu v rohu karty
+      const b = document.createElement("div");
+      b.className = "pick-badge";
+      b.textContent = String(idx + 1);
+      card.appendChild(b);
+    }
+  });
+  if (teamConfirmBtn) {
+    teamConfirmBtn.disabled = teamPick.length !== TEAM_SIZE;
+    teamConfirmBtn.textContent = teamPick.length === TEAM_SIZE
+      ? "CONFIRM TEAM" : `PICK YOUR TEAM (${teamPick.length}/${TEAM_SIZE})`;
+  }
+}
+teamConfirmBtn?.addEventListener("click", () => {
+  if (teamPick.length !== TEAM_SIZE) return;
+  socket.emit("choose_team", [...teamPick]);
+  teamConfirmBtn.disabled = true; // čakačku prepne až state so serverovým rosterReady
 });
 
 /* ---------- Náhľad špeciálu mága (hover vo výbere) ---------- */
@@ -2567,7 +2621,7 @@ const charPrevBtn = document.getElementById("char-page-prev");
 const charNextBtn = document.getElementById("char-page-next");
 const charPageTitle = document.getElementById("char-page-title");
 function setCharPage(p) {
-  if (selEl.classList.contains("no-paging")) p = 0; // tournament — len stránka Mages
+  if (selEl.classList.contains("no-paging")) p = 0; // tournament — roster-mode zlúči karty, stránkovanie je vypnuté
   charPage = Math.max(0, Math.min(CHAR_PAGES.length - 1, p));
   selEl.querySelectorAll(".char-cards").forEach(el =>
     el.classList.toggle("hidden", Number(el.dataset.page) !== charPage));
@@ -2926,12 +2980,21 @@ function applyPhaseUI(s) {
     lobbyWaitEl.classList.add("hidden");
   }
 
-  // char-select len v hernej fáze, kým nemám zvolenú postavu
+  // turnajový draft: kým nepotvrdím tím, char-select beží v team-mode (toggle výber + confirm);
+  // po potvrdení „TEAM LOCKED" čakačka, kým tím nepotvrdí aj súper (server vtedy prepne na playing)
+  const teamPhase = phase === "team_select" && !isSpectator && me;
+  const needTeam = teamPhase && !s?.rosterReady?.[me];
+  teamWaitEl?.classList.toggle("hidden", !(teamPhase && !needTeam));
+  selEl.classList.toggle("team-mode", needTeam);
+
+  // char-select v hernej fáze (kým nemám zvolenú postavu) alebo draft tímu (team-mode)
   const needChar = phase === "playing" && !isSpectator && me && !s?.[me]?.char;
-  if (needChar) {
-    updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom)
+  if (needChar || needTeam) {
+    updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom); v drafte null → bez statov
     selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
-    if (selEl.classList.contains("hidden")) setCharPage(0); // nové otvorenie výberu — vždy od stránky Mages
+    if (selEl.classList.contains("hidden")) { teamPick = []; setCharPage(0); } // nové otvorenie — od stránky Mages, čistý draft
+    if (needTeam) syncTeamUi();
+    else selEl.querySelectorAll(".char-card.picked").forEach(c => { c.classList.remove("picked"); c.querySelector(".pick-badge")?.remove(); });
     hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber
   } else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
 
@@ -2968,8 +3031,12 @@ function updateMatchScore(s) {
 
 // tournament: 3 hlavy magov v HUD boxe každého hráča na mieste placeholderov (predtým lebky).
 // mŕtvy mág = lebka (nesie info o prehrách), aktuálny = zvýraznený, ostatní živí = klikateľní (len moja strana) na výmenu.
-// tournament zatiaľ len základní magovia (musí sedieť so serverovým TOURNAMENT_MAGES)
-const MAGE_ORDER = ["fire", "lightning", "wanderer"];
+// poradie hláv = draftnutý tím daného slotu (state.roster, poradie výberu); kým tím nie je známy
+// (fáza team_select — súperov roster je maskovaný), strana nemá žiadne hlavy
+function mageOrderFor(slot) {
+  return state?.roster?.[slot]
+    || (state?.rosterHp?.[slot] ? Object.keys(state.rosterHp[slot]) : []);
+}
 // aktuálne HP/mana maga pre daný slot (VEREJNÉ pre oba sloty): nasadený mág = živý stav z boardu (p1/p2),
 // lavička = prenesené hodnoty z verejného rosteru (rosterHp/rosterMana)
 function headStats(slot, char, isCurrent) {
@@ -2980,11 +3047,16 @@ function headStats(slot, char, isCurrent) {
   return null;
 }
 function renderMageHeads() {
+  // labyrint: hlavy (swap buttony) sú počas kliatby skryté u OBOCH hráčov — objavia sa až s labyrinth_end
+  // (flag labyrinth padá až vtedy, reveal ho drží); visibility drží layout HUD boxu bez skoku
+  const labActive = !!(state?.p1?.labyrinth || state?.p2?.labyrinth);
+  crownsP1El.classList.toggle("lab-hidden", labActive);
+  crownsP2El.classList.toggle("lab-hidden", labActive);
   const buildSide = (slot) => {
     const dead = state?.mageDead?.[slot] || [];
     const cur = state?.[slot]?.char || null;
     const mineSlot = slot === me;
-    return MAGE_ORDER.map(char => {
+    return mageOrderFor(slot).map(char => {
       const isDead = dead.includes(char);
       const isCurrent = cur === char;
       const armed = mineSlot && myQueue.some(a => a.type === "swap" && a.to === char);
@@ -3016,6 +3088,7 @@ function toggleSwap(char) {
   if (openPicker) return;
   if (!me || state?.phase !== "playing" || !state?.[me]?.char) return;
   if (state?.series?.format !== "tournament") return;
+  if (state?.p1?.labyrinth || state?.p2?.labyrinth) return;  // počas labyrintu je výmena zakázaná (hlavy sú skryté)
   if ((state?.mageDead?.[me] || []).includes(char)) return; // mŕtveho maga nemožno nasadiť
   if (state?.[me]?.char === char) return;                    // aktuálneho maga nemožno vymeniť za seba
   const idx = myQueue.findIndex(a => a.type === "swap" && a.to === char);
