@@ -295,6 +295,9 @@ const ANIM_DEF = {
   attack2_loop: { file: "Attack_2.png", fps: 10, loop: true },
   attack1_loop: { file: "Attack_1.png", fps: 10, loop: true }, // melee Medúzy — šľah celým telom (Attack_1)
   hurt:    { file: "Hurt.png",     fps: 10, loop: false },
+  // flinch = to isté PNG ako hurt, ale klon ho ZRKADLÍ (hurt/dead klon potláča na idle, aby zásah naň nič neprezradil).
+  // Používa sa pri neplatnej akcii (žiadny dmg) → aj Naruto aj klon trhnú rovnako a nedá sa rozoznať pravý.
+  flinch:  { file: "Hurt.png",     fps: 10, loop: false },
   dead:    { file: "Dead.png",     fps: 7,  loop: false },
   // Naruto: summon klona — po pečatiach hrá postava (aj kópie po bokoch) Special_2 (dýchanie)
   special2:{ file: "Special_2.png", fps: 6, loop: true },
@@ -336,6 +339,9 @@ function resetActorFade() {
 }
 
 let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
+// klonový flinch (tile zásah na klonovi) — čas štartu; klon sa strhne rovnako ako pravý Naruto pri zásahu,
+// aby „nezraniteľne" nestál a neprezradil sa. Nezávislé od animState (to zdieľa s majiteľom).
+let cloneFlinch = { p1: 0, p2: 0 };
 const SPRITES = {};
 let actorsInitialized = false;
 
@@ -386,20 +392,23 @@ function ensureSpriteMeta(charDir, file) {
     img.src = `/assets/${charDir}/${file}`;
   });
 }
-function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0) {
+function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0, cropXFrac=0) {
   // anim.frames prepíše odhad počtu framov (keď framy nie sú štvorcové a inference zlyhá)
   const total = anim.frames || meta.frames;
   const fw = anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
   const idx = anim.loop ? Math.floor((t / (1000 / anim.fps)) % total)
                         : Math.min(total - 1, Math.floor(t / (1000 / anim.fps)));
-  const sx = idx * fw;
-  const scale = Math.min(dstW / fw, dstH / meta.fh) * fill;
-  const dw = fw * scale, dh = meta.fh * scale;
+  // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu — kreslí sa len stredový pás postavy
+  const cropPx = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
+  const sx = idx * fw + cropPx;
+  const sw = fw - 2 * cropPx;
+  const scale = Math.min(dstW / fw, dstH / meta.fh) * fill; // výška ostáva „normálna" (škáluje sa podľa plnej výšky/šírky framu)
+  const dw = sw * scale, dh = meta.fh * scale;
   // anchorY: 0 = hore, 0.5 = stred, 1 = dole; offsetX/offsetY = posun v px (záporné offsetY dvíha hore)
   const dx = (dstW - dw) / 2 + offsetX, dy = (dstH - dh) * anchorY + offsetY;
   if (clear) ctx.clearRect(0, 0, dstW, dstH); // clear=false -> vrstvenie (efekt navrch mága)
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(meta.img, sx, 0, fw, meta.fh, dx, dy, dw, dh);
+  ctx.drawImage(meta.img, sx, 0, sw, meta.fh, dx, dy, dw, dh);
 }
 
 /* ---------- Teleport (výmena maga v turnaji) — dvojfázová explózia ---------- */
@@ -657,34 +666,44 @@ function cloneFloat(slot, text, className) {
   spawnCellFloat([c.x, c.y], text, className);
 }
 
-// Naruto summon: 2 kópie po bokoch bunky hrajú Special_2 spolu s postavou (kage bunshin moment);
-// docasné canvasy kreslí raf (cloneSummonFx), po dohraní framu sa odstránia
+// Naruto summon: jedna kópia na TEJ ISTEJ bunke, otočená proti Narutovi (kage bunshin moment —
+// dvaja Naruti na jednom políčku tvárou v tvár); docasný canvas kreslí raf (cloneSummonFx), po dohraní framu sa odstráni
 let cloneSummonFx = [];
+let cloneSummonPose = { p1: null, p2: null }; // póza skutočného Naruta počas Special_2 (drží ju positionActors)
+const SUMMON_CROP = 0.24; // orez prázdneho bočného okraja spritu počas Special_2 (aby sa dvaja Naruti vošli vedľa seba)
 function spawnCloneSummonFx(slot, cell, durMs) {
   const st = state?.[slot];
   if (!st || !st.char || !Array.isArray(cell)) return;
   const facing = computeFacing(state?.p1, state?.p2)[slot] || 1;
-  for (const side of [-1, 1]) {
-    const el = document.createElement("canvas");
-    el.className = "sprite-actor sprite-clone-summon";
-    el.width = ACTOR_W; el.height = ACTOR_H;
-    el.style.width = ACTOR_W + "px"; el.style.height = ACTOR_H + "px";
-    // kópia v susednej bunke; na okraji boardu sa pritlačí do vlastnej bunky s menším odstupom
-    const cx = Math.min(Math.max(cell[0] + side, 0), board.w - 1);
-    const { left, top } = cellToPx(cx, cell[1]);
-    el.style.left = (left - (ACTOR_W - TILE_W) / 2 + (cx === cell[0] ? side * 70 : 0)) + "px";
-    el.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
-    el.style.transform = `scaleX(${facing})`;
-    el.style.pointerEvents = "none";
-    el.classList.toggle("alt-color", usesAltColor(st.char, slot));
-    actorsEl.appendChild(el);
-    el.animate(
-      [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }],
-      { duration: Math.max(400, durMs), easing: "linear", fill: "forwards" }
-    );
-    cloneSummonFx.push({ el, dir: charDirFor(st.char, slot) });
-    setTimeout(() => el.remove(), Math.max(400, durMs) + 120);
-  }
+  // NORMÁLNA výška (bez zmenšenia) — aby sa dvaja Naruti vošli vedľa seba, orežeme prázdny bočný okraj spritu
+  // (SUMMON_CROP) a posunieme ich o štvrtinu bunky na opačné strany; kotva dole (feet), nech stoja na zemi
+  const OFFSET = Math.round(TILE_W * 0.24);
+  const { left, top } = cellToPx(cell[0], cell[1]);
+  const baseLeft = left - (ACTOR_W - TILE_W) / 2;
+  const baseTop  = top - (ACTOR_H - TILE_H);
+
+  // pravý Naruto (skutočný actor) na jednu stranu bunky, kópia zrkadlovo na druhú → hľadia na seba, obaja v bunke.
+  // Pózu skutočného actora aplikuje positionActors (inak by ju hneď prepísal); tu ju len nastavíme (scale 1 = normálna výška).
+  cloneSummonPose[slot] = { off: OFFSET, until: performance.now() + Math.max(400, durMs) - 150 };
+  positionActors(state); // hneď premietni pózu (bez čakania na ďalší frame)
+
+  const el = document.createElement("canvas");
+  el.className = "sprite-actor sprite-clone-summon";
+  el.width = ACTOR_W; el.height = ACTOR_H;
+  el.style.width = ACTOR_W + "px"; el.style.height = ACTOR_H + "px";
+  el.style.left = baseLeft + "px";
+  el.style.top  = baseTop + "px";
+  el.style.transformOrigin = "50% 100%";
+  el.style.transform = `translateX(${facing * OFFSET}px) scaleX(${-facing})`; // normálna výška, len zrkadlenie
+  el.style.pointerEvents = "none";
+  el.classList.toggle("alt-color", usesAltColor(st.char, slot));
+  actorsEl.appendChild(el);
+  el.animate(
+    [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }],
+    { duration: Math.max(400, durMs), easing: "linear", fill: "forwards" }
+  );
+  cloneSummonFx.push({ el, dir: charDirFor(st.char, slot) });
+  setTimeout(() => el.remove(), Math.max(400, durMs) + 120);
 }
 
 // glow okolo postavy: obrana (pulzuje) nahrádza zlatý „YOU", inak fallback na zlatý
@@ -699,10 +718,11 @@ function pulseGlow(color, now) {
   return `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 ${b1}px ${c}) drop-shadow(0 0 ${b2}px ${c}) drop-shadow(0 0 ${b3}px ${c})`;
 }
 // filter postavy: alt-color (pravá strana p2, ak nemá natívnu paletu) + kameň (sivá socha) + glow
-function actorFilter(slot, now) {
+// isClone = true: klon NEZRKADLÍ Last Stand vizuály (zlatý death-glow) — ostáva neutrálny (rozhodnutie hráča)
+function actorFilter(slot, now, isClone = false) {
   const st = state?.[slot];
-  // golden recharge stav (death summon) — žiarivý zlatý pulz postavy, má prednosť pred ostatným
-  if (_deathGoldenSlot === slot) {
+  // golden recharge stav (death summon) — žiarivý zlatý pulz postavy, má prednosť pred ostatným (klon ho nemá)
+  if (_deathGoldenSlot === slot && !isClone) {
     const t = 0.5 + 0.5 * Math.sin(now / 110);
     return `brightness(${(1.15 + 0.45 * t).toFixed(2)}) saturate(1.5) ` + pulseGlow("#ffd24a", now);
   }
@@ -908,13 +928,16 @@ function placeDeathBehind(slot) {
 }
 
 // efektný náraz do štítu pri úspešnom bloku — hexagonálna bariéra flashne, rázové prstence + iskry
-function spawnShieldBlock(slot, gold) {
+// originCell (voliteľné): štít sa rozbije na inej bunke než na Narutovi — napr. zásah na KLONOVI cez zdieľaný
+// štít, aby sa block ukázal aj na klonovej figúre (nielen na pravom Narutovi)
+function spawnShieldBlock(slot, gold, originCell = null) {
   const p = state?.[slot];
   if (!p || p.x == null) return;
-  const shift = pairShift(slot);
+  const shift = Array.isArray(originCell) ? 0 : pairShift(slot);
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
-  const { left, top } = cellToPx(p.x, p.y);
+  const cell = Array.isArray(originCell) ? originCell : [p.x, p.y];
+  const { left, top } = cellToPx(cell[0], cell[1]);
   const cx = left + TILE_W / 2 + shift + headDx;
   const cy = top + TILE_H * 0.5;
 
@@ -957,8 +980,12 @@ function centerOf(slot) {
 
 // efektná animácia odrazu: zrkadlová tabuľa flashne a praskne pri obrancovi,
 // rázová vlna + sklenené úlomky, lúč vystrelí späť do útočníka, board sa otrasie
-function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = false) {
-  const d = centerOf(defenderSlot);
+// originCell (voliteľné): odraz vychádza z inej bunky než z obrancu — napr. zásah na KLONOVI cez zdieľaný
+// mirror, aby lúč nešiel z pravého Naruta (to by prezradilo, ktorý je skutočný)
+function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = false, originCell = null) {
+  const d = Array.isArray(originCell)
+    ? (() => { const { left, top } = cellToPx(originCell[0], originCell[1]); return { x: left + TILE_W / 2, y: top + TILE_H / 2 }; })()
+    : centerOf(defenderSlot);
   if (!d) return;
   const a = centerOf(defenderSlot === "p1" ? "p2" : "p1");
 
@@ -1356,13 +1383,28 @@ function renderHUD() {
 }
 
 /* ---------- záznam akcií kola pod widgetom ---------- */
-function actionIcon(action) {
-  const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
+// Narutov vertikálny pohyb je verejne zrkadlený klonom (klon ide opačne) → smer up/down by SÚPEROVI prezradil,
+// ktorá z dvoch figúr je pravý Naruto. V zázname/lište ho preto súperovi anonymizujeme na neutrálne „↕"
+// (vlastný hráč vidí svoj skutočný smer). Horizontálny smer je bezpečný — klon ho kopíruje 1:1 (figúry sa nerozídu).
+const ARROW_DIR = { up: "↑", down: "↓", left: "←", right: "→", vert: "↕" };
+function displayDir(action, ownerSlot) {
+  const dir = action?.dir;
+  // Narutov klon zrkadlí vertikálu pri pohybe (move/dash) AJ pri basic útoku → smer up/down by súperovi prezradil,
+  // ktorá figúra je pravá. Súperovi ho anonymizujeme na „↕" (vlastný hráč vidí skutočný smer).
+  const vertMirrored = action?.type === "move" || action?.type === "dash" || action?.type === "attack";
+  if (vertMirrored && (dir === "up" || dir === "down") &&
+      ownerSlot && ownerSlot !== me && state?.[ownerSlot]?.char === "naruto") {
+    return "vert";
+  }
+  return dir;
+}
+function actionIcon(action, ownerSlot) {
+  const arr = (a) => ARROW_DIR[displayDir(a, ownerSlot)] || "";
   switch (action?.type) {
-    case "move":     return `🚶${arrow[action.dir] || ""}`;
-    case "dash":     return `🏃${arrow[action.dir] || ""}`;
+    case "move":     return `🚶${arr(action)}`;
+    case "dash":     return `🏃${arr(action)}`;
     case "recharge": return "🙏";
-    case "attack":   return `🏹${arrow[action.dir] || ""}`;
+    case "attack":   return `🏹${arr(action)}`;
     case "melee":    return "🗡️";
     case "shield":   return "🛡️";
     case "mirror":   return "🪞";
@@ -1370,7 +1412,7 @@ function actionIcon(action) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return `✨${arrow[action.dir] || ""}`; // smer má len Medúza
+    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer má len Medúza
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
@@ -1425,7 +1467,7 @@ function appendActionLog(slot, action) {
   const el = log.querySelector(".a-slot.slot-act");
   if (el) {
     el.className = `a-badge ${action?.type || ""}`;
-    el.textContent = actionIcon(action);
+    el.textContent = actionIcon(action, slot);
   }
   return el;
 }
@@ -1802,46 +1844,57 @@ function positionActors(s, immediate = false) {
 
     const shift = pairShift(slot, s);
     const scale = currentFacing(slot, facing);
-    el.style.transform = `translateX(${shift}px) scaleX(${scale})`;
+    // summon póza (Special_2): skutočný Naruto v NORMÁLNEJ výške stojí pri jednom okraji bunky, kópia zrkadlovo
+    // pri druhom (orez bočného okraja spritu v raf ich zúži). positionActors sa cez summon beat volá, preto
+    // pózu držíme tu (inak by ju hneď prepísal).
+    const pose = cloneSummonPose[slot];
+    if (pose && performance.now() < pose.until) {
+      el.style.transformOrigin = "50% 100%";
+      el.style.transform = `translateX(${shift - (facing[slot] || 1) * pose.off}px) scaleX(${facing[slot] || 1})`;
+    } else {
+      el.style.transformOrigin = "";
+      el.style.transform = `translateX(${shift}px) scaleX(${scale})`;
+    }
 
     el.dataset.slot = slot;
     if (same) el.dataset.pair = "1"; else el.removeAttribute("data-pair");
   });
 
-  // tieňové klony — pozícia/facing ako majiteľ; na majiteľovej bunke sa klon NEkreslí (jedna postava),
-  // pri prvom odlepení vykĺzne z majiteľovej bunky (slide namiesto zjavenia)
+  // tieňové klony — pozícia/facing ako majiteľ; klon je VŽDY viditeľný a PLNE KRYCÍ (identická figúra ako Naruto),
+  // aby bolo vidno, že Naruto má klona. Na majiteľovej bunke stojí len jemne posunutý (STACK_OFFSET px);
+  // pri rozdelení sa obe figúry rozbehnú SÚBEŽNE zo spoločnej bunky (klon vždy KĹŽE — nikdy nezmizne na mieste).
   [["p1", cloneEls.p1, p1, p2], ["p2", cloneEls.p2, p2, p1]].forEach(([slot, el, data, opp]) => {
     const c = data?.clone;
-    if (!data || !data.char || data.x == null || !c || (c.x === data.x && c.y === data.y)) {
+    if (!data || !data.char || data.x == null || !c) {
       el.style.display = "none";
+      el._logCell = null;
       return;
     }
-    const wasHidden = el.style.display === "none";
-    el.style.display = "block";
     const { left, top } = cellToPx(c.x, c.y);
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
-    if (immediate || !actorsInitialized) {
+    const onOwner = (c.x === data.x && c.y === data.y);
+    const wasHidden = el.style.display === "none";
+    const STACK_OFFSET = 18; // klon na majiteľovej bunke: jemný posun, aby bolo vidno dve figúry
+    // zdieľaná bunka so súperom → rozostup ako postavy (pairShift); na majiteľovej bunke pridaj STACK_OFFSET
+    const foeShift = (opp && opp.x === c.x && opp.y === c.y)
+      ? (slot === "p1" ? -PAIR_SHIFT_DEFAULT : PAIR_SHIFT_DEFAULT) : 0;
+    const shift = foeShift + (onOwner ? STACK_OFFSET : 0);
+
+    el.style.display = "block";
+    el.style.opacity = "1"; // klon nie je priehľadný ani na Narutovej bunke
+    if (immediate || !actorsInitialized || wasHidden) {
+      // prvé zjavenie (summon) / immediate — umiestni bez slideu (nie z rohu)
       el.style.transition = "none";
       el.style.left = px + "px"; el.style.top = py + "px";
       void el.offsetHeight;
       el.style.transition = "";
-    } else if (wasHidden) {
-      // vykĺznutie z bunky majiteľa (kage bunshin sa oddelí od originálu)
-      const o = cellToPx(data.x, data.y);
-      el.style.transition = "none";
-      el.style.left = (o.left - (ACTOR_W - TILE_W) / 2) + "px";
-      el.style.top  = (o.top - (ACTOR_H - TILE_H)) + "px";
-      void el.offsetHeight;
-      el.style.transition = "";
-      el.style.left = px + "px"; el.style.top = py + "px";
     } else {
+      // bežný frame — CSS transition dá súbežný slide s majiteľom (rozdelenie aj zliatie plynulo)
       el.style.left = px + "px"; el.style.top = py + "px";
     }
-    // zdieľaná bunka so súperom → rovnaký rozostup ako postavy (pairShift)
-    const shift = (opp && opp.x === c.x && opp.y === c.y)
-      ? (slot === "p1" ? -PAIR_SHIFT_DEFAULT : PAIR_SHIFT_DEFAULT) : 0;
     el.style.transform = `translateX(${shift}px) scaleX(${currentFacing(slot, facing)})`;
+    el._logCell = { x: c.x, y: c.y };
   });
 
   // „YOU" značka nad vlastnou postavou — sleduje aktéra (rovnaké transition ako pohyb)
@@ -1880,12 +1933,13 @@ function positionActors(s, immediate = false) {
 /* ---------- Queue + Lock ---------- */
 // ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove); ownerSlot kvôli alt-color hláv p2
 function actionBadgeView(a, ownerSlot) {
-  const arrow = { up: "↑", down: "↓", left: "←", right: "→" };
+  const arrow = ARROW_DIR;
+  const dd = ARROW_DIR[displayDir(a, ownerSlot)] || ""; // Narutov vertikálny smer (move/dash/attack) súperovi anonymizovaný (↕)
   switch (a?.type) {
-    case "move":          return { cls: "move",    text: `🚶${arrow[a.dir] || "?"}` };
-    case "dash":          return { cls: "dash",    text: `🏃${arrow[a.dir] || "?"}` };
+    case "move":          return { cls: "move",    text: `🚶${dd || "?"}` };
+    case "dash":          return { cls: "dash",    text: `🏃${dd || "?"}` };
     case "recharge":      return { cls: "mana",    text: "🙏" };
-    case "attack":        return { cls: "attack",  text: `🏹${arrow[a.dir] || ""}` };
+    case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
     case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` };
     case "shield":        return { cls: "shield",  text: "🛡️" };
@@ -2335,7 +2389,8 @@ function schedulePlayTimeline(timeline) {
         if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
-        setAnim(e.target, "hurt", frameHold);
+        // flinch (nie hurt) — klon ho zrkadlí, takže pri neplatnej akcii trhnú obaja Naruti rovnako
+        setAnim(e.target, "flinch", frameHold);
         // nevykonaná akcia — prečiarkni práve zaznamenaný badge (log) aj beat (lišta) jemným červeným ✕
         const acted = lastActed[e.target];
         if (acted) {
@@ -2345,6 +2400,7 @@ function schedulePlayTimeline(timeline) {
         // vždy zobraz dôvod (aj neznámy → default), nech žiadna nevykonaná akcia nie je „tichá“
         const [msg, cls] = INVALID_MSG[e.reason] || INVALID_MSG_DEFAULT;
         spawnFloat(e.target, msg, cls);
+        cloneFloat(e.target, msg, cls); // rovnaká hláška nad klonom — nesmie prezradiť, ktorý je pravý
         // nedostatok many — navyše výrazná výstraha: bliknutie mana baru v HUD
         if (e.reason === "mana") {
           const bar = e.target === "p1" ? hudP1Mana : hudP2Mana;
@@ -2354,6 +2410,29 @@ function schedulePlayTimeline(timeline) {
             bar.classList.add("low-warn");
             setTimeout(() => bar.classList.remove("low-warn"), 1000);
           }
+        }
+      }
+      // náraz do steny — figúra (Naruto ALEBO jeho klon), ktorá sa daným smerom nedá pohnúť, sa strhne
+      // k stene + OUT OF BOUNDS; tá druhá sa medzitým pohla. e.clone === true → náraz je na klonovi.
+      if (e.kind === "wall_bump" && (e.from === "p1" || e.from === "p2")) {
+        const onClone = e.clone === true;
+        const el = onClone ? cloneEls[e.from] : (e.from === "p1" ? actorP1 : actorP2);
+        const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[e.dir] || [0,0];
+        // translate sa skladá „add" na základný transform (translateX(shift) scaleX(scale)) — scaleX prevracia X,
+        // preto horizontálny náraz násobíme znamienkom facingu, aby smeroval do skutočnej steny
+        const scale = computeFacing(state?.p1, state?.p2)[e.from] || 1;
+        const nx = d[0] * 14 * scale, ny = d[1] * 14;
+        if (el && el.style.display !== "none") {
+          el.animate(
+            [{ transform: "translate(0,0)" }, { transform: `translate(${nx}px,${ny}px)`, offset: 0.4 }, { transform: "translate(0,0)" }],
+            { duration: Math.min(frameHold, 420), easing: "ease-out", composite: "add" }
+          );
+        }
+        if (onClone) {
+          const c = state?.[e.from]?.clone;
+          if (c) spawnCellFloat([c.x, c.y], "🚫 OUT OF BOUNDS", "lowmana-float");
+        } else {
+          spawnFloat(e.from, "🚫 OUT OF BOUNDS", "lowmana-float");
         }
       }
       if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
@@ -2403,7 +2482,7 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.from, "🪞 MIRROR", "shield-float");
         cloneFloat(e.from, "🪞 MIRROR", "shield-float");
       }
-      // Naruto: summon klona — postava + 2 kópie po bokoch hrajú Special_2
+      // Naruto: summon klona — postava + 1 kópia na tej istej bunke tvárou v tvár hrajú Special_2
       if (e.kind === "clone_summon" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "special2", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
@@ -2423,13 +2502,19 @@ function schedulePlayTimeline(timeline) {
         }
         if (Array.isArray(e.cell)) spawnCellFloat(e.cell, "💨", "maze-float");
       }
-      // kozmetický tile dmg na klonovi (dmg tile klona nezabíja — len ukáže, že „dostal")
-      if (e.kind === "clone_hit" && Array.isArray(e.cell)) {
-        spawnCellFloat(e.cell, `-${e.dmg ?? 1}`, "dmg-float");
+      // kozmetický tile dmg na klonovi (dmg tile klona nezabíja) — klon sa MUSÍ strhnúť a floatnúť ako pravý,
+      // inak by „nezraniteľná" figúrka prezradila, ktorý je klon. Súperovi ukáž „-N HP" (bluff = ako pravý zásah),
+      // vlastnému hráčovi „-N" (pravda — je to len kozmetika, HP mu neklesá).
+      if (e.kind === "clone_hit" && Array.isArray(e.cell) && (e.target === "p1" || e.target === "p2")) {
+        const ownerView = me === e.target;
+        spawnCellFloat(e.cell, ownerView ? `-${e.dmg ?? 1}` : `-${e.dmg ?? 1} HP`, "dmg-float");
+        cloneFlinch[e.target] = performance.now();
       }
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
-        spawnMirrorReflect(e.target, e.dmg, e.atk, !!e.gold);
-        spawnFloat(e.target, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
+        // odraz na KLONOVI (e.cell) vychádza z klonovej bunky, nie z pravého Naruta — inak by prezradil skutočného
+        spawnMirrorReflect(e.target, e.dmg, e.atk, !!e.gold, Array.isArray(e.cell) ? e.cell : null);
+        if (Array.isArray(e.cell)) spawnCellFloat(e.cell, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
+        else spawnFloat(e.target, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
       }
       if (e.kind === "golden_shield" && (e.from === "p1" || e.from === "p2")) {
         // navonok je to SHIELD, len zlatý — "golden shield" je interné pomenovanie
@@ -2537,10 +2622,12 @@ function schedulePlayTimeline(timeline) {
         }
       }
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
-        spawnShieldBlock(e.target, !!e.gold); // efektný náraz do štítu
-        // zlatý text, ak blokoval golden shield
-        if (e.gold) spawnFloat(e.target, "🛡️ BLOCKED", "golden-float");
-        else spawnFloat(e.target, "🛡️ BLOCKED", "block-float");
+        // block na KLONOVI (e.cell) sa ukáže na klonovej bunke — zdieľaný štít sa rozbije na oboch figúrach
+        const bcell = Array.isArray(e.cell) ? e.cell : null;
+        spawnShieldBlock(e.target, !!e.gold, bcell); // efektný náraz do štítu
+        const bcls = e.gold ? "golden-float" : "block-float"; // zlatý text, ak blokoval golden shield
+        if (bcell) spawnCellFloat(bcell, "🛡️ BLOCKED", bcls);
+        else spawnFloat(e.target, "🛡️ BLOCKED", bcls);
       }
       if (e.kind === "heal" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
@@ -2571,9 +2658,12 @@ function clearActors() {
     el.style.display = "none";
     el.style.left = "0px"; el.style.top = "0px";
     el.style.transform = "translateX(0) scaleX(1)";
+    el.style.opacity = "1";
+    clearTimeout(el._hideT); clearTimeout(el._fadeT); el._logCell = null; // reset sledovania klonovej pozície
   });
   actorsEl.querySelectorAll(".sprite-clone-summon").forEach(n => n.remove());
   cloneSummonFx = [];
+  cloneSummonPose = { p1: null, p2: null };
   youMarker.style.display = "none";
   actorsInitialized = false;
 }
@@ -3531,6 +3621,7 @@ socket.on("reset", () => {
   closePickers();
   renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
+  cloneFlinch = { p1: 0, p2: 0 };
   castingNow = { p1:false, p2:false };
   facingOverride = { p1: { sx: 0, until: 0 }, p2: { sx: 0, until: 0 } };
   clearActors();
@@ -3586,20 +3677,24 @@ socket.on("state", (s) => {
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
     }
   }
-  // label special podľa mága (len cost badge + tooltip, ikonu nechaj)
-  const mine = s[me];
-  if (mine?.char && specialBtn) {
+  // label special podľa mága — v turnaji po naplánovanom swape platí nový mág (ghostCharAt), nie ten na štarte kola
+  const specChar = ghostCharAt();
+  if (specChar && specialBtn) {
     const cost = specialBtn.querySelector(".cost");
-    if (mine.char === "medusa") {
+    if (specChar === "medusa") {
       // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
       specialBtn.title = "Special (−5 mana) — petrifying gaze: choose a direction; a hit opponent skips their next 2 actions";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 2×🗿`; hydratePix(cost); }
-    } else if (mine.char === "minotaur") {
+    } else if (specChar === "minotaur") {
       // Minotaur: žiadny dmg — celoplošný labyrint (trvá do vzájomného zásahu)
       specialBtn.title = "Special (−5 mana) — hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🌀`; hydratePix(cost); }
+    } else if (specChar === "naruto") {
+      // Naruto: žiadny priamy dmg — musí stáť sám, prizve tieňového klona (kópia s 1 dmg)
+      specialBtn.title = "Special (−5 mana) — must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals 1 dmg and vanishes on any hit";
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 👥`; hydratePix(cost); }
     } else {
-      const dmg = { fire:5, lightning:3, wanderer:8 }[mine.char];
+      const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {
         specialBtn.title = `Special (−5 mana, ${dmg} dmg)`;
         if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
@@ -3642,6 +3737,7 @@ socket.on("new_game", () => {
   syncGoldDualHalves();
   closePickers(); renderQueue();
   animState = { p1:{key:"idle", until:0}, p2:{key:"idle", until:0} };
+  cloneFlinch = { p1: 0, p2: 0 };
   castingNow = { p1:false, p2:false };
   facingOverride = { p1: { sx: 0, until: 0 }, p2: { sx: 0, until: 0 } };
   clearActors();
@@ -3696,8 +3792,10 @@ function raf() {
       : (aSt.key === "victory" || aSt.key === "casting")
         ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
         : currentAnim(slot);
+    // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
+    const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, stoned ? 0 : now, ACTOR_W, ACTOR_H))
+      .then(meta => drawSprite(ctx, meta, anim, stoned ? 0 : now, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
@@ -3711,12 +3809,15 @@ function raf() {
     if (el.style.display === "none" || !st?.clone || !st.char) return;
     const ctx = el.getContext("2d");
     el.classList.toggle("alt-color", usesAltColor(st.char, slot));
-    el.style.filter = actorFilter(slot, now);
+    el.style.filter = actorFilter(slot, now, true); // klon: bez Last Stand zlatého glow
     const dir = charDirFor(st.char, slot);
     const aSt = animState[slot];
     const stoned = (st.stone || 0) > 0;
+    const flAt = cloneFlinch[slot] || 0;
+    const flinching = !stoned && flAt && (now - flAt) < 500; // tile zásah na klonovi → strhnutie (Hurt.png póza) ako pravý
     let anim;
     if (stoned) anim = ANIM_DEF.idle;
+    else if (flinching) anim = ANIM_DEF.flinch; // rovnaká statická hurt-póza ako majiteľ pri zásahu
     else if (aSt.key === "victory" || aSt.key === "casting") anim = { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true };
     else {
       anim = currentAnim(slot);
@@ -3727,12 +3828,12 @@ function raf() {
       .catch(() => {});
   });
 
-  // summon kópie (Narutov clone_summon) — dočasné canvasy po bokoch hrajú Special_2
+  // summon kópia (Narutov clone_summon) — dočasný canvas na tej istej bunke hrá Special_2 tvárou v tvár
   cloneSummonFx = cloneSummonFx.filter(f => f.el.isConnected);
   for (const f of cloneSummonFx) {
     const ctx = f.el.getContext("2d");
     ensureSpriteMeta(f.dir, ANIM_DEF.special2.file)
-      .then(meta => drawSprite(ctx, meta, ANIM_DEF.special2, now, ACTOR_W, ACTOR_H))
+      .then(meta => drawSprite(ctx, meta, ANIM_DEF.special2, now, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, SUMMON_CROP))
       .catch(() => {});
   }
 

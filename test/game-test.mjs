@@ -1182,17 +1182,17 @@ async function main() {
   // redakcia: prekliaty (c2) nesmie vidieť pozíciu Naruta ANI jeho klona
   check(c2.lastState.p1.x === null && c2.lastState.p1.clone === null,
     "T52: prekliaty nevidí Naruta ani klona v dátach", `p1=${JSON.stringify({ x: c2.lastState.p1.x, clone: c2.lastState.p1.clone })}`);
-  // kolo 2 (starter p2): slepá strela doľava v rade 1 trafí KLONA na (0,1) — absorbuje ho (stacked bait);
-  // zásah klona labyrint NEUKONČÍ a prekliaty sa o ňom nesmie dozvedieť
+  // kolo 2 (starter p2): slepá strela doľava trafí STACKNUTÝ pár Naruto+klon na (0,1) — klon pohltí len 1 dmg
+  // (zomrie), zvyšok prejde na REÁLNEHO Naruta → keďže je zasiahnutý reálny hráč, labyrint sa PRED zásahom
+  // odhalí a zásahom skončí (konzistentné s bežným súbojom — klon nie je dokonalý štít ani v labyrinte)
   c2.lastTimeline = null;
   tl = await playRound(c1, c2, [R, S, M("right")], [A("left"), R, S]);
   t52last = tl[tl.length - 1];
-  check(fxOf(tl, "clone_die").length === 1, "T52: slepá strela trafila klona (bait na zdieľanej bunke)");
-  check(t52last.p1.hp === 10, "T52: Naruto na tej istej bunke nedostal nič (klon absorboval)", `hp=${t52last.p1.hp}`);
-  check(t52last.p2.labyrinth === true, "T52: zásah klona labyrint NEukončil");
-  check(fxOf(tl, "labyrinth_reveal").length === 0, "T52: zásah klona labyrint ani neodhalil");
+  check(fxOf(tl, "clone_die").length === 1, "T52: strela zabila klona na zdieľanej bunke");
+  check(t52last.p1.hp === 9, "T52: klon pohltil 1 dmg, zvyšok (1) prešiel na Naruta", `hp=${t52last.p1.hp}`);
+  check(t52last.p2.labyrinth === false, "T52: zásah cez klona na Naruta ukončil labyrint");
+  check(fxOf(tl, "labyrinth_reveal").length >= 1, "T52: labyrint sa pred zásahom odhalil");
   const c2fx = (c2.lastTimeline || []).flatMap(f => f.effects || []);
-  check(!c2fx.some(e => e.kind === "clone_die"), "T52: prekliaty strelec sa o zničení klona nedozvedel (redakcia)");
   check(c2fx.some(e => e.kind === "charge" && e.from === "p2"), "T52: vlastnú strelu prekliaty vidí");
   invariantCheck(tl, "T52");
 
