@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A 2-player turn-based browser arena game (wizard duel on a 5×3 grid) built with Express + Socket.IO. No build step, no tests, no linter — plain JS served statically. Code comments are in Slovak.
 
+> **Adding a new character?** Read `docs/ADDING_CHARACTERS.md` first — a step-by-step guide (files to touch, questions to ask up front, and the edge-case matrix: defenses, labyrinth, Last Stand, tournament, clone/summon). It exists because adding Naruto touched far more systems than expected.
+
 ## Commands
 
 ```
