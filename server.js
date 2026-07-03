@@ -1385,9 +1385,15 @@ function resolveTurn() {
       }
     }
 
-    // DOOM: ak je toto buffnuté (posledné) kolo a obaja stále žijú → démon Last Stand hráča opustí a zabije ho
+    // DOOM: ak je toto buffnuté (posledné) kolo a obaja stále žijú → démon Last Stand hráča opustí a zabije ho.
+    // Banish je istá smrť = koniec hry — ak beží labyrint, prehraj rovnakú sekvenciu ako pri istom zásahu:
+    // odhalenie PRED banish animáciou, koniec labyrintu (ESCAPED + rozsvietenie) po smrti — hra nesmie
+    // skončiť v hmle/redakcii (rovnaké pravidlo ako smrteľný tile/IK zásah)
     if (doomSlot && !winnerNow()) {
+      const labActive = game.players.p1.labyrinth || game.players.p2.labyrinth;
+      if (labActive) revealLabyrinths(tl);
       resolveLastStandBanish(doomSlot, tl);
+      if (labActive) endLabyrinths(tl);
       ended = true;
     }
   }

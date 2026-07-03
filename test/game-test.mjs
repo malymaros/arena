@@ -1047,6 +1047,35 @@ async function main() {
   check(tl[tl.length - 1].p1.hp === 0, "T44: doom — banish zabil mága s paktom", `hp=${tl[tl.length - 1].p1.hp}`);
   check(c1.gameResult?.gameWinner === "p2", "T44: hru berie p2", `res=${JSON.stringify(c1.gameResult)}`);
 
+  /* ---------- Test 45: doom banish počas labyrintu = reveal sekvencia ako pri istom zásahu ---------- */
+  // Minotaur zakleje súpera, privolá Last Stand; vo final kole nikto nikoho netrafí → banish ho zabije.
+  // Banish je istá smrť = koniec hry — labyrint sa musí odhaliť PRED banish animáciou a skončiť po smrti,
+  // inak by hra skončila v hmle s aktívnou redakciou.
+  await freshMinotaur(); // single: p1 = minotaur, p2 = fire (mana-only tiles)
+  tl = await playRound(c1, c2, [SP, R, S], [R, S, M("up")]);              // kolo 1: p2 zakliaty
+  check(tl[tl.length - 1].p2.labyrinth === true, "T45: p2 blúdi v labyrinte");
+  tl = await playRound(c1, c2, [R, S, M("right"), LS], [R, S, M("left")]); // kolo 2: p1 aktivuje Last Stand
+  check(tl[tl.length - 1].p1.lastStandBuff === true, "T45: p1 má buff, labyrint stále beží");
+  check(tl[tl.length - 1].p2.labyrinth === true, "T45: Last Stand summon labyrint nekončí (žiadny zásah)");
+  // final kolo (starter p1): žiadne zásahy → doom banish na konci kola
+  c1.gameResult = null;
+  tl = await playRound(c1, c2, [R, S, M("left")], [R, S, M("right")]);
+  const idxReveal = tl.findIndex(f => (f.effects || []).some(e => e.kind === "labyrinth_reveal"));
+  const idxBanish = tl.findIndex(f => (f.effects || []).some(e => e.kind === "last_stand_banish"));
+  const idxLabEnd = tl.findIndex(f => (f.effects || []).some(e => e.kind === "labyrinth_end"));
+  check(idxReveal >= 0 && idxBanish > idxReveal, "T45: odhalenie labyrintu prišlo PRED banish animáciou",
+    `reveal=${idxReveal}, banish=${idxBanish}`);
+  check(idxLabEnd > idxBanish, "T45: labyrint skončil po banish smrti", `end=${idxLabEnd}, banish=${idxBanish}`);
+  const t45last = tl[tl.length - 1];
+  check(t45last.p1.hp === 0 && t45last.p2.labyrinth === false && t45last.p2.thread.length === 0,
+    "T45: hra skončila mimo hmly — labyrint aj niť zanikli", `hp=${t45last.p1.hp}, lab=${t45last.p2.labyrinth}`);
+  check(c1.gameResult?.gameWinner === "p2", "T45: hru berie p2", `res=${JSON.stringify(c1.gameResult)}`);
+  // prekliaty (c2) má od reveal framu neredigované dáta — banish choreografiu vidí
+  const c2reveal = c2.lastTimeline.findIndex(f => (f.effects || []).some(e => e.kind === "labyrinth_reveal"));
+  const c2banish = c2.lastTimeline.some(f => (f.effects || []).some(e => e.kind === "last_stand_banish"));
+  check(c2reveal >= 0 && c2banish, "T45: prekliaty vidí banish choreografiu (reveal zrušil redakciu)",
+    `reveal=${c2reveal}, banishSeen=${c2banish}`);
+
   c1.sock.close(); c2.sock.close();
   server.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);
