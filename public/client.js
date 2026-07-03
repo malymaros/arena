@@ -818,6 +818,13 @@ function hideDeathCenter() {
   deathFog.style.opacity = "0";
   deathFog.style.display = "none";
 }
+// tvrdo schovaj démona ZA postavou (koniec hry / nová hra) — bežne ho uprace fill-forwards animácia
+// banishu (onfinish) a raf cleanup pri prvom stave bez buffu, ale tie majú okná (race s koncom hry);
+// POZOR: nevolať počas plánovania final kola — tam démon za buffnutou postavou MÁ visieť (0.25)
+function hideDeathBehind() {
+  deathBehind.getAnimations().forEach(a => a.cancel());
+  deathBehind.style.opacity = "0";
+}
 // umiestni démona za postavu (slot) podľa bunky + ladiace offsety (nemení opacity/scale)
 function placeDeathBehind(slot) {
   const tgt = state?.[slot];
@@ -2108,7 +2115,9 @@ function schedulePlayTimeline(timeline) {
       const winner = serverWinner || serverGameResult?.gameWinner || computeWinnerFromState(state);
       if (winner) {
         clearRoundCursor();
-        setTimeout(hideDeathCenter, 700); // banish: démon ešte chvíľu drží, potom zmizne (a nech nevisí cez koniec hry)
+        // banish/summon: démon ešte chvíľu drží, potom zmizne — stredový AJ ten za postavou
+        // (koniec hry = žiadny démon na ploche, nech už jeho animácie dopadli akokoľvek)
+        setTimeout(() => { hideDeathCenter(); hideDeathBehind(); }, 700);
         if (serverGameResult && !serverGameResult.matchOver) {
           playGameEndAnim(winner, () => showIntermission(winner, serverGameResult.series));
         } else {
@@ -3448,6 +3457,7 @@ socket.on("new_game", () => {
   serverWinner = null; serverGameResult = null; gameOverShown = false;
   lastAttackEndAt = { p1:0, p2:0 };
   hideDeathCenter(); // démon zo summon/banish nesmie prejsť do ďalšej hry
+  hideDeathBehind(); // ani ten za postavou (banish ho mohol nechať visieť pri race s koncom hry)
   resetActorFade();  // teleport fade nesmie prejsť do ďalšej hry
   stopTurnTimer();
   intermissionEl.classList.add("hidden");
@@ -3665,6 +3675,11 @@ function raf() {
       // labyrint: skrytý buffnutý hráč (x null) — priehľadný démon za postavou sa skryje,
       // nemá ho kam sledovať (inak by ostal svietiť na starej/rohovej pozícii a prezradil buff)
       if (tgt && tgt.x == null) {
+        deathBehind.style.opacity = "0";
+      } else if (_lsBanishing && tgt && tgt.down) {
+        // po banish kille hráč leží mŕtvy — démon za postavou nemá za kým visieť; stavová poistka
+        // drží nulu každý tick (fill-forwards animácia banishu mohla racenúť so state updatom).
+        // Summon choreografiu (down=true, _lsBanishing=false) sa toto nedotýka — revive riadi efekt.
         deathBehind.style.opacity = "0";
       } else if (!_lsBanishing && tgt && tgt.char && !tgt.down) {
         // pozícia sleduje postavu per-frame (bez transition); opacity 0.25 dotiahne CSS transition plynulo (z 1 po settle)
