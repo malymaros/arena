@@ -1225,6 +1225,33 @@ async function main() {
   check(t53bhit.length === 1 && t53bhit[0].dmg === 3, "T53b: mág v úlohe lovca dáva normálny dmg (3, nie 6)", `hits=${JSON.stringify(t53bhit)}`);
   invariantCheck(tl, "T53b");
 
+  /* ---------- Test 54: Minotaur vs Minotaur — buff dostáva LEN úspešný kaster ---------- */
+  async function freshMinoVsMino() {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "minotaur");
+    c2.sock.emit("choose_character", "minotaur");
+    await new Promise(r => setTimeout(r, 200));
+  }
+  // 54a: PREKLIATY Minotaur nedostáva 2× (je korisť) — útočí na lovca za normálny dmg
+  await freshMinoVsMino();
+  tl = await playRound(c1, c2, [SP, M("right"), R], [M("left"), R, S]); // p1 zaklial p2; p1→(1,1), p2→(2,1)
+  check(tl[tl.length - 1].p2.labyrinth === true, "T54a: p2 (minotaur) zakliaty");
+  tl = await playRound(c1, c2, [R, S, ML], [A("left"), R, S]);          // p2 (cursed) strelí doľava na p1 (1,1) dist 1
+  const t54a = sumEffects(tl).hits.filter(h => h.target === "p1");
+  check(t54a.length === 1 && t54a[0].dmg === 3, "T54a: cursed Minotaur dáva normálny dmg (3, nie 6)", `hits=${JSON.stringify(t54a)}`);
+  invariantCheck(tl, "T54a");
+  // 54b: labyrint cez MIRROR — mirror-lovec (hoci je Minotaur) NEdostáva 2× (buff patrí len úspešnému kasterovi)
+  await freshMinoVsMino();
+  tl = await playRound(c1, c2, [SP, R, S], [GMI, M("left"), R, S]);     // p2 odrazí → p1 cursed, p2 lovec bez buffu
+  check(tl[tl.length - 1].p1.labyrinth === true, "T54b: odrazený labyrint zaklial p1 (minotaur)");
+  tl = await playRound(c1, c2, [R, A("up"), ML], [M("left"), A("left"), R]); // p2→(1,1) strelí doľava na cursed p1 (0,1)
+  const t54b = sumEffects(tl).hits.filter(h => h.target === "p1");
+  check(t54b.length === 1 && t54b[0].dmg === 3, "T54b: mirror-lovec Minotaur NEdostáva 2× (3, nie 6)", `hits=${JSON.stringify(t54b)}`);
+  invariantCheck(tl, "T54b");
+
   c1.sock.close(); c2.sock.close();
   server.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);
