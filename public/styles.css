@@ -654,18 +654,41 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .char-select.roster-mode .char-card.off-roster,
 .char-select.roster-mode .char-card.soon { display: none; }
 
-/* turnajový draft (team-mode): confirm tlačidlo pod kartami; mimo draftu je lišta skrytá */
+/* turnajový draft (team-mode): confirm tlačidlo pod kartami; mimo draftu je lišta skrytá.
+   Dizajn = jazyk char-selectu: slate podklad, oranžový pixel rám s tvrdým čiernym obrysom,
+   pixel font + bevel (ako .char-arrow / karty); disabled = tlmený šedý rám ako "Coming soon" karta */
 .char-select .team-bar { display: none; }
 .char-select.team-mode .team-bar { display: flex; justify-content: center; }
 .team-confirm {
-  padding: 16px 34px; cursor: pointer; border: none; border-radius: 2px;
-  background: #ffb300; color: #2a1c00; font-family: inherit; font-size: 14px; letter-spacing: 2px;
-  text-shadow: 1px 1px 0 rgba(255,255,255,.25);
-  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
+  padding: 18px 36px; cursor: pointer; border: none; border-radius: 2px;
+  background: #5a6473; color: #ffb300;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 14px; letter-spacing: 2px; text-shadow: 2px 2px 0 rgba(0,0,0,.6);
+  box-shadow:
+    0 0 0 3px #ffb300,
+    0 0 0 5px #000,
+    inset 0 3px 0 rgba(255,255,255,.06),
+    inset 0 -4px 0 rgba(0,0,0,.5);
+  transition: transform .15s ease, box-shadow .15s ease;
 }
-.team-confirm:hover { background: #ffc333; }
-.team-confirm:active { transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
-.team-confirm:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: 0 0 0 2px #000; }
+.team-confirm:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 3px #ffc333,
+    0 0 0 5px #000,
+    0 0 16px rgba(255,179,0,.55),
+    inset 0 3px 0 rgba(255,255,255,.06),
+    inset 0 -4px 0 rgba(0,0,0,.5);
+}
+.team-confirm:active:not(:disabled) { transform: translateY(2px); }
+.team-confirm:disabled {
+  cursor: not-allowed; background: #3b4149; color: #8f97a3; text-shadow: 2px 2px 0 rgba(0,0,0,.45);
+  box-shadow:
+    0 0 0 3px #6b7480,
+    0 0 0 5px #000,
+    inset 0 3px 0 rgba(255,255,255,.04),
+    inset 0 -4px 0 rgba(0,0,0,.5);
+}
 
 /* náhľad špeciálnej abilitky pri hoveri nad mágom */
 .char-ability {

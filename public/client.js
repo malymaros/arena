@@ -468,7 +468,7 @@ const HEAD_CROP = {
   lightning: { cx: 0.41, cy: 0.58, size: 0.26 },
   wanderer:  { cx: 0.47, cy: 0.56, size: 0.27 },
   medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
-  minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2 z alfa centroidu Minotaur_2
+  minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51, cyP2: 0.43 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2/cyP2 = korekcia na posunutú figúru v Minotaur_2
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
@@ -477,14 +477,16 @@ function drawMageHeadAnim(cvs, char, now) {
   const c = HEAD_CROP[char];
   if (!dir || !c) return;
   // natívny p2 sheet môže mať figúru posunutú inde — použi jeho vlastný stred výrezu
-  const cx = (dir === CHAR_META[char]?.dirP2 && c.cxP2 != null) ? c.cxP2 : c.cx;
+  const isP2Sheet = dir === CHAR_META[char]?.dirP2;
+  const cx = (isP2Sheet && c.cxP2 != null) ? c.cxP2 : c.cx;
+  const cy = (isP2Sheet && c.cyP2 != null) ? c.cyP2 : c.cy;
   ensureSpriteMeta(dir, ANIM_DEF.idle.file).then(meta => {
     const ctx = cvs.getContext("2d");
     const fps = ANIM_DEF.idle.fps || 6;
     const idx = Math.floor((now / (1000 / fps)) % meta.frames); // aktuálny idle frame
     const fw = meta.fw, fh = meta.fh, side = fh * c.size;
     let sx = idx * fw + fw * cx - side / 2;
-    let sy = fh * c.cy - side / 2;
+    let sy = fh * cy - side / 2;
     sx = Math.max(idx * fw, Math.min(idx * fw + fw - side, sx)); // udrž výrez v rámci TOHTO framu
     sy = Math.max(0, Math.min(fh - side, sy));
     ctx.clearRect(0, 0, cvs.width, cvs.height);
@@ -2406,6 +2408,9 @@ function updateCharSelectHp(s) {
   selEl.classList.toggle("no-paging", !!charSelectHp);
   selEl.classList.toggle("roster-mode", !!charSelectHp);
   if (charSelectHp && charPage !== 0) setCharPage(0);
+  // setCharPage sa pri otvorení na stránke 0 nevolá — nadpis drž v synce s režimom aj tu
+  const titleEl = document.getElementById("char-page-title");
+  if (titleEl) titleEl.textContent = charSelectHp ? "Your Team" : CHAR_PAGES[charPage].title;
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
     if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
@@ -2625,7 +2630,8 @@ function setCharPage(p) {
   charPage = Math.max(0, Math.min(CHAR_PAGES.length - 1, p));
   selEl.querySelectorAll(".char-cards").forEach(el =>
     el.classList.toggle("hidden", Number(el.dataset.page) !== charPage));
-  if (charPageTitle) charPageTitle.textContent = CHAR_PAGES[charPage].title;
+  // tournament (roster-mode): stránky sú zlúčené na vlastný tím — nadpis "Your Team" namiesto názvu stránky
+  if (charPageTitle) charPageTitle.textContent = selEl.classList.contains("roster-mode") ? "Your Team" : CHAR_PAGES[charPage].title;
   // krajné šípky sú neviditeľné (visibility) — layout kariet sa pri prepnutí nehýbe
   charPrevBtn?.classList.toggle("off", charPage === 0);
   charNextBtn?.classList.toggle("off", charPage === CHAR_PAGES.length - 1);
