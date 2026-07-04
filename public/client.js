@@ -2611,11 +2611,10 @@ function schedulePlayTimeline(timeline) {
         if (me === e.target) fadeActor(otherSlot(), 0, 1, frameHold);
         spawnFloat(e.target, "🌀 REVEALED!", "maze-float");
       }
-      // súper vstúpil na Ariadninu niť — stopa na bunke (perzistentný obrys kreslí raf zo state.threadMark)
+      // súper vstúpil na Ariadninu niť — perzistentný obrys kreslí raf zo state.threadMark; navyše
+      // preblik obrysu na KAŽDEJ prejdenej niťovej bunke — okrem mojej vlastnej (tam lovca vidím naživo/lit,
+      // ten sa rieši fade-om v raf, nie preblikom). Žiadne textové/emoji floaty.
       if (e.kind === "thread_mark" && Array.isArray(e.cell)) {
-        spawnCellFloat(e.cell, "👣", "maze-float");
-        // preblik obrysu na KAŽDEJ prejdenej niťovej bunke — okrem mojej vlastnej (tam lovca vidím naživo/lit,
-        // ten sa rieši fade-om v raf, nie preblikom)
         if (me === e.target) {
           const oppS = otherSlot();
           const oppChar = oppS ? state?.[oppS]?.char : null;
