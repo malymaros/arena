@@ -270,14 +270,17 @@ function redactTilesFor(mySlot, snap) {
   const onMyCell = (t) => me && me.x != null && t.x === me.x && t.y === me.y;
   return { ...snap, tiles: snap.tiles.filter(t => t.type === "dmg" || onMyCell(t)) };
 }
+// lovec (alebo jeho tieňový klon) PRÁVE stojí na bunke prekliateho — nech už naň vstúpil lovec ALEBO
+// prekliaty vošiel na lovca. Prekliaty ho na svojej (vždy fakľami ožiarenej) bunke uvidí OŽIARENÉHO.
+// Počíta sa čerstvo z každého snapshotu/framu, takže po odchode lovca hneď zhasne (žiadny „stale" obrys).
+function hunterOnCursedCell(me, opp) {
+  return !!(me && opp && me.x != null &&
+    ((opp.x === me.x && opp.y === me.y) || (opp.clone && opp.clone.x === me.x && opp.clone.y === me.y)));
+}
 function redactSnapshotFor(mySlot, snap) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   const me = snap[mySlot], opp = snap[oppSlot];
-  // lovec (alebo jeho tieňový klon) PRÁVE stojí na mojej bunke → prekliaty ho na svojej (vždy viditeľnej,
-  // fakľami ožiarenej) bunke uvidí. Je to jediná pozičná info, čo dostane — vlastnú bunku aj tak vidí,
-  // a počíta sa čerstvo z každého snapshotu, takže po odchode lovca hneď zhasne (žiadny „stale" obrys).
-  const hunterHere = !!(me && opp && me.x != null &&
-    ((opp.x === me.x && opp.y === me.y) || (opp.clone && opp.clone.x === me.x && opp.clone.y === me.y)));
+  const hunterHere = hunterOnCursedCell(me, opp);
   return redactTilesFor(mySlot, { ...snap, [mySlot]: { ...me, hunterHere }, [oppSlot]: redactActor(opp) });
 }
 // tournament × labyrint: počas kliatby nevidí ANI JEDNA strana manu súperovho tímu — roster nesie
@@ -314,8 +317,12 @@ function redactTimelineFor(mySlot, tl) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   return tl.map(f => {
     if (f?.[mySlot]?.labyrinth && !f[mySlot].labReveal) {
+      // hunterHere sa musí počítať aj pre každý FRAME timeline (nielen root snapshot) — inak keď prekliaty
+      // POČAS kola vstúpi na lovcovu bunku, frame ho nenesie a klient ukáže čierny tieň namiesto ožiareného lovca
+      const hunterHere = hunterOnCursedCell(f[mySlot], f[oppSlot]);
       return redactRosterMana(oppSlot, redactTilesFor(mySlot, {
         ...f,
+        [mySlot]: { ...f[mySlot], hunterHere },
         [oppSlot]: redactActor(f[oppSlot]),
         effects: (f.effects || []).map(e => redactEffect(mySlot, oppSlot, e, f)).filter(Boolean),
       }));
