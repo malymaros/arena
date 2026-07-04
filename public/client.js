@@ -2593,6 +2593,12 @@ function schedulePlayTimeline(timeline) {
       // súper vstúpil na Ariadninu niť — stopa na bunke (obrys kreslí raf zo state.threadMark)
       if (e.kind === "thread_mark" && Array.isArray(e.cell)) {
         spawnCellFloat(e.cell, "👣", "maze-float");
+        // preblik siluety pri KAŽDOM kontakte (aj na tej istej bunke): reštartuj flash animáciu
+        if (me === e.target) {
+          actorSilhouette.style.animation = "none";
+          void actorSilhouette.offsetWidth; // reflow → animácia sa spustí odznova
+          actorSilhouette.style.animation = "silh-flash .5s ease";
+        }
       }
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🛡️ SHIELD", "shield-float");
@@ -4345,6 +4351,7 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
     else if (e.key === "0") { manual = -1; paused = false; }
   });
 })();
+
 
 
 

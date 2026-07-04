@@ -205,8 +205,14 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   background: radial-gradient(circle at 50% 55%, rgba(255,184,74,.55), rgba(92,46,10,.14) 75%);
   box-shadow: inset 0 0 22px rgba(255,150,50,.6);
 }
-/* obrys súpera na nití — čierna silueta jeho idle pózy */
-.sprite-silhouette { filter: brightness(0) opacity(.55); z-index: 2; }
+/* obrys súpera na nití — čierna silueta jeho idle pózy.
+   ŽIADNE plynulé presuny: pri každom kontakte castera s niťou má silueta preblikuť (zmiznúť→objaviť sa)
+   a ostať na mieste posledného kontaktu — preto vypíname left/top transition (žiadne kĺzanie medzi bunkami). */
+.sprite-silhouette { filter: brightness(0) opacity(.55); z-index: 2; transition: none !important; }
+/* preblik pri kontakte s niťou (reštartuje sa z JS pri každom thread_mark) — zmizne a objaví sa, párkrát */
+@keyframes silh-flash {
+  0% { opacity: 0; } 20% { opacity: 1; } 40% { opacity: 0; } 60% { opacity: 1; } 80% { opacity: 0; } 100% { opacity: 1; }
+}
 /* lovec PRÁVE na mojej fakľami ožiarenej bunke → ukáž ho farebne (nie čierny tieň) */
 .sprite-silhouette.lit { filter: none; opacity: 1; }
 .sprite-silhouette.lit.alt-color { filter: saturate(.22) brightness(1.4); } /* p2 albino paleta pre nenatívne postavy */
