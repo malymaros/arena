@@ -272,7 +272,13 @@ function redactTilesFor(mySlot, snap) {
 }
 function redactSnapshotFor(mySlot, snap) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
-  return redactTilesFor(mySlot, { ...snap, [oppSlot]: redactActor(snap[oppSlot]) });
+  const me = snap[mySlot], opp = snap[oppSlot];
+  // lovec (alebo jeho tieňový klon) PRÁVE stojí na mojej bunke → prekliaty ho na svojej (vždy viditeľnej,
+  // fakľami ožiarenej) bunke uvidí. Je to jediná pozičná info, čo dostane — vlastnú bunku aj tak vidí,
+  // a počíta sa čerstvo z každého snapshotu, takže po odchode lovca hneď zhasne (žiadny „stale" obrys).
+  const hunterHere = !!(me && opp && me.x != null &&
+    ((opp.x === me.x && opp.y === me.y) || (opp.clone && opp.clone.x === me.x && opp.clone.y === me.y)));
+  return redactTilesFor(mySlot, { ...snap, [mySlot]: { ...me, hunterHere }, [oppSlot]: redactActor(opp) });
 }
 // tournament × labyrint: počas kliatby nevidí ANI JEDNA strana manu súperovho tímu — roster nesie
 // uložené hodnoty magov (lavička + posledný uložený stav nasadeného), rediguje sa obojsmerne ako živá mana

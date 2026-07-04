@@ -199,8 +199,17 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 /* bunka s Ariadninou niťou — jemný zlatý nádych (čiaru kreslí .thread-svg cez stredy buniek) */
 .cell.thread-cell { box-shadow: inset 0 0 0 2px rgba(232,178,60,.45); }
 .thread-svg { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; }
+/* vlastná bunka prekliateho — „ožiarená fakľami" (teplý glow), aby ju videl ako mimo labyrintu.
+   Za .thread-cell, nech na zdieľanej vlastnej+niťovej bunke vyhrá tento box-shadow. */
+.cell.torch-lit {
+  background: radial-gradient(circle at 50% 55%, rgba(255,184,74,.55), rgba(92,46,10,.14) 75%);
+  box-shadow: inset 0 0 22px rgba(255,150,50,.6);
+}
 /* obrys súpera na nití — čierna silueta jeho idle pózy */
 .sprite-silhouette { filter: brightness(0) opacity(.55); z-index: 2; }
+/* lovec PRÁVE na mojej fakľami ožiarenej bunke → ukáž ho farebne (nie čierny tieň) */
+.sprite-silhouette.lit { filter: none; opacity: 1; }
+.sprite-silhouette.lit.alt-color { filter: saturate(.22) brightness(1.4); } /* p2 albino paleta pre nenatívne postavy */
 
 /* Hover preview (special rozsah) */
 @keyframes preview-blink {

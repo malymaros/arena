@@ -1679,6 +1679,7 @@ function renderGrid(s, effects = []) {
       const key = `${x},${y}`;
       if (previewSet.has(key)) cell.classList.add("preview-red");
       if (fogged && !fogVisible.has(key)) cell.classList.add("fogged"); // labyrint: tma mimo vlastnej bunky a nite
+      else if (fogged && mineLab && x === mineLab.x && y === mineLab.y) cell.classList.add("torch-lit"); // vlastná bunka ožiarená fakľami
       if (threadSet.has(key)) cell.classList.add("thread-cell");
 
       // tile podfarbenie + ikona; IK prekrýva všetko
@@ -3994,13 +3995,20 @@ function raf() {
     }
   }
 
-  // labyrint: obrys súpera na bunke posledného vstupu na moju niť (fixný idle frame, čierna silueta cez CSS)
+  // labyrint: obrys súpera. Keď lovec PRÁVE stojí na mojej (fakľami ožiarenej) bunke (server flag
+  // hunterHere), ukáž ho tam OŽIARENÉHO (nie čierny tieň) — vidím ho ako mimo labyrintu. Inak čierna
+  // silueta na bunke posledného stretnutia s niťou (threadMark), ako doteraz.
   {
     const ctx = actorSilhouette.getContext("2d");
     const mine = me ? state?.[me] : null;
     const oppS = otherSlot();
     const oppChar = oppS ? state?.[oppS]?.char : null;
-    const mark = mine?.labyrinth ? mine.threadMark : null;
+    const inLab = !!mine?.labyrinth;
+    const hunterHere = !!(inLab && mine?.hunterHere && mine.x != null); // lovec je práve na mojej bunke
+    const mark = inLab ? (hunterHere ? [mine.x, mine.y] : mine.threadMark) : null;
+    // lit = lovec na mojej bunke → CSS zruší brightness(0); p2 albino paleta cez alt-color (natívne palety to ignorujú)
+    actorSilhouette.classList.toggle("lit", hunterHere);
+    actorSilhouette.classList.toggle("alt-color", hunterHere && !!oppChar && usesAltColor(oppChar, oppS));
     if (!mark || !oppChar) {
       ctx.clearRect(0, 0, actorSilhouette.width, actorSilhouette.height);
       actorSilhouette.style.display = "none";
