@@ -1140,8 +1140,8 @@ async function main() {
   // smerom → p2 (3,1, dist 1) dostane DVA zásahy po 3 (falloff) = 6; p2 sa nebráni ani neuhne (A hore + ML minú)
   tl = await playRound(c1, c2, [M("right"), A("right"), R], [R, A("up"), ML]);
   const t48bHits = sumEffects(tl).hits.filter(h => h.target === "p2");
-  check(t48bHits.length === 2 && t48bHits.every(h => h.dmg === 3),
-    "T48b: stacknutý pár strieľa horizontálne → 2 zásahy po 3 (dvojnásobok)", `hits=${JSON.stringify(t48bHits)}`);
+  check(t48bHits.length === 1 && t48bHits[0].dmg === 6 && JSON.stringify(t48bHits[0].parts) === "[3,3]",
+    "T48b: stacknutý pár strieľa horizontálne → JEDEN úder 3+3=6 (parts)", `hits=${JSON.stringify(t48bHits)}`);
   check(tl[tl.length - 1].p2.hp === 4, "T48b: p2 HP 10−3−3=4", `hp=${tl[tl.length - 1].p2.hp}`);
   check(tl[tl.length - 1].p1.clone?.x === 2 && tl[tl.length - 1].p1.clone?.y === 1,
     "T48b: klon prežil, stále stackovaný na (2,1)", `clone=${JSON.stringify(tl[tl.length - 1].p1.clone)}`);
@@ -1155,8 +1155,8 @@ async function main() {
   // (p2 a1 = recharge) → Naruto 8 + klon 8 = 16; klon seká za plný MELEE_DMG, nie za starý plochý 1
   tl = await playRound(c1, c2, [M("right"), ML, R], [R, S, MI]);
   const t48cHits = sumEffects(tl).hits.filter(h => h.target === "p2");
-  check(t48cHits.length === 2 && t48cHits.every(h => h.dmg === 8),
-    "T48c: stacknutý melee = Naruto 8 + klon 8 (klon seká za plný MELEE_DMG)", `hits=${JSON.stringify(t48cHits)}`);
+  check(t48cHits.length === 1 && t48cHits[0].dmg === 16 && JSON.stringify(t48cHits[0].parts) === "[8,8]",
+    "T48c: stacknutý melee = JEDEN úder Naruto 8 + klon 8 = 16 (parts)", `hits=${JSON.stringify(t48cHits)}`);
   check(tl[tl.length - 1].p2.hp === 0, "T48c: p2 padol (16 dmg)", `hp=${tl[tl.length - 1].p2.hp}`);
   invariantCheck(tl, "T48c");
 

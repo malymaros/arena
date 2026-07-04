@@ -794,14 +794,20 @@ function doBasic(slot, dir, tl) {
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
     }
     if (fx.length) pushStateFrame(tl, fx, CHARGE_STEP_MS);
+    // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
+    // (h.shot.dist sa počíta z klonovej bunky) × rovnaké násobiče (Last Stand ×2 / Last Hope ×4, maze ×2).
+    const rawOf = (h) => Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
+    // súperove „player" zásahy z TOHTO kroku: stacknutý Naruto+klon strieľajúci rovnakým smerom trafí
+    // z jednej bunky dvakrát → na NEKRYTÉ HP to spojíme do JEDNÉHO úderu so súčtom dmg (nie dva animačne
+    // oddelené); pri obrane (štít/mirror) applyStackedHit vráti false a rieši sa každá strela zvlášť.
+    const playerHits = hits.filter(h => h.target === "player");
+    if (playerHits.length && !applyStackedHit(opS, playerHits.map(rawOf), tl, "basic")) {
+      for (const h of playerHits) { applyHit(opS, rawOf(h), tl, "basic", h.shot.clone); if (winnerNow()) break; }
+    }
     for (const h of hits) {
-      // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
-      // (h.shot.dist sa počíta z klonovej bunky) × rovnaké násobiče (Last Stand ×2 / Last Hope ×4,
-      // maze ×2). Stacknutý pár strieľajúci rovnakým smerom tak trafí dvakrát = 2× dmg (emergentne).
-      const raw = Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
-      if (h.target === "player") {
-        applyHit(opS, raw, tl, "basic", h.shot.clone);
-      } else if (h.target === "stacked") {
+      if (h.target === "player" || winnerNow()) continue;
+      const raw = rawOf(h);
+      if (h.target === "stacked") {
         const defended = op.shield || op.mirror; // zdieľaná obrana kryje celý zásah (klon prežije)
         if (defended) {
           applyHitOnClone(opS, raw, tl, "basic", true); // quiet — obrana sa ukáže cez applyHit nižšie
@@ -859,10 +865,14 @@ function doMelee(slot, tl) {
   for (let r = 0; r < MELEE_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "melee", from: slot, cells: cells.concat(cloneCells) }], SPECIAL_BEAT_MS);
   }
-  if (hitFoeByMe) applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) * labyrinthMul(slot), tl, "melee"); // maze buff: 2× počas labyrintu
-  // klon seká za ROVNAKÝ dmg ako Naruto (MELEE_DMG × rovnaké násobiče) — stacknutý pár na súperovej
-  // bunke ho tak zasiahne dvakrát = 2× melee (klon je vždy Narutov, takže MEDUSA_MELEE_DMG sa netýka)
-  if (hitFoeByClone && !winnerNow()) applyHit(opS, MELEE_DMG * dealMul(slot) * labyrinthMul(slot), tl, "melee", true);
+  const meleeRaw = (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) * labyrinthMul(slot); // maze buff: 2× počas labyrintu
+  const cloneMeleeRaw = MELEE_DMG * dealMul(slot) * labyrinthMul(slot); // klon (vždy Narutov) seká za plný MELEE_DMG
+  // stacknutý pár Naruto+klon na súperovej bunke seká dvakrát → na nekryté HP JEDEN úder so súčtom
+  // (klient vypíše „8+8" a zanimuje ako jeden zásah); pri obrane sa rieši každý sek zvlášť
+  if (!(hitFoeByMe && hitFoeByClone && applyStackedHit(opS, [meleeRaw, cloneMeleeRaw], tl, "melee"))) {
+    if (hitFoeByMe) applyHit(opS, meleeRaw, tl, "melee");
+    if (hitFoeByClone && !winnerNow()) applyHit(opS, cloneMeleeRaw, tl, "melee", true);
+  }
   if ((hitFoeCloneByMe || hitFoeCloneByClone) && !winnerNow()) {
     // obrana sa už prípadne „ukázala" na zásahu hráča tou istou akciou → bez duplicitných frame-ov
     applyHitOnClone(opS, hitFoeCloneByMe ? (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) : CLONE_DMG * dealMul(slot),
@@ -949,6 +959,21 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
   t.hp = Math.max(0, t.hp - d);
   pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
   endLabyrinths(tl); // labyrint končí až po dopade zásahu a úbytku HP
+}
+
+// Viac SÚBEŽNÝCH zásahov jednou akciou (stacknutý Naruto+klon strieľa/seká rovnakým smerom z jednej
+// bunky) na NEKRYTÉ HP súpera = JEDEN úder so súčtom dmg — klient ho podľa `parts` vypíše ako „2+2"
+// a zanimuje ako jeden zásah (nie dva za sebou). Pri obrane (štít/mirror) vráti false → volajúci
+// nechá každú strelu prejsť applyHit-om zvlášť (obrana rieši každú osobitne). Vráti true ak spracoval.
+function applyStackedHit(targetSlot, raws, tl, kind = "basic") {
+  const t = game.players[targetSlot];
+  if (raws.length < 2 || t.shield || t.mirror) return false; // jediný zásah / obrana → rieši applyHit
+  const parts = raws.map(r => recvDmg(targetSlot, r)); // ½ pri Last Stand/Hope (2× maze je už v raw)
+  const total = parts.reduce((a, b) => a + b, 0);
+  t.hp = Math.max(0, t.hp - total);
+  pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: total, parts }], SMALL_DELAY_MS);
+  endLabyrinths(tl); // súbežný zásah tiež ukončuje labyrint (odhalenie prebehlo pred letom)
+  return true;
 }
 
 // Jedna akcia zasiahne obrancu (ownerSlot) a VOLITEĽNE aj jeho tieňového klona (includeClone) — keďže Naruto
@@ -1395,10 +1420,10 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       pushStateFrame(tl, [{ kind: "tile_proc", tile: "ik", cell: [x, y] }], 600);
       killClone(slot, tl);
     } else if (game.tiles.some(t => t.type === "dmg" && t.x === x && t.y === y)) {
-      pushStateFrame(tl, [
-        { kind: "tile_proc", tile: "dmg", cell: [x, y] },
-        { kind: "clone_hit", target: slot, cell: [x, y], dmg: 1 },
-      ], SMALL_DELAY_MS);
+      // rovnaká dramaturgia ako pri hráčovom tile zásahu: NAJPRV rozsvieť políčko (vlastný frame),
+      // až POTOM kozmetický zásah na klonovi — inak sa blik políčka „stratí" v spoločnom frame
+      pushStateFrame(tl, [{ kind: "tile_proc", tile: "dmg", cell: [x, y] }], 600);
+      pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [x, y], dmg: 1 }], SMALL_DELAY_MS);
     }
   }
 }

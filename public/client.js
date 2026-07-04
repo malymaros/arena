@@ -1510,8 +1510,9 @@ function displayDir(action, ownerSlot) {
   // Narutov klon zrkadlí vertikálu pri pohybe (move/dash) AJ pri basic útoku → smer up/down by súperovi prezradil,
   // ktorá figúra je pravá. Súperovi ho anonymizujeme na „↕" (vlastný hráč vidí skutočný smer).
   const vertMirrored = action?.type === "move" || action?.type === "dash" || action?.type === "attack";
+  // anonymizuj len keď Naruto SKUTOČNE má klona — bez klona sa vertikála nerozdvojuje a smer nič neprezrádza
   if (vertMirrored && (dir === "up" || dir === "down") &&
-      ownerSlot && ownerSlot !== me && state?.[ownerSlot]?.char === "naruto") {
+      ownerSlot && ownerSlot !== me && state?.[ownerSlot]?.char === "naruto" && state?.[ownerSlot]?.clone) {
     return "vert";
   }
   return dir;
@@ -1632,6 +1633,7 @@ function renderGrid(s, effects = []) {
   const specials = [];
   const meleeCasts = [];
   const procs    = [];
+  const cloneHitCells = []; // klon zasiahnutý tile-om → blik jeho bunky (ako hit-blink u hráča)
   let hitTarget  = null;
 
   // špeciálne políčka (dmg/heal/mana + IK overlay)
@@ -1645,6 +1647,7 @@ function renderGrid(s, effects = []) {
     if (e?.kind === "special")   specials.push(e);
     if (e?.kind === "hit")       hitTarget = e.target;
     if (e?.kind === "tile_proc") procs.push(e);
+    if (e?.kind === "clone_hit" && Array.isArray(e.cell)) cloneHitCells.push(e.cell);
     // melee úder — zvýrazni zasahované bunky (server ich posiela v efekte; Medúza má aj diagonály)
     // + zväčšená postava v strede so sekacou animáciou (analógia special overlay)
     if (e?.kind === "melee") {
@@ -1710,6 +1713,7 @@ function renderGrid(s, effects = []) {
       const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
       if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
       if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
+      if (cloneHitCells.some(c => c[0] === x && c[1] === y)) cell.classList.add("hit-blink"); // klon na dmg dlaždici — blik bunky
       // aktívne obrany (shield/mirror) sa už nekreslia na bunku — pulzujúci glow je per-postavu (actorFilter)
 
       gridEl.appendChild(cell);
@@ -2175,10 +2179,16 @@ function renderQueue() {
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
     } else {
       el.classList.add("q-slot");
+      // súperov skamenený ťah je DETERMINISTICKÝ (stun prenesený z minulého kola) — namiesto skrytého „?"
+      // ukáž 🗿 na presných akciách, ktoré súper vynechá, nech kaster Medúzy vidí dokedy súper stojí
+      const oppStone = (!mine && b.kind === "act") ? Math.min(3, state?.[b.owner]?.stone || 0) : 0;
+      const oppStoned = oppStone > 0 && b.idx < oppStone;
       if (b.kind === "gshield")    el.innerHTML = '<span class="g-ico dim">🛡️</span>';
       else if (b.kind === "gmana") el.innerHTML = '<span class="g-ico dim">🙏</span>';
+      else if (oppStoned) { el.classList.add("stoned"); el.textContent = "🗿"; }
       else el.textContent = mine ? ["①", "②", "③"][b.idx] : String(b.idx + 1); // ja kružok, súper holé cifry
-      el.title = mine ? "Your action (required)" : "Opponent (hidden until it resolves)";
+      el.title = oppStoned ? "Opponent is petrified — this action is skipped (carry-over stun)"
+        : mine ? "Your action (required)" : "Opponent (hidden until it resolves)";
     }
 
     queueEl.appendChild(el);
@@ -2491,7 +2501,12 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", frameHold);
-        if (typeof e.dmg === "number" && e.dmg > 0) spawnDamageFloat(e.target, e.dmg);
+        // stacknutý Naruto+klon = súbežné zásahy spojené do jedného úderu → vypíš rozpis „-3 -3 HP"
+        if (Array.isArray(e.parts) && e.parts.length > 1 && e.parts.reduce((a, b) => a + b, 0) > 0) {
+          spawnFloat(e.target, `-${e.parts.join(" -")} HP`, "dmg-float");
+        } else if (typeof e.dmg === "number" && e.dmg > 0) {
+          spawnDamageFloat(e.target, e.dmg);
+        }
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
         // flinch (nie hurt) — klon ho zrkadlí, takže pri neplatnej akcii trhnú obaja Naruti rovnako
@@ -3920,17 +3935,19 @@ function raf() {
     const aSt = animState[slot];
     const stoned = (st.stone || 0) > 0;
     const flAt = cloneFlinch[slot] || 0;
-    const flinching = !stoned && flAt && (now - flAt) < 500; // tile zásah na klonovi → strhnutie (Hurt.png póza) ako pravý
-    let anim;
+    const flinching = !stoned && flAt && (now - flAt) < 700; // tile zásah na klonovi → strhnutie (Hurt.png) ako pravý
+    let anim, animT = stoned ? 0 : now;
     if (stoned) anim = ANIM_DEF.idle;
-    else if (flinching) anim = ANIM_DEF.flinch; // rovnaká statická hurt-póza ako majiteľ pri zásahu
+    // Hurt hrá od ZAČIATKU zásahu (animT = now - flAt), nie zamrznutý na poslednom frame — inak by strhnutie
+    // nebolo vidno (neloopová animácia kreslená globálnym `now` uviazne na poslednom frame)
+    else if (flinching) { anim = ANIM_DEF.flinch; animT = now - flAt; }
     else if (aSt.key === "victory" || aSt.key === "casting") anim = { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true };
     else {
       anim = currentAnim(slot);
       if (animState[slot].key === "hurt" || animState[slot].key === "dead") anim = ANIM_DEF.idle;
     }
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, stoned ? 0 : now, ACTOR_W, ACTOR_H))
+      .then(meta => drawSprite(ctx, meta, anim, animT, ACTOR_W, ACTOR_H))
       .catch(() => {});
   });
 
@@ -4328,3 +4345,6 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
     else if (e.key === "0") { manual = -1; paused = false; }
   });
 })();
+
+
+
