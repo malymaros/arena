@@ -107,8 +107,9 @@ actorsEl.appendChild(actorSilhouette);
 function spawnSilhouetteFlash(cell, oppChar, oppS) {
   if (!oppChar || !Array.isArray(cell)) return;
   const el = document.createElement("canvas");
+  // preblik na cudzej bunke = VŽDY čierny obrys (brightness(0)) — žiadny alt-color, ten by paletou
+  // prebil čiernu (napr. pri labyrinte cez mirror, kde je lovec nenatívna postava na p2)
   el.className = "sprite-actor sprite-silhouette silh-flash-el";
-  if (usesAltColor(oppChar, oppS)) el.classList.add("alt-color");
   el.width = ACTOR_W; el.height = ACTOR_H;
   el.style.width = ACTOR_W + "px"; el.style.height = ACTOR_H + "px";
   const { left, top } = cellToPx(cell[0], cell[1]);
