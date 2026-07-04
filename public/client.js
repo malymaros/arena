@@ -246,6 +246,8 @@ document.documentElement.style.setProperty("--move-ms", MOVE_MS + "ms"); // drž
 // Projektil
 const CHARGE_SCALE = 1.0;
 const CHARGE_ANIM  = { file: "Charge.png", fps: 8, loop: true };
+const CHARGE_STEP_MS = Math.round(240 * ANIM_SLOW); // dĺžka preletu 1 bunky; MUSÍ sedieť so server.js CHARGE_STEP_MS
+document.documentElement.style.setProperty("--charge-ms", CHARGE_STEP_MS + "ms"); // plynulý sklz projektilu (CSS .projectile)
 
 // Special anim
 const SPECIAL_SCALE = 4.8;
@@ -803,6 +805,73 @@ function placeChargeAura(cont, slot) {
   const cellTop  = aTop + (ACTOR_H - TILE_H);
   cont.style.left = (cellLeft + TILE_W / 2 + shift + headDx) + "px";
   cont.style.top  = (cellTop + TILE_H) + "px"; // päta postavy = spodok bunky
+}
+
+// ---- Plynulý projektil basic útoku ----
+// Perzistentné canvasy žijú v #actors (nie v bunke, ktorú renderGrid každý frame maže cez innerHTML=""),
+// takže projektil KĹŽE po bunkách cez CSS transition (left/top var(--charge-ms) linear) — rovnako ako
+// pohyb postavy, bez poskakovania a bez miznutia uprostred letu. Kľúč rozlišuje strelca a jeho klonovu
+// strelu (Naruto + klon = dve súbežné strely, klonova s invertovanou vertikálou).
+const projectiles = new Map(); // `${from}-${clone?1:0}` -> { el, retire }
+function projCenter(x, y) {
+  const { left, top } = cellToPx(x, y);
+  return { left: left + TILE_W / 2, top: top + TILE_H / 2 }; // stred bunky v súradniciach #actors (element má translate(-50%,-50%))
+}
+function spawnOrMoveProjectile(c, s) {
+  const charKey = s?.[c.from]?.char;
+  const dirKey  = charKey ? (CHAR_META[charKey].chargeDir || charDirFor(charKey, c.from)) : null;
+  if (!dirKey) return;
+  const key = `${c.from}-${c.clone ? 1 : 0}`;
+  let entry = projectiles.get(key);
+  if (entry && entry.retire) { clearTimeout(entry.retire); entry.retire = null; } // strela ešte letí ďalej
+  const dst = projCenter(c.cell[0], c.cell[1]);
+  if (!entry) {
+    const el = document.createElement("canvas");
+    const px = Math.round(TILE_H * CHARGE_SCALE);
+    el.width = px; el.height = px;
+    el.className = "projectile";
+    if (usesAltColor(charKey, c.from)) el.classList.add("alt-color"); // p2 paleta (Medúza/Naruto natívne)
+    el.dataset.dir = dirKey;
+    el.style.width = px + "px"; el.style.height = px + "px";
+    // sprite mieri doprava — ostatné smery flip/rotácia; orientácia je fixná počas letu (netranzicuje sa)
+    const orient = { left: "scaleX(-1)", up: "rotate(-90deg)", down: "rotate(90deg)" }[c.dir] || "";
+    el.style.transform = `translate(-50%, -50%) ${orient}`.trim();
+    // vznikni na bunke strelca a odtiaľ plynule kĺž na prvú bunku letu (nie zlietni z rohu (0,0));
+    // klonova strela štartuje z KLONOVEJ bunky, nie z Narutovej
+    const st = s?.[c.from];
+    const origin = c.clone ? st?.clone : st;
+    const start = (origin && origin.x != null) ? projCenter(origin.x, origin.y) : dst;
+    el.style.transition = "none";
+    el.style.left = start.left + "px";
+    el.style.top  = start.top + "px";
+    void el.offsetHeight; // reflow → snap na štart bez sklzu, potom zapni transition
+    el.style.transition = "";
+    actorsEl.appendChild(el);
+    entry = { el, retire: null };
+    projectiles.set(key, entry);
+  }
+  entry.el.style.left = dst.left + "px"; // nová cieľová bunka → CSS ju plynule dokĺže za --charge-ms
+  entry.el.style.top  = dst.top + "px";
+}
+function retireProjectile(key) {
+  const entry = projectiles.get(key);
+  if (!entry || entry.retire) return;
+  // nechaj dobehnúť posledný sklz na cieľovú bunku, až potom zmizni (nikdy nie uprostred letu)
+  entry.retire = setTimeout(() => { entry.el.remove(); projectiles.delete(key); }, CHARGE_STEP_MS);
+}
+// zosúlaď perzistentné projektily s charge efektmi tohto frame-u: nové/pohnuté posuň, chýbajúce stiahni
+function reconcileProjectiles(charges, s) {
+  const live = new Set();
+  for (const c of charges) {
+    if (!c || !Array.isArray(c.cell)) continue;
+    live.add(`${c.from}-${c.clone ? 1 : 0}`);
+    spawnOrMoveProjectile(c, s);
+  }
+  for (const key of projectiles.keys()) if (!live.has(key)) retireProjectile(key);
+}
+function clearProjectiles() {
+  for (const { el, retire } of projectiles.values()) { if (retire) clearTimeout(retire); el.remove(); }
+  projectiles.clear();
 }
 
 // „Goku" nabíjacia aura pri recharge — naviazaná na postavu (sleduje ju per-frame v rafe);
@@ -1632,26 +1701,8 @@ function renderGrid(s, effects = []) {
         cell.classList.add("tile-proc");
       }
 
-      // projektil basic útoku v tejto bunke
-      const chargeHere = charges.find(c => c.cell?.[0] === x && c.cell?.[1] === y);
-      if (chargeHere) {
-        const charKey = s?.[chargeHere.from]?.char;
-        const dirKey  = charKey ? (CHAR_META[charKey].chargeDir || charDirFor(charKey, chargeHere.from)) : null;
-        if (dirKey) {
-          const cvs = document.createElement("canvas");
-          const px  = Math.round(TILE_H * CHARGE_SCALE);
-          cvs.width = px; cvs.height = px;
-          cvs.className = "charge-canvas";
-          if (usesAltColor(charKey, chargeHere.from)) cvs.classList.add("alt-color"); // Medúza má projektil natívne prefarbený
-          cvs.dataset.dir = dirKey;
-          cvs.style.width  = px + "px";
-          cvs.style.height = px + "px";
-          // sprite projektilu smeruje doprava — ostatné smery flip/rotácia
-          const orient = { left: "scaleX(-1)", up: "rotate(-90deg)", down: "rotate(90deg)" }[chargeHere.dir] || "";
-          cvs.style.transform = `translate(-50%, -50%) ${orient}`.trim();
-          cell.appendChild(cvs);
-        }
-      }
+      // projektil basic útoku sa NEkreslí do bunky (renderGrid maže grid každý frame → poskakoval by);
+      // rieši ho perzistentný plynulý element v #actors cez reconcileProjectiles() nižšie
 
       // zásahový blik
       const isP1 = s?.p1 && s.p1.x === x && s.p1.y === y;
@@ -1663,6 +1714,8 @@ function renderGrid(s, effects = []) {
       gridEl.appendChild(cell);
     }
   }
+
+  reconcileProjectiles(charges, s); // plynulé projektily kĺžu v #actors (mimo mazaného gridu)
 
   renderThreadLines(s);
   updateSpecialCenter(specials.concat(meleeCasts));
@@ -2326,6 +2379,7 @@ function schedulePlayTimeline(timeline) {
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
 
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
+  clearProjectiles(); // žiadne staré projektily nesmú prejsť do nového kola
 
   const first = timeline[0];
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
@@ -3644,6 +3698,7 @@ socket.on("reset", () => {
   playing = false;
   hideConnError();
   resetActorFade();
+  clearProjectiles(); // žiadny letiaci projektil nesmie prežiť reset
 
   // reset game-over stavov ešte pred renderHUD — inak by guard nechal visieť GAME OVER text
   serverWinner = null;
@@ -3775,6 +3830,7 @@ socket.on("new_game", () => {
   hideDeathCenter(); // démon zo summon/banish nesmie prejsť do ďalšej hry
   hideDeathBehind(); // ani ten za postavou (banish ho mohol nechať visieť pri race s koncom hry)
   resetActorFade();  // teleport fade nesmie prejsť do ďalšej hry
+  clearProjectiles(); // ani letiaci projektil
   stopTurnTimer();
   intermissionEl.classList.add("hidden");
   goOverlay.classList.add("hidden");
@@ -4010,8 +4066,8 @@ function raf() {
       .catch(() => {});
   });
 
-  // projectiles
-  document.querySelectorAll("canvas.charge-canvas").forEach(cvs => {
+  // projectiles (plynulé perzistentné elementy v #actors)
+  document.querySelectorAll("canvas.projectile").forEach(cvs => {
     const ctx = cvs.getContext("2d");
     const dir = cvs.dataset.dir;
     ensureSpriteMeta(dir, CHARGE_ANIM.file)

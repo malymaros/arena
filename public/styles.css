@@ -128,6 +128,17 @@ body {
   z-index: 5;
 }
 
+/* Plynulý projektil basic útoku — perzistentný canvas v #actors, kĺže po bunkách cez CSS transition
+   (rovnako ako pohyb postavy), namiesto poskakovania/miznutia per-frame v bunke. */
+#actors .projectile {
+  position: absolute;
+  pointer-events: none;
+  image-rendering: pixelated;
+  z-index: 5; /* nad postavami, ako doterajší .charge-canvas */
+  /* --charge-ms nastavuje client.js z CHARGE_STEP_MS; orientácia (rotate/scaleX) je v inline transform a NEtranzicuje sa */
+  transition: left var(--charge-ms, 432ms) linear, top var(--charge-ms, 432ms) linear;
+}
+
 /* Efekty buniek */
 @keyframes hit-blink { 0%,100%{background-color:transparent} 25%,75%{background-color:rgba(255,0,0,.35)} }
 .cell.hit-blink { animation: hit-blink 300ms ease-in-out 1; }
@@ -1186,6 +1197,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .sprite-actor.alt-color,
   .special-center.alt-color,
   .charge-canvas.alt-color,
+  .projectile.alt-color,
   .mage-head.alt-color{ filter: saturate(.22) brightness(1.4); }
   .sprite-ghost.alt-color{ filter: grayscale(35%) saturate(.22) brightness(1.4); }
   /* HUD portrét — len v zdravom stave; wounded/critical/dead degradácia má prednosť */
