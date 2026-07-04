@@ -1105,13 +1105,13 @@ function trackSteps(slot, cells) {
     }
   }
   if (foe?.labyrinth) {
-    let mark = null;
+    // lovec prechádza niťou → preblik na KAŽDEJ prejdenej niťovej bunke (nie len na poslednej);
+    // threadMark ostane posledná bunka (tam silueta natrvalo ostane)
     for (const [x, y] of cells) {
-      if (foe.thread.some(([tx, ty]) => tx === x && ty === y)) mark = [x, y];
-    }
-    if (mark) {
-      foe.threadMark = mark;
-      fx.push({ kind: "thread_mark", cell: mark, target: foeS }); // target = kto obrys uvidí
+      if (foe.thread.some(([tx, ty]) => tx === x && ty === y)) {
+        foe.threadMark = [x, y];
+        fx.push({ kind: "thread_mark", cell: [x, y], target: foeS }); // target = kto obrys uvidí
+      }
     }
   }
   return fx;

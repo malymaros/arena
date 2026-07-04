@@ -206,13 +206,15 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   box-shadow: inset 0 0 22px rgba(255,150,50,.6);
 }
 /* obrys súpera na nití — čierna silueta jeho idle pózy.
-   ŽIADNE plynulé presuny: pri každom kontakte castera s niťou má silueta preblikuť (zmiznúť→objaviť sa)
-   a ostať na mieste posledného kontaktu — preto vypíname left/top transition (žiadne kĺzanie medzi bunkami). */
-.sprite-silhouette { filter: brightness(0) opacity(.55); z-index: 2; transition: none !important; }
-/* preblik pri kontakte s niťou (reštartuje sa z JS pri každom thread_mark) — zmizne a objaví sa, párkrát */
+   ŽIADNE plynulé PRESUNY (left/top transition vypnutá — žiadne kĺzanie medzi bunkami), ale opacity/filter
+   sa menia decentne: lovec na mojej bunke sa VYNORÍ z hmly (fade-in) a pri odchode sa STRATÍ v hmle
+   (fade-out / stmavne na tieň). Preblik na prejdených niťových bunkách rieši transient .silh-flash-el. */
+.sprite-silhouette { filter: brightness(0) opacity(.55); z-index: 2; pointer-events: none; transition: opacity .3s ease, filter .3s ease !important; }
+/* preblik na prejdenej niťovej bunke — transient canvas (spawnSilhouetteFlash): zmizne→objaví sa, párkrát */
 @keyframes silh-flash {
-  0% { opacity: 0; } 20% { opacity: 1; } 40% { opacity: 0; } 60% { opacity: 1; } 80% { opacity: 0; } 100% { opacity: 1; }
+  0% { opacity: 0; } 20% { opacity: 1; } 40% { opacity: 0; } 60% { opacity: 1; } 80% { opacity: 0; } 100% { opacity: 0; }
 }
+.silh-flash-el { animation: silh-flash .5s ease; }
 /* lovec PRÁVE na mojej fakľami ožiarenej bunke → ukáž ho farebne (nie čierny tieň) */
 .sprite-silhouette.lit { filter: none; opacity: 1; }
 .sprite-silhouette.lit.alt-color { filter: saturate(.22) brightness(1.4); } /* p2 albino paleta pre nenatívne postavy */

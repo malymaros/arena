@@ -97,8 +97,29 @@ actorSilhouette.id = "actor-silhouette";
 actorSilhouette.className = "sprite-actor sprite-silhouette";
 actorSilhouette.width = ACTOR_W; actorSilhouette.height = ACTOR_H;
 actorSilhouette.style.width = ACTOR_W + "px"; actorSilhouette.style.height = ACTOR_H + "px";
-actorSilhouette.style.display = "none";
+// necháme ho VŽDY display:block a riadime len opacity — inak by CSS fade (vynorenie/strata v hmle) z display:none neprešlo
+actorSilhouette.style.display = "block";
+actorSilhouette.style.opacity = "0";
 actorsEl.appendChild(actorSilhouette);
+
+// transient preblik obrysu na prejdenej niťovej bunke — lovec prechádza niťou → na KAŽDEJ bunke, kde je,
+// krátko preblikne jeho čierny obrys (nie len na poslednej). Vlastný canvas, po flash animácii sa odstráni.
+function spawnSilhouetteFlash(cell, oppChar, oppS) {
+  if (!oppChar || !Array.isArray(cell)) return;
+  const el = document.createElement("canvas");
+  el.className = "sprite-actor sprite-silhouette silh-flash-el";
+  if (usesAltColor(oppChar, oppS)) el.classList.add("alt-color");
+  el.width = ACTOR_W; el.height = ACTOR_H;
+  el.style.width = ACTOR_W + "px"; el.style.height = ACTOR_H + "px";
+  const { left, top } = cellToPx(cell[0], cell[1]);
+  el.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
+  el.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
+  actorsEl.appendChild(el);
+  ensureSpriteMeta(charDirFor(oppChar, oppS), ANIM_DEF.idle.file)
+    .then(meta => drawSprite(el.getContext("2d"), meta, ANIM_DEF.idle, 0, ACTOR_W, ACTOR_H))
+    .catch(() => {});
+  setTimeout(() => el.remove(), 550);
+}
 
 // tieňové klony (Narutov special) — sprite klona per strana; pozíciu rieši positionActors,
 // kreslí raf zo state[slot].clone (na bunke majiteľa sa klon nekreslí — vidno len jednu postavu)
@@ -2590,14 +2611,17 @@ function schedulePlayTimeline(timeline) {
         if (me === e.target) fadeActor(otherSlot(), 0, 1, frameHold);
         spawnFloat(e.target, "🌀 REVEALED!", "maze-float");
       }
-      // súper vstúpil na Ariadninu niť — stopa na bunke (obrys kreslí raf zo state.threadMark)
+      // súper vstúpil na Ariadninu niť — stopa na bunke (perzistentný obrys kreslí raf zo state.threadMark)
       if (e.kind === "thread_mark" && Array.isArray(e.cell)) {
         spawnCellFloat(e.cell, "👣", "maze-float");
-        // preblik siluety pri KAŽDOM kontakte (aj na tej istej bunke): reštartuj flash animáciu
+        // preblik obrysu na KAŽDEJ prejdenej niťovej bunke — okrem mojej vlastnej (tam lovca vidím naživo/lit,
+        // ten sa rieši fade-om v raf, nie preblikom)
         if (me === e.target) {
-          actorSilhouette.style.animation = "none";
-          void actorSilhouette.offsetWidth; // reflow → animácia sa spustí odznova
-          actorSilhouette.style.animation = "silh-flash .5s ease";
+          const oppS = otherSlot();
+          const oppChar = oppS ? state?.[oppS]?.char : null;
+          const mine = state?.[me];
+          const onMyCell = mine && mine.x === e.cell[0] && mine.y === e.cell[1];
+          if (oppChar && !onMyCell) spawnSilhouetteFlash(e.cell, oppChar, oppS);
         }
       }
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
@@ -4033,10 +4057,12 @@ function raf() {
     actorSilhouette.classList.toggle("lit", hunterHere);
     actorSilhouette.classList.toggle("alt-color", hunterHere && !!oppChar && usesAltColor(oppChar, oppS));
     if (!mark || !oppChar) {
+      // decentne sa STRATÍ v hmle (opacity fade-out cez CSS transition); display necháme block, nech fade dobehne
+      actorSilhouette.style.opacity = "0";
       ctx.clearRect(0, 0, actorSilhouette.width, actorSilhouette.height);
-      actorSilhouette.style.display = "none";
     } else {
       actorSilhouette.style.display = "block";
+      actorSilhouette.style.opacity = "1"; // vynorí sa/ostane (fade-in + lit↔čierny cez CSS transition)
       const { left, top } = cellToPx(mark[0], mark[1]);
       // obrys na MOJEJ bunke (prekliaty vošiel na Minotaura / Minotaur na mňa) — uhni nabok ako pairShift
       const onMe = mine.x === mark[0] && mine.y === mark[1];
@@ -4044,8 +4070,10 @@ function raf() {
       actorSilhouette.style.left = (left - (ACTOR_W - TILE_W) / 2 + dodge) + "px";
       actorSilhouette.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
       const dir = charDirFor(oppChar, oppS);
+      // lovec na mojej bunke (lit) → animuj NORMÁLNE (idle loop, t=now); čierny breadcrumb = statická póza (t=0)
+      const t = hunterHere ? now : 0;
       ensureSpriteMeta(dir, ANIM_DEF.idle.file)
-        .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, 0, ACTOR_W, ACTOR_H))
+        .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, t, ACTOR_W, ACTOR_H))
         .catch(() => {});
     }
   }
@@ -4351,6 +4379,7 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
     else if (e.key === "0") { manual = -1; paused = false; }
   });
 })();
+
 
 
 
