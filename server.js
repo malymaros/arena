@@ -48,7 +48,7 @@ const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECI
 const SPECIAL_COST = 5;
 const STONE_ACTIONS = 2; // Medúzin special: zasiahnutý súper preskočí najbližšie 2 základné akcie (kameň)
 // Minotaurov special (labyrint) nemá číselnú konštantu — trvá, kým jeden hráč nezasiahne druhého (viď endLabyrinths)
-const CLONE_DMG = 1; // Narutov tieňový klon: základ 1 dmg (bez falloffu); škáluje sa buff násobičom majiteľa (dealMul: Last Stand ×2 / Last Hope ×4)
+const CLONE_DMG = 1; // Narutov klon: koľko pohltí na zdieľanej bunke (jednorazový bait), kým zvyšok strely prejde na Naruta. Útok aj odraz mirrorom dávajú PLNÝ dmg ako Naruto (viď doBasic/doMelee/applyHitOnClone)
 const RECHARGE_GAIN = 4;
 const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
 const MIRROR_COST = 4; // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
@@ -469,7 +469,7 @@ function killClone(slot, tl, ms = SMALL_DELAY_MS) {
 }
 // zásah (dmg akcia) na klona cez obrany MAJITEĽA (zdieľané flagy): shield BLOKUJE, mirror ODRAZÍ — a to na
 // OBOCH figúrach samostatne (z ich vlastných buniek). Zdieľaný štít sa pri zásahu na klonovi rozbije/blokne
-// aj na klonovej bunke (nielen na Narutovi), mirror odrazí z klona flat CLONE_DMG (× buff), nie prijatý dmg.
+// aj na klonovej bunke (nielen na Narutovi), mirror odrazí z klona PLNÝ prijatý dmg (ako Narutov mirror).
 // (quietDefense param ostáva kvôli podpisu volaní, ale už sa nepoužíva — obrana sa ukáže na oboch.)
 function applyHitOnClone(ownerSlot, rawDmg, tl, kind = "basic", quietDefense = false) {
   const o = game.players[ownerSlot];
@@ -482,7 +482,7 @@ function applyHitOnClone(ownerSlot, rawDmg, tl, kind = "basic", quietDefense = f
   if (o.mirror) {
     const atkSlot = other(ownerSlot);
     const atk = game.players[atkSlot];
-    const reflectRaw = CLONE_DMG * dealMul(ownerSlot); // klonov odraz = flat CLONE_DMG (× buff), nie prijatý dmg
+    const reflectRaw = rawDmg; // klonov mirror odrazí PLNÝ prijatý dmg (rovnako ako Narutov mirror), nie flat 1
     const d = recvDmg(atkSlot, reflectRaw);
     // samostatný odraz z KLONOVEJ bunky (cell) — nie z pravého Naruta (inak prezradí skutočného)
     pushStateFrame(tl, [{ kind: "mirror", target: ownerSlot, cell: [o.clone.x, o.clone.y], dmg: reflectRaw, atk: kind, gold: !!o.mirrorGold }], MIRROR_BEAM_MS);
@@ -748,8 +748,8 @@ function doBasic(slot, dir, tl) {
   me.mana -= BASIC_COST;
 
   // strely: majiteľ + prípadný klon. Klon zrkadlí smer VERTIKÁLNE (up<->down), horizontálne rovnako
-  // (rovnako ako pohyb); plochý CLONE_DMG bez falloffu a bez buff násobiča. Každá strela nesie vlastný
-  // delta `d` a `dir`, aby klonova vertikála letela opačne.
+  // (rovnako ako pohyb); klonova strela dáva ROVNAKÝ dmg ako Naruto (falloff + rovnaké buffy). Každá
+  // strela nesie vlastný delta `d` a `dir`, aby klonova vertikála letela opačne.
   // Terče v dráhe: SÚPEROV KLON-návnada (mimo majiteľovej bunky) strelu zožerie a letí ďalej dym; keď
   // klon STOJÍ NA majiteľovej bunke, pohltí len CLONE_DMG a zvyšok prejde na Naruta.
   const cloneDir = { up:"down", down:"up", left:"left", right:"right" }[dir];
@@ -789,9 +789,10 @@ function doBasic(slot, dir, tl) {
     }
     if (fx.length) pushStateFrame(tl, fx, CHARGE_STEP_MS);
     for (const h of hits) {
-      // klonova strela dostáva rovnaký buff násobič ako majiteľ (Last Stand ×2 / Last Hope ×4);
-      // Minotaurov vlastný útok navyše ×2 počas jeho labyrintu (maze buff, výstupné — odraz vráti doubled)
-      const raw = h.shot.clone ? CLONE_DMG * dealMul(slot) : Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
+      // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
+      // (h.shot.dist sa počíta z klonovej bunky) × rovnaké násobiče (Last Stand ×2 / Last Hope ×4,
+      // maze ×2). Stacknutý pár strieľajúci rovnakým smerom tak trafí dvakrát = 2× dmg (emergentne).
+      const raw = Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
       if (h.target === "player") {
         applyHit(opS, raw, tl, "basic", h.shot.clone);
       } else if (h.target === "stacked") {
@@ -835,7 +836,7 @@ function doMelee(slot, tl) {
       if (inBounds(me.x + dx, me.y + dy)) cells.push([me.x + dx, me.y + dy]);
     }
   }
-  // vlastný klon seká paralelne na SVOJEJ bunke (plochý CLONE_DMG)
+  // vlastný klon seká paralelne na SVOJEJ bunke (rovnaký dmg ako Naruto)
   const cloneCells = me.clone ? [[me.clone.x, me.clone.y]] : [];
   const atCells = (cs, px, py) => cs.some(([x, y]) => x === px && y === py);
   // terče: súperov klon absorbuje úder na svojej bunke skôr než súper (bait na zdieľanej bunke);
@@ -853,8 +854,9 @@ function doMelee(slot, tl) {
     pushStateFrame(tl, [{ kind: "melee", from: slot, cells: cells.concat(cloneCells) }], SPECIAL_BEAT_MS);
   }
   if (hitFoeByMe) applyHit(opS, (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) * labyrinthMul(slot), tl, "melee"); // maze buff: 2× počas labyrintu
-  // klonov dmg dostáva rovnaký buff násobič ako majiteľ (Last Stand ×2 / Last Hope ×4)
-  if (hitFoeByClone && !winnerNow()) applyHit(opS, CLONE_DMG * dealMul(slot), tl, "melee", true);
+  // klon seká za ROVNAKÝ dmg ako Naruto (MELEE_DMG × rovnaké násobiče) — stacknutý pár na súperovej
+  // bunke ho tak zasiahne dvakrát = 2× melee (klon je vždy Narutov, takže MEDUSA_MELEE_DMG sa netýka)
+  if (hitFoeByClone && !winnerNow()) applyHit(opS, MELEE_DMG * dealMul(slot) * labyrinthMul(slot), tl, "melee", true);
   if ((hitFoeCloneByMe || hitFoeCloneByClone) && !winnerNow()) {
     // obrana sa už prípadne „ukázala" na zásahu hráča tou istou akciou → bez duplicitných frame-ov
     applyHitOnClone(opS, hitFoeCloneByMe ? (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) : CLONE_DMG * dealMul(slot),
@@ -962,7 +964,7 @@ function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
     return;
   }
   if (o.mirror) {
-    const cloneRaw = CLONE_DMG * dealMul(ownerSlot); // klonov odraz = flat CLONE_DMG (× buff)
+    const cloneRaw = ownerDmg; // klon dostal tú istú akciu ako Naruto → jeho mirror odrazí PLNÝ dmg (nie flat 1)
     // lúče oboch naraz (jeden beat), potom oba dopady na útočníka naraz (jeden beat)
     const beams = [{ kind: "mirror", target: ownerSlot, dmg: ownerDmg, atk: kind, gold: !!o.mirrorGold }];
     if (withClone) beams.push({ kind: "mirror", target: ownerSlot, cell: cloneCell, dmg: cloneRaw, atk: kind, gold: !!o.mirrorGold });

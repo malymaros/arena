@@ -124,8 +124,12 @@ Finálna špecifikácia od zadávateľa (rozhodnutia potvrdené v Q&A):
 - **Správanie klona:** kopíruje všetky základné akcie paralelne s Narutom; jediná inverzia je
   vertikálny pohyb (hore↔dole, dash s vlastným clampom). Ak je Narutov ťah neplatný, klon nespraví
   nič. Na zdieľanej bunke s Narutom sa kreslí len jedna postava. Mana je jeden zdieľaný pool.
-- **Ofenzíva klona:** čokoľvek klon spôsobí = plochý **1 dmg** (`CLONE_DMG`, bez falloffu a buffov)
-  — strela, melee, aj odraz jeho mirrorom.
+- **Ofenzíva klona:** klon dáva **rovnaký dmg ako Naruto** — strela s plným falloffom (podľa vlastnej
+  vzdialenosti klona), melee `MELEE_DMG`, obe s rovnakými násobičmi (Last Stand/Hope, maze). Ak stojí
+  klon **na Narutovej bunke**, útok rovnakým smerom trafí dvakrát = **2× dmg** (platí pre horizontálnu
+  strelu a melee; vertikálna strela sa cez inverziu rozdelí hore/dole). `CLONE_DMG = 1` ostáva už len
+  ako **pohlt** na zdieľanej bunke (zvyšok strely prejde na Naruta) — útok aj odraz jeho mirrorom
+  vracajú plný dmg ako Naruto.
 - **Obrany:** klon zdieľa Narutove shield/mirror flagy (armujú sa aj spotrebúvajú spolu, glow na
   oboch — pár je nerozoznateľný). Súperova obrana kryje Narutovu + klonovu strelu ako JEDNU akciu;
   odraz klonovej strely mirrorem zničí klona (HP Naruta netknuté).

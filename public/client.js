@@ -2884,7 +2884,7 @@ const ABILITY_PREVIEW = {
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
   medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
   minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands. Their steps weave a thread; stepping on it reveals your silhouette" },
-  naruto:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals 1 dmg and vanishes on any hit" },
+  naruto:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -3740,7 +3740,7 @@ socket.on("state", (s) => {
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🌀`; hydratePix(cost); }
     } else if (specChar === "naruto") {
       // Naruto: žiadny priamy dmg — musí stáť sám, prizve tieňového klona (kópia s 1 dmg)
-      specialBtn.title = "Special (−5 mana) — must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals 1 dmg and vanishes on any hit";
+      specialBtn.title = "Special (−5 mana) — must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 👥`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
