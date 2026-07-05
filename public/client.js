@@ -332,10 +332,11 @@ const ANIM_DEF = {
   victory: { file: "Idle.png", fps: 6, loop: true }, // placeholder — raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
   // Escanor: WeakIdle = slabá „denná" forma (pred premenou); Transform = premena → chytí sekeru (hrá sa RAZ pri nasadení)
   weakidle:  { file: "WeakIdle.png", fps: 5,  loop: true },
-  transform: { file: "Transform.png", fps: 12, loop: false },
+  transform: { file: "Transform.png", fps: 5, loop: false }, // slow-mo premena — nech si ju hráči všimnú
   cruelhold: { file: "CruelSunHold.png", fps: 11, loop: true } // special fáza 2: malá postava nesie veľké slnko
 };
-const TRANSFORM_MS = Math.round(17 * 1000 / 12); // 17 frameov premeny @12fps (~1420ms) — pred prvým rozohraním
+const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
+const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
 
 let me = null;
 let isHost = false;               // prvý pripojený hráč nastavuje zápas v lobby
