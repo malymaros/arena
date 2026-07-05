@@ -4364,17 +4364,20 @@ function raf() {
       : (aSt.key === "victory" || aSt.key === "casting")
         ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
         : currentAnim(slot);
-    // Escanor: počas premeny hraj Transform; pred premenou (idle) hraj slabú formu WeakIdle
+    // Escanor: počas premeny hraj Transform; pred premenou (idle) hraj slabú formu WeakIdle;
+    // víťazstvo = STREDOVÁ special animácia na jeho postavičke (WinSunBoard: zdvih slnka raz, potom ústa + preblik)
     if (st.char === "escanor" && !stoned && !lyingDead) {
       if (animState[slot].key === "transform") anim = ANIM_DEF.transform;
+      else if (animState[slot].key === "victory") anim = ANIM_DEF.winsun;
       else if (!escTransformed[slot] && animState[slot].key === "idle") anim = ANIM_DEF.weakidle;
     }
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
-    // Transform (loop:false) a winsun (loopFrom — zdvih raz, potom chvost) musia ísť od frame 0 → relatívny čas;
-    // inak (loop) globálny now je ok
+    // Transform (loop:false) a WinSunBoard s loopFrom (zdvih raz, potom chvost — aj pri victory) musia ísť
+    // od frame 0 → relatívny čas; inak (loop) globálny now je ok
+    const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
     const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
-                : (st.char === "escanor" && animState[slot].key === "winsun") ? (now - (animState[slot].start || 0))
+                : escWinsun ? (now - (animState[slot].start || 0))
                 : (stoned ? 0 : now);
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
