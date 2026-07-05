@@ -731,6 +731,53 @@ function spawnClonePuff(cell) {
   }
 }
 
+// roztrieštenie sochy — odkamenenie (Medúzin kameň dohral): kamenné úlomky vyletia do strán a padajú
+// (gravitácia) + krátky prachový záblesk v strede. Čisto kozmetické, self-remove; deterministické (bez random).
+function spawnStoneShatter(slot) {
+  const st = state?.[slot];
+  if (!st || st.x == null) return;
+  const { left, top } = cellToPx(st.x, st.y);
+  const cx = left + TILE_W / 2, cy = top + TILE_H * 0.5;
+  // prachový záblesk
+  const dust = document.createElement("div");
+  dust.style.cssText = "position:absolute;pointer-events:none;z-index:7;border-radius:50%;" +
+    "background:radial-gradient(circle, rgba(205,207,214,.6), rgba(160,162,172,0) 70%)";
+  const ds = Math.round(TILE_W * 0.95);
+  dust.style.width = ds + "px"; dust.style.height = ds + "px";
+  dust.style.left = cx + "px"; dust.style.top = cy + "px";
+  dust.style.marginLeft = (-ds / 2) + "px"; dust.style.marginTop = (-ds / 2) + "px";
+  actorsEl.appendChild(dust);
+  dust.animate([{ transform: "scale(.4)", opacity: .8 }, { transform: "scale(1.5)", opacity: 0 }],
+    { duration: 520, easing: "ease-out", fill: "forwards" });
+  setTimeout(() => dust.remove(), 580);
+  // kamenné úlomky — hranaté sivé kúsky, vyletia do strán a padajú s rotáciou
+  const N = 14;
+  for (let i = 0; i < N; i++) {
+    const w = Math.round(TILE_W * (0.10 + (i % 3) * 0.06));
+    const h = Math.round(w * (0.7 + (i % 2) * 0.5));
+    const el = document.createElement("div");
+    el.style.cssText = "position:absolute;pointer-events:none;z-index:8;border-radius:2px;" +
+      "background:linear-gradient(140deg, rgba(206,208,216,.98), rgba(140,142,152,.92) 60%, rgba(104,106,117,.88));" +
+      "box-shadow:0 0 2px rgba(55,57,66,.55)";
+    el.style.width = w + "px"; el.style.height = h + "px";
+    el.style.left = cx + "px"; el.style.top = cy + "px";
+    el.style.marginLeft = (-w / 2) + "px"; el.style.marginTop = (-h / 2) + "px";
+    actorsEl.appendChild(el);
+    const ang = (Math.PI * 2 * i / N) + i * 0.7;
+    const dist = TILE_W * (0.26 + (i % 4) * 0.12);
+    const dx = Math.cos(ang) * dist;
+    const dy = -Math.abs(Math.sin(ang)) * TILE_H * 0.22 + TILE_H * 0.5; // mierne hore, potom pád nadol
+    const rot = (i % 2 ? 1 : -1) * (120 + (i % 5) * 60);
+    const dur = 620 + (i % 5) * 70;
+    el.animate(
+      [{ transform: "translate(0,0) rotate(0deg) scale(1)", opacity: 1 },
+       { transform: `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) rotate(${rot}deg) scale(.45)`, opacity: 0 }],
+      { duration: dur, easing: "cubic-bezier(.3,.55,.5,1)", fill: "forwards" }
+    );
+    setTimeout(() => el.remove(), dur + 80);
+  }
+}
+
 // float aj nad VIDITEĽNÝM tieňovým klonom — obranné/mana hlášky nesmú prezradiť, ktorá postava je pravá
 function cloneFloat(slot, text, className) {
   const o = state?.[slot];
@@ -2606,6 +2653,10 @@ function schedulePlayTimeline(timeline) {
       // zásah Medúziným specialom — postava skamenie (sivú sochu kreslí raf zo state.stone)
       if (e.kind === "petrify" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, "🗿 PETRIFIED", "stone-float");
+      }
+      // odkamenenie — socha sa roztrieští (kamenné úlomky) namiesto obyčajného prebliku späť do normálu
+      if (e.kind === "unpetrify" && (e.target === "p1" || e.target === "p2")) {
+        spawnStoneShatter(e.target);
       }
       // Minotaurov special — zasiahnutý blúdi v labyrinte (hmlu/niť kreslí renderGrid zo state.labyrinth/thread)
       if (e.kind === "labyrinth" && (e.target === "p1" || e.target === "p2")) {

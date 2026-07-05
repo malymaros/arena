@@ -1706,12 +1706,16 @@ function resolveTurn() {
     // skamenenie chráni pred tile efektmi počas CELÉHO kroku, v ktorom padol aj posledný skamenený ťah
     // (odkamenenie je „na konci ťahu" — tiles sa začnú vyhodnocovať až od nasledujúceho kroku)
     const stonedStep = { p1: game.players.p1.stone > 0, p2: game.players.p2.stone > 0 };
+    const tookStoned = { p1: false, p2: false }; // kto v tomto kroku odohral skamenený pass
     for (const slot of order) {
       const meP = game.players[slot];
       if (meP.stone > 0) {
-        // skamenený ťah: akcia sa preskočí (bez many) a NEspotrebuje súperovu obranu; posledný skip = koniec kameňa
+        // skamenený ťah: akcia sa preskočí (bez many) a NEspotrebuje súperovu obranu.
+        // Kameň sa NEuberá teraz — až na KONCI kroku (nižšie), aby socha vizuálne vydržala celý tento krok
+        // vrátane vyhodnotenia jeho dlaždíc; odkamenenie sa tak prejaví až na začiatku NASLEDUJÚCEJ akcie
+        // (predtým socha zmizla už pri „STONED" float 2. akcie, hoci dlaždica pod hráčom sa ešte netriggerovala).
+        tookStoned[slot] = true;
         pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "stoned", dir: null, to: null } }], 250);
-        meP.stone--;
         pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS);
         pushStateFrame(tl, [], ACTION_GAP_MS);
         continue;
@@ -1736,6 +1740,14 @@ function resolveTurn() {
 
     // koniec ťahu — efekty špeciálnych políčok (pickupy, dmg, IK)
     endOfStepTileEffects(tl, stonedStep);
+    // až TERAZ ubudni kameň za skamenené passy tohto kroku — socha (kreslená zo state.stone) tak zmizne
+    // až v ďalšom kroku, čiže vizuálne na začiatku nasledujúcej akcie, keď sa dlaždice pod hráčom spustia
+    for (const slot of order) {
+      if (!tookStoned[slot] || game.players[slot].stone <= 0) continue;
+      game.players[slot].stone--;
+      // posledný kameň odišiel → socha sa roztrieští (klient vykreslí kamenné úlomky, nie len preblik)
+      if (game.players[slot].stone === 0) pushStateFrame(tl, [{ kind: "unpetrify", target: slot }], SMALL_DELAY_MS);
+    }
     if (winnerNow()) { ended = true; break outer; }
   }
 
