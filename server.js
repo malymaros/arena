@@ -90,6 +90,9 @@ const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
 const ACTION_GAP_MS    = Math.round(350 * ANIM_SLOW); // pokojová pauza medzi jednotlivými akciami, nech sa dá sledovať každý ťah
 const SPECIAL_REPEAT   = 3;
 const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
+// Escanor special: server podrží zásah o dĺžku klientskej choreografie (WinSun→CruelSunHold→slnko→SunBurst),
+// aby dmg dopadol AŽ po dokončení animácie. MUSÍ sedieť s klientskou choreografiou v client.js (runEscanorSpecial).
+const ESC_SPECIAL_MS   = 4625;
 const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za bunku — rýchla strela, aby ani 3-bunkový let nebol pomalší než iné akcie
 const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
 // Teleport (výmena maga v turnaji) — dvojfázová animácia: (1) starý mág zmizne, (2) nový sa objaví
@@ -1265,9 +1268,8 @@ function doSpecial(slot, tl, dir = null) {
     const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
     const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
     if (inZone) revealLabyrinths(tl); // istý zásah odhalí prípadný labyrint pred animáciou
-    for (let r = 0; r < SPECIAL_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
-    }
+    // 1 special frame drží celú choreografiu (klient ju spustí); zásah dopadne až po nej (ESC_SPECIAL_MS)
+    pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], ESC_SPECIAL_MS);
     const dmg = SPECIAL_ZONE_DMG.escanor; // 8
     if (inZone) applyHitBoth(foeS, dmg * dealMul(slot), tl, "special", cloneStruck);
     else if (cloneStruck) applyHitOnClone(foeS, dmg * dealMul(slot), tl, "special", false);

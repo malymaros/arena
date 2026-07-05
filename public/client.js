@@ -639,43 +639,49 @@ function updateSpecialCenter(casts) {
   }
 }
 
-// Escanor special fáza 2: výbuch (SunBurst) → dohasnutie (SunFade) na cieľovej bunke.
-function spawnSunFxAt(cell, slot) {
+// Escanor special — vlastná riadená choreografia (NECYKLÍ). Musí časovo sedieť s ESC_SPECIAL_MS na serveri
+// (server podrží zásah presne o dĺžku choreografie, aby dmg dopadol AŽ po dokončení výbuchu):
+//   WinSun (raz, visí dlhšie) → CruelSunHold (raz, dohrá celá) → slnko odletí z držanej pozície na cieľ
+//   → slow-mo SunBurst (počas neho blikajú všetky aktívne políčka) → [server: dmg] → SunFade.
+const WINSUN_FPS = 7, WINSUN_HOLD_MS = 700;                 // fáza 1: WinSun visí dlhšie
+const CRUELHOLD_ONCE_MS = Math.round(13 * 1000 / 11);       // CruelSunHold raz (13f @ 11fps) — musí dohrať pred letom
+const ESC_TRAVEL_MS = 600;                                  // let slnka na cieľ
+const ESC_BURST_FPS = 6, ESC_FADE_FPS = 6;                  // slow-mo výbuch
+
+// slow-mo výbuch (SunBurst→SunFade) na cieľovej bunke; počas SunBurst blikajú aktívne políčka (zoneCells)
+function spawnSunFxAt(cell, slot, zoneCells) {
   if (!Array.isArray(cell)) return;
   const dir = charDirFor("escanor", slot);
   const { left, top } = cellToPx(cell[0], cell[1]);
-  const size = Math.round(TILE_H * 1.7);
+  const size = Math.round(TILE_H * 1.8);
   const el = document.createElement("canvas");
-  el.width = size; el.height = size;
-  el.className = "sun-fx";
+  el.width = size; el.height = size; el.className = "sun-fx";
   Object.assign(el.style, { position: "absolute", left: (left + TILE_W/2 - size/2) + "px", top: (top + TILE_H/2 - size/2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
   actorsEl.appendChild(el);
+  const cellEls = (zoneCells || []).map(([x, y]) => gridEl.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`)).filter(Boolean);
+  cellEls.forEach(c => c.classList.add("esc-burst-cell")); // blik aktívnych políčok počas výbuchu
   const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
   Promise.all([ensureSpriteMeta(dir, "SunBurst.png"), ensureSpriteMeta(dir, "SunFade.png")]).then(([bm, fm]) => {
-    const BF = 12, FF = 8, bDur = bm.frames * 1000 / BF, fDur = fm.frames * 1000 / FF, t0 = performance.now();
+    const bDur = bm.frames * 1000 / ESC_BURST_FPS, fDur = fm.frames * 1000 / ESC_FADE_FPS, t0 = performance.now();
     const step = () => {
       if (!el.isConnected) return;
       const t = performance.now() - t0;
-      if (t < bDur)       { drawSprite(ctx, bm, { file: "SunBurst.png", frames: bm.frames, frameIndex: Math.min(bm.frames-1, Math.floor(t/1000*BF)) }, 0, size, size); requestAnimationFrame(step); }
-      else if (t < bDur + fDur) { drawSprite(ctx, fm, { file: "SunFade.png", frames: fm.frames, frameIndex: Math.min(fm.frames-1, Math.floor((t-bDur)/1000*FF)) }, 0, size, size); requestAnimationFrame(step); }
-      else el.remove();
+      if (t < bDur)             { drawSprite(ctx, bm, { file: "SunBurst.png", frames: bm.frames, frameIndex: Math.min(bm.frames-1, Math.floor(t/1000*ESC_BURST_FPS)) }, 0, size, size); requestAnimationFrame(step); }
+      else if (t < bDur + fDur) { cellEls.forEach(c => c.classList.remove("esc-burst-cell")); drawSprite(ctx, fm, { file: "SunFade.png", frames: fm.frames, frameIndex: Math.min(fm.frames-1, Math.floor((t-bDur)/1000*ESC_FADE_FPS)) }, 0, size, size); requestAnimationFrame(step); }
+      else { cellEls.forEach(c => c.classList.remove("esc-burst-cell")); el.remove(); }
     };
     requestAnimationFrame(step);
-  }).catch(() => el.remove());
+  }).catch(() => { cellEls.forEach(c => c.classList.remove("esc-burst-cell")); el.remove(); });
 }
-
-// Escanor special — vlastná riadená choreografia (NECYKLÍ):
-// 1) veľký stredový WinSun sa prehrá RAZ (malá postava = Win); 2) keď WinSun zmizne, malá postava = CruelSunHold,
-// slnko priletí do stredu cieľovej bunky a spraví SunBurst → SunFade.
-const WINSUN_FPS = 7, WINSUN_HOLD_MS = 250, ESC_TRAVEL_MS = 550;
+// veľký stredový sprite (WinSun) sa prehrá RAZ a chvíľu visí, potom onDone
 function spawnBigOnce(file, slot, onDone) {
   const dir = charDirFor("escanor", slot);
   const px = Math.round(TILE_H * SPECIAL_SCALE);
   const cvs = document.createElement("canvas");
-  cvs.width = px; cvs.height = px; cvs.className = "special-center";
+  cvs.width = px; cvs.height = px; cvs.className = "esc-big"; // VLASTNÁ trieda — NIE .special-center (updateSpecialCenter ju maže každý frame)
   if (usesAltColor("escanor", slot)) cvs.classList.add("alt-color");
   const flip = computeFacing(state?.p1, state?.p2)[slot] || 1;
-  Object.assign(cvs.style, { left: "50%", top: "50%", transform: `translate(-50%,-50%) scaleX(${flip})` });
+  Object.assign(cvs.style, { position: "absolute", left: "50%", top: "50%", transform: `translate(-50%,-50%) scaleX(${flip})`, zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
   actorsEl.appendChild(cvs);
   const ctx = cvs.getContext("2d"); ctx.imageSmoothingEnabled = false;
   ensureSpriteMeta(dir, file).then(meta => {
@@ -690,34 +696,38 @@ function spawnBigOnce(file, slot, onDone) {
     requestAnimationFrame(step);
   }).catch(() => { cvs.remove(); onDone && onDone(); });
 }
-// slnko priletí z Escanora do stredu cieľovej bunky, potom SunBurst→SunFade
-function travelSunThenBurst(slot, target) {
-  const c = state?.[slot]; if (!c) { spawnSunFxAt(target, slot); return; }
+// slnko odletí Z DRŽANEJ POZÍCIE (nad postavou) do stredu cieľovej bunky, potom slow-mo SunBurst→SunFade
+function travelSunThenBurst(slot, target, zoneCells) {
+  const c = state?.[slot]; if (!c) { spawnSunFxAt(target, slot, zoneCells); return; }
   const dir = charDirFor("escanor", slot);
   const s = cellToPx(c.x, c.y), e = cellToPx(target[0], target[1]);
-  const size = Math.round(TILE_H * 1.05);
-  const el = document.createElement("canvas"); el.width = size; el.height = size;
-  const sx = s.left + TILE_W / 2 - size / 2, sy = s.top - size * 0.35;
+  const size = Math.round(TILE_H * 1.25);
+  const sx = s.left + TILE_W / 2 - size / 2, sy = s.top - size * 0.55; // nad hlavou = kde postava drží slnko
   const ex = e.left + TILE_W / 2 - size / 2, ey = e.top + TILE_H / 2 - size / 2;
+  const el = document.createElement("canvas"); el.width = size; el.height = size; el.className = "sun-fx";
   Object.assign(el.style, { position: "absolute", left: sx + "px", top: sy + "px", zIndex: 7, pointerEvents: "none", imageRendering: "pixelated", transition: `left ${ESC_TRAVEL_MS}ms ease-in, top ${ESC_TRAVEL_MS}ms ease-in` });
   actorsEl.appendChild(el);
   const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
   let alive = true;
   const spin = () => { if (!alive || !el.isConnected) return; ensureSpriteMeta(dir, "Charge.png").then(m => { drawSprite(ctx, m, { file: "Charge.png", frames: m.frames, frameIndex: Math.floor(performance.now() / 1000 * 12) % m.frames }, 0, size, size); }); requestAnimationFrame(spin); };
   requestAnimationFrame(spin);
-  requestAnimationFrame(() => { el.style.left = ex + "px"; el.style.top = ey + "px"; }); // spusti sklz
-  setTimeout(() => { alive = false; el.remove(); spawnSunFxAt(target, slot); }, ESC_TRAVEL_MS);
+  void el.offsetWidth; // commitni štartovú pozíciu, aby CSS transition animoval pohyb (inak skočí/preblikne bez pohybu)
+  el.style.left = ex + "px"; el.style.top = ey + "px"; // sklz na cieľ
+  setTimeout(() => { alive = false; el.remove(); spawnSunFxAt(target, slot, zoneCells); }, ESC_TRAVEL_MS);
 }
-function runEscanorSpecial(slot, dir) {
+function runEscanorSpecial(slot, dir, zoneCells) {
   const c = state?.[slot]; if (!c) return;
   const dx = dir === "left" ? -1 : 1;
   const target = [Math.max(0, Math.min(board.w - 1, c.x + dx)), c.y];
-  // fáza 1: malá postava Win + veľký WinSun raz
-  setAnim(slot, "casting", 9000); // Win.png loop (SPECIAL_ANIMS.escanor) počas fázy 1; skončí keď prepneme na cruelhold
+  // fáza 1: malá postava Win (SPECIAL_ANIMS.escanor) + veľký WinSun raz (visí dlhšie)
+  setAnim(slot, "casting", 60000);
   spawnBigOnce("WinSun.png", slot, () => {
-    // fáza 2: malá postava CruelSunHold; slnko priletí na cieľ + SunBurst→SunFade
-    setAnim(slot, "cruelhold", ESC_TRAVEL_MS + 1000);
-    travelSunThenBurst(slot, target);
+    // fáza 2: malá postava CruelSunHold — nech DOHRÁ CELÁ (raz) pred letom slnka (nech nie sú dve slnká naraz)
+    setAnim(slot, "cruelhold", CRUELHOLD_ONCE_MS);
+    setTimeout(() => {
+      setAnim(slot, "casting", ESC_TRAVEL_MS + 2000); // späť na Win (bez slnka) — slnko už letí samo
+      travelSunThenBurst(slot, target, zoneCells);
+    }, CRUELHOLD_ONCE_MS);
   });
 }
 let escSpecialFired = false; // celá choreografia sa spustí len raz za special (nie na každom beate)
@@ -2591,8 +2601,8 @@ function schedulePlayTimeline(timeline) {
 
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
   clearProjectiles(); // žiadne staré projektily nesmú prejsť do nového kola
-  escSpecialFired = false; // Escanor: fáza 2 specialu (burst na cieli) sa spustí max raz za kolo
-  actorsEl.querySelectorAll(".sun-fx").forEach(n => n.remove());
+  escSpecialFired = false; // Escanor: choreografia specialu sa spustí max raz za kolo
+  actorsEl.querySelectorAll(".sun-fx, .esc-big").forEach(n => n.remove());
 
   const first = timeline[0];
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
@@ -2720,7 +2730,7 @@ function schedulePlayTimeline(timeline) {
       // (políčko pred Escanorom v zvolenom smere) sa prehrá SunBurst→SunFade. Spustí sa RAZ za special.
       if (e.kind === "special" && !escSpecialFired && state?.[e.from]?.char === "escanor") {
         escSpecialFired = true;
-        runEscanorSpecial(e.from, e.dir); // WinSun (raz) → CruelSunHold + slnko na cieľ → SunBurst/SunFade
+        runEscanorSpecial(e.from, e.dir, e.cells); // WinSun (raz) → CruelSunHold → slnko na cieľ → SunBurst (blik políčok) → dmg → SunFade
       }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
