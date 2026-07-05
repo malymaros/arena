@@ -329,8 +329,13 @@ const ANIM_DEF = {
   dead:    { file: "Dead.png",     fps: 7,  loop: false },
   // Naruto: summon klona — po pečatiach hrá postava (aj kópie po bokoch) Special_2 (dýchanie)
   special2:{ file: "Special_2.png", fps: 6, loop: true },
-  victory: { file: "Idle.png", fps: 6, loop: true } // placeholder — raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
+  victory: { file: "Idle.png", fps: 6, loop: true }, // placeholder — raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
+  // Escanor: WeakIdle = slabá „denná" forma (pred premenou); Transform = premena → chytí sekeru (hrá sa RAZ pri nasadení)
+  weakidle:  { file: "WeakIdle.png", fps: 5,  loop: true },
+  transform: { file: "Transform.png", fps: 12, loop: false },
+  cruelhold: { file: "CruelSunHold.png", fps: 11, loop: true } // special fáza 2: malá postava nesie veľké slnko
 };
+const TRANSFORM_MS = Math.round(17 * 1000 / 12); // 17 frameov premeny @12fps (~1420ms) — pred prvým rozohraním
 
 let me = null;
 let isHost = false;               // prvý pripojený hráč nastavuje zápas v lobby
@@ -368,6 +373,10 @@ function resetActorFade() {
 }
 
 let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
+// Escanor: pred premenou je idle WeakIdle; pri prvom rozohraní kola (po nasadení / swape) sa RAZ prehrá Transform,
+// odvtedy je idle Stand. escTransformed drží, či daný slot už premenu odohral; escPrevChar deteguje (re)nasadenie.
+let escTransformed = { p1: false, p2: false };
+let escPrevChar = { p1: null, p2: null };
 // klonový flinch (tile zásah na klonovi) — čas štartu; klon sa strhne rovnako ako pravý Naruto pri zásahu,
 // aby „nezraniteľne" nestál a neprezradil sa. Nezávislé od animState (to zdieľa s majiteľom).
 let cloneFlinch = { p1: 0, p2: 0 };
@@ -627,6 +636,32 @@ function updateSpecialCenter(casts) {
     actorsEl.appendChild(cvs);
   }
 }
+
+// Escanor special fáza 2: výbuch (SunBurst) → dohasnutie (SunFade) na cieľovej bunke.
+function spawnSunFxAt(cell, slot) {
+  if (!Array.isArray(cell)) return;
+  const dir = charDirFor("escanor", slot);
+  const { left, top } = cellToPx(cell[0], cell[1]);
+  const size = Math.round(TILE_H * 1.7);
+  const el = document.createElement("canvas");
+  el.width = size; el.height = size;
+  el.className = "sun-fx";
+  Object.assign(el.style, { position: "absolute", left: (left + TILE_W/2 - size/2) + "px", top: (top + TILE_H/2 - size/2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
+  actorsEl.appendChild(el);
+  const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  Promise.all([ensureSpriteMeta(dir, "SunBurst.png"), ensureSpriteMeta(dir, "SunFade.png")]).then(([bm, fm]) => {
+    const BF = 12, FF = 8, bDur = bm.frames * 1000 / BF, fDur = fm.frames * 1000 / FF, t0 = performance.now();
+    const step = () => {
+      if (!el.isConnected) return;
+      const t = performance.now() - t0;
+      if (t < bDur)       { drawSprite(ctx, bm, { file: "SunBurst.png", frames: bm.frames, frameIndex: Math.min(bm.frames-1, Math.floor(t/1000*BF)) }, 0, size, size); requestAnimationFrame(step); }
+      else if (t < bDur + fDur) { drawSprite(ctx, fm, { file: "SunFade.png", frames: fm.frames, frameIndex: Math.min(fm.frames-1, Math.floor((t-bDur)/1000*FF)) }, 0, size, size); requestAnimationFrame(step); }
+      else el.remove();
+    };
+    requestAnimationFrame(step);
+  }).catch(() => el.remove());
+}
+let escSpecialFired = false; // aby sa fáza 2 (burst na cieli) spustila len raz za special, nie na každom beate
 
 /* ---------- bubliny -X HP / +Y MANA ---------- */
 function cellToPx(x, y) { return { left: x * (TILE_W + GAP), top: y * (TILE_H + GAP) }; }
@@ -1801,7 +1836,8 @@ function renderGrid(s, effects = []) {
   reconcileProjectiles(charges, s); // plynulé projektily kĺžu v #actors (mimo mazaného gridu)
 
   renderThreadLines(s);
-  updateSpecialCenter(specials.concat(meleeCasts));
+  // Escanor: veľký centrálny sprite pri caste = WinSun (Escanor drží rastúce slnko); malá postava ostáva Win
+  updateSpecialCenter(specials.map(sp => s?.[sp.from]?.char === "escanor" ? { ...sp, file: "WinSun.png", fps: 9 } : sp).concat(meleeCasts));
 }
 
 // Ariadnina niť ako súvislá čiara cez stredy navštívených buniek (+ uzlík na začiatku);
@@ -2495,6 +2531,8 @@ function schedulePlayTimeline(timeline) {
 
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
   clearProjectiles(); // žiadne staré projektily nesmú prejsť do nového kola
+  escSpecialFired = false; // Escanor: fáza 2 specialu (burst na cieli) sa spustí max raz za kolo
+  actorsEl.querySelectorAll(".sun-fx").forEach(n => n.remove());
 
   const first = timeline[0];
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
@@ -2509,6 +2547,18 @@ function schedulePlayTimeline(timeline) {
   const NEXT_STARTER = playStarter === "p1" ? "p2" : "p1"; // preklop (hru môže začínať aj p2)
   renderGrid(state, first.effects || []);
   positionActors(state, true);
+
+  // Escanor: pred prvými akciami sa RAZ prehrá premena (WeakIdle→Stand); ak sú dvaja Escanori, paralelne.
+  // Timeline sa o dĺžku premeny oneskorí (len prvé kolo po nasadení).
+  let preDelay = 0;
+  for (const slot of ["p1", "p2"]) {
+    if (state[slot]?.char === "escanor" && !escTransformed[slot]) {
+      setAnim(slot, "transform", TRANSFORM_MS);
+      const sl = slot;
+      setTimeout(() => { escTransformed[sl] = true; }, TRANSFORM_MS);
+      preDelay = TRANSFORM_MS;
+    }
+  }
 
   let i = 1;
   let prev = first;
@@ -2601,9 +2651,22 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "charge" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
         facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Medúzin special má smer — počas castu je otočená v smere pohľadu, nie na súpera
+      // Medúzin/Escanorov special má smer — počas castu je otočená v smere pohľadu, nie na súpera
       if (e.kind === "special" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
         facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
+      }
+      // Escanor special fáza 2: po caste (WinSun+Win) malá postava prejde na CruelSunHold a na cieľovej bunke
+      // (políčko pred Escanorom v zvolenom smere) sa prehrá SunBurst→SunFade. Spustí sa RAZ za special.
+      if (e.kind === "special" && !escSpecialFired && state?.[e.from]?.char === "escanor") {
+        escSpecialFired = true;
+        const c = state[e.from], dx = e.dir === "left" ? -1 : 1;
+        const target = [Math.max(0, Math.min(board.w - 1, c.x + dx)), c.y];
+        const fromSlot = e.from;
+        setTimeout(() => {
+          if (!playing) return;
+          setAnim(fromSlot, "cruelhold", 1400);        // malá postava fáza 2
+          spawnSunFxAt(target, fromSlot);              // výbuch + dohasnutie na cieli
+        }, 1050); // ~3 beaty castu (WinSun+Win), potom fáza 2
       }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
@@ -2887,7 +2950,8 @@ function schedulePlayTimeline(timeline) {
     setTimeout(step, frame.delayMs ?? 600);
   };
 
-  step();
+  if (preDelay > 0) setTimeout(() => { if (gen === playGen) step(); }, preDelay); // počkaj na premenu Escanora
+  else step();
 }
 
 /* ---------- Actors clear ---------- */
@@ -3924,6 +3988,13 @@ socket.on("reset", () => {
 socket.on("state", (s) => {
   tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing });
   state = s; board = s.board || board;
+  // Escanor: keď sa na slote OBJAVÍ (nasadenie na začiatku hry alebo turnajový swap), resetuj premenu — nech sa
+  // pri najbližšom rozohraní kola prehrá WeakIdle→Transform→Stand znova (nie mid-hra, char sa medzi kolami nemení)
+  for (const slot of ["p1", "p2"]) {
+    const c = s?.[slot]?.char || null;
+    if (c === "escanor" && escPrevChar[slot] !== "escanor") escTransformed[slot] = false;
+    escPrevChar[slot] = c;
+  }
   // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
   if (!s.timeline) _finalRoundActive = !!s.goldLocked;
 
@@ -4079,11 +4150,16 @@ function raf() {
     else if (!lyingDead && aSt.key === "dead") { aSt.key = "idle"; aSt.until = 0; }
     // skamenená postava = zamrznutá socha (fixný idle frame; sivý nádych rieši actorFilter); smrť má prednosť
     const stoned = (st.stone || 0) > 0 && !lyingDead;
-    const anim = stoned
+    let anim = stoned
       ? ANIM_DEF.idle
       : (aSt.key === "victory" || aSt.key === "casting")
         ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
         : currentAnim(slot);
+    // Escanor: počas premeny hraj Transform; pred premenou (idle) hraj slabú formu WeakIdle
+    if (st.char === "escanor" && !stoned && !lyingDead) {
+      if (animState[slot].key === "transform") anim = ANIM_DEF.transform;
+      else if (!escTransformed[slot] && animState[slot].key === "idle") anim = ANIM_DEF.weakidle;
+    }
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
     ensureSpriteMeta(dir, anim.file)

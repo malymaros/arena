@@ -9,6 +9,7 @@ skripty slúžia na pregenerovanie.
 npm install pngjs         # jediná závislosť
 node detect.cjs           # 1. detekcia frame boxov -> bands.json (+ overview.png náhľad)
 node export_game.cjs      # 2. herné sheety do public/assets/escanor/ + P2 recolor do escanor_2/
+node export_special.cjs   # 2b. special-fázové sheety (WinSun, CruelSunHold, SunBurst, SunFade) + P2
 node collect.cjs          # (voliteľné) HOTOVE.html — galéria schválených/zložených animácií
 node gen_viewer.cjs       # (voliteľné) viewer.html — animovaný prehliadač všetkých detekovaných pásov
 ```
