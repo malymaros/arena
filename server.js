@@ -146,7 +146,7 @@ function newPlayer(slot) {
     clone: null,
     labyrinth: false,  // blúdi v labyrinte (Minotaurov special) — nevidí board, kým nepadne vzájomný zásah
     mazeBuff: false,   // hráč ÚSPEŠNE zaklial súpera do labyrintu (len priamym castom, nie cez odraz) → 2× výstupný
-                       // dmg + imunita na Damage/IK dlaždice, kým labyrint trvá. Cielené na toho, kto hrá Minotaura.
+                       // dmg, kým labyrint trvá. Cielené na toho, kto hrá Minotaura. (tile dmg/IK dostáva normálne)
     labReveal: false,  // labyrint sa v tomto ťahu isto skončí zásahom — redakcia/hmla padli už PRED animáciou akcie
     thread: [],        // Ariadnina niť: [x,y] políčka, na ktoré prekliaty vstúpil (prvé = kde stál pri zakliatí)
     threadMark: null,  // [x,y] posledného súperovho vstupu na niť — prekliaty tam vidí jeho obrys
@@ -909,7 +909,7 @@ function endLabyrinths(tl) {
     p.labReveal = false;
     p.thread = [];
     p.threadMark = null;
-    game.players[other(slot)].mazeBuff = false; // labyrint skončil → kaster stráca 2× dmg + imunitu na dlaždice
+    game.players[other(slot)].mazeBuff = false; // labyrint skončil → kaster stráca 2× dmg
     pushStateFrame(tl, [{ kind: "labyrinth_end", target: slot }], SMALL_DELAY_MS);
   }
 }
@@ -1396,7 +1396,7 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     const p = game.players[slot];
     if (p.hp <= 0) continue;
     if (stoned(slot)) continue; // na skamenenú postavu sa tile dmg/IK nevyhodnocuje
-    if (p.mazeBuff) continue;   // Minotaur je počas svojho labyrintu imúnny na Damage aj IK dlaždice (heal/mana zbiera ďalej)
+    // (kaster labyrintu dostáva tile dmg/IK normálne ako mimo labyrintu — mazeBuff už nedáva imunitu na dlaždice)
     let dmg = 0, tileType = null;
     if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
     else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) { dmg = 1; tileType = "dmg"; }
