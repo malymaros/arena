@@ -1220,6 +1220,39 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   }
   .hud-p2 .hud-char{ transform: scaleX(-1); } /* P2 pozerá doľava */
 
+  /* Escanor: pride indikátor (ikona pride.png + číslo) vľavo od postavy, rozsah abilitky (minimapka) vpravo */
+  /* vertikálne vycentrované na stred Escanorovho tela (~68px od vrchu widgetu), väčší margin od okraja */
+  .pride-badge{ position: absolute; left: 16px; top: 52px; z-index: 4; display: flex; flex-direction: row; align-items: center; gap: 3px; pointer-events: none; }
+  .pride-badge.hidden, .pride-range.hidden{ display: none; }
+  .pride-badge img{ height: 42px; width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)); } /* pomer strán zachovaný */
+  .pride-badge .pride-num{ font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 18px; color: #ffd24a;
+    text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
+  .pride-range{ position: absolute; right: 40px; top: 58px; z-index: 4; display: grid; gap: 2px; pointer-events: none;
+    padding: 3px; background: rgba(0,0,0,.4); border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.6); }
+  .pride-range .pr-cell{ width: 9px; height: 7px; border-radius: 1px; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+  .pride-range .pr-cell.hit{ background: rgba(255,150,0,.85); box-shadow: inset 0 0 0 1px rgba(255,210,80,.9); }
+  /* pozícia hráča = červená bodka (navrch, aj keď je políčko v range) — nemýli sa s dosahom */
+  .pride-range .pr-cell.caster{ position: relative; }
+  .pride-range .pr-cell.caster::after{ content: ""; position: absolute; inset: 0; margin: auto; width: 4px; height: 4px;
+    border-radius: 50%; background: #ff2b2b; box-shadow: 0 0 0 1px #000, 0 0 3px rgba(255,0,0,.8); }
+
+  /* Escanor: float nad postavou po zmene pride — zelený lev + ▲ (rástol) / červený lev + ▼ (klesol) */
+  @keyframes pride-float-rise {
+    0%   { transform: translateX(-50%) translateY(8px) scale(.7); opacity: 0; }
+    18%  { transform: translateX(-50%) translateY(-2px) scale(1); opacity: 1; }
+    70%  { opacity: 1; }
+    100% { transform: translateX(-50%) translateY(-50px) scale(1); opacity: 0; }
+  }
+  .pride-float{ position: absolute; z-index: 9; display: flex; flex-direction: row; align-items: center; gap: 4px; pointer-events: none;
+    animation: pride-float-rise 1.7s ease-out forwards; }
+  /* solídne zafarbený lev (silueta cez mask z pride.png) — vedľa neho šípka */
+  .pride-float .pf-lion{ width: 78px; height: 52px; -webkit-mask: url(/assets/pride.png) center/contain no-repeat; mask: url(/assets/pride.png) center/contain no-repeat;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.7)); }
+  .pride-float .pf-arrow{ font-size: 30px; font-weight: 900; line-height: .8;
+    text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
+  .pride-float.up .pf-lion{ background: #3ddc84; }  .pride-float.up .pf-arrow{ color: #3ddc84; }
+  .pride-float.down .pf-lion{ background: #ff3b3b; } .pride-float.down .pf-arrow{ color: #ff3b3b; }
+
   /* palette swap pravej strany (p2) — vyblednutý „albino" variant (do biela), fixný na celú sériu */
   .sprite-actor.alt-color,
   .special-center.alt-color,

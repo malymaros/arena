@@ -16,11 +16,13 @@ const feetY = f => { const cx=Math.round(feetX(f)); let mx=-1; for(let y=f.y0;y<
 const R = (band, from, to) => { const B=bandById(band),a=[]; for(let k=from;k<=to;k++)a.push({B,f:B.frames[k]}); return a; };
 const BXi = (band, x0,y0,x1,y1) => ({ B: bandById(band), f:{x0,y0,x1,y1} });
 
-const S = 226, CX = S / 2; // štvorcová bunka; NOHY kotvené na SPODOK framu (ako ostatné postavy, belowFeet=0)
+const S = 226, CX = S / 2; // štvorcová bunka; každý frame kotvený svojím NAJNIŽŠÍM pixelom na spodok (belowFeet=0)
 function buildChar(list, file) {
-  const items = list.map(({ B, f: f0 }) => { const f = { ...f0, y0: trimTop(f0) }; return { f, fx: feetX(f), fy: feetY(f) }; });
+  const items = list.map(({ B, f: f0 }) => { const f = { ...f0, y0: trimTop(f0) }; return { f, fx: feetX(f) }; });
+  // per-frame kotvenie podľa NAJNIŽŠIEHO pixelu framu (f.y1): neorezáva výpady/melee a funguje aj pre viac-bandové
+  // sheety (IntroStand/Transform sú z bandov na rôznych y v zdroji — spoločná max-baseline by ich odhodila mimo rám)
   const N = items.length, strip = new PNG({ width: S * N, height: S }); strip.data.fill(0);
-  items.forEach((o, k) => { const { f, fx, fy } = o, dx0 = k*S + Math.round(CX-(fx-f.x0)), dy0 = (S-1)-(fy-f.y0);
+  items.forEach((o, k) => { const { f, fx } = o, dx0 = k*S + Math.round(CX-(fx-f.x0)), dy0 = (S-1)-(f.y1-f.y0);
     for (let yy=f.y0; yy<=f.y1; yy++) for (let xx=f.x0; xx<=f.x1; xx++) { if (isBg(xx,yy)) continue; const si=(yy*SW+xx)*4, dx=dx0+(xx-f.x0), dy=dy0+(yy-f.y0); if (dx<0||dy<0||dx>=strip.width||dy>=S) continue; const di=(dy*strip.width+dx)*4; strip.data[di]=SD[si];strip.data[di+1]=SD[si+1];strip.data[di+2]=SD[si+2];strip.data[di+3]=SD[si+3]||255; } });
   fs.writeFileSync(path.join(OUT1, file), PNG.sync.write(strip));
   console.log(file, N + "f", strip.width + "x" + S);

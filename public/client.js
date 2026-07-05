@@ -32,6 +32,9 @@ const hudP2Hp   = document.getElementById("p2-hp");
 const hudP2Mana = document.getElementById("p2-mana");
 const hudCharP1 = document.getElementById("hud-char-p1");
 const hudCharP2 = document.getElementById("hud-char-p2");
+// Escanor pride indikátor (ikona+číslo) + rozsah abilitky (minimapka) v HUD widgete
+const prideBadge = { p1: document.getElementById("pride-p1"), p2: document.getElementById("pride-p2") };
+const prideRange = { p1: document.getElementById("prange-p1"), p2: document.getElementById("prange-p2") };
 const flagP1    = document.getElementById("flag-p1");
 const flagP2    = document.getElementById("flag-p2");
 const logP1     = document.getElementById("log-p1");
@@ -731,6 +734,19 @@ function runEscanorSpecial(slot, dir, zoneCells) {
   });
 }
 let escSpecialFired = false; // celá choreografia sa spustí len raz za special (nie na každom beate)
+
+// Escanor: po kole sa zmenil pride → krátky float nad ním. up=true → zelený lev + ▲ (rástol), inak červený + ▼.
+function spawnPrideFloat(slot, up) {
+  const p = state?.[slot]; if (!p || p.x == null) return;
+  const { left, top } = cellToPx(p.x, p.y);
+  const el = document.createElement("div");
+  el.className = "pride-float " + (up ? "up" : "down");
+  el.innerHTML = `<span class="pf-lion"></span><span class="pf-arrow">${up ? "▲" : "▼"}</span>`; // solídny lev + šípka vedľa
+  el.style.left = (left + TILE_W / 2) + "px";
+  el.style.top = (top - 24) + "px";
+  actorsEl.appendChild(el);
+  setTimeout(() => el.remove(), 1700);
+}
 
 /* ---------- bubliny -X HP / +Y MANA ---------- */
 function cellToPx(x, y) { return { left: x * (TILE_W + GAP), top: y * (TILE_H + GAP) }; }
@@ -1679,7 +1695,35 @@ function renderHUD() {
   actorP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   hudCharP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
+  renderPrideHud("p1"); renderPrideHud("p2");
   updateGoldenButton();
+}
+
+// Escanor: pride level (ikona+číslo) vľavo, rozsah abilitky pri aktuálnom pride (minimapka) vpravo v HUD widgete.
+// Smer zóny = kam Escanor pozerá (na súpera). Pri inej postave sa oba prvky skryjú.
+function renderPrideHud(slot) {
+  const p = state?.[slot];
+  const badge = prideBadge[slot], range = prideRange[slot];
+  if (!badge || !range) return;
+  if (!p || p.char !== "escanor") { badge.classList.add("hidden"); range.classList.add("hidden"); return; }
+  const pride = Math.max(0, Math.min(3, p.pride || 0));
+  const numEl = badge.querySelector(".pride-num");
+  if (numEl) numEl.textContent = pride;
+  badge.classList.remove("hidden");
+  // rozsah zóny na minimapke (aktuálna pozícia + pride + smer k súperovi)
+  if (p.x == null) { range.classList.add("hidden"); return; } // labyrint: skrytá pozícia
+  const facing = computeFacing(state?.p1, state?.p2)[slot] || 1;
+  const dir = facing < 0 ? "left" : "right";
+  const hit = new Set(cellsForSpecialPreview({ x: p.x, y: p.y, char: "escanor", pride }, dir).map(([x, y]) => `${x},${y}`));
+  range.style.gridTemplateColumns = `repeat(${board.w}, auto)`;
+  range.innerHTML = "";
+  for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) {
+    const c = document.createElement("div"); c.className = "pr-cell";
+    if (hit.has(`${x},${y}`)) c.classList.add("hit");          // range (aj na políčku hráča)
+    if (x === p.x && y === p.y) c.classList.add("caster");     // pozícia hráča = červená bodka (navrch range)
+    range.appendChild(c);
+  }
+  range.classList.remove("hidden");
 }
 
 /* ---------- záznam akcií kola pod widgetom ---------- */
@@ -2103,7 +2147,13 @@ function computeFacing(p1, p2) {
 // Escanor: veľkosť rastie o 20 % za pride level; škáluje sa od nôh. FEET_FRAC = kde nohy sedia v ACTOR canvase
 // (feet-anchor spritov ~0.97 výšky) — origin škálovania, aby postava ostala na zemi a nedvíhala sa medzera pod ňou.
 const ESC_FEET_FRAC = 0.973;
-const escPrideMul = a => a?.char === "escanor" ? Math.pow(1.2, Math.max(0, Math.min(3, a.pride || 0))) : 1;
+// escPrideDisplay: dočasné podržanie STAREJ veľkosti po kole — lev sa ukáže PRED zmenou, potom sa aplikuje nové pride
+let escPrideDisplay = { p1: null, p2: null };
+const escPrideMul = a => {
+  if (a?.char !== "escanor") return 1;
+  const pr = (a.slot && escPrideDisplay[a.slot] != null) ? escPrideDisplay[a.slot] : (a.pride || 0);
+  return Math.pow(1.2, Math.max(0, Math.min(3, pr)));
+};
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
 // vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
@@ -2602,9 +2652,15 @@ function schedulePlayTimeline(timeline) {
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
   clearProjectiles(); // žiadne staré projektily nesmú prejsť do nového kola
   escSpecialFired = false; // Escanor: choreografia specialu sa spustí max raz za kolo
+  escPrideDisplay = { p1: null, p2: null }; // zruš prípadné podržanie starej veľkosti z minulého kola
   actorsEl.querySelectorAll(".sun-fx, .esc-big").forEach(n => n.remove());
 
   const first = timeline[0];
+  // Escanor: pride pred kolom (na konci prehrávania porovnáme s novým → float zelený ▲ / červený ▼)
+  const prePride = { p1: first.p1?.pride ?? 0, p2: first.p2?.pride ?? 0 };
+  // drž veľkosť podľa pride NA ZAČIATKU kola cez celé kolo (nová veľkosť sa aplikuje až po kole, keď sa ukáže lev) —
+  // inak by posledný frame (s novým pride) zmenil veľkosť ešte pred levom
+  for (const slot of ["p1", "p2"]) if (first[slot]?.char === "escanor") escPrideDisplay[slot] = prePride[slot];
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
   const playStarter = first.starter ?? state?.starter ?? "p1";
   const beatCounts = { p1: 0, p2: 0 };
@@ -2639,6 +2695,20 @@ function schedulePlayTimeline(timeline) {
 
     if (i >= timeline.length) {
       playing = false;
+
+      // Escanor: pride sa po kole zmenil → veľkosť je stále držaná na starej (od začiatku kola); ukáž leva nad ním
+      // a AŽ POTOM (po pauze) pusti na novú veľkosť (plynulý prechod). Bez zmeny → hneď pusti hold.
+      for (const slot of ["p1", "p2"]) {
+        if (state?.[slot]?.char !== "escanor") continue;
+        const nowP = state[slot].pride ?? 0;
+        if (nowP !== prePride[slot]) {
+          spawnPrideFloat(slot, nowP > prePride[slot]); // lev sa ukáže NAD ním, veľkosť ešte stará
+          const sl = slot;
+          setTimeout(() => { escPrideDisplay[sl] = null; positionActors(state); }, 650); // potom plynulé zväčšenie/zmenšenie
+        } else {
+          escPrideDisplay[slot] = null; // bez zmeny pride — pusti hold
+        }
+      }
 
       // koniec hry: ak séria pokračuje -> medzihra; ak je rozhodnutá -> game over
       const winner = serverWinner || serverGameResult?.gameWinner || computeWinnerFromState(state);
@@ -3683,7 +3753,8 @@ function applyPhaseUI(s) {
   if (needChar || needTeam) {
     updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom); v drafte null → bez statov
     selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
-    if (selEl.classList.contains("hidden")) { teamPick = []; setCharPage(1); } // nové otvorenie — od stránky Mages (str. 1), čistý draft
+    if (selEl.classList.contains("hidden")) { teamPick = []; charPage = 1; } // nové otvorenie — od stránky Mages (str. 1), čistý draft
+    setCharPage(charPage); // vždy zosynchronizuj stránku/šípky/nadpis — aj po Ctrl+F5 priamo do char-selectu (inak chýba ľavá šípka)
     if (needTeam) syncTeamUi();
     else selEl.querySelectorAll(".char-card.picked").forEach(c => { c.classList.remove("picked"); c.querySelector(".pick-badge")?.remove(); });
     hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber
@@ -4056,7 +4127,12 @@ socket.on("state", (s) => {
   // pri najbližšom rozohraní kola prehrá WeakIdle→Transform→Stand znova (nie mid-hra, char sa medzi kolami nemení)
   for (const slot of ["p1", "p2"]) {
     const c = s?.[slot]?.char || null;
-    if (c === "escanor" && escPrevChar[slot] !== "escanor") escTransformed[slot] = false;
+    if (c === "escanor" && escPrevChar[slot] !== "escanor") {
+      // escPrevChar === null = čerstvo načítaná stránka (Ctrl+F5). Uprostred hry (turn>1) je Escanor už premenený →
+      // ukáž silnú formu (Stand, škálovaný podľa pride), NIE weak. Inak (nová hra / turnajový swap) premena bude.
+      const fromReload = escPrevChar[slot] === null;
+      escTransformed[slot] = fromReload && (s.turn || 1) > 1;
+    }
     escPrevChar[slot] = c;
   }
   // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
