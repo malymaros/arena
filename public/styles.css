@@ -1224,7 +1224,14 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   /* vertikálne vycentrované na stred Escanorovho tela (~68px od vrchu widgetu), väčší margin od okraja */
   .pride-badge{ position: absolute; left: 16px; top: 52px; z-index: 4; display: flex; flex-direction: row; align-items: center; gap: 3px; pointer-events: none; }
   .pride-badge.hidden, .pride-range.hidden{ display: none; }
+  /* Lev = indikátor pride: 4 framy (pride_lion_0..3.png, orezané z „pride lions.png") — biely → zlatý odspodku, JS mení src.
+     Pride 3 (celý zlatý) navyše pulzuje = signál, že je to max. */
   .pride-badge img{ height: 42px; width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)); } /* pomer strán zachovaný */
+  .pride-badge.pride-max img{ animation: pride-max-pulse 1s ease-in-out infinite; }
+  @keyframes pride-max-pulse{
+    0%,100%{ filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)) drop-shadow(0 0 2px rgba(255,210,74,.5)); }
+    50%    { filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)) drop-shadow(0 0 8px rgba(255,210,74,1)); }
+  }
   .pride-badge .pride-num{ font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 18px; color: #ffd24a;
     text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
   .pride-range{ position: absolute; right: 40px; top: 58px; z-index: 4; display: grid; gap: 2px; pointer-events: none;

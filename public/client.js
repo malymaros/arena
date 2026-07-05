@@ -625,7 +625,9 @@ function updateSpecialCenter(casts) {
     const file   = sp.file || SPECIAL_ANIMS[caster.char].file;
 
     const cvs = document.createElement("canvas");
-    const px  = Math.round(TILE_H * SPECIAL_SCALE);
+    // Escanorovo melee sem chodí (jeho special je odfiltrovaný a rieši ho spawnBigOnce) → stredová postava škáluje s Pridom
+    const fx = caster.char === "escanor" ? escFxMul(sp.from) : 1;
+    const px  = Math.round(TILE_H * SPECIAL_SCALE * fx);
     cvs.width = px; cvs.height = px;
     cvs.className = "special-center";
     if (usesAltColor(caster.char, sp.from)) cvs.classList.add("alt-color");
@@ -656,7 +658,7 @@ function spawnSunFxAt(cell, slot, zoneCells) {
   if (!Array.isArray(cell)) return;
   const dir = charDirFor("escanor", slot);
   const { left, top } = cellToPx(cell[0], cell[1]);
-  const size = Math.round(TILE_H * 1.8);
+  const size = Math.round(TILE_H * 1.8 * escFxMul(slot)); // škáluje s Pridom (pride3 = súčasná veľkosť)
   const el = document.createElement("canvas");
   el.width = size; el.height = size; el.className = "sun-fx";
   Object.assign(el.style, { position: "absolute", left: (left + TILE_W/2 - size/2) + "px", top: (top + TILE_H/2 - size/2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
@@ -679,7 +681,7 @@ function spawnSunFxAt(cell, slot, zoneCells) {
 // veľký stredový sprite (WinSun) sa prehrá RAZ a chvíľu visí, potom onDone
 function spawnBigOnce(file, slot, onDone) {
   const dir = charDirFor("escanor", slot);
-  const px = Math.round(TILE_H * SPECIAL_SCALE);
+  const px = Math.round(TILE_H * SPECIAL_SCALE * escFxMul(slot)); // WinSun škáluje s Pridom (pride3 = súčasná veľkosť)
   const cvs = document.createElement("canvas");
   cvs.width = px; cvs.height = px; cvs.className = "esc-big"; // VLASTNÁ trieda — NIE .special-center (updateSpecialCenter ju maže každý frame)
   if (usesAltColor("escanor", slot)) cvs.classList.add("alt-color");
@@ -704,7 +706,7 @@ function travelSunThenBurst(slot, target, zoneCells) {
   const c = state?.[slot]; if (!c) { spawnSunFxAt(target, slot, zoneCells); return; }
   const dir = charDirFor("escanor", slot);
   const s = cellToPx(c.x, c.y), e = cellToPx(target[0], target[1]);
-  const size = Math.round(TILE_H * 1.25);
+  const size = Math.round(TILE_H * 1.25 * escFxMul(slot)); // letiace slnko škáluje s Pridom (pride3 = súčasná veľkosť)
   const sx = s.left + TILE_W / 2 - size / 2, sy = s.top - size * 0.55; // nad hlavou = kde postava drží slnko
   const ex = e.left + TILE_W / 2 - size / 2, ey = e.top + TILE_H / 2 - size / 2;
   const el = document.createElement("canvas"); el.width = size; el.height = size; el.className = "sun-fx";
@@ -1025,7 +1027,9 @@ function spawnOrMoveProjectile(c, s) {
   const dst = projCenter(c.cell[0], c.cell[1]);
   if (!entry) {
     const el = document.createElement("canvas");
-    const px = Math.round(TILE_H * CHARGE_SCALE);
+    // Escanorova základná strela (slnko) ostáva relatívne malá: autorská veľkosť = pride3 (strop), nižšie menšia; ostatné postavy bez zmeny
+    const fx = charKey === "escanor" ? escChargeMul(c.from) : 1;
+    const px = Math.round(TILE_H * CHARGE_SCALE * fx);
     el.width = px; el.height = px;
     el.className = "projectile";
     if (usesAltColor(charKey, c.from)) el.classList.add("alt-color"); // p2 paleta (Medúza/Naruto natívne)
@@ -1709,6 +1713,10 @@ function renderPrideHud(slot) {
   const pride = Math.max(0, Math.min(3, p.pride || 0));
   const numEl = badge.querySelector(".pride-num");
   if (numEl) numEl.textContent = pride;
+  // lev = indikátor levelu: swap framu (0=biely … 3=celý zlatý); pri 3 pulzuje (max)
+  const imgEl = badge.querySelector("img");
+  if (imgEl && !imgEl.getAttribute("src").endsWith("_" + pride + ".png")) imgEl.src = "/assets/pride_lion_" + pride + ".png";
+  badge.classList.toggle("pride-max", pride >= 3);
   badge.classList.remove("hidden");
   // rozsah zóny na minimapke (aktuálna pozícia + pride + smer k súperovi)
   if (p.x == null) { range.classList.add("hidden"); return; } // labyrint: skrytá pozícia
@@ -2154,6 +2162,16 @@ const escPrideMul = a => {
   const pr = (a.slot && escPrideDisplay[a.slot] != null) ? escPrideDisplay[a.slot] : (a.pride || 0);
   return Math.pow(1.2, Math.max(0, Math.min(3, pr)));
 };
+// Escanorove FX (WinSun, melee center, letiace slnko, výbuch, charge strela) škálujú s Pridom rovnako ako telo:
+// pride0 = súčasná (autorská) veľkosť ako u ostatných post­áv, rast NAD ňu (1.2^pride, pride3 ≈ 1.73×) — nikdy menšie.
+// Číta ten istý zdroj Pride ako telo (escPrideDisplay počas prehrávania kola, inak state[slot].pride).
+function escFxMul(slot) {
+  const pr = (escPrideDisplay[slot] != null) ? escPrideDisplay[slot] : (state?.[slot]?.pride || 0);
+  return Math.pow(1.2, Math.max(0, Math.min(3, pr)));
+}
+// Charge (základná strela) je výnimka: má ostať relatívne malá → autorská veľkosť = PRIDE 3 (strop),
+// pri nižšom Pride ešte menšia (pride0 ≈ 0.58×). Preto exponent posunutý o -3 oproti escFxMul.
+function escChargeMul(slot) { return escFxMul(slot) * Math.pow(1.2, -3); }
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
 // vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
