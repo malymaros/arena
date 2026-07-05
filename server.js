@@ -482,8 +482,11 @@ function escanorCells(me, dir) {
   const out = [];
   const add = (x, y) => { if (inb(x, y) && !out.some(c => c[0] === x && c[1] === y)) out.push([x, y]); };
   const pride = Math.max(0, Math.min(3, me.pride || 0));
-  if (pride >= 3) { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) add(x, y); return out; }
   const fx = me.x + (dir === "left" ? -1 : 1), fy = me.y;
+  // kotva F mimo dosky = slnko hodené DO AUTU — žiadna zóna, ANI pri pride 3 (celý hod letí von z plochy);
+  // doSpecial z prázdnej zóny robí offboard whiff (mana preč, OUT OF BOUNDS, neprečiarkuje sa — ako útok do steny)
+  if (fx < 0 || fx >= W) return out;
+  if (pride >= 3) { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) add(x, y); return out; }
   add(fx, fy);                                                        // pride 0
   if (pride === 1) { add(fx - 1, fy - 1); add(fx + 1, fy - 1); add(fx - 1, fy + 1); add(fx + 1, fy + 1); }
   if (pride === 2) for (let yy = fy - 1; yy <= fy + 1; yy++) for (let xx = fx - 1; xx <= fx + 1; xx++) add(xx, yy);
@@ -1263,6 +1266,13 @@ function doSpecial(slot, tl, dir = null) {
     if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
     const cells = escanorCells(actor, dir);
+    // hod slnka MIMO plochy (kotva F von z dosky → prázdna zóna, aj pri pride 3): akcia sa VYKONÁ ako útok
+    // do steny — mana je preč, choreografia prebehne (slnko odletí do autu), klient ukáže OUT OF BOUNDS,
+    // akcia sa NEprečiarkuje; žiadny dmg ani zásah klona
+    if (!cells.length) {
+      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells, offboard: true }], ESC_SPECIAL_MS);
+      return;
+    }
     const foeS = other(slot);
     const foe  = game.players[foeS];
     const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));

@@ -727,16 +727,17 @@ function spawnBigOnce(file, slot, onDone) {
     requestAnimationFrame(step);
   }).catch(() => { cvs.remove(); onDone && onDone(); });
 }
-// slnko odletí Z DRŽANEJ POZÍCIE (nad postavou) do stredu cieľovej bunky, potom slow-mo SunBurst→SunFade
-function travelSunThenBurst(slot, target, zoneCells) {
-  const c = state?.[slot]; if (!c) { spawnSunFxAt(target, slot, zoneCells); return; }
+// slnko odletí Z DRŽANEJ POZÍCIE (nad postavou) do stredu cieľovej bunky, potom slow-mo SunBurst→SunFade;
+// offboard hod: cieľ je bunka MIMO plochy — slnko počas letu vyhasína, žiadny burst, nad casterom OUT OF BOUNDS
+function travelSunThenBurst(slot, target, zoneCells, offboard = false) {
+  const c = state?.[slot]; if (!c) { if (!offboard) spawnSunFxAt(target, slot, zoneCells); return; }
   const dir = charDirFor("escanor", slot);
   const s = cellToPx(c.x, c.y), e = cellToPx(target[0], target[1]);
   const size = Math.round(TILE_H * 1.25 * escFxMul(slot)); // letiace slnko škáluje s Pridom (pride3 = súčasná veľkosť)
   const sx = s.left + TILE_W / 2 - size / 2, sy = s.top - size * 0.55; // nad hlavou = kde postava drží slnko
   const ex = e.left + TILE_W / 2 - size / 2, ey = e.top + TILE_H / 2 - size / 2;
   const el = document.createElement("canvas"); el.width = size; el.height = size; el.className = "sun-fx";
-  Object.assign(el.style, { position: "absolute", left: sx + "px", top: sy + "px", zIndex: 7, pointerEvents: "none", imageRendering: "pixelated", transition: `left ${ESC_TRAVEL_MS}ms ease-in, top ${ESC_TRAVEL_MS}ms ease-in` });
+  Object.assign(el.style, { position: "absolute", left: sx + "px", top: sy + "px", zIndex: 7, pointerEvents: "none", imageRendering: "pixelated", transition: `left ${ESC_TRAVEL_MS}ms ease-in, top ${ESC_TRAVEL_MS}ms ease-in, opacity ${ESC_TRAVEL_MS}ms ease-in` });
   actorsEl.appendChild(el);
   const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
   let alive = true;
@@ -744,12 +745,18 @@ function travelSunThenBurst(slot, target, zoneCells) {
   requestAnimationFrame(spin);
   void el.offsetWidth; // commitni štartovú pozíciu, aby CSS transition animoval pohyb (inak skočí/preblikne bez pohybu)
   el.style.left = ex + "px"; el.style.top = ey + "px"; // sklz na cieľ
-  setTimeout(() => { alive = false; el.remove(); spawnSunFxAt(target, slot, zoneCells); }, ESC_TRAVEL_MS);
+  if (offboard) el.style.opacity = "0"; // let do autu = slnko cestou vyhasne
+  setTimeout(() => {
+    alive = false; el.remove();
+    if (offboard) { const [msg, cls] = INVALID_MSG.offboard; spawnFloat(slot, msg, cls); }
+    else spawnSunFxAt(target, slot, zoneCells);
+  }, ESC_TRAVEL_MS);
 }
-function runEscanorSpecial(slot, dir, zoneCells) {
+function runEscanorSpecial(slot, dir, zoneCells, offboard = false) {
   const c = state?.[slot]; if (!c) return;
   const dx = dir === "left" ? -1 : 1;
-  const target = [Math.max(0, Math.min(board.w - 1, c.x + dx)), c.y];
+  // offboard: cieľ NEclampovať — slnko letí na bunku za okrajom (do autu); inak clamp na plochu
+  const target = offboard ? [c.x + dx, c.y] : [Math.max(0, Math.min(board.w - 1, c.x + dx)), c.y];
   // fáza 1: malá postava WinSunBoard (zdvih so slnkom RAZ, potom len ústa + preblikávajúce slnko — loopFrom 4)
   // + veľký WinSun raz (visí dlhšie)
   setAnim(slot, "winsun", 60000);
@@ -758,7 +765,7 @@ function runEscanorSpecial(slot, dir, zoneCells) {
     setAnim(slot, "cruelhold", CRUELHOLD_ONCE_MS);
     setTimeout(() => {
       setAnim(slot, "wintalk", ESC_TRAVEL_MS + 2000); // ústa bez slnka (žiadny nový zdvih) — slnko už letí samo
-      travelSunThenBurst(slot, target, zoneCells);
+      travelSunThenBurst(slot, target, zoneCells, offboard);
     }, CRUELHOLD_ONCE_MS);
   });
 }
@@ -2051,9 +2058,11 @@ function cellsForSpecialPreview(meState, dir){
     // smerový (left/right) — rozsah podľa pride levelu; zrkadlí escanorCells na serveri
     const pride = Math.max(0, Math.min(3, meState.pride ?? 0));
     const add = (cx,cy) => { if (cx>=0 && cy>=0 && cx<board.w && cy<board.h && !cells.some(c=>c[0]===cx&&c[1]===cy)) cells.push([cx,cy]); };
+    const fx = x + (dir === "left" ? -1 : 1), fy = y;
+    // kotva F mimo plochy = slnko letí do autu — nič nezvýrazni, ANI pri pride 3 (ako basic mimo plochy)
+    if (fx < 0 || fx >= board.w) return cells;
     if (pride >= 3){ for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) add(cx,cy); }
     else {
-      const fx = x + (dir === "left" ? -1 : 1), fy = y;
       add(fx, fy);
       if (pride === 1){ add(fx-1,fy-1); add(fx+1,fy-1); add(fx-1,fy+1); add(fx+1,fy+1); }
       if (pride === 2) for (let yy=fy-1; yy<=fy+1; yy++) for (let xx=fx-1; xx<=fx+1; xx++) add(xx,yy);
@@ -2845,7 +2854,8 @@ function schedulePlayTimeline(timeline) {
       // (políčko pred Escanorom v zvolenom smere) sa prehrá SunBurst→SunFade. Spustí sa RAZ za special.
       if (e.kind === "special" && !escSpecialFired && state?.[e.from]?.char === "escanor") {
         escSpecialFired = true;
-        runEscanorSpecial(e.from, e.dir, e.cells); // WinSun (raz) → CruelSunHold → slnko na cieľ → SunBurst (blik políčok) → dmg → SunFade
+        // offboard = hod do autu: slnko odletí von z plochy a vyhasne (bez burstu), OUT OF BOUNDS float
+        runEscanorSpecial(e.from, e.dir, e.cells, !!e.offboard); // WinSun (raz) → CruelSunHold → slnko na cieľ → SunBurst (blik políčok) → dmg → SunFade
       }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
