@@ -27,6 +27,8 @@ function writeSquare(file, N, W, H, cb) {
 const blit = (strip, f, dx0, dy0, k, W, H) => { for (let yy=f.y0; yy<=f.y1; yy++) for (let xx=f.x0; xx<=f.x1; xx++){ if(isBg(xx,yy))continue; const si=(yy*SW+xx)*4, dx=dx0+(xx-f.x0), dy=dy0+(yy-f.y0); if(dx<0||dy<0||dx>=W||dy>=H)continue; const di=(dy*strip.width+k*W+dx)*4; strip.data[di]=SD[si];strip.data[di+1]=SD[si+1];strip.data[di+2]=SD[si+2];strip.data[di+3]=255; } };
 const blitSun = (strip, f, cx, bottomY, sc, k, W, H) => { const sw=f.x1-f.x0+1, sh=f.y1-f.y0+1, dw=Math.round(sw*sc), dh=Math.round(sh*sc), dx0=Math.round(cx-dw/2), dy0=bottomY-dh; for(let dyy=0;dyy<dh;dyy++)for(let dxx=0;dxx<dw;dxx++){ const sx=f.x0+Math.min(sw-1,Math.floor(dxx/sc)), sy=f.y0+Math.min(sh-1,Math.floor(dyy/sc)); if(isBg(sx,sy))continue; const si=(sy*SW+sx)*4, dx=dx0+dxx, dy=dy0+dyy; if(dx<0||dy<0||dx>=W||dy>=H)continue; const di=(dy*strip.width+k*W+dx)*4; strip.data[di]=SD[si];strip.data[di+1]=SD[si+1];strip.data[di+2]=SD[si+2];strip.data[di+3]=255; } };
 const blitCenter = (strip, f, k, W, H) => { const w=f.x1-f.x0+1, h=f.y1-f.y0+1, dx0=Math.round((W-w)/2), dy0=Math.round((H-h)/2); blit(strip, f, dx0, dy0, k, W, H); };
+// ako blitSun, ale s explicitným ľavým horným rohom (dx0/dy0) — na škálovanie postavy s feet/feetX kotvou
+const blitScaled = (strip, f, dx0, dy0, sc, k, W, H) => { const sw=f.x1-f.x0+1, sh=f.y1-f.y0+1, dw=Math.round(sw*sc), dh=Math.round(sh*sc); for(let dyy=0;dyy<dh;dyy++)for(let dxx=0;dxx<dw;dxx++){ const sx=f.x0+Math.min(sw-1,Math.floor(dxx/sc)), sy=f.y0+Math.min(sh-1,Math.floor(dyy/sc)); if(isBg(sx,sy))continue; const si=(sy*SW+sx)*4, dx=dx0+dxx, dy=dy0+dyy; if(dx<0||dy<0||dx>=W||dy>=H)continue; const di=(dy*strip.width+k*W+dx)*4; strip.data[di]=SD[si];strip.data[di+1]=SD[si+1];strip.data[di+2]=SD[si+2];strip.data[di+3]=255; } };
 
 // --- WinSun: veľký cast sprite (Escanor drží rastúce slnko) ---
 {
@@ -45,8 +47,15 @@ const blitCenter = (strip, f, k, W, H) => { const w=f.x1-f.x0+1, h=f.y1-f.y0+1, 
     ...[0,1,2,3].map(k=>({f:B36.frames[k],baseY:B36.y1}))];
   const bigSuns=[B46.frames[3],B46.frames[4],B46.frames[5],B46.frames[6]];
   const CW=260, CH=330, BASE=322, CX=CW/2, OFF=-25, SC=1.3;
-  writeSquare("CruelSunHold.png", base.length, CW, CH, (strip,k,W,H) => { const {f,baseY}=base[k], fx=feetX(f), escTop=BASE-(baseY-f.y0);
-    blit(strip, f, Math.round(CX-(fx-f.x0)), BASE-(baseY-f.y0), k, W, H); blitSun(strip, bigSuns[k%bigSuns.length], CX, escTop+OFF, SC, k, W, H); });
+  // K: postava blitovaná 1:1 by v 330px frame vyšla v hre ~0.68× oproti 226px herným sheetom (engine škáluje
+  // celý štvorcový frame do rovnakého boxu) — zväčšením o 330/226 má v hre rovnakú veľkosť ako Idle/Win.
+  // Slnko ostáva v pôvodnej mierke (jeho hernú veľkosť 330px frame nemení); jeho spodok sa len kotví na nový
+  // (vyšší) vrch postavy a clampuje, aby sa vrch slnka neorezal o okraj framu.
+  const K = 330/226;
+  writeSquare("CruelSunHold.png", base.length, CW, CH, (strip,k,W,H) => { const {f,baseY}=base[k], fx=feetX(f), escTop=BASE-Math.round((baseY-f.y0)*K);
+    blitScaled(strip, f, Math.round(CX-(fx-f.x0)*K), escTop, K, k, W, H);
+    const s=bigSuns[k%bigSuns.length], sunH=Math.round((s.y1-s.y0+1)*SC);
+    blitSun(strip, s, CX, Math.max(escTop+OFF, sunH+2), SC, k, W, H); });
 }
 // --- SunBurst / SunFade: výbuch a dohasnutie na cieľovej bunke (centrované) ---
 {
