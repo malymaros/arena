@@ -563,7 +563,7 @@ const HEAD_CROP = {
   medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
   minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51, cyP2: 0.43 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2/cyP2 = korekcia na posunutú figúru v Minotaur_2
   naruto:    { cx: 0.50, cy: 0.58, size: 0.26 }, // bojový postoj (Stance) — figúra centrovaná, bottom-anchor
-  escanor:   { cx: 0.535, cy: 0.755, size: 0.11 }, // hlava zo slabej formy (WeakIdle) — figúra je DROBNÁ (~22×63 px pri spodku 226px framu), preto malý výrez nízko; cx vpravo od stredu figúry = hlava v okienku sedí viac vľavo
+  escanor:   { cx: 0.52, cy: 0.755, size: 0.11 }, // hlava zo slabej formy (WeakIdle) — figúra je DROBNÁ (~22×63 px pri spodku 226px framu), preto malý výrez nízko; cx mierne vpravo od stredu figúry = hlava v okienku mierne vľavo
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
