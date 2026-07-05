@@ -610,6 +610,18 @@ function currentAnim(slot) {
 }
 
 /* ---------- specials/melee v strede boardu ---------- */
+// Escanorove stredové overlaye (special WinSun aj melee postava) rastú s Pridom — ukotvené za NOHY:
+// drawSprite kreslí frame na 95 % canvasu centrovane, takže nohy sedia ~0.95 výšky canvasu. Nohy držíme
+// na mieste, kde by boli pri pride0 (centrovaný basePx canvas), rast ide len nahor a do šírky.
+// top = pevný bod nôh (nezávislý od px), translateY(-95 %) je relatívny k výške elementu → nohy vždy na top.
+// Pri pride0 (px == basePx) je výsledok identický s pôvodným centrovaním translate(-50%,-50%).
+const ESC_CENTER_FEET = 0.95;
+function escCenterAnchor(el, flip) {
+  const basePx = Math.round(TILE_H * SPECIAL_SCALE);
+  el.style.left = "50%";
+  el.style.top  = `calc(50% + ${Math.round(basePx * (ESC_CENTER_FEET - 0.5))}px)`;
+  el.style.transform = `translate(-50%, -${ESC_CENTER_FEET * 100}%) scaleX(${flip})`;
+}
 // veľký centrálny overlay — pre special efektový sprite mága, pre melee zväčšená postava so sekaním
 function updateSpecialCenter(casts) {
   actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
@@ -636,9 +648,13 @@ function updateSpecialCenter(casts) {
     if (sp.fps) cvs.dataset.fps = sp.fps;
 
     const flip = currentFacing(sp.from, facing);
-    cvs.style.left = "50%";
-    cvs.style.top  = "50%";
-    cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
+    if (caster.char === "escanor") {
+      escCenterAnchor(cvs, flip); // rastie s Pridom → nohy fixné, rast nahor
+    } else {
+      cvs.style.left = "50%";
+      cvs.style.top  = "50%";
+      cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
+    }
 
     actorsEl.appendChild(cvs);
   }
@@ -686,7 +702,8 @@ function spawnBigOnce(file, slot, onDone) {
   cvs.width = px; cvs.height = px; cvs.className = "esc-big"; // VLASTNÁ trieda — NIE .special-center (updateSpecialCenter ju maže každý frame)
   if (usesAltColor("escanor", slot)) cvs.classList.add("alt-color");
   const flip = computeFacing(state?.p1, state?.p2)[slot] || 1;
-  Object.assign(cvs.style, { position: "absolute", left: "50%", top: "50%", transform: `translate(-50%,-50%) scaleX(${flip})`, zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
+  Object.assign(cvs.style, { position: "absolute", zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
+  escCenterAnchor(cvs, flip); // rastie s Pridom → nohy fixné, rast nahor
   actorsEl.appendChild(cvs);
   const ctx = cvs.getContext("2d"); ctx.imageSmoothingEnabled = false;
   ensureSpriteMeta(dir, file).then(meta => {
