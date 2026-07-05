@@ -677,8 +677,8 @@ function doMove(slot, dir, tl) {
   // klon (Naruto) sa hýbe vertikálne inverzne s vlastným clampom
   const hasClone = !!a.clone;
   const cloneCan = hasClone && cloneMovableSteps(a, delta, 1) > 0;
-  // akcia je neplatná len ak sa nepohne ani jeden; inak sa vykoná a tá druhá figúra narazí do steny (OUT OF BOUNDS)
-  if (!ownCan && !cloneCan) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
+  // NOVÉ PRAVIDLO: pohyb do steny sa už neprečiarkne — akcia sa „vykoná" ako náraz do steny
+  // (žiadny pohyb, ale slot je spotrebovaný). Ak sa aspoň jedna figúra pohne, druhá narazí (OUT OF BOUNDS).
   const fx = [];
   if (ownCan) {
     a.x = nx; a.y = ny;
@@ -699,7 +699,7 @@ function doDash(slot, dir, tl) {
   if (!delta) { pushInvalid(tl, slot); return; }
   if (a.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
 
-  // posun až o 2 políčka zvoleným smerom; na okraji sa skráti na 1, bez možného pohybu je neplatný
+  // posun až o 2 políčka zvoleným smerom; na okraji sa skráti na 1 (bez možného pohybu = náraz do steny nižšie)
   let nx = a.x, ny = a.y, steps = 0;
   const path = []; // aj medzibunka — labyrintná niť/obrys sa počíta na každom prejdenom políčku
   for (let s = 0; s < 2; s++) {
@@ -708,9 +708,10 @@ function doDash(slot, dir, tl) {
   // klon dashuje vertikálne inverzne s vlastným clampom — dash prebehne aj keď Naruto naráža do steny
   const hasClone = !!a.clone;
   const cloneSteps = hasClone ? cloneMovableSteps(a, delta, 2) : 0;
-  if (!steps && !cloneSteps) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
 
-  a.mana -= DASH_COST; // dash sa vykonal (aspoň jedna figúra sa pohla) → mana sa minie
+  // NOVÉ PRAVIDLO: dash do steny sa už neprečiarkne — máš naň manu (overené vyššie), tak sa minie
+  // a akcia sa „vykoná" ako náraz do steny (žiadny pohyb). Pasívne skreč many cez dash do steny padá.
+  a.mana -= DASH_COST;
   const fx = [];
   if (steps) {
     a.x = nx; a.y = ny;
@@ -756,9 +757,10 @@ function doBasic(slot, dir, tl) {
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
   if (!delta) { pushInvalid(tl, slot); return; }
   if (me.mana < BASIC_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
-  // strela nemá kam letieť (hráč na okraji mieri von z plochy, žiadne políčko nezasahuje) -> neplatný ťah, mana sa neminie
-  if (!inBounds(me.x + delta[0], me.y + delta[1])) { pushInvalid(tl, slot, SMALL_DELAY_MS, "offboard"); return; }
+  // NOVÉ PRAVIDLO: útok do steny sa už neprečiarkne — máš naň manu, tak sa minie a strela sa „vypustí"
+  // (hneď zhasne na okraji). Klonova strela (vertikálne zrkadlená) môže pritom letieť ďalej.
   me.mana -= BASIC_COST;
+  let anyCharge = false; // aspoň jedna strela vôbec vzlietla (dostala in-board bunku) → netreba whiff
 
   // strely: majiteľ + prípadný klon. Klon zrkadlí smer VERTIKÁLNE (up<->down), horizontálne rovnako
   // (rovnako ako pohyb); klonova strela dáva ROVNAKÝ dmg ako Naruto (falloff + rovnaké buffy). Každá
@@ -800,7 +802,7 @@ function doBasic(slot, dir, tl) {
       else if (cloneHere)         { hits.push({ target: "clone", shot: s }); }
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
     }
-    if (fx.length) pushStateFrame(tl, fx, CHARGE_STEP_MS);
+    if (fx.length) { anyCharge = true; pushStateFrame(tl, fx, CHARGE_STEP_MS); }
     // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
     // (h.shot.dist sa počíta z klonovej bunky) × rovnaké násobiče (Last Stand ×2 / Last Hope ×4, maze ×2).
     const rawOf = (h) => Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
@@ -835,6 +837,9 @@ function doBasic(slot, dir, tl) {
     }
     if (winnerNow()) break; // prvá smrť končí hru — zvyšok letu sa už nehrá
   }
+  // žiadna strela nevzlietla (Naruto aj klon mieria von z plochy) — zahraj útočný švih naprázdno
+  // + whiff float, nech akcia nie je „tichá" a čitateľne minula manu (namiesto starého prečiarknutia)
+  if (!anyCharge) pushStateFrame(tl, [{ kind: "attack_swing", from: slot, dir, offboard: true }], SMALL_DELAY_MS);
 }
 
 function doMelee(slot, tl) {
@@ -1207,9 +1212,17 @@ function doSpecial(slot, tl, dir = null) {
   if (actor.char === "naruto") {
     const foeS = other(slot);
     const foe  = game.players[foeS];
-    if (foe && foe.x === actor.x && foe.y === actor.y) { pushInvalid(tl, slot, SMALL_DELAY_MS, "not_alone"); return; }
+    // summon vyžaduje bunku bez súpera — súper stojaci na Narutovej bunke je JEDINÝ spôsob, ako special
+    // zablokovať. NOVÉ PRAVIDLO: máš naň manu → minie sa aj tak. Starý klon zaniká VŽDY (recast aj blok)
+    // ešte PRED animáciou pečatí — Naruto sa naň nakoncentruje bez ohľadu na to, či nový vznikne.
     actor.mana -= SPECIAL_COST;
     killClone(slot, tl);
+    if (foe && foe.x === actor.x && foe.y === actor.y) {
+      for (let r = 0; r < SPECIAL_REPEAT; r++)
+        pushStateFrame(tl, [{ kind: "special", from: slot, cells: [[actor.x, actor.y]] }], SPECIAL_BEAT_MS);
+      pushInvalid(tl, slot, SMALL_DELAY_MS, "not_alone");
+      return;
+    }
     // pečate (Special.png) v rovnakej kadencii ako ostatné speciály; zóna = vlastná bunka
     for (let r = 0; r < SPECIAL_REPEAT; r++) {
       pushStateFrame(tl, [{ kind: "special", from: slot, cells: [[actor.x, actor.y]] }], SPECIAL_BEAT_MS);

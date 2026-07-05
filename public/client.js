@@ -1930,7 +1930,7 @@ function computeFacing(p1, p2) {
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
 // vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
-const PAIR_SHIFT = { medusa: 80, minotaur: 70 };
+const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80 };
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2 || p1.x !== p2.x || p1.y !== p2.y) return 0;
@@ -2006,9 +2006,11 @@ function positionActors(s, immediate = false) {
     const onOwner = (c.x === data.x && c.y === data.y);
     const wasHidden = el.style.display === "none";
     const STACK_OFFSET = 18; // klon na majiteľovej bunke: jemný posun, aby bolo vidno dve figúry
-    // zdieľaná bunka so súperom → rozostup ako postavy (pairShift); na majiteľovej bunke pridaj STACK_OFFSET
+    // zdieľaná bunka so súperom → rozostup ako postavy (rovnaká char-aware hodnota ako pairShift majiteľa,
+    // inak by sa owner a klon rozišli rôzne ďaleko a prezradili, ktorý je pravý); na majiteľovej bunke + STACK_OFFSET
+    const foeMag = PAIR_SHIFT[data.char] ?? PAIR_SHIFT_DEFAULT;
     const foeShift = (opp && opp.x === c.x && opp.y === c.y)
-      ? (slot === "p1" ? -PAIR_SHIFT_DEFAULT : PAIR_SHIFT_DEFAULT) : 0;
+      ? (slot === "p1" ? -foeMag : foeMag) : 0;
     const shift = foeShift + (onOwner ? STACK_OFFSET : 0);
 
     el.style.display = "block";
@@ -2507,6 +2509,13 @@ function schedulePlayTimeline(timeline) {
       // neodchytený throw by reťaz natrvalo prerušil a UI by ostalo zamknuté uprostred kola)
       try {
       if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
+      // útok do steny (strela nemá kam letieť) — útočná póza sa zahrá cez `shooters`, sem len whiff float;
+      // akcia sa NEprečiarkne (minula manu a „vykonala sa"), na rozdiel od starého OFF-BOARD invalidu
+      if (e.kind === "attack_swing" && e.offboard && (e.from === "p1" || e.from === "p2")) {
+        const [msg, cls] = INVALID_MSG.offboard;
+        spawnFloat(e.from, msg, cls);
+        cloneFloat(e.from, msg, cls);
+      }
       if (e.kind === "special" && e.from) casters.add(e.from);
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení)
       if (e.kind === "charge" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {

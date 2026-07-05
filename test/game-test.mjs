@@ -1202,14 +1202,15 @@ async function main() {
   check(tl[tl.length - 1].p1.clone?.x === 0 && tl[tl.length - 1].p1.clone?.y === 0,
     "T50: nový klon na Narutovej bunke (0,0)", `clone=${JSON.stringify(tl[tl.length - 1].p1.clone)}`);
   invariantCheck(tl, "T50");
-  // not_alone: p2 sa priblíži, Naruto mu vstúpi na bunku a skúsi summon — invalid, mana sa neminie
+  // not_alone: p2 sa priblíži, Naruto mu vstúpi na bunku a skúsi summon — blok súperom na bunke;
+  // NOVÉ PRAVIDLO: klon nevznikne, ale mana sa MINIE (special sa „vykonal" — pečate + whiff)
   await freshNaruto();
   tl = await playRound(c1, c2, [M("right"), R, S], [M("left"), R, S]); // p1 (1,1), p2 (2,1); mana p1 = 8
-  tl = await playRound(c1, c2, [M("right"), SP, R], [R, S, MI]);       // p1 vstúpi na (2,1) k p2 → summon invalid
+  tl = await playRound(c1, c2, [M("right"), SP, R], [R, S, MI]);       // p1 vstúpi na (2,1) k p2 → summon blokovaný
   const t50inv = fxOf(tl, "invalid").filter(e => e.target === "p1" && e.reason === "not_alone");
   check(t50inv.length === 1, "T50: summon na zdieľanej bunke = invalid not_alone", `inv=${JSON.stringify(fxOf(tl, "invalid"))}`);
   check(tl[tl.length - 1].p1.clone === null, "T50: klon nevznikol");
-  check(tl[tl.length - 1].p1.mana === 10, "T50: neplatný summon nestál manu (8+4 cap 10)", `mana=${tl[tl.length - 1].p1.mana}`);
+  check(tl[tl.length - 1].p1.mana === 7, "T50: blokovaný summon MINUL manu (8−5 special +4 recharge)", `mana=${tl[tl.length - 1].p1.mana}`);
   invariantCheck(tl, "T50b");
 
   /* ---------- Test 51: zónový special (fire riadok) zničí klona aj bez zásahu hráča ---------- */
