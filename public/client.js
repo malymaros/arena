@@ -3340,8 +3340,9 @@ const charAbilityEl = document.getElementById("char-ability");
 // reprezentatívna pozícia castera, ktorá najlepšie ukáže tvar zásahu daného mága + cena many špeciálu
 const SPECIAL_MANA = 5;
 const ABILITY_PREVIEW = {
-  // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview)
-  escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range grows with Pride: 0=1 cell, 1=+diagonals, 2=3×3, 3=whole board. Pride +1 each round you don't defend, −1 when you shield/mirror" },
+  // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview;
+  // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
+  escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror and falls when you use them" },
   fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row" },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours" },
@@ -3381,8 +3382,11 @@ function renderAbilityPreview(char) {
     }
     grid.appendChild(c);
   }
-  // Escanor: cyklenie pride 0→3 (raf posúva); mini-caster hrá Win (SPECIAL_ANIMS.escanor)
+  // Escanor: cyklenie pride 0→3 (raf posúva); mini-caster hrá Win (SPECIAL_ANIMS.escanor);
+  // pod mini-doskou pride lev + číslo (ako HUD widget), synchrónne s cyklom
   escPridePreview = def.prideCycle ? { grid, caster, dir, pride: 0, last: 0 } : null;
+  const caPride = document.getElementById("ca-pride");
+  if (caPride) { caPride.classList.toggle("hidden", !def.prideCycle); if (def.prideCycle) syncCaPride(0); }
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   document.getElementById("ca-text").textContent = def.desc;
   const stats = document.getElementById("ca-stats");
@@ -3392,11 +3396,21 @@ function renderAbilityPreview(char) {
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
+// Escanor char-select: pride lev + číslo pod mini-doskou (rovnaký indikátor ako HUD widget — swap framu
+// pride_lion_{0..3}.png, biely → celý zlatý; pri 3 pulz cez .pride-max)
+function syncCaPride(pride) {
+  const el = document.getElementById("ca-pride"); if (!el) return;
+  const numEl = el.querySelector(".pride-num");
+  if (numEl) numEl.textContent = pride;
+  const img = el.querySelector("img");
+  if (img && !img.getAttribute("src").endsWith("_" + pride + ".png")) img.src = "/assets/pride_lion_" + pride + ".png";
+  el.classList.toggle("pride-max", pride >= 3);
+}
 // Escanor char-select: prekresli zvýraznené bunky pre daný pride level (cyklí 0→3 v drawCharSelectFrame)
 function markEscPridePreview(now) {
   const s = escPridePreview; if (!s) return;
   if (!s.last) s.last = now;
-  if (now - s.last >= 900) { s.last = now; s.pride = (s.pride + 1) % 4; } // ~0.9s na level
+  if (now - s.last >= 1500) { s.last = now; s.pride = (s.pride + 1) % 4; syncCaPride(s.pride); } // ~1.5s na level (pomalšie, nech sa dá zóna prečítať)
   const hit = new Set(cellsForSpecialPreview({ x: s.caster.x, y: s.caster.y, char: "escanor", pride: s.pride }, s.dir).map(([x, y]) => `${x},${y}`));
   s.grid.querySelectorAll(".mini-cell").forEach(c => {
     if (c.classList.contains("caster")) return;

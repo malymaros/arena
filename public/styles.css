@@ -729,7 +729,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 /* náhľad špeciálnej abilitky pri hoveri nad mágom */
 .char-ability {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  height: 270px; /* fixná výška od začiatku — nič pri hoveri neskáče (text má vlastný pevný 4-riadkový blok) */
+  height: 300px; /* fixná výška od začiatku — nič pri hoveri neskáče (text má pevný 4-riadkový blok; rezerva na Escanorov pride riadok) */
 }
 .char-ability.hidden { visibility: hidden; }
 .ca-title {
@@ -747,6 +747,14 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .ca-grid .mini-cell.caster { background: #ffb300; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), inset 0 0 0 3px rgba(0,0,0,.25); }
 /* malý castiaci mág priamo v bunke castera */
 .ca-grid .mini-cell .mini-caster { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+/* Escanor: pride level pod mini-doskou — lev + číslo ako v HUD widgete (pride_lion_{0..3}.png, pri 3 pulz);
+   JS (syncCaPride) prepína frame/číslo synchrónne s cyklením zvýraznenej zóny */
+.ca-pride { display: flex; align-items: center; gap: 3px; }
+.ca-pride.hidden { display: none; }
+.ca-pride img { height: 34px; width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)); }
+.ca-pride.pride-max img { animation: pride-max-pulse 1s ease-in-out infinite; }
+.ca-pride .pride-num { font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 15px; color: #ffd24a;
+  text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
 .ca-text {
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
   font-size: 11px; color: #cfd2d6; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6);
