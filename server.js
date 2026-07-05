@@ -68,7 +68,7 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // koľko vyhratých hier treba na zisk série
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
-const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto"];
+const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor"];
 // tournament: každý hráč si pred hrou 1 naslepo draftne vlastný tím TEAM_SIZE postáv z celého poolu CHARS
 // (choose_team vo fáze team_select); tím je fixný na celú sériu a určuje kľúče mageHp/mageMana danej osoby.
 const TEAM_SIZE = 3;
@@ -138,8 +138,11 @@ function newPlayer(slot) {
     x: pos.x, y: pos.y,
     hp: START_HP,
     mana: START_MANA,
-    char: null,        // "fire" | "lightning" | "wanderer" | "medusa" | "minotaur" | "naruto"
+    char: null,        // "fire" | "lightning" | "wanderer" | "medusa" | "minotaur" | "naruto" | "escanor"
     stone: 0,          // koľko najbližších základných akcií hráč preskočí skamenený (Medúzin special)
+    // Escanor: „pride level" 0–3. Rozsah smerového specialu rastie s levelom (0=1 bunka, 3=celá plocha).
+    // Na konci kola: použil shield/mirror (aj golden)? → −1, inak → +1 (clamp 0–3). Reset na 0 pri nasadení.
+    pride: 0,
     // Narutov tieňový klon: { x, y } alebo null. Kopíruje všetky základné akcie majiteľa (vertikálny pohyb
     // inverzne), spôsobuje vždy len CLONE_DMG, zmizne pri akomkoľvek zásahu (obrany zdieľa s majiteľom —
     // armujú sa aj spotrebúvajú spolu, sú to tie isté shield/mirror flagy)
@@ -358,12 +361,12 @@ function emitStateMasked(timeline = null) {
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, stone, labyrinth, labReveal, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
+  const { slot, x, y, hp, mana, char, stone, pride, labyrinth, labReveal, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
   // niť treba hlboko kopírovať — server do nej pushuje, plytká referencia by menila už uložené timeline framy
   const thread = (a.thread || []).map(c => [...c]);
   const threadMark = a.threadMark ? [...a.threadMark] : null;
   const clone = a.clone ? { ...a.clone } : null; // Narutov tieňový klon (pozícia)
-  return { slot, x, y, hp, mana, char, stone, labyrinth, labReveal, thread, threadMark, clone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
+  return { slot, x, y, hp, mana, char, stone, pride, labyrinth, labReveal, thread, threadMark, clone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
 }
 function snapshot() {
   return {
@@ -465,7 +468,24 @@ function specialZoneHas(me, x, y) {
     default:          return false;
   }
 }
-const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8 }; // raw dmg zóny (kvôli odrazu pri zásahu klona)
+const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8, escanor: 8 }; // raw dmg zóny (kvôli odrazu pri zásahu klona)
+
+// Escanor: zóna smerového specialu podľa pride levelu. dir = "left" | "right" (ako Medúza).
+// F = bunka pred Escanorom v danom smere; 0=F, 1=F+diagonály, 2=F+3×3 okolie, 3=celá plocha.
+// MUSÍ sedieť s cellsForSpecialPreview v client.js (paralelne udržiavané).
+function escanorCells(me, dir) {
+  const W = game.board.w, H = game.board.h;
+  const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
+  const out = [];
+  const add = (x, y) => { if (inb(x, y) && !out.some(c => c[0] === x && c[1] === y)) out.push([x, y]); };
+  const pride = Math.max(0, Math.min(3, me.pride || 0));
+  if (pride >= 3) { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) add(x, y); return out; }
+  const fx = me.x + (dir === "left" ? -1 : 1), fy = me.y;
+  add(fx, fy);                                                        // pride 0
+  if (pride === 1) { add(fx - 1, fy - 1); add(fx + 1, fy - 1); add(fx - 1, fy + 1); add(fx + 1, fy + 1); }
+  if (pride === 2) for (let yy = fy - 1; yy <= fy + 1; yy++) for (let xx = fx - 1; xx <= fx + 1; xx++) add(xx, yy);
+  return out;
+}
 
 /* ---- Narutov tieňový klon ---- */
 // Klon nemá HP — zmizne pri akomkoľvek zásahu od súpera (dmg aj status speciály), pri IK tile,
@@ -1234,6 +1254,27 @@ function doSpecial(slot, tl, dir = null) {
     return;
   }
 
+  // Escanor: smerový (left/right) dmg special; rozsah zóny podľa pride levelu (8 dmg). Cez obrany ako
+  // ostatné dmg speciály (shield blokuje, mirror odrazí 8 na Escanora). Zóna = escanorCells (pride).
+  if (actor.char === "escanor") {
+    if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
+    actor.mana -= SPECIAL_COST;
+    const cells = escanorCells(actor, dir);
+    const foeS = other(slot);
+    const foe  = game.players[foeS];
+    const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
+    const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
+    if (inZone) revealLabyrinths(tl); // istý zásah odhalí prípadný labyrint pred animáciou
+    for (let r = 0; r < SPECIAL_REPEAT; r++) {
+      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
+    }
+    const dmg = SPECIAL_ZONE_DMG.escanor; // 8
+    if (inZone) applyHitBoth(foeS, dmg * dealMul(slot), tl, "special", cloneStruck);
+    else if (cloneStruck) applyHitOnClone(foeS, dmg * dealMul(slot), tl, "special", false);
+    else pushStateFrame(tl, [], SMALL_DELAY_MS);
+    return;
+  }
+
   actor.mana -= SPECIAL_COST;
 
   // vyhodnotenie zásahu je deterministické už pred nádychmi (pozície sa počas nich nemenia) —
@@ -1328,6 +1369,7 @@ function doSwap(slot, to, tl) {
   pushStateFrame(tl, [{ kind: "teleport_out", from: slot, char: from }], TELEPORT_OUT_MS);
   // prepni identitu + nasaď HP/manu nového maga
   me.char = to;
+  me.pride = 0; // Escanor: nasadenie swapom začína na pride 0
   me.hp = game.mageHp[person][to];
   me.mana = game.mageMana[person][to];
   // (2) nový mág sa objaví
@@ -1533,7 +1575,7 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limi
   while (q.length < limit && pool.length) {
     const t = pool.shift();
     if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] });
-    else if (t === "special" && char === "medusa") q.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin special potrebuje smer
+    else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
     else q.push({ type: t });
   }
   return q;
@@ -1647,6 +1689,15 @@ function resolveTurn() {
 
   const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
   let ended = false;
+  // Escanor pride: zachyť PRED spracovaním, či daný Escanor v tomto kole použil shield/mirror/golden shield/mirror
+  // (fronta aj golden flagy sa počas kola menia/miznú). Na konci kola: použil → −1, inak → +1.
+  const escUsedDefense = {};
+  for (const slot of ["p1", "p2"]) {
+    const p = game.players[slot];
+    if (p.char !== "escanor") continue;
+    escUsedDefense[slot] = !!p.golden || !!p.goldenMirror ||
+      (p.queue || []).some(a => a && (a.type === "shield" || a.type === "mirror"));
+  }
   // doom: zachyť na začiatku kola — true len v buffnutom (poslednom) kole, NIE v aktivačnom (vtedy sa nastaví až v gold fáze)
   const doomSlot = game.players.p1.lastStandDoom ? "p1" : game.players.p2.lastStandDoom ? "p2" : null;
 
@@ -1753,6 +1804,13 @@ function resolveTurn() {
 
   // koniec hry: tieňové klony miznú (aj pri výhre majiteľa) — poof po dohraní smrteľného zásahu
   if (ended) { killClone("p1", tl); killClone("p2", tl); }
+
+  // Escanor pride: koniec kola — použil obranu → −1, inak → +1 (clamp 0–3). Prejaví sa v nasledujúcom kole.
+  for (const slot of ["p1", "p2"]) {
+    const p = game.players[slot];
+    if (p.char !== "escanor" || !(slot in escUsedDefense)) continue;
+    p.pride = Math.max(0, Math.min(3, (p.pride || 0) + (escUsedDefense[slot] ? -1 : 1)));
+  }
 
   // nevyužité obrany zanikajú s koncom kola
   game.players.p1.shield = false;
@@ -2052,6 +2110,7 @@ io.on("connection", (socket) => {
       me.mana = game.mageMana[person]?.[key] ?? START_MANA;
     }
     me.char = key;
+    me.pride = 0; // Escanor: každá nová hra začína na pride 0
     // obaja vybrali -> začína 1. kolo, naštartuj časovač pred emitom (snapshot nesie timerMs pre refresh-sync)
     if (game.players.p1.char && game.players.p2.char) beginPlanningTimer(0);
     emitStateMasked(); // súperov pick sa odhalí až keď si vyberie aj druhý hráč (žiadna výhoda pre rozmýšľajúceho)

@@ -230,11 +230,11 @@ youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
 // horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
-const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50 };
+const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50 };
 // vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
 // ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
 // Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128)
-const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51 };
+const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56 };
 
 // zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -281,6 +281,7 @@ const SPECIAL_ANIMS = {
   medusa:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true },
   minotaur:  { file: "Walk.png",         fps: SPECIAL_FPS, loop: true }, // bez vlastného fx spritu — cast = veľký kráčajúci Minotaur (blúdenie labyrintom)
   naruto:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true }, // pečate rukami (summon tieňového klona)
+  escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder — plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
@@ -301,7 +302,10 @@ const CHAR_META = {
   // Minotaur: natívna p2 paleta (Minotaur_2, hnedý so sekerou); Charge.png = prefarbený fire fireball per paleta
   minotaur:  { name: "Minotaur",         dir: "minotaur/Minotaur_1", dirP2: "minotaur/Minotaur_2" },
   // Naruto: natívna p2 paleta (žltý kostým + zlatá čakra — paletový swap z kostýmov v sheete)
-  naruto:    { name: "Naruto",           dir: "naruto/Naruto_1", dirP2: "naruto/Naruto_2" }
+  naruto:    { name: "Naruto",           dir: "naruto/Naruto_1", dirP2: "naruto/Naruto_2" },
+  // Escanor: zatiaľ LEN ukážka vo výbere (nová stránka vľavo), nedá sa zvoliť ani hrať.
+  // Natívna paleta; p2 = escanor_2 (zelené oblečenie prefarbené na červené). V karte: WeakIdle, hover IntroStand.
+  escanor:   { name: "Escanor",          dir: "escanor", dirP2: "escanor_2" }
 };
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
@@ -341,6 +345,7 @@ let lastStandArmed = false;    // objednaný Last Stand (duálny s golden mana, 
 let lastHopeArmed = false;     // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
 let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
+let escPridePreview = null;      // Escanor char-select: cyklenie pride 0→3 v náhľade zóny (viď markEscPridePreview)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
 
 // počas special castu skryjeme bežný actor sprite
@@ -423,7 +428,9 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
   // anim.frames prepíše odhad počtu framov (keď framy nie sú štvorcové a inference zlyhá)
   const total = anim.frames || meta.frames;
   const fw = anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
-  const idx = anim.loop ? Math.floor((t / (1000 / anim.fps)) % total)
+  // anim.frameIndex: explicitný frame (vlastná časová logika, napr. Escanor IntroStand s loopFrom)
+  const idx = anim.frameIndex != null ? Math.max(0, Math.min(total - 1, anim.frameIndex))
+            : anim.loop ? Math.floor((t / (1000 / anim.fps)) % total)
                         : Math.min(total - 1, Math.floor(t / (1000 / anim.fps)));
   // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu — kreslí sa len stredový pás postavy
   const cropPx = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
@@ -534,6 +541,7 @@ const HEAD_CROP = {
   medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
   minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51, cyP2: 0.43 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2/cyP2 = korekcia na posunutú figúru v Minotaur_2
   naruto:    { cx: 0.50, cy: 0.58, size: 0.26 }, // bojový postoj (Stance) — figúra centrovaná, bottom-anchor
+  escanor:   { cx: 0.50, cy: 0.60, size: 0.24 }, // hlava zo slabej formy (WeakIdle) — dolaď cez head-cropper
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
@@ -545,7 +553,8 @@ function drawMageHeadAnim(cvs, char, now) {
   const isP2Sheet = dir === CHAR_META[char]?.dirP2;
   const cx = (isP2Sheet && c.cxP2 != null) ? c.cxP2 : c.cx;
   const cy = (isP2Sheet && c.cyP2 != null) ? c.cyP2 : c.cy;
-  ensureSpriteMeta(dir, ANIM_DEF.idle.file).then(meta => {
+  const idleFile = char === "escanor" ? "WeakIdle.png" : ANIM_DEF.idle.file; // Escanor: hlava zo slabej formy
+  ensureSpriteMeta(dir, idleFile).then(meta => {
     const ctx = cvs.getContext("2d");
     const fps = ANIM_DEF.idle.fps || 6;
     const idx = Math.floor((now / (1000 / fps)) % meta.frames); // aktuálny idle frame
@@ -1853,6 +1862,17 @@ function cellsForSpecialPreview(meState, dir){
   } else if (char === "naruto"){
     // range self — summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
     cells.push([x, y]);
+  } else if (char === "escanor"){
+    // smerový (left/right) — rozsah podľa pride levelu; zrkadlí escanorCells na serveri
+    const pride = Math.max(0, Math.min(3, meState.pride ?? 0));
+    const add = (cx,cy) => { if (cx>=0 && cy>=0 && cx<board.w && cy<board.h && !cells.some(c=>c[0]===cx&&c[1]===cy)) cells.push([cx,cy]); };
+    if (pride >= 3){ for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) add(cx,cy); }
+    else {
+      const fx = x + (dir === "left" ? -1 : 1), fy = y;
+      add(fx, fy);
+      if (pride === 1){ add(fx-1,fy-1); add(fx+1,fy-1); add(fx-1,fy+1); add(fx+1,fy+1); }
+      if (pride === 2) for (let yy=fy-1; yy<=fy+1; yy++) for (let xx=fx-1; xx<=fx+1; xx++) add(xx,yy);
+    }
   }
   return cells;
 }
@@ -1974,14 +1994,18 @@ function computeFacing(p1, p2) {
 }
 // horizontálny rozostup postáv na ZDIEĽANOM políčku (p1 doľava, p2 doprava) — veľké postavy (Medúza)
 // potrebujú väčší, pokojne aj s presahom do susedných políčok, inak sa sprity škaredo prekrývajú
+// Escanor: veľkosť rastie o 20 % za pride level; škáluje sa od nôh. FEET_FRAC = kde nohy sedia v ACTOR canvase
+// (feet-anchor spritov ~0.97 výšky) — origin škálovania, aby postava ostala na zemi a nedvíhala sa medzera pod ňou.
+const ESC_FEET_FRAC = 0.973;
+const escPrideMul = a => a?.char === "escanor" ? Math.pow(1.2, Math.max(0, Math.min(3, a.pride || 0))) : 1;
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
 // vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
-const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80 };
+const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80 };
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2 || p1.x !== p2.x || p1.y !== p2.y) return 0;
-  const mag = PAIR_SHIFT[s?.[slot]?.char] ?? PAIR_SHIFT_DEFAULT;
+  const mag = PAIR_SHIFT[s?.[slot]?.char] ?? PAIR_SHIFT_DEFAULT; // konštantný odsun (nezávisí od pride veľkosti)
   return slot === "p1" ? -mag : mag;
 }
 // pri horizontálnom útoku sa mág otočí v smere streľby, aj keď súper stojí inde
@@ -2023,10 +2047,15 @@ function positionActors(s, immediate = false) {
     // summon póza (Special_2): skutočný Naruto v NORMÁLNEJ výške stojí pri jednom okraji bunky, kópia zrkadlovo
     // pri druhom (orez bočného okraja spritu v raf ich zúži). positionActors sa cez summon beat volá, preto
     // pózu držíme tu (inak by ju hneď prepísal).
+    // Escanor: veľkosť postavy = indikátor pride levelu (rastie o 20 % za level, od nôh nahor)
+    const prideMul = escPrideMul(data);
     const pose = cloneSummonPose[slot];
     if (pose && performance.now() < pose.until) {
       el.style.transformOrigin = "50% 100%";
       el.style.transform = `translateX(${shift - (facing[slot] || 1) * pose.off}px) scaleX(${facing[slot] || 1})`;
+    } else if (prideMul !== 1) {
+      el.style.transformOrigin = `50% ${ESC_FEET_FRAC * 100}%`; // rast od pät (nohy ostanú na zemi, žiadna medzera)
+      el.style.transform = `translateX(${shift}px) scaleX(${scale * prideMul}) scaleY(${prideMul})`;
     } else {
       el.style.transformOrigin = "";
       el.style.transform = `translateX(${shift}px) scaleX(${scale})`;
@@ -2083,12 +2112,16 @@ function positionActors(s, immediate = false) {
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
     const shift = pairShift(me, s);
-    // vertikálne: vrch hlavy per-mág (HEAD_TOP; mágovia ~48 % rámu, Medúza vyššie) —
+    // Escanor: sprite je zväčšený podľa pride (rast od pät, origin ESC_FEET_FRAC) → hlava je vyššie a bočný offset väčší
+    const prideMul = escPrideMul(meData);
+    // vertikálne: vrch hlavy per-mág (HEAD_TOP) — pri pride sa škáluje okolo pät (FEET_FRAC), nie okolo spodku canvasu;
     // značku kotvíme jej spodkom (chevron) tesne nad hlavu cez translateY(-100%)
-    const headY = py + ACTOR_H * (HEAD_TOP[meData.char] ?? 0.48) - 2;
-    // horizontálne: postava nie je v strede rámca; stred hlavy + flip podľa smeru otočenia
+    const headTop = HEAD_TOP[meData.char] ?? 0.48;
+    const headTopScaled = ESC_FEET_FRAC + (headTop - ESC_FEET_FRAC) * prideMul; // prideMul=1 → headTop
+    const headY = py + ACTOR_H * headTopScaled - 2;
+    // horizontálne: postava nie je v strede rámca; stred hlavy + flip podľa smeru otočenia (offset škáluje pride)
     const headCx = HEAD_CX[meData.char] ?? 0.5;
-    const headDx = facing[me] * ACTOR_W * (headCx - 0.5);
+    const headDx = facing[me] * ACTOR_W * (headCx - 0.5) * prideMul;
     const markerX = px + ACTOR_W / 2 + shift + headDx;
     youMarker.style.display = "block";
     youMarker.style.transform = "translate(-50%, -100%)";
@@ -2922,13 +2955,37 @@ function isMageDead(key) {
   return !!charSelectHp && (charSelectHp[key] ?? 0) <= 0;
 }
 
+// Escanor (ukážka): bez hoveru WeakIdle loop; po nadídení IntroStand (intro raz → loop Stand).
+const ESC_INTRO = { file: "IntroStand.png", frames: 22, fps: 9, loopFrom: 17 }; // musí sedieť s export_escanor.cjs
+const ESC_WEAK  = { file: "WeakIdle.png", frames: 4, fps: 5, loop: true };
+let escHoverT0 = 0; // čas nadídenia na Escanor kartu (štart IntroStand)
+function drawEscanorCard(ctx, cvs, now) {
+  const dir = charDirFor("escanor", me); // p2 = escanor_2 (červené oblečenie)
+  const hover = abilityHoverChar === "escanor";
+  if (hover) {
+    if (!escHoverT0) escHoverT0 = now;
+    const { frames, fps, loopFrom } = ESC_INTRO;
+    const fi = Math.floor((now - escHoverT0) / 1000 * fps);
+    const idx = fi < frames ? fi : loopFrom + ((fi - frames) % (frames - loopFrom));
+    ensureSpriteMeta(dir, ESC_INTRO.file)
+      .then(meta => drawSprite(ctx, meta, { file: ESC_INTRO.file, frames, frameIndex: idx }, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52))
+      .catch(() => {});
+  } else {
+    escHoverT0 = 0;
+    ensureSpriteMeta(dir, ESC_WEAK.file)
+      .then(meta => drawSprite(ctx, meta, ESC_WEAK, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52))
+      .catch(() => {});
+  }
+}
+
 function drawCharSelectFrame(now) {
   const canvases = selEl.querySelectorAll("canvas.char-canvas");
   canvases.forEach((cvs) => {
     const key = cvs.dataset.char;
+    const ctx = cvs.getContext("2d");
+    if (key === "escanor") { drawEscanorCard(ctx, cvs, now); return; } // vlastné WeakIdle/IntroStand
     const dir = charDirFor(key, me); // hráč vpravo vidí Medúzu v natívnej tmavej palete (Medusa2)
     if (!dir) return;
-    const ctx = cvs.getContext("2d");
     // mŕtvy mág (tournament): dead póza mága + death démon prekrytý cez okno karty
     if (isMageDead(key)) {
       ensureSpriteMeta(dir, ANIM_DEF.dead.file)
@@ -2958,6 +3015,8 @@ function drawCharSelectFrame(now) {
       .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height, portraitFill(key, 1.31), 0.98, true, offX, -52))
       .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
   });
+
+  if (abilityHoverChar === "escanor") markEscPridePreview(now); // cyklí zvýraznenie zóny podľa pride
 
   // malý castiaci mág v bunke castera mini-dosky — tiež animácia špeciálu (efektový sprite)
   if (abilityHoverChar && abilityCasterCanvas && SPECIAL_ANIMS[abilityHoverChar]) {
@@ -3038,6 +3097,8 @@ const charAbilityEl = document.getElementById("char-ability");
 // reprezentatívna pozícia castera, ktorá najlepšie ukáže tvar zásahu daného mága + cena many špeciálu
 const SPECIAL_MANA = 5;
 const ABILITY_PREVIEW = {
+  // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview)
+  escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range grows with Pride: 0=1 cell, 1=+diagonals, 2=3×3, 3=whole board. Pride +1 each round you don't defend, −1 when you shield/mirror" },
   fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row" },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours" },
@@ -3063,6 +3124,7 @@ function renderAbilityPreview(char) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const c = document.createElement("div");
     c.className = "mini-cell";
+    c.dataset.gx = x; c.dataset.gy = y;
     if (caster.x === x && caster.y === y) {
       c.classList.add("caster");
       // malý castiaci mág priamo v bunke castera (rAF ho cyklicky kreslí)
@@ -3076,6 +3138,8 @@ function renderAbilityPreview(char) {
     }
     grid.appendChild(c);
   }
+  // Escanor: cyklenie pride 0→3 (raf posúva); mini-caster hrá Win (SPECIAL_ANIMS.escanor)
+  escPridePreview = def.prideCycle ? { grid, caster, dir, pride: 0, last: 0 } : null;
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   document.getElementById("ca-text").textContent = def.desc;
   const stats = document.getElementById("ca-stats");
@@ -3085,9 +3149,21 @@ function renderAbilityPreview(char) {
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
+// Escanor char-select: prekresli zvýraznené bunky pre daný pride level (cyklí 0→3 v drawCharSelectFrame)
+function markEscPridePreview(now) {
+  const s = escPridePreview; if (!s) return;
+  if (!s.last) s.last = now;
+  if (now - s.last >= 900) { s.last = now; s.pride = (s.pride + 1) % 4; } // ~0.9s na level
+  const hit = new Set(cellsForSpecialPreview({ x: s.caster.x, y: s.caster.y, char: "escanor", pride: s.pride }, s.dir).map(([x, y]) => `${x},${y}`));
+  s.grid.querySelectorAll(".mini-cell").forEach(c => {
+    if (c.classList.contains("caster")) return;
+    c.classList.toggle("hit", hit.has(`${c.dataset.gx},${c.dataset.gy}`));
+  });
+}
 function clearAbilityPreview() {
   abilityHoverChar = null;
   abilityCasterCanvas = null;
+  escPridePreview = null;
   charAbilityEl?.classList.add("hidden");
 }
 selEl.querySelectorAll(".char-card[data-char]").forEach(card => {
@@ -3100,8 +3176,9 @@ selEl.querySelectorAll(".char-cards").forEach(el => el.addEventListener("mousele
 
 /* ---------- Stránkovanie výberu postáv ---------- */
 // str. 0 = základní magovia (Mages), str. 1 = experimentálne postavy (Experimental)
-const CHAR_PAGES = [{ title: "Mages" }, { title: "Experimental" }];
-let charPage = 0;
+// str. 0 = nové postavy (Escanor + coming soon), str. 1 = základní magovia, str. 2 = experimentálne
+const CHAR_PAGES = [{ title: "Experimental" }, { title: "Mages" }, { title: "Experimental" }];
+let charPage = 1; // default landing = Mages (Escanor stránka je vľavo cez šípku späť)
 const charPrevBtn = document.getElementById("char-page-prev");
 const charNextBtn = document.getElementById("char-page-next");
 const charPageTitle = document.getElementById("char-page-title");
@@ -3194,7 +3271,7 @@ attackBtn.addEventListener("click", () => togglePicker("attack", attackBtn, "att
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
 // Special: Medúza si najprv vyberie smer pohľadu (←/→), ostatní mágovia pridajú akciu priamo
 specialBtn.addEventListener("click", () => {
-  if (ghostCharAt() === "medusa") { togglePicker("special", specialBtn, "special"); return; }
+  if (ghostCharAt() === "medusa" || ghostCharAt() === "escanor") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(specialBtn); return; }
   if (myQueue.length >= 3 || myQueue.some(a => a.type === "special")) { shakeBtn(specialBtn); return; }
@@ -3478,7 +3555,7 @@ function applyPhaseUI(s) {
   if (needChar || needTeam) {
     updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom); v drafte null → bez statov
     selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
-    if (selEl.classList.contains("hidden")) { teamPick = []; setCharPage(0); } // nové otvorenie — od stránky Mages, čistý draft
+    if (selEl.classList.contains("hidden")) { teamPick = []; setCharPage(1); } // nové otvorenie — od stránky Mages (str. 1), čistý draft
     if (needTeam) syncTeamUi();
     else selEl.querySelectorAll(".char-card.picked").forEach(c => { c.classList.remove("picked"); c.querySelector(".pick-badge")?.remove(); });
     hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber
@@ -3903,6 +3980,10 @@ socket.on("state", (s) => {
       // Naruto: žiadny priamy dmg — musí stáť sám, prizve tieňového klona (kópia s 1 dmg)
       specialBtn.title = "Special (−5 mana) — must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 👥`; hydratePix(cost); }
+    } else if (specChar === "escanor") {
+      // Escanor: smerový dmg (8); rozsah rastie s pride levelom (veľkosť postavy na ploche = indikátor pride)
+      specialBtn.title = "Special (−5 mana, 8 dmg) — choose a direction (left/right)";
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {
@@ -4091,9 +4172,12 @@ function raf() {
       const { left, top } = cellToPx(gp.x, gp.y);
       actorGhost.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
       actorGhost.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
-      // rovnaký flip ako hráčov sprite — postava je vo frame mimo stredu, bez flipu vyzerá posunutá
-      actorGhost.style.transform = `scaleX(${computeFacing(state.p1, state.p2)[me]})`;
       const ghostChar = ghostCharAt() || mine.char;
+      // rovnaký flip ako hráčov sprite; Escanor sa škáluje podľa pride (od pät) rovnako ako živá postava
+      const gFace = computeFacing(state.p1, state.p2)[me];
+      const gPride = escPrideMul({ char: ghostChar, pride: mine.pride });
+      if (gPride !== 1) { actorGhost.style.transformOrigin = `50% ${ESC_FEET_FRAC * 100}%`; actorGhost.style.transform = `scaleX(${gFace * gPride}) scaleY(${gPride})`; }
+      else { actorGhost.style.transformOrigin = ""; actorGhost.style.transform = `scaleX(${gFace})`; }
       actorGhost.classList.toggle("alt-color", usesAltColor(ghostChar, me));
       const dir = charDirFor(ghostChar, me);
       ensureSpriteMeta(dir, ANIM_DEF.idle.file)
@@ -4312,7 +4396,7 @@ if (specialBtn){
     const char = ghostCharAt();   // po prípadnom swape vo fronte = nový mág
     const p = ghostPos();
     if (!char || !p) return;
-    if (char === "medusa") return; // Medúza potrebuje smer — preview ukazujú až šípky pickeru
+    if (char === "medusa" || char === "escanor") return; // smerový special — preview ukazujú až šípky pickeru
     showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
@@ -4323,7 +4407,8 @@ specialPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   btn.addEventListener("mouseenter", () => {
     const char = ghostCharAt();
     const p = ghostPos();
-    if (char === "medusa" && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }, dir));
+    if ((char === "medusa" || char === "escanor") && p)
+      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride }, dir));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
