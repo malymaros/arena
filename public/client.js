@@ -377,6 +377,7 @@ let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
 // odvtedy je idle Stand. escTransformed drží, či daný slot už premenu odohral; escPrevChar deteguje (re)nasadenie.
 let escTransformed = { p1: false, p2: false };
 let escPrevChar = { p1: null, p2: null };
+let escTransformStart = { p1: 0, p2: 0 }; // čas štartu premeny — Transform (loop:false) sa musí kresliť RELATÍVNYM časom
 // klonový flinch (tile zásah na klonovi) — čas štartu; klon sa strhne rovnako ako pravý Naruto pri zásahu,
 // aby „nezraniteľne" nestál a neprezradil sa. Nezávislé od animState (to zdieľa s majiteľom).
 let cloneFlinch = { p1: 0, p2: 0 };
@@ -2554,6 +2555,7 @@ function schedulePlayTimeline(timeline) {
   for (const slot of ["p1", "p2"]) {
     if (state[slot]?.char === "escanor" && !escTransformed[slot]) {
       setAnim(slot, "transform", TRANSFORM_MS);
+      escTransformStart[slot] = performance.now(); // Transform sa kreslí relatívnym časom (now - start)
       const sl = slot;
       setTimeout(() => { escTransformed[sl] = true; }, TRANSFORM_MS);
       preDelay = TRANSFORM_MS;
@@ -4162,8 +4164,10 @@ function raf() {
     }
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
+    // Transform (loop:false) musí ísť od frame 0 → relatívny čas; inak (loop) globálny now je ok
+    const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot]) : (stoned ? 0 : now);
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, stoned ? 0 : now, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
+      .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
