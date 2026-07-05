@@ -1221,8 +1221,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .hud-p2 .hud-char{ transform: scaleX(-1); } /* P2 pozerá doľava */
 
   /* Escanor: pride indikátor (ikona pride.png + číslo) vľavo od postavy, rozsah abilitky (minimapka) vpravo */
-  /* vertikálne vycentrované na stred Escanorovho tela (~68px od vrchu widgetu), väčší margin od okraja */
-  .pride-badge{ position: absolute; left: 16px; top: 52px; z-index: 4; display: flex; flex-direction: row; align-items: center; gap: 3px; pointer-events: none; }
+  /* vertikálne vycentrované na stred Escanorovho tela (~68px od vrchu widgetu); left = rovnaký odstup od okraja ako minimapka (.pride-range right: 40px) */
+  .pride-badge{ position: absolute; left: 40px; top: 52px; z-index: 4; display: flex; flex-direction: row; align-items: center; gap: 3px; pointer-events: none; }
   .pride-badge.hidden, .pride-range.hidden{ display: none; }
   /* Lev = indikátor pride: 4 framy (pride_lion_0..3.png, orezané z „pride lions.png") — biely → zlatý odspodku, JS mení src.
      Pride 3 (celý zlatý) navyše pulzuje = signál, že je to max. */

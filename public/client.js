@@ -336,7 +336,11 @@ const ANIM_DEF = {
   // Escanor: WeakIdle = slabá „denná" forma (pred premenou); Transform = premena → chytí sekeru (hrá sa RAZ pri nasadení)
   weakidle:  { file: "WeakIdle.png", fps: 5,  loop: true },
   transform: { file: "Transform.png", fps: 5, loop: false }, // slow-mo premena — nech si ju hráči všimnú
-  cruelhold: { file: "CruelSunHold.png", fps: 11, loop: true } // special fáza 2: malá postava nesie veľké slnko
+  cruelhold: { file: "CruelSunHold.png", fps: 11, loop: true }, // special fáza 2: malá postava nesie veľké slnko
+  // Escanor special fáza 1: zdvih ruky so slnkom RAZ, potom už len ústa + preblikávajúce slnko (posledné 4 framy);
+  // loopFrom potrebuje čas od štartu animácie (raf: drawT = now - animState.start)
+  winsun:  { file: "WinSunBoard.png", fps: 7, loopFrom: 4 },
+  wintalk: { file: "WinTalk.png",     fps: 5, loop: true } // special fáza 3 (slnko letí na cieľ): len otvára/zatvára ústa, bez slnka a bez zdvihu
 };
 const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
 const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
@@ -443,9 +447,13 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
   const total = anim.frames || meta.frames;
   const fw = anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
   // anim.frameIndex: explicitný frame (vlastná časová logika, napr. Escanor IntroStand s loopFrom)
+  // anim.loopFrom: prehraj RAZ celé (0..N-1), potom cykli len chvost od loopFrom (napr. Escanorov WinSunBoard —
+  // zdvih ruky raz, ďalej len ústa + preblikávajúce slnko). Vyžaduje t relatívny od štartu animácie.
+  const elapsedF = Math.floor(t / (1000 / anim.fps));
   const idx = anim.frameIndex != null ? Math.max(0, Math.min(total - 1, anim.frameIndex))
-            : anim.loop ? Math.floor((t / (1000 / anim.fps)) % total)
-                        : Math.min(total - 1, Math.floor(t / (1000 / anim.fps)));
+            : anim.loopFrom != null ? (elapsedF < total ? elapsedF : anim.loopFrom + ((elapsedF - anim.loopFrom) % (total - anim.loopFrom)))
+            : anim.loop ? elapsedF % total
+                        : Math.min(total - 1, elapsedF);
   // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu — kreslí sa len stredový pás postavy
   const cropPx = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
   const sx = idx * fw + cropPx;
@@ -587,6 +595,7 @@ function drawMageHeadAnim(cvs, char, now) {
 function setAnim(slot, key, durationMs = 0) {
   const def = ANIM_DEF[key] ?? ANIM_DEF.idle;
   animState[slot].key = key;
+  animState[slot].start = performance.now(); // pre animácie s loopFrom (hrajú od frame 0, potom cyklia chvost)
   if (durationMs && durationMs > 0) {
     animState[slot].until = performance.now() + durationMs;
   } else if (!def.loop) {
@@ -741,13 +750,14 @@ function runEscanorSpecial(slot, dir, zoneCells) {
   const c = state?.[slot]; if (!c) return;
   const dx = dir === "left" ? -1 : 1;
   const target = [Math.max(0, Math.min(board.w - 1, c.x + dx)), c.y];
-  // fáza 1: malá postava Win (SPECIAL_ANIMS.escanor) + veľký WinSun raz (visí dlhšie)
-  setAnim(slot, "casting", 60000);
+  // fáza 1: malá postava WinSunBoard (zdvih so slnkom RAZ, potom len ústa + preblikávajúce slnko — loopFrom 4)
+  // + veľký WinSun raz (visí dlhšie)
+  setAnim(slot, "winsun", 60000);
   spawnBigOnce("WinSun.png", slot, () => {
     // fáza 2: malá postava CruelSunHold — nech DOHRÁ CELÁ (raz) pred letom slnka (nech nie sú dve slnká naraz)
     setAnim(slot, "cruelhold", CRUELHOLD_ONCE_MS);
     setTimeout(() => {
-      setAnim(slot, "casting", ESC_TRAVEL_MS + 2000); // späť na Win (bez slnka) — slnko už letí samo
+      setAnim(slot, "wintalk", ESC_TRAVEL_MS + 2000); // ústa bez slnka (žiadny nový zdvih) — slnko už letí samo
       travelSunThenBurst(slot, target, zoneCells);
     }, CRUELHOLD_ONCE_MS);
   });
@@ -4337,8 +4347,11 @@ function raf() {
     }
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
-    // Transform (loop:false) musí ísť od frame 0 → relatívny čas; inak (loop) globálny now je ok
-    const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot]) : (stoned ? 0 : now);
+    // Transform (loop:false) a winsun (loopFrom — zdvih raz, potom chvost) musia ísť od frame 0 → relatívny čas;
+    // inak (loop) globálny now je ok
+    const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
+                : (st.char === "escanor" && animState[slot].key === "winsun") ? (now - (animState[slot].start || 0))
+                : (stoned ? 0 : now);
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)

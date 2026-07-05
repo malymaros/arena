@@ -57,6 +57,27 @@ const blitScaled = (strip, f, dx0, dy0, sc, k, W, H) => { const sw=f.x1-f.x0+1, 
     const s=bigSuns[k%bigSuns.length], sunH=Math.round((s.y1-s.y0+1)*SC);
     blitSun(strip, s, CX, Math.max(escTop+OFF, sunH+2), SC, k, W, H); });
 }
+// --- WinSunBoard: malá BOARD postava fáza 1 — zdvih ruky so slnkom RAZ (framy 0..3), chvost (4..7) už len
+// ústa (Win pózy 2,3) + preblikávajúce veľké slnko (S46 framy 3..6 = tie isté ako CruelSunHold bigSuns pri
+// rovnakom SC → plynulý prechod do fázy 2). Postava v HERNEJ mierke (K ako CruelSunHold), klient cykli
+// posledné 4 framy cez ANIM_DEF loopFrom. ---
+{
+  const WB = bandById(44), winBase = WB.y1, S46 = bandById(46);
+  const sun = [S46.frames[0], {x0:60,y0:4508,x1:91,y1:4537}, {x0:92,y0:4494,x1:149,y1:4551}, S46.frames[2], S46.frames[3], S46.frames[4], S46.frames[5], S46.frames[6]];
+  const winMap=[0,1,2,3,2,3,2,3];
+  const CW=260, CH=330, BASE=322, CX=CW/2, OFF=-25, SC=1.3, K=330/226;
+  writeSquare("WinSunBoard.png", 8, CW, CH, (strip,k,W,H) => { const f=WB.frames[winMap[k]], fx=feetX(f), escTop=BASE-Math.round((winBase-f.y0)*K);
+    blitScaled(strip, f, Math.round(CX-(fx-f.x0)*K), escTop, K, k, W, H);
+    const s=sun[k], sunH=Math.round((s.y1-s.y0+1)*SC);
+    blitSun(strip, s, CX, Math.max(escTop+OFF, sunH+2), SC, k, W, H); });
+}
+// --- WinTalk: BOARD postava fáza 3 (slnko už letí na cieľ) — len otváranie/zatváranie úst (Win pózy 2,3),
+// herná mierka 226 ako export_game (najnižší pixel na spodok bunky, feetX centrované), bez slnka a bez zdvihu ---
+{
+  const WB = bandById(44);
+  writeSquare("WinTalk.png", 2, 226, 226, (strip,k,W,H) => { const f=WB.frames[k+2], fx=feetX(f), h=f.y1-f.y0+1;
+    blit(strip, f, Math.round(W/2-(fx-f.x0)), H-h, k, W, H); });
+}
 // --- SunBurst / SunFade: výbuch a dohasnutie na cieľovej bunke (centrované) ---
 {
   const B47=bandById(47); const fw=Math.max(...B47.frames.map(f=>f.x1-f.x0+1)), fh=Math.max(...B47.frames.map(f=>f.y1-f.y0+1));
@@ -68,7 +89,7 @@ const blitScaled = (strip, f, dx0, dy0, sc, k, W, H) => { const sw=f.x1-f.x0+1, 
 }
 
 // P2 recolor (zelené oblečenie -> červené; slnká bez zelene ostanú)
-for (const file of ["WinSun.png","CruelSunHold.png","SunBurst.png","SunFade.png"]) {
+for (const file of ["WinSun.png","CruelSunHold.png","WinSunBoard.png","WinTalk.png","SunBurst.png","SunFade.png"]) {
   const p = PNG.sync.read(fs.readFileSync(path.join(OUT1, file))); const d = p.data;
   for (let i=0;i<d.length;i+=4){ if(d[i+3]<20)continue; const r=d[i],g=d[i+1],b=d[i+2]; if(g>r+6&&g>b+6){ d[i]=g; d[i+1]=Math.round(r*0.55); d[i+2]=Math.round(b*0.40); } }
   fs.writeFileSync(path.join(OUT2, file), PNG.sync.write(p));
