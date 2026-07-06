@@ -533,7 +533,9 @@ function applyHitOnClone(ownerSlot, rawDmg, tl, kind = "basic", quietDefense = f
   killClone(ownerSlot, tl);
 }
 // status special (petrify/labyrint) na klona cez obrany majiteľa — analógia applyHitOnClone:
-// shield blokuje, mirror odrazí STATUS na castera (ako applyPetrify/applyLabyrinth), inak klon zmizne
+// shield blokuje, mirror odrazí STATUS na castera (ako applyPetrify/applyLabyrinth). Bez obrany klona
+// NEZABÍJA — status kliatby sa týkajú len skutočného Naruta (skamenený majiteľ aj tak „zmrazí" obe figúry,
+// prekliaty si klona nesie do labyrintu); klon zomiera len na dmg zásahy, IK tile, smrť/swap majiteľa a recast.
 function applyStatusOnClone(ownerSlot, tl, statusKind, quietDefense = false) {
   const o = game.players[ownerSlot];
   if (!o?.clone) return;
@@ -549,7 +551,7 @@ function applyStatusOnClone(ownerSlot, tl, statusKind, quietDefense = false) {
     else { endLabyrinths(tl); loseInLabyrinth(atkSlot, tl); }
     return;
   }
-  killClone(ownerSlot, tl);
+  // bez obrany: klon prežije — status naň nemá účinok
 }
 // klon kopíruje pohyb majiteľa: horizontálne rovnako, VERTIKÁLNE INVERZNE (up<->down); kroky mimo boardu prepadnú
 function moveCloneSteps(slot, delta, maxSteps) {
