@@ -380,6 +380,7 @@ let lastHopeArmed = false;     // objednaný Last Hope (úvodná akcia nebuffnut
 let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let escPridePreview = null;      // Escanor char-select: cyklenie pride 0→3 v náhľade zóny (viď markEscPridePreview)
+let moonPreview = null;          // Vlkolak char-select: cyklenie fázy mesiaca 0→3 + dmg (viď markMoonPreview)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
 
 // počas special castu skryjeme bežný actor sprite
@@ -3480,6 +3481,7 @@ function drawCharSelectFrame(now) {
   });
 
   if (abilityHoverChar === "escanor") markEscPridePreview(now); // cyklí zvýraznenie zóny podľa pride
+  if (abilityHoverChar === "werewolf") markMoonPreview(now);    // cyklí fázu mesiaca + dmg pod mini-doskou
 
   // malý castiaci mág v bunke castera mini-dosky — tiež animácia špeciálu (efektový sprite)
   if (abilityHoverChar && abilityCasterCanvas && SPECIAL_ANIMS[abilityHoverChar]) {
@@ -3572,8 +3574,9 @@ const ABILITY_PREVIEW = {
   naruto:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
   // Vojak: cieľová bunka je voľba hráča — náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
   soldier:   { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
-  // Vlkolak: charge — náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg 2–8 podľa fázy mesiaca
-  werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", effect: { num: "2–8", emoji: "🌕" }, desc: "Charge in one of 8 directions - the werewolf stops at the first foe in his path (or the board edge) and strikes for 2/4/6/8 dmg by his moon phase. The moon waxes as his HP drops; he stays on the target's cell even through a shield or mirror" },
+  // Vlkolak: charge — náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg podľa fázy
+  // mesiaca cykluje pod mini-doskou (moonCycle — ako Escanorov pride náhľad), preto krátky text
+  werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, effect: { num: "2–8", emoji: "🌕" }, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -3615,6 +3618,11 @@ function renderAbilityPreview(char) {
   escPridePreview = def.prideCycle ? { grid, caster, dir, pride: 0, last: 0 } : null;
   const caPride = document.getElementById("ca-pride");
   if (caPride) { caPride.classList.toggle("hidden", !def.prideCycle); if (def.prideCycle) syncCaPride(0); }
+  // Vlkolak: cyklenie fázy mesiaca 0→3 + dmg vedľa nej pod mini-doskou (rovnaký štýl ako pride náhľad;
+  // dráha charge od fázy nezávisí, cyklí len badge)
+  moonPreview = def.moonCycle ? { lvl: 0, last: 0 } : null;
+  const caMoon = document.getElementById("ca-moon");
+  if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   document.getElementById("ca-text").textContent = def.desc;
   const stats = document.getElementById("ca-stats");
@@ -3634,6 +3642,22 @@ function syncCaPride(pride) {
   if (img && !img.getAttribute("src").endsWith("_" + pride + ".png")) img.src = "/assets/pride_lion_" + pride + ".png";
   el.classList.toggle("pride-max", pride >= 3);
 }
+// Vlkolak char-select: fáza mesiaca + dmg pod mini-doskou (moon_{0..3}.png; spln pulzuje ako max)
+function syncCaMoon(lvl) {
+  const el = document.getElementById("ca-moon"); if (!el) return;
+  const img = el.querySelector("img");
+  if (img && !img.getAttribute("src").endsWith("_" + lvl + ".png")) img.src = "/assets/moon_" + lvl + ".png";
+  el.classList.toggle("pride-max", lvl >= 3); // rovnaký pulz ako pride 3
+  const dmgEl = el.querySelector(".ca-moon-dmg");
+  if (dmgEl) { dmgEl.innerHTML = `${WOLF_MOON_DMG[lvl]}<span class="pix-ico mini" data-emoji="☠️"></span>`; hydratePix(dmgEl); }
+}
+// Vlkolak char-select: cyklenie fázy 0→3 (posúva drawCharSelectFrame, tempo ako pride náhľad)
+function markMoonPreview(now) {
+  const s = moonPreview; if (!s) return;
+  if (!s.last) s.last = now;
+  if (now - s.last >= 1500) { s.last = now; s.lvl = (s.lvl + 1) % 4; syncCaMoon(s.lvl); }
+}
+
 // Escanor char-select: prekresli zvýraznené bunky pre daný pride level (cyklí 0→3 v drawCharSelectFrame)
 function markEscPridePreview(now) {
   const s = escPridePreview; if (!s) return;
@@ -3656,6 +3680,7 @@ function clearAbilityPreview() {
   abilityHoverChar = null;
   abilityCasterCanvas = null;
   escPridePreview = null;
+  moonPreview = null;
   charAbilityEl?.classList.add("hidden");
 }
 selEl.querySelectorAll(".char-card[data-char]").forEach(card => {
