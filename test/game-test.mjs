@@ -1299,6 +1299,110 @@ async function main() {
   check(t54b.length === 1 && t54b[0].dmg === 3, "T54b: mirror-lovec Minotaur NEdostáva 2× (3, nie 6)", `hits=${JSON.stringify(t54b)}`);
   invariantCheck(tl, "T54b");
 
+  /* ---------- Vojak (soldier): pomocný fresh game (p1 = soldier; mana-only tiles = deterministické HP) ---------- */
+  async function freshSoldier(p2char = "fire") {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "soldier");
+    c2.sock.emit("choose_character", p2char);
+    await new Promise(r => setTimeout(r, 200));
+  }
+  const SPC = (x, y) => ({ type: "special", cell: { x, y } }); // Vojakov special s cieľovou bunkou
+  // lock_in s ack — na testy validácie (server vráti {ok:false} pri odmietnutej fronte)
+  const lockAck = (ctx, q) => new Promise(res => ctx.sock.emit("lock_in", q, (r) => res(r)));
+
+  /* ---------- Test 55: Vojakov special trafí súpera, ktorý sa POHOL na zvolenú bunku (10 dmg) ---------- */
+  await freshSoldier();
+  // starter p1: p1a1 recharge, p2a1 move left → (2,1), p1a2 special na (2,1) → zásah 10 (súper sa naň pohol)
+  tl = await playRound(c1, c2, [R, SPC(2, 1), S], [M("left"), R, S]);
+  const t55sp = fxOf(tl, "special").filter(e => e.from === "p1");
+  check(t55sp.length === 3 && JSON.stringify(t55sp[0].cells) === "[[2,1]]",
+    "T55: special beaty nesú cieľovú bunku", `cells=${JSON.stringify(t55sp[0]?.cells)}`);
+  const t55beam = fxOf(tl, "soldier_beam");
+  check(t55beam.length === 1 && JSON.stringify(t55beam[0].cell) === "[2,1]",
+    "T55: soldier_beam efekt na cieľovej bunke", `fx=${JSON.stringify(t55beam)}`);
+  const t55hits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t55hits.length === 1 && t55hits[0].dmg === 10, "T55: zásah pohnutého súpera = 10 dmg", `hits=${JSON.stringify(t55hits)}`);
+  check(tl[tl.length - 1].p2.hp === 0, "T55: 10 dmg zabíja z plného HP", `hp=${tl[tl.length - 1].p2.hp}`);
+  invariantCheck(tl, "T55");
+
+  /* ---------- Test 55b: súper sa nepohol → lúč trafí prázdnu bunku (miss, mana preč) ---------- */
+  await freshSoldier();
+  tl = await playRound(c1, c2, [SPC(2, 1), R, S], [R, S, M("up")]); // p1a1 special hneď — p2 stále na (3,1)
+  check(fxOf(tl, "soldier_beam").length === 1, "T55b: lúč vyletel aj naprázdno");
+  check(sumEffects(tl).hits.length === 0, "T55b: žiadny zásah (súper sa nepohol)", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tl[tl.length - 1].p2.hp === 10, "T55b: p2 HP netknuté");
+  check(tl[tl.length - 1].p1.mana === 3, "T55b: mana sa minula (6−5+4−2=3)", `mana=${tl[tl.length - 1].p1.mana}`);
+  invariantCheck(tl, "T55b");
+
+  /* ---------- Test 55c: validácia cieľa — súperova bunka, vlastná ghost bunka, mimo plochy ---------- */
+  await freshSoldier();
+  let t55r = await lockAck(c1, [SPC(3, 1), R, S]);
+  check(t55r && t55r.ok === false, "T55c: cieľ na súperovej AKTUÁLNEJ bunke odmietnutý");
+  t55r = await lockAck(c1, [SPC(0, 1), R, S]);
+  check(t55r && t55r.ok === false, "T55c: cieľ na vlastnej bunke odmietnutý");
+  t55r = await lockAck(c1, [M("right"), SPC(1, 1), S]);
+  check(t55r && t55r.ok === false, "T55c: cieľ na vlastnej GHOST bunke (po move) odmietnutý");
+  t55r = await lockAck(c1, [SPC(4, 1), R, S]);
+  check(t55r && t55r.ok === false, "T55c: cieľ mimo plochy odmietnutý");
+  t55r = await lockAck(c1, [SP, R, S]);
+  check(t55r && t55r.ok === false, "T55c: special bez cieľovej bunky odmietnutý");
+  // po odmietnutiach ide platné kolo normálne ďalej (hráč nie je zaseknutý)
+  tl = await playRound(c1, c2, [SPC(2, 1), R, S], [R, S, M("up")]);
+  check(Array.isArray(tl) && tl.length > 0, "T55c: platná fronta po odmietnutiach prešla");
+
+  /* ---------- Test 55d: obrany — shield zablokuje lúč, mirror odrazí plných 10 na Vojaka ---------- */
+  await freshSoldier();
+  tl = await playRound(c1, c2, [R, M("up"), S], [R, S, M("up")]); // p1 (0,0) mana 8; p2 (3,0) mana 8
+  // kolo 2 (starter p2): p2a1 move na cieľ (2,0), p1a1 recharge, p2a2 SHIELD (kryje ďalšiu p1 akciu), p1a2 special → block
+  tl = await playRound(c1, c2, [R, SPC(2, 0), ML], [M("left"), S, R]);
+  const t55dBlocks = fxOf(tl, "block").filter(e => e.target === "p2");
+  check(t55dBlocks.length === 1, "T55d: shield zablokoval Vojakov lúč", `blocks=${JSON.stringify(fxOf(tl, "block"))}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p2").length === 0, "T55d: žiadny dmg cez štít");
+  invariantCheck(tl, "T55d");
+  await freshSoldier();
+  tl = await playRound(c1, c2, [R, M("up"), S], [R, S, M("up")]); // p1 (0,0) mana 8; p2 (3,0) mana 8
+  // kolo 2 (starter p2): p2a1 move na cieľ (2,0), p2a2 MIRROR → p1a2 special sa odrazí: plných 10 zabije Vojaka
+  tl = await playRound(c1, c2, [R, SPC(2, 0), S], [M("left"), MI, R]);
+  const t55dMirror = fxOf(tl, "mirror").filter(e => e.target === "p2");
+  check(t55dMirror.length === 1 && t55dMirror[0].dmg === 10 && t55dMirror[0].atk === "special",
+    "T55d: mirror odrazil special (10, atk=special)", `fx=${JSON.stringify(t55dMirror)}`);
+  const t55dHit = sumEffects(tl).hits.filter(h => h.target === "p1");
+  check(t55dHit.length === 1 && t55dHit[0].dmg === 10 && tl[tl.length - 1].p1.hp === 0,
+    "T55d: odrazených 10 dmg dopadlo na Vojaka (smrť)", `hits=${JSON.stringify(t55dHit)}, hp=${tl[tl.length - 1].p1.hp}`);
+  invariantCheck(tl, "T55d-mirror");
+
+  /* ---------- Test 55e: labyrint — prekliaty Vojak SMIE zamerať lovcovu aktuálnu bunku (maze buff) ---------- */
+  await freshSoldier("minotaur");
+  tl = await playRound(c1, c2, [R, M("up"), S], [SP, R, S]); // p2 (minotaur) zaklial p1 do labyrintu
+  check(tl[tl.length - 1].p1.labyrinth === true, "T55e: p1 (vojak) zakliaty v labyrinte");
+  // kolo 2 (starter p2): prekliaty vojak strieľa „naslepo" na lovcovu SKUTOČNÚ bunku (3,1) — validácia to
+  // v labyrinte dovoľuje (blokovanie súperovej bunky by prezradilo pozíciu); zásah odhalí a ukončí labyrint
+  tl = await playRound(c1, c2, [SPC(3, 1), R, ML], [R, S, M("up")]);
+  check(fxOf(tl, "labyrinth_reveal").filter(e => e.target === "p1").length === 1,
+    "T55e: istý zásah odhalil labyrint pred animáciou (labyrinth_reveal)");
+  const t55eHit = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t55eHit.length === 1 && t55eHit[0].dmg === 10, "T55e: stojaci lovec trafený za 10", `hits=${JSON.stringify(t55eHit)}`);
+  check(fxOf(tl, "labyrinth_end").filter(e => e.target === "p1").length === 1, "T55e: zásah ukončil labyrint");
+  invariantCheck(tl, "T55e");
+
+  /* ---------- Test 55f: Narutov klon — jeho bunka je pri výbere blokovaná; lúč zabije klona, čo na cieľ vstúpi ---------- */
+  await freshSoldier("naruto");
+  tl = await playRound(c1, c2, [R, S, M("up")], [SP, M("up"), R]); // p2: summon → naruto (3,0), klon inverzne (3,2)
+  check(tl[tl.length - 1].p2.clone?.x === 3 && tl[tl.length - 1].p2.clone?.y === 2,
+    "T55f: klon na (3,2)", `clone=${JSON.stringify(tl[tl.length - 1].p2.clone)}`);
+  // bunka KLONA je pri výbere blokovaná rovnako ako Narutova (inak by picker prezradil, ktorá figúra je pravá)
+  t55r = await lockAck(c1, [SPC(3, 2), R, ML]);
+  check(t55r && t55r.ok === false, "T55f: cieľ na bunke klona odmietnutý");
+  // kolo 2 (starter p2): p2a1 move left → klon vstúpi na (2,2) = cieľ; lúč klona rozplynie, Naruto bez dmg
+  tl = await playRound(c1, c2, [R, SPC(2, 2), ML], [M("left"), R, S]);
+  check(fxOf(tl, "clone_die").length === 1, "T55f: lúč zničil klona na cieľovej bunke");
+  check(sumEffects(tl).hits.filter(h => h.target === "p2").length === 0, "T55f: Naruto nedostal žiadny dmg");
+  check(tl[tl.length - 1].p2.clone === null, "T55f: klon je preč zo stavu");
+  invariantCheck(tl, "T55f");
+
   c1.sock.close(); c2.sock.close();
   server.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);

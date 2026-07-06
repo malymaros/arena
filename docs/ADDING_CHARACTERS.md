@@ -16,6 +16,7 @@ Náročnosť pridania **úplne závisí od typu specialu**. Rozhodni to hneď a 
 | Typ specialu | Príklad | Náročnosť | Prečo |
 |---|---|---|---|
 | **Poškodzujúca zóna** (zasiahne bunky, dá dmg) | fire (riadok), lightning (šach farba), wanderer (diagonála) | **Nízka** | Len 3 paralelné funkcie + dmg konštanta. Žiadny nový stav. |
+| **Cielená bunka** (hráč si cieľ VYBERÁ — akcia nesie parameter) | soldier (snajperský lúč na zvolenú bunku) | **Stredná** | Žiadny nový stav, ale akcia nesie `cell` → nový picker UI, validácia vo `validQueue` (ghost pozícia, súperova bunka + klon, labyrint výnimka), timeout auto-fill a hover náhľad z akcie namiesto zo zóny. |
 | **Statusový special** (bez dmg, mení stav súpera) | medusa (petrify), minotaur (labyrint) | **Vysoká** | Zavádza NOVÝ herný systém (nový stav v hráčovi, nová redakcia, nové animácie, nové interakcie s obranami). |
 | **Summon / druhá entita** | naruto (tieňový klon) | **Veľmi vysoká** | Pridáva druhú figúru so samostatným renderom, pohybom, zásahmi, smrťou a interakciou s KAŽDÝM iným systémom. |
 

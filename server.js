@@ -46,6 +46,7 @@ const MEDUSA_MELEE_DMG = 4; // Medúzin melee má širší dosah (vlastné polí
 const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECIAL_BEAT_MS)
 
 const SPECIAL_COST = 5;
+const SOLDIER_SPECIAL_DMG = 10; // Vojakov snajperský lúč na zvolenú bunku — trafí, len ak tam súper PRÍDE (cieľ nesmie byť jeho aktuálna bunka)
 const STONE_ACTIONS = 2; // Medúzin special: zasiahnutý súper preskočí najbližšie 2 základné akcie (kameň)
 // Minotaurov special (labyrint) nemá číselnú konštantu — trvá, kým jeden hráč nezasiahne druhého (viď endLabyrinths)
 const CLONE_DMG = 1; // Narutov klon: koľko pohltí na zdieľanej bunke (jednorazový bait), kým zvyšok strely prejde na Naruta. Útok aj odraz mirrorom dávajú PLNÝ dmg ako Naruto (viď doBasic/doMelee/applyHitOnClone)
@@ -68,7 +69,7 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // koľko vyhratých hier treba na zisk série
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
-const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor"];
+const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor", "soldier"];
 // tournament: každý hráč si pred hrou 1 naslepo draftne vlastný tím TEAM_SIZE postáv z celého poolu CHARS
 // (choose_team vo fáze team_select); tím je fixný na celú sériu a určuje kľúče mageHp/mageMana danej osoby.
 const TEAM_SIZE = 3;
@@ -90,6 +91,10 @@ const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
 const ACTION_GAP_MS    = Math.round(350 * ANIM_SLOW); // pokojová pauza medzi jednotlivými akciami, nech sa dá sledovať každý ťah
 const SPECIAL_REPEAT   = 3;
 const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
+// Vojak: po stredovej Shot_2 animácii letí zo zbrane tenký červený lúč na zvolenú bunku + výbuch;
+// jeden frame drží let lúča aj nábeh výbuchu, zásah (hit/block/mirror) padne až po ňom.
+// MUSÍ sedieť s klientskou choreografiou spawnSoldierBeam v client.js.
+const SOLDIER_BEAM_MS  = 900;
 // Escanor special: server podrží zásah o dĺžku klientskej choreografie (WinSun→CruelSunHold→slnko→SunBurst),
 // aby dmg dopadol AŽ po dokončení animácie. MUSÍ sedieť s klientskou choreografiou v client.js (runEscanorSpecial).
 const ESC_SPECIAL_MS   = 4625;
@@ -471,7 +476,9 @@ function specialZoneHas(me, x, y) {
     default:          return false;
   }
 }
-const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8, escanor: 8 }; // raw dmg zóny (kvôli odrazu pri zásahu klona)
+// raw dmg zóny (kvôli odrazu pri zásahu klona); soldier = snajperský lúč na jednu zvolenú bunku
+// (jeho „zónu" nesie akcia — cell — preto nemá vetvu v specialZoneHas, klona testuje vlastná vetva doSpecial)
+const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8, escanor: 8, soldier: SOLDIER_SPECIAL_DMG };
 
 // Escanor: zóna smerového specialu podľa pride levelu. dir = "left" | "right" (ako Medúza).
 // F = bunka pred Escanorom v danom smere; 0=F, 1=F+diagonály, 2=F+3×3 okolie, 3=celá plocha.
@@ -652,7 +659,34 @@ function validQueue(queue, slot) {
   // golden shield/mirror sa vzájomne vylučuje s príslušnou bežnou akciou — nemôžeš ju zahrať 2× za kolo
   if (goldenPre === "golden_shield" && types.includes("shield")) return false;
   if (goldenPre === "golden_mirror" && types.includes("mirror")) return false;
-  return q.every(a => (a.type !== "move" && a.type !== "attack" && a.type !== "dash") || MOVE_DIRS.has(a.dir));
+  if (!q.every(a => (a.type !== "move" && a.type !== "attack" && a.type !== "dash") || MOVE_DIRS.has(a.dir))) return false;
+  // Vojak: special nesie cieľovú bunku {x,y}. Cieľ nesmie byť súperova AKTUÁLNA bunka (ani jeho tieňový
+  // klon — obe figúry sú „súper", blokovanie len pravej by prezradilo, ktorá je skutočná) — zásah má
+  // padnúť len keď sa súper POHNE. Vlastná bunka sa blokuje podľa GHOST pozície v čase specialu (po
+  // naplánovaných move/dash — zrkadlí klientský picker/simulatedPositions; dash sa simuluje ako keby
+  // mana vyšla, rovnako ako ghost). Výnimka labyrint: prekliaty vojak strieľa naslepo — súperova bunka
+  // sa nekontroluje (blokovanie by mu ju prezradilo), takže stojaceho lovca trafiť SMIE (maze buff vojaka).
+  {
+    const meP = game.players[slot];
+    const foe = game.players[other(slot)];
+    let simChar = meP?.char, sx = meP?.x, sy = meP?.y;
+    for (const a of q) {
+      if (a.type === "swap" && a.to) simChar = a.to; // v turnaji môže special hádzať až swapnutý mág
+      const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
+      if (a.type === "move" && d && inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
+      if (a.type === "dash" && d) for (let s = 0; s < 2; s++) if (inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
+      if (a.type === "special" && simChar === "soldier") {
+        const c = a.cell;
+        if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
+        if (c.x === sx && c.y === sy) return false; // vlastná (ghost) bunka
+        if (!meP?.labyrinth && foe) {
+          if (foe.x === c.x && foe.y === c.y) return false;
+          if (foe.clone && foe.clone.x === c.x && foe.clone.y === c.y) return false;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 function winnerNow() {
@@ -1206,7 +1240,7 @@ function doMirror(slot, tl) {
   pushStateFrame(tl, [{ kind: "mirror_on", from: slot }], SMALL_DELAY_MS);
 }
 
-function doSpecial(slot, tl, dir = null) {
+function doSpecial(slot, tl, dir = null, cell = null) {
   const actor = game.players[slot];
   if (!actor) return;
 
@@ -1297,6 +1331,33 @@ function doSpecial(slot, tl, dir = null) {
     pushStateFrame(tl, [{ kind: "clone_summon", from: slot, cell: [actor.x, actor.y] }], CLONE_SUMMON_MS);
     actor.clone = { x: actor.x, y: actor.y };
     pushStateFrame(tl, [{ kind: "clone_born", from: slot, cell: [actor.x, actor.y] }], SMALL_DELAY_MS);
+    return;
+  }
+
+  // Vojak: snajperský lúč na ZVOLENÚ bunku (akcia nesie cell — validQueue overil hranice, súperovu
+  // aktuálnu bunku aj vlastnú ghost pozíciu; v labyrinte prekliateho vojaka sa súperova bunka neblokuje).
+  // 10 dmg tomu, kto na bunke STOJÍ v momente výstrelu — súper je zraniteľný, len keď sa pohne (alebo
+  // stojaci lovec, keď strieľa prekliaty vojak). Ide cez obrany ako každý dmg special (shield blokuje,
+  // mirror odrazí 10); samotného vojaka lúč nikdy nezraní (vlastnú bunku ani nejde zvoliť).
+  if (actor.char === "soldier") {
+    if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !inBounds(cell.x, cell.y)) { pushInvalid(tl, slot); return; }
+    actor.mana -= SPECIAL_COST;
+    const cells = [[cell.x, cell.y]];
+    const foeS = other(slot);
+    const foe  = game.players[foeS];
+    const inZone = !!(foe && foe.x === cell.x && foe.y === cell.y);
+    const cloneStruck = !!(foe?.clone && foe.clone.x === cell.x && foe.clone.y === cell.y);
+    // istý zásah reálneho hráča (aj do štítu/zrkadla) odhalí prípadný labyrint ešte pred animáciou
+    if (inZone) revealLabyrinths(tl);
+    for (let r = 0; r < SPECIAL_REPEAT; r++) {
+      pushStateFrame(tl, [{ kind: "special", from: slot, cells }], SPECIAL_BEAT_MS);
+    }
+    // lúč zo zbrane + výbuch na cieľovej bunke — zásah (hit/block/odraz) padne až po dolete
+    pushStateFrame(tl, [{ kind: "soldier_beam", from: slot, cell: [cell.x, cell.y] }], SOLDIER_BEAM_MS);
+    const dmg = SPECIAL_ZONE_DMG.soldier * dealMul(slot);
+    if (inZone) applyHitBoth(foeS, dmg, tl, "special", cloneStruck);
+    else if (cloneStruck) applyHitOnClone(foeS, dmg, tl, "special", false); // klon-návnada na cieli — zomiera (obrana kryje/odráža)
+    else pushStateFrame(tl, [], SMALL_DELAY_MS);
     return;
   }
 
@@ -1437,7 +1498,7 @@ function doAction(slot, action, tl) {
     case "recharge": return doRecharge(slot, tl);
     case "attack":   return doBasic(slot, action.dir, tl);
     case "melee":    return doMelee(slot, tl);
-    case "special":  return doSpecial(slot, tl, action.dir); // dir má len Medúza (left/right)
+    case "special":  return doSpecial(slot, tl, action.dir, action.cell || null); // dir: Medúza/Escanor; cell: Vojak (cieľová bunka)
     case "shield":   return doShield(slot, tl);
     case "mirror":   return doMirror(slot, tl);
     case "demon":    return doDemon(slot, tl);
@@ -1613,12 +1674,12 @@ function validBasicAction(a, used, allowDemon = false) {
 // hráč, ktorý sa nestihol locknúť: zachová svoju rozpracovanú frontu (draft) a chýbajúce do 3 doplní náhodne
 // exclude = typy, ktoré už pokrýva golden predťah (shield pri golden_shield, mirror pri golden_mirror) —
 // nesmú sa pridať ani z draftu, ani z náhodného doplnenia (inak by sa akcia zahrala 2× za kolo)
-function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limit = 3, char = null) {
+function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limit = 3, char = null, slot = null) {
   const q = [], used = new Set(exclude);
   for (const a of (Array.isArray(draftQueue) ? draftQueue : [])) {
     if (q.length >= limit) break;
     if (!validBasicAction(a, used, allowDemon)) continue;
-    q.push({ type: a.type, dir: a.dir || null });
+    q.push({ type: a.type, dir: a.dir || null, cell: a.cell || null }); // cell = cieľ Vojakovho specialu
     used.add(a.type);
   }
   const pool = [...ACTION_TYPES].filter(t => !used.has(t));
@@ -1628,9 +1689,26 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limi
     const t = pool.shift();
     if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] });
     else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
+    else if (t === "special" && char === "soldier") q.push({ type: t, cell: randomSoldierTarget(slot) }); // Vojakov special potrebuje cieľovú bunku
     else q.push({ type: t });
   }
   return q;
+}
+
+// náhodná platná cieľová bunka Vojakovho specialu (timeout auto-fill) — rovnaké pravidlá ako validQueue:
+// nie vlastná bunka, nie súperova figúra ani jeho klon (v labyrinte prekliateho sa súper neblokuje)
+function randomSoldierTarget(slot) {
+  const meP = slot ? game.players[slot] : null;
+  const foe = slot ? game.players[other(slot)] : null;
+  const c = pickCell((x, y) => {
+    if (meP && meP.x === x && meP.y === y) return false;
+    if (meP && !meP.labyrinth && foe) {
+      if (foe.x === x && foe.y === y) return false;
+      if (foe.clone && foe.clone.x === x && foe.clone.y === y) return false;
+    }
+    return true;
+  });
+  return c ? { x: c.x, y: c.y } : null;
 }
 
 // naplánuj backstop pre práve začínajúce kolo; extraMs = čas, kým klient dohrá timeline (počas neho neplánuje)
@@ -1675,7 +1753,7 @@ function onTurnTimeout() {
     const stone = Math.min(3, p.stone || 0);
     p.queue = [
       ...Array.from({ length: stone }, () => ({ type: "stoned" })),
-      ...fillFromDraft(p.draft?.queue, exclude, !!p.lastStandBuff, 3 - stone, p.char),
+      ...fillFromDraft(p.draft?.queue, exclude, !!p.lastStandBuff, 3 - stone, p.char, slot),
     ];
     p.locked = true;
   }
@@ -2216,7 +2294,7 @@ io.on("connection", (socket) => {
     for (const a of inQ) {
       if (out.length >= 3) break;
       if (!validBasicAction(a, used, allowDemon)) continue;
-      out.push({ type: a.type, dir: a.dir || null });
+      out.push({ type: a.type, dir: a.dir || null, cell: a.cell || null }); // cell = cieľ Vojakovho specialu
       used.add(a.type);
     }
     me.draft = { queue: out, golden: !!d?.golden, goldenMirror: !!d?.goldenMirror, goldenMana: !!d?.goldenMana, lastStand: !!d?.lastStand, lastHope: !!d?.lastHope };

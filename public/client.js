@@ -233,11 +233,11 @@ youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
 // horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
-const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50 };
+const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50, soldier: 0.47 };
 // vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
 // ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
 // Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128)
-const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56 };
+const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48 };
 
 // zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -285,6 +285,7 @@ const SPECIAL_ANIMS = {
   minotaur:  { file: "Walk.png",         fps: SPECIAL_FPS, loop: true }, // bez vlastného fx spritu — cast = veľký kráčajúci Minotaur (blúdenie labyrintom)
   naruto:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true }, // pečate rukami (summon tieňového klona)
   escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder — plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
+  soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // mierenie + výstrel — po stredovej animácii letí červený lúč na zvolenú bunku
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
@@ -308,7 +309,9 @@ const CHAR_META = {
   naruto:    { name: "Naruto",           dir: "naruto/Naruto_1", dirP2: "naruto/Naruto_2" },
   // Escanor: zatiaľ LEN ukážka vo výbere (nová stránka vľavo), nedá sa zvoliť ani hrať.
   // Natívna paleta; p2 = escanor_2 (zelené oblečenie prefarbené na červené). V karte: WeakIdle, hover IntroStand.
-  escanor:   { name: "Escanor",          dir: "escanor", dirP2: "escanor_2" }
+  escanor:   { name: "Escanor",          dir: "escanor", dirP2: "escanor_2" },
+  // Vojak: p2 = soldier_2 (uniforma prefarbená na čiernu — tools/sprites-soldier); Charge.png = kotúľajúci sa granát
+  soldier:   { name: "Soldier",          dir: "soldier", dirP2: "soldier_2" }
 };
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
@@ -340,7 +343,10 @@ const ANIM_DEF = {
   // Escanor special fáza 1: zdvih ruky so slnkom RAZ, potom už len ústa + preblikávajúce slnko (posledné 4 framy);
   // loopFrom potrebuje čas od štartu animácie (raf: drawT = now - animState.start)
   winsun:  { file: "WinSunBoard.png", fps: 7, loopFrom: 4 },
-  wintalk: { file: "WinTalk.png",     fps: 5, loop: true } // special fáza 3 (slnko letí na cieľ): len otvára/zatvára ústa, bez slnka a bez zdvihu
+  wintalk: { file: "WinTalk.png",     fps: 5, loop: true }, // special fáza 3 (slnko letí na cieľ): len otvára/zatvára ústa, bez slnka a bez zdvihu
+  // Vojak: vlastná póza pri recharge (ostatné postavy hrajú len auru v idle); loop — neslučkové anims
+  // sa kreslia absolútnym časom (držali by len posledný frame), slučka sa pri frameHold ~1s prehrá raz
+  recharge: { file: "Recharge.png", fps: 12, loop: true }
 };
 const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
 const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
@@ -418,6 +424,8 @@ let hudDeadSince = { p1: 0, p2: 0 };
 // nech všetky ANIM_DEF/SPECIAL cesty fungujú bez per-char výnimiek v kóde
 const SPRITE_FILE_ALIAS = {
   "minotaur/": { "Run.png": "Walk.png", "Attack_1.png": "Attack.png", "Attack_2.png": "Attack.png" },
+  // Vojak (prefix chytí aj soldier_2): basic útok = hod granátom, melee = výstrel zblízka (Shot_1)
+  "soldier": { "Attack_1.png": "Grenade.png", "Attack_2.png": "Shot_1.png" },
 };
 function spriteFileFor(charDir, file) {
   for (const pfx in SPRITE_FILE_ALIAS) {
@@ -784,6 +792,51 @@ function spawnPrideFloat(slot, up) {
   setTimeout(() => el.remove(), 1700);
 }
 
+/* ---------- Vojak: snajperský lúč + výbuch ---------- */
+// výbuch (Explosion.png, prehrá sa raz) na bunke — dopad specialového lúča aj koniec letu granátu
+function spawnExplosionAt(cell, slot, sizeMul = 1.4, fps = 12) {
+  if (!Array.isArray(cell)) return;
+  const dir = charDirFor("soldier", slot);
+  const { left, top } = cellToPx(cell[0], cell[1]);
+  const size = Math.round(TILE_H * sizeMul);
+  const el = document.createElement("canvas");
+  el.width = size; el.height = size; el.className = "explosion-fx";
+  Object.assign(el.style, { position: "absolute", left: (left + TILE_W / 2 - size / 2) + "px", top: (top + TILE_H / 2 - size / 2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
+  actorsEl.appendChild(el);
+  const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  ensureSpriteMeta(dir, "Explosion.png").then(m => {
+    const dur = m.frames * 1000 / fps, t0 = performance.now();
+    const step = () => {
+      if (!el.isConnected) return;
+      const t = performance.now() - t0;
+      if (t < dur) { drawSprite(ctx, m, { file: "Explosion.png", frames: m.frames, frameIndex: Math.min(m.frames - 1, Math.floor(t / 1000 * fps)) }, 0, size, size); requestAnimationFrame(step); }
+      else el.remove();
+    };
+    requestAnimationFrame(step);
+  }).catch(() => el.remove());
+}
+// tenký červený lúč zo zbrane vojaka na zvolenú bunku (štýl mirror beamu) + výbuch na cieli po dolete.
+// MUSÍ časovo sedieť so serverovým SOLDIER_BEAM_MS (frame drží let lúča, zásah padne po ňom).
+const SOLDIER_BEAM_HIT_MS = 350; // kedy počas lúča štartuje výbuch na cieli
+function spawnSoldierBeam(fromSlot, cell, holdMs) {
+  const p = state?.[fromSlot];
+  if (!Array.isArray(cell)) return;
+  if (!p || p.x == null) { spawnExplosionAt(cell, fromSlot); return; } // skrytý strelec (labyrint) — aspoň dopad
+  const s = cellToPx(p.x, p.y), t = cellToPx(cell[0], cell[1]);
+  const sx = s.left + TILE_W / 2 + pairShift(fromSlot), sy = s.top + TILE_H * 0.42; // výška zbrane
+  const tx = t.left + TILE_W / 2, ty = t.top + TILE_H / 2;
+  const dist = Math.hypot(tx - sx, ty - sy), ang = Math.atan2(ty - sy, tx - sx) * 180 / Math.PI;
+  const wrap = document.createElement("div");
+  wrap.className = "soldier-beam-wrap";
+  Object.assign(wrap.style, { position: "absolute", left: sx + "px", top: (sy - 3) + "px", width: dist + "px", height: "6px", transform: `rotate(${ang}deg)`, pointerEvents: "none", zIndex: 8 });
+  const beam = document.createElement("div");
+  beam.className = "soldier-beam";
+  wrap.appendChild(beam);
+  actorsEl.appendChild(wrap);
+  setTimeout(() => wrap.remove(), Math.min(holdMs || 900, 900));
+  setTimeout(() => spawnExplosionAt(cell, fromSlot, 1.6), SOLDIER_BEAM_HIT_MS);
+}
+
 /* ---------- bubliny -X HP / +Y MANA ---------- */
 function cellToPx(x, y) { return { left: x * (TILE_W + GAP), top: y * (TILE_H + GAP) }; }
 
@@ -1058,11 +1111,14 @@ function spawnOrMoveProjectile(c, s) {
   const key = `${c.from}-${c.clone ? 1 : 0}`;
   let entry = projectiles.get(key);
   if (entry && entry.retire) { clearTimeout(entry.retire); entry.retire = null; } // strela ešte letí ďalej
+  // Vojakov granát sa kotúľa PO ZEMI (spodok bunky), nie stredom ako mágove strely
+  const yOff = charKey === "soldier" ? Math.round(TILE_H * 0.24) : 0;
   const dst = projCenter(c.cell[0], c.cell[1]);
   if (!entry) {
     const el = document.createElement("canvas");
-    // Escanorova základná strela (slnko) ostáva relatívne malá: autorská veľkosť = pride3 (strop), nižšie menšia; ostatné postavy bez zmeny
-    const fx = charKey === "escanor" ? escChargeMul(c.from) : 1;
+    // Escanorova základná strela (slnko) ostáva relatívne malá: autorská veľkosť = pride3 (strop), nižšie menšia;
+    // Vojakov granát je malý (kotúľajúci sa projektil, nie ohnivá guľa); ostatné postavy bez zmeny
+    const fx = charKey === "escanor" ? escChargeMul(c.from) : charKey === "soldier" ? 0.55 : 1;
     const px = Math.round(TILE_H * CHARGE_SCALE * fx);
     el.width = px; el.height = px;
     el.className = "projectile";
@@ -1079,21 +1135,28 @@ function spawnOrMoveProjectile(c, s) {
     const start = (origin && origin.x != null) ? projCenter(origin.x, origin.y) : dst;
     el.style.transition = "none";
     el.style.left = start.left + "px";
-    el.style.top  = start.top + "px";
+    el.style.top  = (start.top + yOff) + "px";
     void el.offsetHeight; // reflow → snap na štart bez sklzu, potom zapni transition
     el.style.transition = "";
     actorsEl.appendChild(el);
     entry = { el, retire: null };
     projectiles.set(key, entry);
   }
+  entry.charKey = charKey;    // Vojak: na konci letu granát vybuchne (retireProjectile)
+  entry.from = c.from;
+  entry.lastCell = c.cell;    // posledná bunka letu = miesto výbuchu (zásah súpera/klona alebo okraj plochy)
   entry.el.style.left = dst.left + "px"; // nová cieľová bunka → CSS ju plynule dokĺže za --charge-ms
-  entry.el.style.top  = dst.top + "px";
+  entry.el.style.top  = (dst.top + yOff) + "px";
 }
 function retireProjectile(key) {
   const entry = projectiles.get(key);
   if (!entry || entry.retire) return;
   // nechaj dobehnúť posledný sklz na cieľovú bunku, až potom zmizni (nikdy nie uprostred letu)
-  entry.retire = setTimeout(() => { entry.el.remove(); projectiles.delete(key); }, CHARGE_STEP_MS);
+  entry.retire = setTimeout(() => {
+    entry.el.remove(); projectiles.delete(key);
+    // Vojakov granát: výbuch na poslednej bunke letu — na súperovi/klonovi, alebo na okraji plochy v smere hodu
+    if (entry.charKey === "soldier" && Array.isArray(entry.lastCell)) spawnExplosionAt(entry.lastCell, entry.from, 1.2);
+  }, CHARGE_STEP_MS);
 }
 // zosúlaď perzistentné projektily s charge efektmi tohto frame-u: nové/pohnuté posuň, chýbajúce stiahni
 function reconcileProjectiles(charges, s) {
@@ -1805,7 +1868,7 @@ function actionIcon(action, ownerSlot) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer má len Medúza
+    case "special":  return `✨${ARROW_DIR[action.dir] || (action.cell ? "⌖" : "")}`; // smer: Medúza/Escanor; ⌖ = Vojakov cieľ
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
@@ -2060,6 +2123,10 @@ function cellsForSpecialPreview(meState, dir){
   } else if (char === "naruto"){
     // range self — summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
     cells.push([x, y]);
+  } else if (char === "soldier"){
+    // cieľová bunka je súčasť AKCIE (cell), nie odvoditeľná z pozície — hover fronty ju rieši
+    // attachQueueHover, prehrávanie číta sp.cells zo servera, char-select ABILITY_PREVIEW.target
+    return cells;
   } else if (char === "escanor"){
     // smerový (left/right) — rozsah podľa pride levelu; zrkadlí escanorCells na serveri
     const pride = Math.max(0, Math.min(3, meState.pride ?? 0));
@@ -2369,7 +2436,7 @@ function actionBadgeView(a, ownerSlot) {
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
-    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` };
+    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || (a.cell ? "⌖" : "")}` }; // ⌖ = Vojakov cieľ (bunku ukáže hover)
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
@@ -2393,7 +2460,12 @@ function attachQueueHover(el, a, idx) {
   } else if (a.type === "special") {
     // pride: Escanorova zóna závisí od AKTUÁLNEHO pride levelu (rovnako ako hover na šípkach pickeru) —
     // bez neho by náhľad ukazoval vždy pride 0; pride sa mení až na konci kola, takže current je správny
-    el.addEventListener("mouseenter", () => { const char = ghostCharAt(idx); const p = ghostPos(idx); if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride }, a.dir)); });
+    // Vojak: akcia nesie cieľovú bunku — zvýrazni presne ju (zóna sa nedá odvodiť z pozície)
+    el.addEventListener("mouseenter", () => {
+      if (a.cell) { showPreviewCells([[a.cell.x, a.cell.y]]); return; }
+      const char = ghostCharAt(idx); const p = ghostPos(idx);
+      if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride }, a.dir));
+    });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForMeleePreview(p, ghostCharAt(idx))); });
@@ -2586,7 +2658,7 @@ function updateActionButtons() {
   // special už nemá data-act (kvôli Medúzinmu pickeru) — zneaktívni ho rovnako ako move/attack/dash
   const specialUsed = myQueue.some(a => a.type === "special");
   specialBtn.disabled = specialUsed;
-  if (specialUsed) specialPicker.classList.add("hidden");
+  if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); }
 }
 function updateLockButton() {
   const locked = !!state?.[me]?.locked;
@@ -2858,6 +2930,20 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "special" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
         facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
+      // Vojak: počas mierenia (aj lúča) je otočený k ZVOLENEJ bunke, nie na súpera
+      if ((e.kind === "special" || e.kind === "soldier_beam") && (e.from === "p1" || e.from === "p2") && state?.[e.from]?.char === "soldier") {
+        const tcell = e.kind === "soldier_beam" ? e.cell : (Array.isArray(e.cells) ? e.cells[0] : null);
+        const px = state?.[e.from]?.x;
+        if (Array.isArray(tcell) && px != null && tcell[0] !== px) {
+          facingOverride[e.from] = { sx: tcell[0] < px ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
+        }
+      }
+      // Vojak: po stredovej Shot_2 animácii letí zo zbrane tenký červený lúč na zvolenú bunku + výbuch;
+      // zásah (hit/block/mirror frame) padne až po tomto frame — server drží SOLDIER_BEAM_MS
+      if (e.kind === "soldier_beam" && (e.from === "p1" || e.from === "p2")) {
+        spawnSoldierBeam(e.from, e.cell, frameHold);
+        lastAttackEndAt[e.from] = performance.now() + frameHold;
+      }
       // Escanor special fáza 2: po caste (WinSun+Win) malá postava prejde na CruelSunHold a na cieľovej bunke
       // (políčko pred Escanorom v zvolenom smere) sa prehrá SunBurst→SunFade. Spustí sa RAZ za special.
       if (e.kind === "special" && !escSpecialFired && state?.[e.from]?.char === "escanor") {
@@ -2930,6 +3016,7 @@ function schedulePlayTimeline(timeline) {
         const amt = (typeof e.amount === "number" ? e.amount : 4);
         spawnManaFloat(e.from, amt);
         spawnChargeAura(e.from); // „Goku" nabíjacia aura na postave
+        if (state?.[e.from]?.char === "soldier") setAnim(e.from, "recharge", frameHold); // Vojak má vlastnú recharge pózu
         // klon sa „nabíja" naprázdno tiež — aura+float na oboch, nech recharge neprezradí pravého
         cloneFloat(e.from, `+${amt}`, "mana-float");
         spawnChargeAura(e.from, false, false, "clone");
@@ -3368,6 +3455,8 @@ const ABILITY_PREVIEW = {
   medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
   minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands. Their steps weave a thread; stepping on it reveals your silhouette" },
   naruto:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
+  // Vojak: cieľová bunka je voľba hráča — náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
+  soldier:   { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -3378,7 +3467,10 @@ function renderAbilityPreview(char) {
   const mirror = me === "p2";
   const caster = mirror ? { x: w - 1 - def.caster.x, y: def.caster.y } : def.caster;
   const dir = (mirror && def.dir) ? (def.dir === "right" ? "left" : "right") : def.dir;
-  const hit = new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
+  // Vojak: zóna = príkladová cieľová bunka z definície (zrkadlená pre p2), nie odvodená z pozície castera
+  const hit = def.target
+    ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
+    : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
   grid.innerHTML = "";
@@ -3489,6 +3581,7 @@ const dashBtn    = document.getElementById("dash-btn");
 const dashPicker = document.getElementById("dash-picker");
 const specialBtn    = document.getElementById("special-btn");
 const specialPicker = document.getElementById("special-picker"); // smer pohľadu — používa len Medúza
+const cellPicker    = document.getElementById("cell-picker");    // Vojak — mini mapa plochy na výber cieľovej bunky
 
 function shakeBtn(btn) {
   btn.classList.add("shake");
@@ -3497,9 +3590,9 @@ function shakeBtn(btn) {
 
 // otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
 // odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
-let openPicker = null; // null | "move" | "attack" | "dash" | "special"
-const PICKERS = { move: dirPicker, attack: aimPicker, dash: dashPicker, special: specialPicker };
-const PICKER_BTNS = { move: moveBtn, attack: attackBtn, dash: dashBtn, special: specialBtn };
+let openPicker = null; // null | "move" | "attack" | "dash" | "special" | "special_cell"
+const PICKERS = { move: dirPicker, attack: aimPicker, dash: dashPicker, special: specialPicker, special_cell: cellPicker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn };
 
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
@@ -3552,9 +3645,44 @@ function togglePicker(kind, btn, usedType) {
 moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"));
 attackBtn.addEventListener("click", () => togglePicker("attack", attackBtn, "attack"));
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
-// Special: Medúza si najprv vyberie smer pohľadu (←/→), ostatní mágovia pridajú akciu priamo
+// Vojak: mini mapa plochy pod special tlačidlom — klik vyberie cieľovú bunku lúča. Blokované:
+// vlastná GHOST pozícia (kde budem v čase specialu po naplánovaných move/dash) a súperova aktuálna
+// bunka + jeho tieňový klon (obe figúry — blokovanie len pravej by prezradilo, ktorá je skutočná).
+// V labyrinte má súper x=null (server rediguje) → neblokuje sa nič okrem vlastnej bunky (streľba naslepo).
+function buildCellPicker() {
+  if (!cellPicker) return;
+  cellPicker.innerHTML = "";
+  cellPicker.style.gridTemplateColumns = `repeat(${board.w}, auto)`;
+  const gp = ghostPos(); // pozícia, z ktorej sa special vykoná (po akciách už vo fronte)
+  const opp = state?.[otherSlot()];
+  for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn mini-target";
+    const isMe  = !!(gp && gp.x === x && gp.y === y);
+    const isFoe = !!(opp && opp.x === x && opp.y === y) || !!(opp?.clone && opp.clone.x === x && opp.clone.y === y);
+    if (isMe)       { b.disabled = true; b.classList.add("own"); b.textContent = "▲"; b.title = "Your position at that point of the queue"; }
+    else if (isFoe) { b.disabled = true; b.classList.add("foe"); b.textContent = "✕"; b.title = "Opponent's current cell — they're hit only if they move"; }
+    b.addEventListener("mouseenter", () => showPreviewCells([[x, y]]));
+    b.addEventListener("mouseleave", clearPreviewCells);
+    b.addEventListener("click", () => {
+      if (uiLocked() || b.disabled) return;
+      if (myQueue.length >= 3 || myQueue.some(a => a.type === "special")) return;
+      myQueue.push({ type: "special", cell: { x, y } });
+      closePickers();
+      renderQueue();
+    });
+    cellPicker.appendChild(b);
+  }
+}
+// Special: Medúza/Escanor si najprv vyberú smer pohľadu (←/→), Vojak cieľovú bunku; ostatní pridajú akciu priamo
 specialBtn.addEventListener("click", () => {
   if (ghostCharAt() === "medusa" || ghostCharAt() === "escanor") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
+  if (ghostCharAt() === "soldier") {
+    if (openPicker !== "special_cell") buildCellPicker(); // obsah podľa aktuálnych pozícií + ghost fronty
+    togglePicker("special_cell", specialBtn, "special");
+    return;
+  }
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(specialBtn); return; }
   if (myQueue.length >= 3 || myQueue.some(a => a.type === "special")) { shakeBtn(specialBtn); return; }
@@ -4009,7 +4137,20 @@ function autoLockTimeout() {
   while (myQueue.length < 3 && pool.length) {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
     if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
-    else if (t === "special" && ghostCharAt() === "medusa") myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin special potrebuje smer
+    else if (t === "special" && (ghostCharAt() === "medusa" || ghostCharAt() === "escanor")) myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
+    else if (t === "special" && ghostCharAt() === "soldier") {
+      // Vojakov special potrebuje cieľovú bunku — náhodná platná (nie vlastná ghost, nie súperova figúra/klon;
+      // skrytý súper v labyrinte má x null → neblokuje sa), inak by server celý lock odmietol
+      const gp = ghostPos(), opp = state?.[otherSlot()];
+      const opts = [];
+      for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) {
+        if (gp && gp.x === x && gp.y === y) continue;
+        if (opp && opp.x === x && opp.y === y) continue;
+        if (opp?.clone && opp.clone.x === x && opp.clone.y === y) continue;
+        opts.push({ x, y });
+      }
+      if (opts.length) myQueue.push({ type: t, cell: opts[Math.floor(Math.random() * opts.length)] });
+    }
     else myQueue.push({ type: t });
   }
   const payload = [...myQueue];
@@ -4280,6 +4421,10 @@ socket.on("state", (s) => {
       // Escanor: smerový dmg (8); rozsah rastie s pride levelom (veľkosť postavy na ploche = indikátor pride)
       specialBtn.title = "Special (−5 mana, 8 dmg) — choose a direction (left/right)";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
+    } else if (specChar === "soldier") {
+      // Vojak: snajperský lúč na zvolenú bunku — súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
+      specialBtn.title = "Special (−5 mana, 10 dmg) — pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it";
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 10${miniPix("☠️")}`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {

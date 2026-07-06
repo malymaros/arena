@@ -377,6 +377,17 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 /* special picker má len ←/→ — jednoriadková mriežka bez prázdnych oblastí kríža */
 .dir-picker.special-picker{ grid-template-areas: "left right"; }
 
+/* Vojak: mini mapa plochy na výber cieľovej bunky specialu (stĺpce nastaví buildCellPicker podľa board.w) */
+.dir-picker.cell-picker{ grid-template-areas: none; gap: 3px; }
+.cell-picker .mini-target{
+  width: 28px; height: 21px; padding: 0;
+  font-size: 11px; line-height: 1; font-weight: 800;
+  background: #37405a; border-radius: 2px;
+}
+.cell-picker .mini-target:hover:not(:disabled){ background: #7b1fa2; } /* fialová ako special */
+.cell-picker .mini-target.own{ background: #14324a; color: #5bc0ff; cursor: not-allowed; opacity: .85; } /* moja (ghost) bunka */
+.cell-picker .mini-target.foe{ background: #47201f; color: #ff8a7a; cursor: not-allowed; opacity: .85; } /* súperova aktuálna bunka / jeho klon */
+
 /* Colors */
 .btn.mana    { background: #1565c0; } /* Recharge (+4) — modrá ako mana bar */
 .btn.attack  { background: #b71c1c; } /* Basic (−2, smerová strela) — červená */
@@ -1912,6 +1923,26 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   @keyframes mirror-shard{
     0%   { transform: translate(-50%,-50%) rotate(0deg); opacity: 1; }
     100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)); opacity: 0; }
+  }
+
+  /* Vojak: snajperský lúč zo zbrane na zvolenú bunku — tenká červená verzia mirror beamu
+     (wrap drží rotáciu, vnútro animuje scaleX; dopad ~350 ms = SOLDIER_BEAM_HIT_MS, kedy štartuje výbuch) */
+  .soldier-beam-wrap{ transform-origin: left center; }
+  .soldier-beam{
+    width: 100%; height: 100%;
+    transform-origin: left center;
+    transform: scaleX(0);
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(255,120,80,0) 0%, #ff5a3c 18%, #ffe0b2 50%, #ff3d2e 100%);
+    box-shadow: 0 0 10px 3px rgba(255,70,45,.85);
+    animation: soldier-beam .9s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  @keyframes soldier-beam{
+    0%   { transform: scaleX(0); opacity: 0; }
+    12%  { opacity: 1; }
+    38%  { transform: scaleX(1); opacity: 1; filter: brightness(1.6); }
+    70%  { transform: scaleX(1); opacity: .9; filter: brightness(1.2); }
+    100% { transform: scaleX(1); opacity: 0; filter: brightness(1); }
   }
 
   /* lúč odrazu obranca → útočník (wrap drží rotáciu, vnútro animuje scaleX) */
