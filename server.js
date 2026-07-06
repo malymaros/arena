@@ -533,9 +533,9 @@ function applyHitOnClone(ownerSlot, rawDmg, tl, kind = "basic", quietDefense = f
   killClone(ownerSlot, tl);
 }
 // status special (petrify/labyrint) na klona cez obrany majiteľa — analógia applyHitOnClone:
-// shield blokuje, mirror odrazí STATUS na castera (ako applyPetrify/applyLabyrinth). Bez obrany klona
-// NEZABÍJA — status kliatby sa týkajú len skutočného Naruta (skamenený majiteľ aj tak „zmrazí" obe figúry,
-// prekliaty si klona nesie do labyrintu); klon zomiera len na dmg zásahy, IK tile, smrť/swap majiteľa a recast.
+// shield blokuje, mirror odrazí STATUS na castera (ako applyPetrify/applyLabyrinth). Bez obrany:
+// PETRIFY klona ZABIJE (zásah kliatby ho rozplynie ako každý iný zásah), LABYRINT nie — kliatba bludiska
+// sa týka len skutočného Naruta (prekliaty si klona nesie do labyrintu so sebou).
 function applyStatusOnClone(ownerSlot, tl, statusKind, quietDefense = false) {
   const o = game.players[ownerSlot];
   if (!o?.clone) return;
@@ -551,7 +551,8 @@ function applyStatusOnClone(ownerSlot, tl, statusKind, quietDefense = false) {
     else { endLabyrinths(tl); loseInLabyrinth(atkSlot, tl); }
     return;
   }
-  // bez obrany: klon prežije — status naň nemá účinok
+  // bez obrany: petrify klona rozplynie; labyrint klona nechá žiť (kliatba len na skutočného Naruta)
+  if (statusKind === "petrify") killClone(ownerSlot, tl);
 }
 // klon kopíruje pohyb majiteľa: horizontálne rovnako, VERTIKÁLNE INVERZNE (up<->down); kroky mimo boardu prepadnú
 function moveCloneSteps(slot, delta, maxSteps) {
