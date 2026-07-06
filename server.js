@@ -845,8 +845,9 @@ function doBasic(slot, dir, tl) {
       if (h.target === "stacked") {
         const defended = op.shield || op.mirror; // zdieľaná obrana kryje celý zásah (klon prežije)
         if (defended) {
-          applyHitOnClone(opS, raw, tl, "basic", true); // quiet — obrana sa ukáže cez applyHit nižšie
-          if (!winnerNow()) applyHit(opS, raw, tl, "basic", h.shot.clone);
+          // obe figúry na JEDNEJ bunke → obrana zareaguje ako jedna postava v JEDNOM beate
+          // (jeden block / jeden lúč + odraz oboch figúr naraz ako „n+n" hit) — nie dva zásahy za sebou
+          applyHitPairDefended(opS, raw, tl, "basic", h.shot.clone);
         } else {
           // klon na majiteľovej bunke pohltí len CLONE_DMG (zomrie), zvyšok dmg prejde na Naruta
           applyHitOnClone(opS, CLONE_DMG, tl, "basic");
@@ -1014,6 +1015,39 @@ function applyStackedHit(targetSlot, raws, tl, kind = "basic") {
   return true;
 }
 
+// Zásah JEDNEJ akcie do STACKNUTÉHO páru Naruto+klon so zdieľanou obranou (obe figúry na jednej bunke).
+// Obrana zareaguje ako JEDNA postava v JEDNOM beate: shield = jeden block frame; mirror = JEDEN lúč z bunky
+// páru a útočník dostane odraz OBOCH figúr NARAZ — jeden hit frame s parts [n, n] (klient vypíše rozpis
+// v jednom floate a HP klesne naraz). fromClone (strela pochádza od útočníkovho klona): odraz z páru
+// rozplynie útočníkovho klona a HP zásah nesie len jednu časť — zachováva pôvodnú kombináciu
+// applyHitOnClone (odraz do HP) + applyHit (fromClone → killClone), len v jednom spoločnom beate.
+// Volať LEN keď je obrana armed (o.shield || o.mirror) a klon stojí na majiteľovej bunke.
+function applyHitPairDefended(ownerSlot, rawDmg, tl, kind = "basic", fromClone = false) {
+  const o = game.players[ownerSlot];
+  const atkSlot = other(ownerSlot);
+  const atk = game.players[atkSlot];
+  if (o.shield) {
+    pushStateFrame(tl, [{ kind: "block", target: ownerSlot, gold: !!o.shieldGold }], SMALL_DELAY_MS);
+    endLabyrinths(tl);
+    return;
+  }
+  pushStateFrame(tl, [{ kind: "mirror", target: ownerSlot, dmg: rawDmg, atk: kind, gold: !!o.mirrorGold }], MIRROR_BEAM_MS);
+  if (fromClone) {
+    const d = recvDmg(atkSlot, rawDmg);
+    atk.hp = Math.max(0, atk.hp - d);
+    const fx = [{ kind: "hit", target: atkSlot, dmg: d }];
+    if (atk.clone) { fx.push({ kind: "clone_die", target: atkSlot, cell: [atk.clone.x, atk.clone.y] }); atk.clone = null; }
+    pushStateFrame(tl, fx, SMALL_DELAY_MS);
+    endLabyrinths(tl);
+    return;
+  }
+  const parts = [recvDmg(atkSlot, rawDmg), recvDmg(atkSlot, rawDmg)];
+  const total = parts[0] + parts[1];
+  atk.hp = Math.max(0, atk.hp - total);
+  pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: total, parts }], SMALL_DELAY_MS);
+  endLabyrinths(tl);
+}
+
 // Jedna akcia zasiahne obrancu (ownerSlot) a VOLITEĽNE aj jeho tieňového klona (includeClone) — keďže Naruto
 // a klon sú „tá istá postava" so zdieľanou obranou, ich reakcie idú do SPOLOČNÝCH beatov (blok / mirror-lúč /
 // hit sa prehrajú NARAZ, nie sekvenčne). ownerDmg = dmg na Naruta; klon vždy „stojí za" flat CLONE_DMG×buff.
@@ -1041,8 +1075,11 @@ function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
     const dO = recvDmg(atkSlot, ownerDmg);
     const dC = withClone ? recvDmg(atkSlot, cloneRaw) : 0;
     atk.hp = Math.max(0, atk.hp - dO - dC);
-    const hits = [{ kind: "hit", target: atkSlot, dmg: dO }];
-    if (dC > 0) hits.push({ kind: "hit", target: atkSlot, dmg: dC });
+    // oba odrazy dopadnú na útočníka ako JEDEN úder so súčtom a rozpisom (klient: jeden float „-n -n HP"),
+    // nie dva samostatné floaty — HP klesne naraz
+    const hits = dC > 0
+      ? [{ kind: "hit", target: atkSlot, dmg: dO + dC, parts: [dO, dC] }]
+      : [{ kind: "hit", target: atkSlot, dmg: dO }];
     pushStateFrame(tl, hits, SMALL_DELAY_MS);
     endLabyrinths(tl);
     return;

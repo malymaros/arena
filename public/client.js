@@ -1097,8 +1097,14 @@ function retireProjectile(key) {
 }
 // zosúlaď perzistentné projektily s charge efektmi tohto frame-u: nové/pohnuté posuň, chýbajúce stiahni
 function reconcileProjectiles(charges, s) {
+  // stacknutý Naruto+klon strieľajúci ROVNAKÝM smerom z jednej bunky = dve identické strely presne na sebe →
+  // kresli len majiteľovu (vizuálne JEDEN projektil, dmg aj tak dopadne spojený ako „n+n"); vertikálne
+  // rozdelené strely majú inú bunku/smer a ostávajú obe
+  const drawn = charges.filter(c => !(c?.clone && charges.some(o => o && !o.clone && o.from === c.from
+    && Array.isArray(o.cell) && Array.isArray(c.cell)
+    && o.cell[0] === c.cell[0] && o.cell[1] === c.cell[1] && o.dir === c.dir)));
   const live = new Set();
-  for (const c of charges) {
+  for (const c of drawn) {
     if (!c || !Array.isArray(c.cell)) continue;
     live.add(`${c.from}-${c.clone ? 1 : 0}`);
     spawnOrMoveProjectile(c, s);
@@ -3389,6 +3395,7 @@ function renderAbilityPreview(char) {
       abilityCasterCanvas = mini;
     } else if (hit.has(`${x},${y}`)) {
       c.classList.add("hit");
+      c.style.animationDelay = -(performance.now() % 1000) + "ms"; // sync fáza pulzu s neskôr pridanými bunkami (viď markEscPridePreview)
     }
     grid.appendChild(c);
   }
@@ -3424,7 +3431,14 @@ function markEscPridePreview(now) {
   const hit = new Set(cellsForSpecialPreview({ x: s.caster.x, y: s.caster.y, char: "escanor", pride: s.pride }, s.dir).map(([x, y]) => `${x},${y}`));
   s.grid.querySelectorAll(".mini-cell").forEach(c => {
     if (c.classList.contains("caster")) return;
-    c.classList.toggle("hit", hit.has(`${c.dataset.gx},${c.dataset.gy}`));
+    const on = hit.has(`${c.dataset.gx},${c.dataset.gy}`);
+    // SYNCHRÓNNY pulz: fáza animácie sa kotví na globálne hodiny (záporný animation-delay = -(now mod 1s)),
+    // inak bunky pridané pri rôznych pride leveloch blikajú každá vo vlastnej fáze. Delay sa nastavuje len
+    // pri PRIDANÍ triedy — zmena delay na bežiacej animácii by ju reštartovala každý frame.
+    if (on && !c.classList.contains("hit")) {
+      c.style.animationDelay = -(now % 1000) + "ms"; // mini-hit-pulse má 1s cyklus
+      c.classList.add("hit");
+    } else if (!on) c.classList.remove("hit");
   });
 }
 function clearAbilityPreview() {
