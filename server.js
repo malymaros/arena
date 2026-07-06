@@ -47,6 +47,19 @@ const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECI
 
 const SPECIAL_COST = 5;
 const SOLDIER_SPECIAL_DMG = 10; // Vojakov snajperský lúč na zvolenú bunku — trafí, len ak tam súper PRÍDE (cieľ nesmie byť jeho aktuálna bunka)
+// Vlkolak (werewolf): charge special — dmg podľa fázy mesiaca (index = moon level 0–3: nov/kosáčik/polmesiac/spln)
+const WOLF_MOON_DMG = [2, 4, 6, 8];
+// vlkolakov special má 8 smerov (aj diagonály) — kľúče nesie akcia v `dir`
+const WOLF_DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
+const WOLF_DIR_KEYS = Object.keys(WOLF_DIRS);
+// fáza mesiaca podľa AKTUÁLNYCH HP (prepočítava sa na konci kola + pri nasadení/swape):
+// 10 → 0 (nov), 9–7 → 1 (kosáčik), 6–4 → 2 (polmesiac), 3–1 → 3 (spln)
+function moonLevelFor(hp) {
+  if (hp >= 10) return 0;
+  if (hp >= 7) return 1;
+  if (hp >= 4) return 2;
+  return 3;
+}
 const STONE_ACTIONS = 2; // Medúzin special: zasiahnutý súper preskočí najbližšie 2 základné akcie (kameň)
 // Minotaurov special (labyrint) nemá číselnú konštantu — trvá, kým jeden hráč nezasiahne druhého (viď endLabyrinths)
 const CLONE_DMG = 1; // Narutov klon: koľko pohltí na zdieľanej bunke (jednorazový bait), kým zvyšok strely prejde na Naruta. Útok aj odraz mirrorom dávajú PLNÝ dmg ako Naruto (viď doBasic/doMelee/applyHitOnClone)
@@ -69,7 +82,7 @@ const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // koľko vyhratých hier treba na zisk série
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
-const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor", "soldier"];
+const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor", "soldier", "werewolf"];
 // tournament: každý hráč si pred hrou 1 naslepo draftne vlastný tím TEAM_SIZE postáv z celého poolu CHARS
 // (choose_team vo fáze team_select); tím je fixný na celú sériu a určuje kľúče mageHp/mageMana danej osoby.
 const TEAM_SIZE = 3;
@@ -98,6 +111,10 @@ const SOLDIER_BEAM_MS  = 900;
 // Escanor special: server podrží zásah o dĺžku klientskej choreografie (WinSun→CruelSunHold→slnko→SunBurst),
 // aby dmg dopadol AŽ po dokončení animácie. MUSÍ sedieť s klientskou choreografiou v client.js (runEscanorSpecial).
 const ESC_SPECIAL_MS   = 4625;
+// Vlkolak special: rozbehový cast (veľký Run+Attack v strede) → beh po doske → Attack_2 seknutie na bunke
+// terča → až potom dopadne dmg. Časy musia sedieť s klientskou obsluhou wolf_charge/wolf_strike v client.js.
+const WOLF_CAST_MS     = Math.round(1200 * ANIM_SLOW);
+const WOLF_STRIKE_MS   = Math.round(900 * ANIM_SLOW);
 const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za bunku — rýchla strela, aby ani 3-bunkový let nebol pomalší než iné akcie
 const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
 // Teleport (výmena maga v turnaji) — dvojfázová animácia: (1) starý mág zmizne, (2) nový sa objaví
@@ -146,11 +163,14 @@ function newPlayer(slot) {
     x: pos.x, y: pos.y,
     hp: START_HP,
     mana: START_MANA,
-    char: null,        // "fire" | "lightning" | "wanderer" | "medusa" | "minotaur" | "naruto" | "escanor"
+    char: null,        // "fire" | "lightning" | "wanderer" | "medusa" | "minotaur" | "naruto" | "escanor" | "soldier" | "werewolf"
     stone: 0,          // koľko najbližších základných akcií hráč preskočí skamenený (Medúzin special)
     // Escanor: „pride level" 0–3. Rozsah smerového specialu rastie s levelom (0=1 bunka, 3=celá plocha).
     // Na konci kola: použil shield/mirror (aj golden)? → −1, inak → +1 (clamp 0–3). Reset na 0 pri nasadení.
     pride: 0,
+    // Vlkolak: „fáza mesiaca" 0–3 (nov → spln) = dmg jeho charge specialu (WOLF_MOON_DMG). Odvodená z HP
+    // (moonLevelFor) — prepočíta sa na KONCI každého kola a pri nasadení/swape. Verejná (veľkosť postavy je tell).
+    moon: 0,
     // Narutov tieňový klon: { x, y } alebo null. Kopíruje všetky základné akcie majiteľa (vertikálny pohyb
     // inverzne), spôsobuje vždy len CLONE_DMG, zmizne pri akomkoľvek zásahu (obrany zdieľa s majiteľom —
     // armujú sa aj spotrebúvajú spolu, sú to tie isté shield/mirror flagy)
@@ -369,12 +389,12 @@ function emitStateMasked(timeline = null) {
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, stone, pride, labyrinth, labReveal, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
+  const { slot, x, y, hp, mana, char, stone, pride, moon, labyrinth, labReveal, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
   // niť treba hlboko kopírovať — server do nej pushuje, plytká referencia by menila už uložené timeline framy
   const thread = (a.thread || []).map(c => [...c]);
   const threadMark = a.threadMark ? [...a.threadMark] : null;
   const clone = a.clone ? { ...a.clone } : null; // Narutov tieňový klon (pozícia)
-  return { slot, x, y, hp, mana, char, stone, pride, labyrinth, labReveal, thread, threadMark, clone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
+  return { slot, x, y, hp, mana, char, stone, pride, moon, labyrinth, labReveal, thread, threadMark, clone, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
 }
 function snapshot() {
   return {
@@ -675,6 +695,18 @@ function validQueue(queue, slot) {
       const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
       if (a.type === "move" && d && inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
       if (a.type === "dash" && d) for (let s = 0; s < 2; s++) if (inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
+      // Vlkolakov charge hýbe kasterom — simuluj presun (stop na prvej VIDITEĽNEJ figúre súpera alebo na
+      // okraji; v labyrinte je súper skrytý → beh na okraj, zrkadlí klientský ghost). Ovplyvňuje ghost
+      // pozíciu neskoršieho Vojakovho specialu po turnajovom swape.
+      if (a.type === "special" && simChar === "werewolf") {
+        const wd = WOLF_DIRS[a.dir];
+        if (wd) {
+          while (inBounds(sx + wd[0], sy + wd[1])) {
+            sx += wd[0]; sy += wd[1];
+            if (!meP?.labyrinth && foe && ((foe.x === sx && foe.y === sy) || (foe.clone && foe.clone.x === sx && foe.clone.y === sy))) break;
+          }
+        }
+      }
       if (a.type === "special" && simChar === "soldier") {
         const c = a.cell;
         if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
@@ -1361,6 +1393,54 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     return;
   }
 
+  // Vlkolak (werewolf): „moon charge" — rozbehne sa jedným z 8 smerov (aj diagonály) a zastane na PRVEJ
+  // figúre súpera v dráhe (klon-návnada absorbuje úder skôr než súper — ako pri melee) alebo na okraji
+  // plochy. Vlastnú bunku nezasahuje (súper na vlkolakovej bunke = beh na okraj bez hitu, ako basic).
+  // Zásah = WOLF_MOON_DMG[moon] (bez falloffu podľa vzdialenosti) cez obrany ako každý dmg special
+  // (shield blokuje, mirror odrazí plný moon dmg) — vlkolak ale na bunke terča OSTÁVA STÁŤ aj pri
+  // bloku/odraze (hit je hit). Bez terča je akcia len presun na poslednú bunku smeru; charge z okrajovej
+  // bunky von z plochy sa VYKONÁ podľa wall pravidla (mana preč, wall_bump, neprečiarkuje sa).
+  if (actor.char === "werewolf") {
+    const delta = WOLF_DIRS[dir];
+    if (!delta) { pushInvalid(tl, slot); return; }
+    actor.mana -= SPECIAL_COST;
+    const foeS = other(slot);
+    const foe  = game.players[foeS];
+    // dráha: krok za krokom po okraj; stop na prvej figúre (klon pred súperom — bait pravidlo ako melee)
+    let x = actor.x, y = actor.y, target = null; // null | "clone" | "player"
+    const path = [];
+    while (inBounds(x + delta[0], y + delta[1])) {
+      x += delta[0]; y += delta[1];
+      path.push([x, y]);
+      const cloneHere  = !!(foe?.clone && foe.clone.x === x && foe.clone.y === y);
+      const playerHere = !!(foe && foe.x === x && foe.y === y);
+      if (cloneHere) { target = "clone"; break; }
+      if (playerHere) { target = "player"; break; }
+    }
+    // charge do steny z okrajovej bunky — akcia sa vykoná na mieste: rozbehová póza + náraz (OUT OF BOUNDS)
+    if (!path.length) {
+      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: [] }], WOLF_CAST_MS);
+      pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
+      return;
+    }
+    const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * dealMul(slot) * labyrinthMul(slot);
+    // istý zásah REÁLNEHO hráča (aj do štítu/zrkadla) odhalí prípadný labyrint pred animáciou;
+    // zásah klona-návnady labyrint neodhaľuje (kill klona ho nekončí — súper sa nesmie dozvedieť, že trafil klona)
+    if (target === "player") revealLabyrinths(tl);
+    // rozbehový cast: veľký Run+Attack v strede, malá postava tiež (casting), dráha bliká
+    pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: path.map(c => [...c]) }], WOLF_CAST_MS);
+    // samotný beh: presun na cieľovú bunku jedným sklzom (ako dash); niť labyrintu ráta všetky prejdené bunky
+    actor.x = path[path.length - 1][0];
+    actor.y = path[path.length - 1][1];
+    pushStateFrame(tl, [{ kind: "wolf_charge", from: slot, dir }, ...trackSteps(slot, path)], MOVE_DELAY_MS);
+    if (!target) return; // dobehol na okraj bez terča — len presun
+    // seknutie (Attack_2) na bunke terča; dmg/block/odraz dopadne až po ňom
+    pushStateFrame(tl, [{ kind: "wolf_strike", from: slot, cell: [actor.x, actor.y] }], WOLF_STRIKE_MS);
+    if (target === "player") applyHit(foeS, raw, tl, "special");
+    else applyHitOnClone(foeS, raw, tl, "special");
+    return;
+  }
+
   // Escanor: smerový (left/right) dmg special; rozsah zóny podľa pride levelu (8 dmg). Cez obrany ako
   // ostatné dmg speciály (shield blokuje, mirror odrazí 8 na Escanora). Zóna = escanorCells (pride).
   if (actor.char === "escanor") {
@@ -1485,6 +1565,7 @@ function doSwap(slot, to, tl) {
   me.pride = 0; // Escanor: nasadenie swapom začína na pride 0
   me.hp = game.mageHp[person][to];
   me.mana = game.mageMana[person][to];
+  me.moon = to === "werewolf" ? moonLevelFor(me.hp) : 0; // Vlkolak: fáza HNEĎ podľa preneseného HP
   // (2) nový mág sa objaví
   pushStateFrame(tl, [{ kind: "teleport_in", from: slot, char: to }], TELEPORT_IN_MS);
 }
@@ -1689,6 +1770,7 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limi
     const t = pool.shift();
     if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] });
     else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
+    else if (t === "special" && char === "werewolf") q.push({ type: t, dir: WOLF_DIR_KEYS[Math.floor(Math.random() * WOLF_DIR_KEYS.length)] }); // Vlkolakov charge — náhodný z 8 smerov
     else if (t === "special" && char === "soldier") q.push({ type: t, cell: randomSoldierTarget(slot) }); // Vojakov special potrebuje cieľovú bunku
     else q.push({ type: t });
   }
@@ -2009,6 +2091,13 @@ function resolveTurn() {
   }
 
   if (!ended) {
+    // Vlkolak: fáza mesiaca sa prepočíta na KONCI kola z aktuálnych HP (po tiles, golden mane aj Last Stand
+    // full-heale) — nesie ju až finálny frame; klient porovná prvý/posledný frame a ukáže float s novou fázou.
+    for (const slot of ["p1", "p2"]) {
+      const p = game.players[slot];
+      if (p.char === "werewolf") p.moon = moonLevelFor(p.hp);
+    }
+
     // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)
     const nextTurn    = game.turn + 1;
     const nextStarter = game.starter === "p1" ? "p2" : "p1"; // preklop (hru mohol začínať aj p2)
@@ -2074,8 +2163,13 @@ function handleGameEnd(timelineDurationMs) {
     game.phase = "match_over";
     io.emit("game_over", { winner: w, series: seriesSnapshot() }); // séria skončila
   } else {
-    // medzihra: počkaj, kým klient dohrá timeline + animáciu smrti + zobrazí skóre, potom ďalšia hra
+    // medzihra: počkaj, kým klient dohrá timeline + animáciu smrti + zobrazí skóre, potom ďalšia hra.
+    // Guard na identitu hry: retry/admin reset medzitým vytvorí NOVÝ game objekt — stale časovač
+    // z opustenej série sa vtedy zahodí (inak by o desiatky sekúnd resetol postavy a startera
+    // úplne inej rozbehnutej hry).
+    const forGame = game;
     setTimeout(() => {
+      if (game !== forGame) return;
       io.emit("new_game", { series: seriesSnapshot() });
       startGame(game.series.gameIndex + 1);
     }, (timelineDurationMs || 0) + 6500);
@@ -2241,6 +2335,7 @@ io.on("connection", (socket) => {
     }
     me.char = key;
     me.pride = 0; // Escanor: každá nová hra začína na pride 0
+    me.moon = key === "werewolf" ? moonLevelFor(me.hp) : 0; // Vlkolak: fáza HNEĎ podľa (preneseného) HP
     // obaja vybrali -> začína 1. kolo, naštartuj časovač pred emitom (snapshot nesie timerMs pre refresh-sync)
     if (game.players.p1.char && game.players.p2.char) beginPlanningTimer(0);
     emitStateMasked(); // súperov pick sa odhalí až keď si vyberie aj druhý hráč (žiadna výhoda pre rozmýšľajúceho)

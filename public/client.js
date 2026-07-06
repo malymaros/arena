@@ -35,6 +35,14 @@ const hudCharP2 = document.getElementById("hud-char-p2");
 // Escanor pride indikátor (ikona+číslo) + rozsah abilitky (minimapka) v HUD widgete
 const prideBadge = { p1: document.getElementById("pride-p1"), p2: document.getElementById("pride-p2") };
 const prideRange = { p1: document.getElementById("prange-p1"), p2: document.getElementById("prange-p2") };
+// Vlkolak: fáza mesiaca (ikona bez čísla) vľavo + dmg specialu pri aktuálnej fáze vpravo v HUD widgete
+const moonBadge = { p1: document.getElementById("moon-p1"), p2: document.getElementById("moon-p2") };
+const moonDmg   = { p1: document.getElementById("mdmg-p1"), p2: document.getElementById("mdmg-p2") };
+// dmg vlkolakovho charge podľa fázy mesiaca — MUSÍ sedieť so serverovým WOLF_MOON_DMG
+const WOLF_MOON_DMG = [2, 4, 6, 8];
+// 8 smerov vlkolakovho specialu — MUSÍ sedieť so serverovým WOLF_DIRS
+const WOLF_DIRS_CLIENT = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
+const WOLF_DIR_KEYS_CLIENT = Object.keys(WOLF_DIRS_CLIENT);
 const flagP1    = document.getElementById("flag-p1");
 const flagP2    = document.getElementById("flag-p2");
 const logP1     = document.getElementById("log-p1");
@@ -233,11 +241,11 @@ youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
 // horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
-const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50, soldier: 0.47 };
+const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50, soldier: 0.47, werewolf: 0.50 };
 // vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
 // ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
-// Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128)
-const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48 };
+// Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128); Vlkolak je zhrbený nízko (vrch figúry ~0.55 framu)
+const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48, werewolf: 0.55 };
 
 // zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -286,6 +294,7 @@ const SPECIAL_ANIMS = {
   naruto:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true }, // pečate rukami (summon tieňového klona)
   escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder — plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
   soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // mierenie + výstrel — po stredovej animácii letí červený lúč na zvolenú bunku
+  werewolf:  { file: "Run+Attack.png",   fps: SPECIAL_FPS, loop: true }, // rozbeh charge — veľký stredový sprite hrá LEN Run+Attack (Attack_2 seknutie je na malej figúre pri dopade)
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
@@ -311,7 +320,10 @@ const CHAR_META = {
   // Natívna paleta; p2 = escanor_2 (zelené oblečenie prefarbené na červené). V karte: WeakIdle, hover IntroStand.
   escanor:   { name: "Escanor",          dir: "escanor", dirP2: "escanor_2" },
   // Vojak: p2 = soldier_2 (uniforma prefarbená na čiernu — tools/sprites-soldier); Charge.png = kotúľajúci sa granát
-  soldier:   { name: "Soldier",          dir: "soldier", dirP2: "soldier_2" }
+  soldier:   { name: "Soldier",          dir: "soldier", dirP2: "soldier_2" },
+  // Vlkolak: natívna p2 paleta (Werewolf_2, teplejší odtieň); Charge.png = prefarbený fire fireball per paleta
+  // (P1 mesačná modrá, P2 krvavá červená) — tools/sprites-werewolf
+  werewolf:  { name: "Werewolf",         dir: "Werewolf_1", dirP2: "Werewolf_2" }
 };
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
@@ -346,7 +358,10 @@ const ANIM_DEF = {
   wintalk: { file: "WinTalk.png",     fps: 5, loop: true }, // special fáza 3 (slnko letí na cieľ): len otvára/zatvára ústa, bez slnka a bez zdvihu
   // Vojak: vlastná póza pri recharge (ostatné postavy hrajú len auru v idle); loop — neslučkové anims
   // sa kreslia absolútnym časom (držali by len posledný frame), slučka sa pri frameHold ~1s prehrá raz
-  recharge: { file: "Recharge.png", fps: 12, loop: true }
+  recharge: { file: "Recharge.png", fps: 12, loop: true },
+  // Vlkolak: beh charge specialu (Run+Attack) + seknutie na bunke terča (WolfStrike.png → alias Attack_2.png)
+  wolfrun:    { file: "Run+Attack.png", fps: 12, loop: true },
+  wolfstrike: { file: "WolfStrike.png", fps: 10, loop: false }
 };
 const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
 const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
@@ -426,6 +441,9 @@ const SPRITE_FILE_ALIAS = {
   "minotaur/": { "Run.png": "Walk.png", "Attack_1.png": "Attack.png", "Attack_2.png": "Attack.png" },
   // Vojak (prefix chytí aj soldier_2): basic útok = hod granátom, melee = výstrel zblízka (Shot_1)
   "soldier": { "Attack_1.png": "Grenade.png", "Attack_2.png": "Shot_1.png" },
+  // Vlkolak (prefix chytí Werewolf_1 aj _2): melee = Attack_3; natívny Attack_2 je rezervovaný pre
+  // seknutie charge specialu (kľúč wolfstrike žiada fiktívny WolfStrike.png → mapuje sa naň)
+  "Werewolf_": { "Attack_2.png": "Attack_3.png", "WolfStrike.png": "Attack_2.png" },
 };
 function spriteFileFor(charDir, file) {
   for (const pfx in SPRITE_FILE_ALIAS) {
@@ -572,6 +590,8 @@ const HEAD_CROP = {
   minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51, cyP2: 0.43 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2/cyP2 = korekcia na posunutú figúru v Minotaur_2
   naruto:    { cx: 0.50, cy: 0.58, size: 0.26 }, // bojový postoj (Stance) — figúra centrovaná, bottom-anchor
   escanor:   { cx: 0.52, cy: 0.755, size: 0.11 }, // hlava zo slabej formy (WeakIdle) — figúra je DROBNÁ (~22×63 px pri spodku 226px framu), preto malý výrez nízko; cx mierne vpravo od stredu figúry = hlava v okienku mierne vľavo
+  soldier:   { cx: 0.46, cy: 0.555, size: 0.22 }, // hlava namerané z Idle.png riadky 62–82 (stred x ≈ 0.46) — telo sa nakláňa doprava, hlava je nad ľavou nohou
+  werewolf:  { cx: 0.73, cy: 0.62, size: 0.24, cxP2: 0.72 }, // zhrbený vlk hľadí doprava — hlava vpredu vpravo (bbox po recentrovaní x27–102, y71–127)
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
@@ -786,6 +806,20 @@ function spawnPrideFloat(slot, up) {
   const el = document.createElement("div");
   el.className = "pride-float " + (up ? "up" : "down");
   el.innerHTML = `<span class="pf-lion"></span><span class="pf-arrow">${up ? "▲" : "▼"}</span>`; // solídny lev + šípka vedľa
+  el.style.left = (left + TILE_W / 2) + "px";
+  el.style.top = (top - 24) + "px";
+  actorsEl.appendChild(el);
+  setTimeout(() => el.remove(), 1700);
+}
+
+// Vlkolak: po kole sa zmenila fáza mesiaca → float s NOVOU fázou nad ním (bez farieb/šípok — hráč vidí
+// len mesiac, čísla 0–3 sú čisto interné; aj pri preskoku o viac levelov sa ukáže len výsledná fáza)
+function spawnMoonFloat(slot, level) {
+  const p = state?.[slot]; if (!p || p.x == null) return;
+  const { left, top } = cellToPx(p.x, p.y);
+  const el = document.createElement("div");
+  el.className = "moon-float";
+  el.innerHTML = `<img src="/assets/moon_${Math.max(0, Math.min(3, level))}.png" alt="" />`;
   el.style.left = (left + TILE_W / 2) + "px";
   el.style.top = (top - 24) + "px";
   actorsEl.appendChild(el);
@@ -1805,7 +1839,28 @@ function renderHUD() {
   hudCharP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
   renderPrideHud("p1"); renderPrideHud("p2");
+  renderMoonHud("p1"); renderMoonHud("p2");
   updateGoldenButton();
+}
+
+// Vlkolak: fáza mesiaca (ikona BEZ čísla — level 0–3 je interný, hráč vidí len mesiac) vľavo,
+// dmg specialu pri aktuálnej fáze vpravo v HUD widgete. Pri inej postave sa oba prvky skryjú.
+function renderMoonHud(slot) {
+  const p = state?.[slot];
+  const badge = moonBadge[slot], dmgEl = moonDmg[slot];
+  if (!badge || !dmgEl) return;
+  if (!p || p.char !== "werewolf") { badge.classList.add("hidden"); dmgEl.classList.add("hidden"); return; }
+  const lvl = Math.max(0, Math.min(3, p.moon || 0));
+  const img = badge.querySelector("img");
+  if (img && !img.getAttribute("src").endsWith("_" + lvl + ".png")) img.src = "/assets/moon_" + lvl + ".png";
+  badge.classList.toggle("moon-max", lvl >= 3); // spln pulzuje (max dmg)
+  badge.classList.remove("hidden");
+  if (dmgEl.dataset.lvl !== String(lvl)) { // prekresli len pri zmene (renderHUD beží per frame)
+    dmgEl.dataset.lvl = String(lvl);
+    dmgEl.innerHTML = `${WOLF_MOON_DMG[lvl]}<span class="pix-ico mini" data-emoji="☠️"></span>`;
+    hydratePix(dmgEl);
+  }
+  dmgEl.classList.remove("hidden");
 }
 
 // Escanor: pride level (ikona+číslo) vľavo, rozsah abilitky pri aktuálnom pride (minimapka) vpravo v HUD widgete.
@@ -1843,7 +1898,7 @@ function renderPrideHud(slot) {
 // Narutov vertikálny pohyb je verejne zrkadlený klonom (klon ide opačne) → smer up/down by SÚPEROVI prezradil,
 // ktorá z dvoch figúr je pravý Naruto. V zázname/lište ho preto súperovi anonymizujeme na neutrálne „↕"
 // (vlastný hráč vidí svoj skutočný smer). Horizontálny smer je bezpečný — klon ho kopíruje 1:1 (figúry sa nerozídu).
-const ARROW_DIR = { up: "↑", down: "↓", left: "←", right: "→", vert: "↕" };
+const ARROW_DIR = { up: "↑", down: "↓", left: "←", right: "→", vert: "↕", up_left: "↖", up_right: "↗", down_left: "↙", down_right: "↘" };
 function displayDir(action, ownerSlot) {
   const dir = action?.dir;
   // Narutov klon zrkadlí vertikálu pri pohybe (move/dash) AJ pri basic útoku → smer up/down by súperovi prezradil,
@@ -2000,6 +2055,8 @@ function renderGrid(s, effects = []) {
     if (e?.kind === "demon_attack" && Array.isArray(e.cells)) {
       e.cells.forEach(([x, y]) => previewSet.add(`${x},${y}`));
     }
+    // vlkolakovo seknutie — zvýrazni bunku terča (ako melee)
+    if (e?.kind === "wolf_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
   }
 
   for (const sp of specials) {
@@ -2129,6 +2186,19 @@ function cellsForSpecialPreview(meState, dir){
     // cieľová bunka je súčasť AKCIE (cell), nie odvoditeľná z pozície — hover fronty ju rieši
     // attachQueueHover, prehrávanie číta sp.cells zo servera, char-select ABILITY_PREVIEW.target
     return cells;
+  } else if (char === "werewolf"){
+    // dráha charge: z pozície zvoleným z 8 smerov po PRVÚ figúru súpera (aj jeho klon) alebo okraj —
+    // zrkadlí doSpecial na serveri. Súpera dodáva volajúci cez meState.foe (hover fronty/pickera);
+    // bez neho (char-select ukážka) alebo so skrytým súperom v labyrinte (x null) ide dráha až na okraj.
+    const delta = WOLF_DIRS_CLIENT[dir];
+    if (!delta) return cells;
+    const foe = meState.foe;
+    let cx = x + delta[0], cy = y + delta[1];
+    while (cx >= 0 && cy >= 0 && cx < board.w && cy < board.h){
+      cells.push([cx, cy]);
+      if (foe && foe.x != null && ((foe.x === cx && foe.y === cy) || (foe.clone && foe.clone.x === cx && foe.clone.y === cy))) break;
+      cx += delta[0]; cy += delta[1];
+    }
   } else if (char === "escanor"){
     // smerový (left/right) — rozsah podľa pride levelu; zrkadlí escanorCells na serveri
     const pride = Math.max(0, Math.min(3, meState.pride ?? 0));
@@ -2168,18 +2238,33 @@ function simulatedPositions(){
   const mine = state?.[me];
   if (!mine) return [];
   let x = mine.x, y = mine.y;
+  let char = mine.char; // turnajový swap vo fronte mení maga — vlkolakov charge hýbe len vlkolakom
+  const inB = (px, py) => px >= 0 && py >= 0 && px < board.w && py < board.h;
   const out = [];
   for (const a of myQueue){
+    if (a.type === "swap" && a.to) char = a.to;
     const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
     if (a.type === "move" && d){
       const nx = x + d[0], ny = y + d[1];
-      if (nx >= 0 && ny >= 0 && nx < board.w && ny < board.h){ x = nx; y = ny; }
+      if (inB(nx, ny)){ x = nx; y = ny; }
     }
     if (a.type === "dash" && d){
       // až 2 políčka, na okraji sa skráti (zrkadlí server)
       for (let s = 0; s < 2; s++){
         const nx = x + d[0], ny = y + d[1];
-        if (nx >= 0 && ny >= 0 && nx < board.w && ny < board.h){ x = nx; y = ny; }
+        if (inB(nx, ny)){ x = nx; y = ny; }
+      }
+    }
+    // vlkolakov charge special hýbe kasterom: stop na prvej VIDITEĽNEJ figúre súpera alebo na okraji
+    // (skrytý súper v labyrinte má x null → beh na okraj; zrkadlí serverovú simuláciu vo validQueue)
+    if (a.type === "special" && char === "werewolf"){
+      const wd = WOLF_DIRS_CLIENT[a.dir];
+      if (wd){
+        const foe = state?.[otherSlot()];
+        while (inB(x + wd[0], y + wd[1])){
+          x += wd[0]; y += wd[1];
+          if (foe && foe.x != null && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
+        }
       }
     }
     out.push({ x, y });
@@ -2268,10 +2353,15 @@ function computeFacing(p1, p2) {
 const ESC_FEET_FRAC = 0.973;
 // escPrideDisplay: dočasné podržanie STAREJ veľkosti po kole — lev sa ukáže PRED zmenou, potom sa aplikuje nové pride
 let escPrideDisplay = { p1: null, p2: null };
+// levelová veľkosť postavy: Escanor = pride, Vlkolak = fáza mesiaca (rast 1.2^level od nôh);
+// vlkolakova ZÁKLADNÁ forma (nov) je zmenšená na 0.7× a rastie z nej (spln ≈ 1.21×), Escanor od 1×.
+// escPrideDisplay drží počas prehrávania kola STARÝ level pre oba prípady (nová veľkosť až po floate)
 const escPrideMul = a => {
-  if (a?.char !== "escanor") return 1;
-  const pr = (a.slot && escPrideDisplay[a.slot] != null) ? escPrideDisplay[a.slot] : (a.pride || 0);
-  return Math.pow(1.2, Math.max(0, Math.min(3, pr)));
+  const lvl = a?.char === "escanor" ? (a.pride || 0) : a?.char === "werewolf" ? (a.moon || 0) : null;
+  if (lvl === null) return 1;
+  const base = a.char === "werewolf" ? 0.7 : 1;
+  const pr = (a.slot && escPrideDisplay[a.slot] != null) ? escPrideDisplay[a.slot] : lvl;
+  return base * Math.pow(1.2, Math.max(0, Math.min(3, pr)));
 };
 // Escanorove FX (WinSun, melee center, letiace slnko, výbuch, charge strela) škálujú s Pridom rovnako ako telo:
 // pride0 = súčasná (autorská) veľkosť ako u ostatných post­áv, rast NAD ňu (1.2^pride, pride3 ≈ 1.73×) — nikdy menšie.
@@ -2286,7 +2376,7 @@ function escChargeMul(slot) { return escFxMul(slot) * Math.pow(1.2, -3); }
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
 // vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
-const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80 };
+const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2 || p1.x !== p2.x || p1.y !== p2.y) return 0;
@@ -2463,10 +2553,11 @@ function attachQueueHover(el, a, idx) {
     // pride: Escanorova zóna závisí od AKTUÁLNEHO pride levelu (rovnako ako hover na šípkach pickeru) —
     // bez neho by náhľad ukazoval vždy pride 0; pride sa mení až na konci kola, takže current je správny
     // Vojak: akcia nesie cieľovú bunku — zvýrazni presne ju (zóna sa nedá odvodiť z pozície)
+    // Vlkolak: dráha charge sa zastaví na viditeľnej figúre súpera → preview potrebuje foe
     el.addEventListener("mouseenter", () => {
       if (a.cell) { showPreviewCells([[a.cell.x, a.cell.y]]); return; }
       const char = ghostCharAt(idx); const p = ghostPos(idx);
-      if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride }, a.dir));
+      if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, foe: state?.[otherSlot()] }, a.dir));
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
@@ -2660,7 +2751,7 @@ function updateActionButtons() {
   // special už nemá data-act (kvôli Medúzinmu pickeru) — zneaktívni ho rovnako ako move/attack/dash
   const specialUsed = myQueue.some(a => a.type === "special");
   specialBtn.disabled = specialUsed;
-  if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); }
+  if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); wolfPicker?.classList.add("hidden"); }
 }
 function updateLockButton() {
   const locked = !!state?.[me]?.locked;
@@ -2792,11 +2883,13 @@ function schedulePlayTimeline(timeline) {
   actorsEl.querySelectorAll(".sun-fx, .esc-big").forEach(n => n.remove());
 
   const first = timeline[0];
-  // Escanor: pride pred kolom (na konci prehrávania porovnáme s novým → float zelený ▲ / červený ▼)
-  const prePride = { p1: first.p1?.pride ?? 0, p2: first.p2?.pride ?? 0 };
-  // drž veľkosť podľa pride NA ZAČIATKU kola cez celé kolo (nová veľkosť sa aplikuje až po kole, keď sa ukáže lev) —
-  // inak by posledný frame (s novým pride) zmenil veľkosť ešte pred levom
-  for (const slot of ["p1", "p2"]) if (first[slot]?.char === "escanor") escPrideDisplay[slot] = prePride[slot];
+  // levelová veľkosť (Escanor pride / Vlkolakova fáza mesiaca) pred kolom — na konci prehrávania porovnáme
+  // s novou hodnotou → float (lev ▲▼ / nová fáza mesiaca)
+  const lvlOf = (a) => a?.char === "escanor" ? (a.pride ?? 0) : a?.char === "werewolf" ? (a.moon ?? 0) : null;
+  const preLvl = { p1: lvlOf(first.p1), p2: lvlOf(first.p2) };
+  // drž veľkosť podľa levelu NA ZAČIATKU kola cez celé kolo (nová veľkosť sa aplikuje až po kole, keď sa
+  // ukáže float) — inak by posledný frame (s novým levelom) zmenil veľkosť ešte pred floatom
+  for (const slot of ["p1", "p2"]) if (preLvl[slot] != null) escPrideDisplay[slot] = preLvl[slot];
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
   const playStarter = first.starter ?? state?.starter ?? "p1";
   const beatCounts = { p1: 0, p2: 0 };
@@ -2832,17 +2925,19 @@ function schedulePlayTimeline(timeline) {
     if (i >= timeline.length) {
       playing = false;
 
-      // Escanor: pride sa po kole zmenil → veľkosť je stále držaná na starej (od začiatku kola); ukáž leva nad ním
-      // a AŽ POTOM (po pauze) pusti na novú veľkosť (plynulý prechod). Bez zmeny → hneď pusti hold.
+      // Escanor/Vlkolak: level sa po kole zmenil → veľkosť je stále držaná na starej (od začiatku kola);
+      // ukáž float nad ním (lev ▲▼ / nová fáza mesiaca) a AŽ POTOM (po pauze) pusti na novú veľkosť
+      // (plynulý prechod). Bez zmeny → hneď pusti hold. Iná postava (swap) → hold len zruš.
       for (const slot of ["p1", "p2"]) {
-        if (state?.[slot]?.char !== "escanor") continue;
-        const nowP = state[slot].pride ?? 0;
-        if (nowP !== prePride[slot]) {
-          spawnPrideFloat(slot, nowP > prePride[slot]); // lev sa ukáže NAD ním, veľkosť ešte stará
+        const nowLvl = lvlOf(state?.[slot]);
+        if (nowLvl === null) { escPrideDisplay[slot] = null; continue; }
+        if (preLvl[slot] != null && nowLvl !== preLvl[slot]) {
+          if (state[slot].char === "escanor") spawnPrideFloat(slot, nowLvl > preLvl[slot]); // lev NAD ním, veľkosť ešte stará
+          else spawnMoonFloat(slot, nowLvl); // vlkolak: len nová fáza mesiaca, bez farieb a šípok
           const sl = slot;
           setTimeout(() => { escPrideDisplay[sl] = null; positionActors(state); }, 650); // potom plynulé zväčšenie/zmenšenie
         } else {
-          escPrideDisplay[slot] = null; // bez zmeny pride — pusti hold
+          escPrideDisplay[slot] = null; // bez zmeny levelu — pusti hold
         }
       }
 
@@ -2932,6 +3027,23 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "special" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
         facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
+      // Vlkolak: rozbehový cast aj beh charge — otočený v horizontálnom smere behu (diagonály vrátane)
+      if ((e.kind === "special" || e.kind === "wolf_charge") && (e.from === "p1" || e.from === "p2")
+          && state?.[e.from]?.char === "werewolf" && typeof e.dir === "string") {
+        const sx = e.dir.includes("left") ? -1 : e.dir.includes("right") ? 1 : 0;
+        if (sx) facingOverride[e.from] = { sx, until: performance.now() + frameHold + POSE_TAIL_MS };
+      }
+      // Vlkolakov beh po doske (charge special) — Run+Attack namiesto bežného Run (auto-run z posunu
+      // pozície beží pred efektmi, tu ho prepíšeme)
+      if (e.kind === "wolf_charge" && (e.from === "p1" || e.from === "p2")) {
+        setAnim(e.from, "wolfrun", frameHold);
+        lastAttackEndAt[e.from] = performance.now() + frameHold;
+      }
+      // Vlkolakovo seknutie na bunke terča (Attack_2) — dmg/block/odraz padne až po tomto frame
+      if (e.kind === "wolf_strike" && (e.from === "p1" || e.from === "p2")) {
+        setAnim(e.from, "wolfstrike", frameHold);
+        lastAttackEndAt[e.from] = performance.now() + frameHold;
+      }
       // Vojak: počas mierenia (aj lúča) je otočený k ZVOLENEJ bunke, nie na súpera
       if ((e.kind === "special" || e.kind === "soldier_beam") && (e.from === "p1" || e.from === "p2") && state?.[e.from]?.char === "soldier") {
         const tcell = e.kind === "soldier_beam" ? e.cell : (Array.isArray(e.cells) ? e.cells[0] : null);
@@ -2996,7 +3108,8 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "wall_bump" && (e.from === "p1" || e.from === "p2")) {
         const onClone = e.clone === true;
         const el = onClone ? cloneEls[e.from] : (e.from === "p1" ? actorP1 : actorP2);
-        const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[e.dir] || [0,0];
+        // aj diagonálne smery — vlkolakov charge do steny z okrajovej bunky (wall pravidlo)
+        const d = WOLF_DIRS_CLIENT[e.dir] || [0,0];
         // translate sa skladá „add" na základný transform (translateX(shift) scaleX(scale)) — scaleX prevracia X,
         // preto horizontálny náraz násobíme znamienkom facingu, aby smeroval do skutočnej steny
         const scale = computeFacing(state?.p1, state?.p2)[e.from] || 1;
@@ -3459,6 +3572,8 @@ const ABILITY_PREVIEW = {
   naruto:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
   // Vojak: cieľová bunka je voľba hráča — náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
   soldier:   { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
+  // Vlkolak: charge — náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg 2–8 podľa fázy mesiaca
+  werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", effect: { num: "2–8", emoji: "🌕" }, desc: "Charge in one of 8 directions - the werewolf stops at the first foe in his path (or the board edge) and strikes for 2/4/6/8 dmg by his moon phase. The moon waxes as his HP drops; he stays on the target's cell even through a shield or mirror" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -3584,6 +3699,7 @@ const dashPicker = document.getElementById("dash-picker");
 const specialBtn    = document.getElementById("special-btn");
 const specialPicker = document.getElementById("special-picker"); // smer pohľadu — používa len Medúza
 const cellPicker    = document.getElementById("cell-picker");    // Vojak — mini mapa plochy na výber cieľovej bunky
+const wolfPicker    = document.getElementById("wolf-picker");    // Vlkolak — 8 smerov charge (aj diagonály)
 
 function shakeBtn(btn) {
   btn.classList.add("shake");
@@ -3592,9 +3708,9 @@ function shakeBtn(btn) {
 
 // otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
 // odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
-let openPicker = null; // null | "move" | "attack" | "dash" | "special" | "special_cell"
-const PICKERS = { move: dirPicker, attack: aimPicker, dash: dashPicker, special: specialPicker, special_cell: cellPicker };
-const PICKER_BTNS = { move: moveBtn, attack: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn };
+let openPicker = null; // null | "move" | "attack" | "dash" | "special" | "special_cell" | "special_wolf"
+const PICKERS = { move: dirPicker, attack: aimPicker, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn };
 
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
@@ -3677,9 +3793,11 @@ function buildCellPicker() {
     cellPicker.appendChild(b);
   }
 }
-// Special: Medúza/Escanor si najprv vyberú smer pohľadu (←/→), Vojak cieľovú bunku; ostatní pridajú akciu priamo
+// Special: Medúza/Escanor si najprv vyberú smer pohľadu (←/→), Vlkolak jeden z 8 smerov charge,
+// Vojak cieľovú bunku; ostatní pridajú akciu priamo
 specialBtn.addEventListener("click", () => {
   if (ghostCharAt() === "medusa" || ghostCharAt() === "escanor") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
+  if (ghostCharAt() === "werewolf") { togglePicker("special_wolf", specialBtn, "special"); return; } // charge — 8 smerov
   if (ghostCharAt() === "soldier") {
     if (openPicker !== "special_cell") buildCellPicker(); // obsah podľa aktuálnych pozícií + ghost fronty
     togglePicker("special_cell", specialBtn, "special");
@@ -4140,6 +4258,7 @@ function autoLockTimeout() {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
     if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
     else if (t === "special" && (ghostCharAt() === "medusa" || ghostCharAt() === "escanor")) myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
+    else if (t === "special" && ghostCharAt() === "werewolf") myQueue.push({ type: t, dir: WOLF_DIR_KEYS_CLIENT[Math.floor(Math.random() * WOLF_DIR_KEYS_CLIENT.length)] }); // Vlkolakov charge — náhodný z 8 smerov
     else if (t === "special" && ghostCharAt() === "soldier") {
       // Vojakov special potrebuje cieľovú bunku — náhodná platná (nie vlastná ghost, nie súperova figúra/klon;
       // skrytý súper v labyrinte má x null → neblokuje sa), inak by server celý lock odmietol
@@ -4427,6 +4546,11 @@ socket.on("state", (s) => {
       // Vojak: snajperský lúč na zvolenú bunku — súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
       specialBtn.title = "Special (−5 mana, 10 dmg) — pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 10${miniPix("☠️")}`; hydratePix(cost); }
+    } else if (specChar === "werewolf") {
+      // Vlkolak: charge jedným z 8 smerov — dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP)
+      const wolfDmg = WOLF_MOON_DMG[Math.max(0, Math.min(3, s[me]?.moon || 0))];
+      specialBtn.title = `Special (−5 mana, ${wolfDmg} dmg by moon phase) — charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`;
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${wolfDmg}${miniPix("☠️")}`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {
@@ -4618,7 +4742,7 @@ function raf() {
     const mine = state?.[me];
     const gp = ghostPos();
     const show = mine && mine.char && !mine.locked && !playing && gp &&
-                 myQueue.some(a => a.type === "move" || a.type === "dash") &&
+                 myQueue.some(a => a.type === "move" || a.type === "dash" || a.type === "special") && // special: vlkolakov charge hýbe kasterom
                  (gp.x !== mine.x || gp.y !== mine.y);
     if (!show) {
       ctx.clearRect(0, 0, actorGhost.width, actorGhost.height);
@@ -4631,7 +4755,7 @@ function raf() {
       const ghostChar = ghostCharAt() || mine.char;
       // rovnaký flip ako hráčov sprite; Escanor sa škáluje podľa pride (od pät) rovnako ako živá postava
       const gFace = computeFacing(state.p1, state.p2)[me];
-      const gPride = escPrideMul({ char: ghostChar, pride: mine.pride });
+      const gPride = escPrideMul({ char: ghostChar, pride: mine.pride, moon: mine.moon });
       if (gPride !== 1) { actorGhost.style.transformOrigin = `50% ${ESC_FEET_FRAC * 100}%`; actorGhost.style.transform = `scaleX(${gFace * gPride}) scaleY(${gPride})`; }
       else { actorGhost.style.transformOrigin = ""; actorGhost.style.transform = `scaleX(${gFace})`; }
       actorGhost.classList.toggle("alt-color", usesAltColor(ghostChar, me));
@@ -4852,7 +4976,7 @@ if (specialBtn){
     const char = ghostCharAt();   // po prípadnom swape vo fronte = nový mág
     const p = ghostPos();
     if (!char || !p) return;
-    if (char === "medusa" || char === "escanor") return; // smerový special — preview ukazujú až šípky pickeru
+    if (char === "medusa" || char === "escanor" || char === "werewolf") return; // smerový special — preview ukazujú až šípky pickeru
     showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
@@ -4865,6 +4989,17 @@ specialPicker?.querySelectorAll("button[data-act]").forEach(btn => {
     const p = ghostPos();
     if ((char === "medusa" || char === "escanor") && p)
       showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride }, dir));
+  });
+  btn.addEventListener("mouseleave", clearPreviewCells);
+});
+// hover preview dráhy vlkolakovho charge na šípkach 8-smerového pickera — z ghost pozície,
+// stop na viditeľnej figúre súpera (foe); skrytý súper v labyrinte → dráha až na okraj
+wolfPicker?.querySelectorAll("button[data-act]").forEach(btn => {
+  const dir = btn.dataset.act.split(":")[1];
+  btn.addEventListener("mouseenter", () => {
+    const p = ghostPos();
+    if (ghostCharAt() === "werewolf" && p)
+      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: "werewolf", foe: state?.[otherSlot()] }, dir));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });

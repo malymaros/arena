@@ -377,6 +377,15 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 /* special picker má len ←/→ — jednoriadková mriežka bez prázdnych oblastí kríža */
 .dir-picker.special-picker{ grid-template-areas: "left right"; }
 
+/* Vlkolak: 8-smerový picker charge — plná 3×3 mriežka (diagonály + kríž), stred prázdny */
+.dir-picker.wolf-picker{ grid-template-areas: "ul up ur" "left c right" "dl down dr"; }
+.wolf-picker .arrow.ul{ grid-area: ul; }
+.wolf-picker .arrow.ur{ grid-area: ur; }
+.wolf-picker .arrow.dl{ grid-area: dl; }
+.wolf-picker .arrow.dr{ grid-area: dr; }
+.wolf-picker .wolf-center{ grid-area: c; }
+#wolf-picker .arrow{ background: #6a1b9a; } /* fialová ako special */
+
 /* Vojak: mini mapa plochy na výber cieľovej bunky specialu (stĺpce nastaví buildCellPicker podľa board.w) */
 .dir-picker.cell-picker{ grid-template-areas: none; gap: 3px; }
 .cell-picker .mini-target{
@@ -1278,6 +1287,23 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
   .pride-float.up .pf-lion{ background: #3ddc84; }  .pride-float.up .pf-arrow{ color: #3ddc84; }
   .pride-float.down .pf-lion{ background: #ff3b3b; } .pride-float.down .pf-arrow{ color: #ff3b3b; }
+
+  /* Vlkolak: fáza mesiaca (ikona BEZ čísla) vľavo od postavy — rovnaké miesto ako Escanorov pride lev */
+  .moon-badge{ position: absolute; left: 40px; top: 52px; z-index: 4; display: flex; align-items: center; pointer-events: none; }
+  .moon-badge.hidden, .moon-dmg.hidden{ display: none; }
+  .moon-badge img{ height: 42px; width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)); }
+  .moon-badge.moon-max img{ animation: pride-max-pulse 1s ease-in-out infinite; } /* spln pulzuje = max dmg */
+  /* dmg specialu pri aktuálnej fáze — vpravo od postavy (miesto Escanorovej minimapky) */
+  .moon-dmg{ position: absolute; right: 40px; top: 58px; z-index: 4; pointer-events: none;
+    display: flex; align-items: center; gap: 4px;
+    font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 18px; color: #ffd24a;
+    text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
+  /* smrtka pri čísle dmg — rovnako veľká ako číslo (default .mini je len 12px) */
+  .moon-dmg .pix-ico.mini{ width: 18px; height: 18px; vertical-align: 0; margin-left: 0; }
+
+  /* Vlkolak: float s NOVOU fázou mesiaca po zmene levelu — rovnaký let ako pride float, bez farieb/šípok */
+  .moon-float{ position: absolute; z-index: 9; pointer-events: none; animation: pride-float-rise 1.7s ease-out forwards; }
+  .moon-float img{ height: 46px; width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 3px rgba(0,0,0,.85)); }
 
   /* palette swap pravej strany (p2) — vyblednutý „albino" variant (do biela), fixný na celú sériu */
   .sprite-actor.alt-color,

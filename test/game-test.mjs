@@ -1403,6 +1403,161 @@ async function main() {
   check(tl[tl.length - 1].p2.clone === null, "T55f: klon je preč zo stavu");
   invariantCheck(tl, "T55f");
 
+  /* ---------- Vlkolak (werewolf): pomocný fresh game (p1 = werewolf; mana-only tiles = deterministické HP) ---------- */
+  async function freshWolf(p2char = "fire") {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "werewolf");
+    c2.sock.emit("choose_character", p2char);
+    await new Promise(r => setTimeout(r, 200));
+  }
+  const WSP = (dir) => ({ type: "special", dir }); // vlkolakov charge — 8 smerov
+
+  /* ---------- Test 56: charge doprava — beh po súperovu bunku, zásah podľa fázy mesiaca (moon 0 → 2 dmg) ---------- */
+  await freshWolf();
+  // starter p1: p1a1 charge right z (0,1) → dráha (1,1)(2,1)(3,1), stop na p2 → 2 dmg, vlkolak OSTÁVA na (3,1)
+  tl = await playRound(c1, c2, [WSP("right"), R, S], [R, M("up"), S]);
+  const t56cast = fxOf(tl, "special").filter(e => e.from === "p1");
+  check(t56cast.length === 1 && JSON.stringify(t56cast[0].cells) === "[[1,1],[2,1],[3,1]]",
+    "T56: cast nesie dráhu charge po súperovu bunku", `cells=${JSON.stringify(t56cast[0]?.cells)}`);
+  check(fxOf(tl, "wolf_charge").filter(e => e.from === "p1").length === 1, "T56: wolf_charge (beh) v timeline");
+  const t56strike = fxOf(tl, "wolf_strike");
+  check(t56strike.length === 1 && JSON.stringify(t56strike[0].cell) === "[3,1]",
+    "T56: seknutie (wolf_strike) na bunke terča", `fx=${JSON.stringify(t56strike)}`);
+  const t56hits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t56hits.length === 1 && t56hits[0].dmg === 2, "T56: nov (moon 0) dáva 2 dmg", `hits=${JSON.stringify(t56hits)}`);
+  check(tl[tl.length - 1].p1.x === 3 && tl[tl.length - 1].p1.y === 1,
+    "T56: vlkolak ostal na bunke terča (3,1)", `pos=${tl[tl.length - 1].p1.x},${tl[tl.length - 1].p1.y}`);
+  check(tl[tl.length - 1].p1.moon === 0, "T56: plné HP → moon ostáva 0");
+  invariantCheck(tl, "T56");
+
+  /* ---------- Test 56b: charge bez terča v dráhe — len presun na okraj (žiadny strike, žiadny dmg) ---------- */
+  await freshWolf();
+  tl = await playRound(c1, c2, [WSP("up"), R, S], [R, S, M("up")]); // hore z (0,1) → (0,0), p2 mimo dráhy
+  check(fxOf(tl, "wolf_strike").length === 0, "T56b: bez terča žiadne seknutie");
+  check(sumEffects(tl).hits.length === 0, "T56b: žiadny zásah", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tl[tl.length - 1].p1.x === 0 && tl[tl.length - 1].p1.y === 0,
+    "T56b: vlkolak dobehol na okraj (0,0)", `pos=${tl[tl.length - 1].p1.x},${tl[tl.length - 1].p1.y}`);
+  invariantCheck(tl, "T56b");
+
+  /* ---------- Test 56c: fáza mesiaca z HP — po 5 dmg (HP 5) je na konci kola moon 2 a charge dáva 6 ---------- */
+  await freshWolf();
+  // p1a1 R, p2a1 fire special (celý riadok, p1 na (0,1) v riadku) → p1 HP 5; koniec kola → moon 2 (HP 6–4)
+  // p1a2 = lacný útok do prázdna (−1) — melee (−4) by vlkolakovi nenechal manu na charge v 2. kole
+  tl = await playRound(c1, c2, [R, A("up"), S], [SP, R, S]);
+  check(tl[tl.length - 1].p1.hp === 5, "T56c: fire special zobral 5 HP", `hp=${tl[tl.length - 1].p1.hp}`);
+  check(tl[0].p1.moon === 0 && tl[tl.length - 1].p1.moon === 2,
+    "T56c: moon sa prepočítal na konci kola (0 → 2)", `moon=${tl[tl.length - 1].p1.moon}`);
+  invariantCheck(tl, "T56c");
+  // kolo 2 (starter p2): charge right z (0,1) → stop na p2 (3,1), polmesiac (moon 2) = 6 dmg
+  tl = await playRound(c1, c2, [WSP("right"), R, S], [R, S, ML]);
+  const t56cHits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t56cHits.length === 1 && t56cHits[0].dmg === 6, "T56c: polmesiac (moon 2) dáva 6 dmg", `hits=${JSON.stringify(t56cHits)}`);
+  invariantCheck(tl, "T56c-r2");
+
+  /* ---------- Test 56d: obrany — shield blokne, mirror odrazí plný moon dmg; vlkolak VŽDY ostáva na bunke terča ---------- */
+  await freshWolf();
+  // p1a1 R, p2a1 SHIELD (kryje p1a2), p1a2 charge right → block; vlkolak aj tak dobehne na (3,1)
+  tl = await playRound(c1, c2, [R, WSP("right"), S], [S, R, M("up")]);
+  const t56dBlocks = fxOf(tl, "block").filter(e => e.target === "p2");
+  check(t56dBlocks.length === 1, "T56d: shield zablokoval charge", `blocks=${JSON.stringify(fxOf(tl, "block"))}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p2").length === 0, "T56d: žiadny dmg cez štít");
+  const t56dWolfFrame = tl.filter(f => (f.effects || []).some(e => e.kind === "block"))[0];
+  check(t56dWolfFrame && t56dWolfFrame.p1.x === 3 && t56dWolfFrame.p1.y === 1,
+    "T56d: vlkolak ostal na bunke terča aj pri bloku", `pos=${t56dWolfFrame?.p1.x},${t56dWolfFrame?.p1.y}`);
+  invariantCheck(tl, "T56d");
+  await freshWolf();
+  // mirror: odrazí plný moon dmg (nov = 2) na vlkolaka; vlkolak stále skončí na bunke terča
+  tl = await playRound(c1, c2, [R, WSP("right"), S], [MI, R, M("up")]);
+  const t56dMirror = fxOf(tl, "mirror").filter(e => e.target === "p2");
+  check(t56dMirror.length === 1 && t56dMirror[0].dmg === 2 && t56dMirror[0].atk === "special",
+    "T56d: mirror odrazil charge (2, atk=special)", `fx=${JSON.stringify(t56dMirror)}`);
+  const t56dHit = sumEffects(tl).hits.filter(h => h.target === "p1");
+  check(t56dHit.length === 1 && t56dHit[0].dmg === 2, "T56d: odrazené 2 dmg dopadli na vlkolaka", `hits=${JSON.stringify(t56dHit)}`);
+  const t56dPos = tl[tl.length - 1].p1;
+  check(t56dPos.x === 3 && t56dPos.y === 1, "T56d: vlkolak ostal na bunke terča aj pri odraze", `pos=${t56dPos.x},${t56dPos.y}`);
+  invariantCheck(tl, "T56d-mirror");
+
+  /* ---------- Test 56e: charge do steny z okrajovej bunky — akcia sa VYKONÁ (mana preč, wall_bump, nie invalid) ---------- */
+  await freshWolf();
+  tl = await playRound(c1, c2, [WSP("left"), R, S], [R, S, M("up")]); // z (0,1) doľava = von z plochy
+  const t56eBump = fxOf(tl, "wall_bump").filter(e => e.from === "p1" && e.dir === "left");
+  check(t56eBump.length === 1, "T56e: charge do steny = wall_bump", `fx=${JSON.stringify(fxOf(tl, "wall_bump"))}`);
+  check(fxOf(tl, "invalid").filter(e => e.target === "p1").length === 0, "T56e: akcia sa neprečiarkla");
+  check(tl[tl.length - 1].p1.x === 0 && tl[tl.length - 1].p1.y === 1, "T56e: vlkolak sa nepohol");
+  check(tl[tl.length - 1].p1.mana === 3, "T56e: mana sa minula (6−5+4−2=3)", `mana=${tl[tl.length - 1].p1.mana}`);
+  invariantCheck(tl, "T56e");
+
+  /* ---------- Test 56f: Narutov klon-návnada v dráhe — charge zastane na klonovi, klon zomrie, Naruto bez dmg ---------- */
+  await freshWolf("naruto");
+  // kolo 1: p2 summon + move up → naruto (3,0), klon inverzne (3,2); p1 zíde dole na (0,2)
+  tl = await playRound(c1, c2, [R, S, M("down")], [SP, M("up"), R]);
+  check(tl[tl.length - 1].p2.clone?.x === 3 && tl[tl.length - 1].p2.clone?.y === 2,
+    "T56f: klon na (3,2)", `clone=${JSON.stringify(tl[tl.length - 1].p2.clone)}`);
+  // kolo 2 (starter p2): charge right z (0,2) → dráha končí na klonovi (3,2); klon puffne, vlkolak tam ostáva
+  tl = await playRound(c1, c2, [WSP("right"), R, S], [R, S, ML]);
+  check(fxOf(tl, "clone_die").length === 1, "T56f: charge zabil klona-návnadu");
+  check(sumEffects(tl).hits.filter(h => h.target === "p2").length === 0, "T56f: Naruto nedostal žiadny dmg");
+  check(tl[tl.length - 1].p2.clone === null, "T56f: klon je preč zo stavu");
+  check(tl[tl.length - 1].p1.x === 3 && tl[tl.length - 1].p1.y === 2,
+    "T56f: vlkolak ostal na bunke klona (3,2)", `pos=${tl[tl.length - 1].p1.x},${tl[tl.length - 1].p1.y}`);
+  invariantCheck(tl, "T56f");
+
+  /* ---------- Test 56g: diagonálny charge (up_right) — dráha po okraj/figúru aj šikmo ---------- */
+  await freshWolf();
+  // kolo 1: p2 dash left + move up → (1,0); p1 stojí (lacný útok do prázdna, nech ostane mana na charge)
+  tl = await playRound(c1, c2, [R, A("up"), S], [D("left"), M("up"), R]);
+  check(tl[tl.length - 1].p2.x === 1 && tl[tl.length - 1].p2.y === 0, "T56g: p2 na (1,0)");
+  // kolo 2 (starter p2): charge up_right z (0,1) → prvý krok (1,0) = p2 → zásah 2 (moon 0), vlkolak na (1,0)
+  tl = await playRound(c1, c2, [WSP("up_right"), R, S], [R, S, ML]);
+  const t56gHits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t56gHits.length === 1 && t56gHits[0].dmg === 2, "T56g: diagonálny charge trafil za 2", `hits=${JSON.stringify(t56gHits)}`);
+  check(tl[tl.length - 1].p1.x === 1 && tl[tl.length - 1].p1.y === 0,
+    "T56g: vlkolak skončil na (1,0)", `pos=${tl[tl.length - 1].p1.x},${tl[tl.length - 1].p1.y}`);
+  invariantCheck(tl, "T56g");
+
+  /* ---------- Test 56h: labyrint — prekliaty vlkolak charge-om trafí stojaceho lovca (reveal + koniec) ---------- */
+  await freshWolf("minotaur");
+  tl = await playRound(c1, c2, [R, A("up"), S], [SP, R, S]); // p2 (minotaur) zaklial p1; p1 šetrí manu na charge
+  check(tl[tl.length - 1].p1.labyrinth === true, "T56h: p1 (vlkolak) zakliaty v labyrinte");
+  // kolo 2 (starter p2): prekliaty vlkolak beží naslepo doprava — server ho zastaví na SKUTOČNEJ bunke lovca;
+  // istý zásah odhalí labyrint pred animáciou a zásah ho ukončí
+  tl = await playRound(c1, c2, [WSP("right"), R, S], [R, S, ML]);
+  check(fxOf(tl, "labyrinth_reveal").filter(e => e.target === "p1").length === 1,
+    "T56h: istý zásah odhalil labyrint pred animáciou");
+  const t56hHits = sumEffects(tl).hits.filter(h => h.target === "p2");
+  check(t56hHits.length === 1 && t56hHits[0].dmg === 2, "T56h: stojaci lovec trafený za 2 (moon 0)", `hits=${JSON.stringify(t56hHits)}`);
+  check(fxOf(tl, "labyrinth_end").filter(e => e.target === "p1").length === 1, "T56h: zásah ukončil labyrint");
+  invariantCheck(tl, "T56h");
+
+  /* ---------- Test 56i: turnaj — moon HNEĎ podľa preneseného HP pri swape na vlkolaka ---------- */
+  {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { format: "tournament", tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await new Promise(r => setTimeout(r, 200));
+    c1.sock.emit("choose_team", ["werewolf", "fire", "lightning"]);
+    c2.sock.emit("choose_team", ["fire", "lightning", "wanderer"]);
+    await new Promise(r => setTimeout(r, 300));
+    c1.sock.emit("choose_character", "werewolf");
+    c2.sock.emit("choose_character", "fire");
+    await new Promise(r => setTimeout(r, 200));
+    // kolo 1: p2 fire special (rovnaký riadok) → vlkolak HP 5; koniec kola moon 2
+    tl = await playRound(c1, c2, [R, ML, S], [SP, R, S]);
+    check(tl[tl.length - 1].p1.hp === 5 && tl[tl.length - 1].p1.moon === 2,
+      "T56i: vlkolak HP 5 → moon 2 na konci kola", `hp=${tl[tl.length - 1].p1.hp}, moon=${tl[tl.length - 1].p1.moon}`);
+    // kolo 2 (starter p2): p1 vymení vlkolaka za fire (HP 5 sa uloží do rosteru)
+    tl = await playRound(c1, c2, [{ type: "swap", to: "fire" }, R, S], [R, S, M("up")]);
+    check(tl[tl.length - 1].p1.char === "fire", "T56i: swap na fire prebehol");
+    // kolo 3: swap späť na vlkolaka — moon musí byť HNEĎ 2 (prenesené HP 5), nie 0
+    tl = await playRound(c1, c2, [{ type: "swap", to: "werewolf" }, R, S], [R, S, M("down")]);
+    const t56iLast = tl[tl.length - 1].p1;
+    check(t56iLast.char === "werewolf" && t56iLast.hp === 5 && t56iLast.moon === 2,
+      "T56i: swap-in vlkolaka s HP 5 → moon hneď 2", `char=${t56iLast.char}, hp=${t56iLast.hp}, moon=${t56iLast.moon}`);
+  }
+
   c1.sock.close(); c2.sock.close();
   server.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);
