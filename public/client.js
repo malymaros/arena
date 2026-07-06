@@ -3575,8 +3575,8 @@ const ABILITY_PREVIEW = {
   // Vojak: cieľová bunka je voľba hráča — náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
   soldier:   { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
   // Vlkolak: charge — náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg podľa fázy
-  // mesiaca cykluje pod mini-doskou (moonCycle — ako Escanorov pride náhľad), preto krátky text
-  werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, effect: { num: "2–8", emoji: "🌕" }, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
+  // mesiaca cykluje pod mini-doskou (moonCycle — ako Escanorov pride náhľad), preto žiadny effect/stats riadok
+  werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -3628,7 +3628,9 @@ function renderAbilityPreview(char) {
   const stats = document.getElementById("ca-stats");
   stats.innerHTML = def.dmg != null
     ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span></span>`
-    : `<span class="ca-dmg"><span class="ca-num">${def.effect?.num ?? ""}</span><span class="pix-ico" data-emoji="${def.effect?.emoji ?? "✨"}"></span></span>`; // bez dmg — ikona efektu (kameň/labyrint)
+    : def.effect
+      ? `<span class="ca-dmg"><span class="ca-num">${def.effect.num ?? ""}</span><span class="pix-ico" data-emoji="${def.effect.emoji ?? "✨"}"></span></span>` // bez dmg — ikona efektu (kameň/labyrint)
+      : ""; // ani dmg, ani effect (vlkolak — dmg cykluje pod mini-doskou) → žiadny stats riadok
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
