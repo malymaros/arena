@@ -801,7 +801,9 @@ function spawnExplosionAt(cell, slot, sizeMul = 1.4, fps = 12) {
   const size = Math.round(TILE_H * sizeMul);
   const el = document.createElement("canvas");
   el.width = size; el.height = size; el.className = "explosion-fx";
-  Object.assign(el.style, { position: "absolute", left: (left + TILE_W / 2 - size / 2) + "px", top: (top + TILE_H / 2 - size / 2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
+  // Explosion.png je v sheete ukotvený k SPODKU framu (rastie od zeme hore) → spodok canvasu
+  // sadá na spodok bunky, inak ohnivá guľa trčí pod políčkom
+  Object.assign(el.style, { position: "absolute", left: (left + TILE_W / 2 - size / 2) + "px", top: (top + TILE_H - size) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
   actorsEl.appendChild(el);
   const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
   ensureSpriteMeta(dir, "Explosion.png").then(m => {
@@ -1112,13 +1114,13 @@ function spawnOrMoveProjectile(c, s) {
   let entry = projectiles.get(key);
   if (entry && entry.retire) { clearTimeout(entry.retire); entry.retire = null; } // strela ešte letí ďalej
   // Vojakov granát sa kotúľa PO ZEMI (spodok bunky), nie stredom ako mágove strely
-  const yOff = charKey === "soldier" ? Math.round(TILE_H * 0.24) : 0;
+  const yOff = charKey === "soldier" ? Math.round(TILE_H * 0.3) : 0;
   const dst = projCenter(c.cell[0], c.cell[1]);
   if (!entry) {
     const el = document.createElement("canvas");
     // Escanorova základná strela (slnko) ostáva relatívne malá: autorská veľkosť = pride3 (strop), nižšie menšia;
-    // Vojakov granát je malý (kotúľajúci sa projektil, nie ohnivá guľa); ostatné postavy bez zmeny
-    const fx = charKey === "escanor" ? escChargeMul(c.from) : charKey === "soldier" ? 0.55 : 1;
+    // Vojakov granát je MALÝ (kotúľajúci sa projektil veľkosti ~⅓ bunky, nie ohnivá guľa); ostatné postavy bez zmeny
+    const fx = charKey === "escanor" ? escChargeMul(c.from) : charKey === "soldier" ? 0.3 : 1;
     const px = Math.round(TILE_H * CHARGE_SCALE * fx);
     el.width = px; el.height = px;
     el.className = "projectile";
