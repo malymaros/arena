@@ -1976,7 +1976,7 @@ function actionIcon(action, ownerSlot) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return `✨${ARROW_DIR[action.dir] || (action.cell ? "⌖" : "")}`; // smer: Medúza/Escanor; ⌖ = Vojakov cieľ
+    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — len čistý badge
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
@@ -2579,7 +2579,7 @@ function actionBadgeView(a, ownerSlot) {
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
-    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || (a.cell ? "⌖" : "")}` }; // ⌖ = Vojakov cieľ (bunku ukáže hover)
+    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
