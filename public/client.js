@@ -359,9 +359,10 @@ const ANIM_DEF = {
   // Vojak: vlastná póza pri recharge (ostatné postavy hrajú len auru v idle); loop — neslučkové anims
   // sa kreslia absolútnym časom (držali by len posledný frame), slučka sa pri frameHold ~1s prehrá raz
   recharge: { file: "Recharge.png", fps: 12, loop: true },
-  // Vlkolak: beh charge specialu (Run+Attack) + seknutie na bunke terča (WolfStrike.png → alias Attack_2.png)
+  // Vlkolak: beh charge specialu (Run+Attack) + seknutie na bunke terča (WolfStrike.png → alias Attack_2.png);
+  // neloopové → raf ho kreslí relatívnym časom od setAnim (drawT), inak by viselo na poslednom frame
   wolfrun:    { file: "Run+Attack.png", fps: 12, loop: true },
-  wolfstrike: { file: "WolfStrike.png", fps: 10, loop: false }
+  wolfstrike: { file: "WolfStrike.png", fps: 5, loop: false }
 };
 const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
 const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
@@ -4692,6 +4693,7 @@ function raf() {
     const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
     const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
                 : escWinsun ? (now - (animState[slot].start || 0))
+                : aSt.key === "wolfstrike" ? (now - (aSt.start || 0)) // seknutie hrá RAZ od frame 0, potom drží dopadovú pózu
                 : (stoned ? 0 : now);
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
