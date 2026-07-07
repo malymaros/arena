@@ -104,7 +104,11 @@ const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
 const ACTION_GAP_MS    = Math.round(350 * ANIM_SLOW); // pokojová pauza medzi jednotlivými akciami, nech sa dá sledovať každý ťah
 const SPECIAL_REPEAT   = 3;
 const SPECIAL_BEAT_MS  = Math.round(900 * ANIM_SLOW);
-// Vojak: po stredovej Shot_2 animácii letí zo zbrane tenký červený lúč na zvolenú bunku + výbuch;
+// Vojak: special = jeden silný snajperský výstrel — cast frame drží MIERENIE (veľký sprite zamrznutý
+// v mieriacej póze, laser sight sa ustáli na cieli) a výšľah (framy 1–3 Shot_2) sa prehrá RAZ na jeho
+// konci; až potom letí lúč. MUSÍ sedieť s klientskou choreografiou (SOLDIER_AIM_MS/FIRE v client.js).
+const SOLDIER_AIM_MS   = 2600;
+// po výstrele letí zo zbrane tenký červený lúč na zvolenú bunku + výbuch;
 // jeden frame drží let lúča aj nábeh výbuchu, zásah (hit/block/mirror) padne až po ňom.
 // MUSÍ sedieť s klientskou choreografiou spawnSoldierBeam v client.js.
 const SOLDIER_BEAM_MS  = 900;
@@ -1382,9 +1386,9 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     const cloneStruck = !!(foe?.clone && foe.clone.x === cell.x && foe.clone.y === cell.y);
     // istý zásah reálneho hráča (aj do štítu/zrkadla) odhalí prípadný labyrint ešte pred animáciou
     if (inZone) revealLabyrinths(tl);
-    for (let r = 0; r < SPECIAL_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, cells }], SPECIAL_BEAT_MS);
-    }
+    // mierenie: JEDEN dlhý cast frame (nie opakované beaty — sniperka nestrieľa dávkou) — veľký sprite
+    // drží mieriacu pózu, laser sight sa ustáli na cieli a výšľah vyjde raz tesne pred lúčom
+    pushStateFrame(tl, [{ kind: "special", from: slot, cells }], SOLDIER_AIM_MS);
     // lúč zo zbrane + výbuch na cieľovej bunke — zásah (hit/block/odraz) padne až po dolete
     pushStateFrame(tl, [{ kind: "soldier_beam", from: slot, cell: [cell.x, cell.y] }], SOLDIER_BEAM_MS);
     const dmg = SPECIAL_ZONE_DMG.soldier * dealMul(slot);

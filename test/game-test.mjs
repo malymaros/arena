@@ -1318,8 +1318,8 @@ async function main() {
   // starter p1: p1a1 recharge, p2a1 move left → (2,1), p1a2 special na (2,1) → zásah 10 (súper sa naň pohol)
   tl = await playRound(c1, c2, [R, SPC(2, 1), S], [M("left"), R, S]);
   const t55sp = fxOf(tl, "special").filter(e => e.from === "p1");
-  check(t55sp.length === 3 && JSON.stringify(t55sp[0].cells) === "[[2,1]]",
-    "T55: special beaty nesú cieľovú bunku", `cells=${JSON.stringify(t55sp[0]?.cells)}`);
+  check(t55sp.length === 1 && JSON.stringify(t55sp[0].cells) === "[[2,1]]",
+    "T55: jediný cast beat (mierenie) nesie cieľovú bunku", `cells=${JSON.stringify(t55sp[0]?.cells)}`);
   const t55beam = fxOf(tl, "soldier_beam");
   check(t55beam.length === 1 && JSON.stringify(t55beam[0].cell) === "[2,1]",
     "T55: soldier_beam efekt na cieľovej bunke", `fx=${JSON.stringify(t55beam)}`);

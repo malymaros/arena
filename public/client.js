@@ -293,7 +293,7 @@ const SPECIAL_ANIMS = {
   minotaur:  { file: "Walk.png",         fps: SPECIAL_FPS, loop: true }, // bez vlastného fx spritu — cast = veľký kráčajúci Minotaur (blúdenie labyrintom)
   naruto:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true }, // pečate rukami (summon tieňového klona)
   escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder — plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
-  soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // mierenie + výstrel — po stredovej animácii letí červený lúč na zvolenú bunku
+  soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // loop len pre victory/preview — pri caste NECYKLÍ: mierenie (frame 0 + laser sight) → jeden výšľah → lúč (SOLDIER_AIM/FIRE)
   werewolf:  { file: "Run+Attack.png",   fps: SPECIAL_FPS, loop: true }, // rozbeh charge — veľký stredový sprite hrá LEN Run+Attack (Attack_2 seknutie je na malej figúre pri dopade)
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
@@ -685,6 +685,12 @@ function updateSpecialCenter(casts) {
     cvs.dataset.dir  = dirKey;
     cvs.dataset.file = file;
     if (sp.fps) cvs.dataset.fps = sp.fps;
+    // vojakov special (melee sem chodí s sp.file): NECYKLÍ — raf drží mieriacu pózu a výšľah prehrá
+    // raz na konci mierenia (čas od vzniku canvasu = od začiatku cast framu)
+    if (caster.char === "soldier" && !sp.file) {
+      cvs.dataset.soldierAim = "1";
+      cvs.dataset.born = String(performance.now());
+    }
 
     const flip = currentFacing(sp.from, facing);
     if (caster.char === "escanor") {
@@ -856,13 +862,56 @@ function spawnExplosionAt(cell, slot, sizeMul = 1.4, fps = 12) {
 // tenký červený lúč zo zbrane vojaka na zvolenú bunku (štýl mirror beamu) + výbuch na cieli po dolete.
 // MUSÍ časovo sedieť so serverovým SOLDIER_BEAM_MS (frame drží let lúča, zásah padne po ňom).
 const SOLDIER_BEAM_HIT_MS = 350; // kedy počas lúča štartuje výbuch na cieli
+// špička hlavne pušky — zmerané z Shot_2.png (štvorcový 128px frame; vo výstrelovom frame hlaveň končí
+// na sprite pixeli ~(100,78), stred framu x=64). Prepočet kopíruje geometriu positionActors + drawSprite
+// (fill .95, anchorY .5, canvas centrovaný na bunku, spodok canvasu na spodku bunky), takže laser aj lúč
+// vychádzajú presne zo špičky hlavne. Horizontálny offset ide v smere streľby (sprite je otočený na cieľ
+// cez facingOverride); pri čisto vertikálnom cieli je 0 — hlaveň mieri hore/dole, strieľa sa z osi tela.
+const SOLDIER_MUZZLE = { x: 100, y: 78, frame: 128 };
+function soldierGunOrigin(fromSlot, tx) {
+  const p = state?.[fromSlot];
+  const c = cellToPx(p.x, p.y);
+  const scale = Math.min(ACTOR_W, ACTOR_H) / SOLDIER_MUZZLE.frame * 0.95;
+  const cx = c.left + TILE_W / 2 + pairShift(fromSlot);
+  const sx = cx + Math.sign(tx - cx) * (SOLDIER_MUZZLE.x - SOLDIER_MUZZLE.frame / 2) * scale;
+  const sy = c.top - (ACTOR_H - TILE_H) + (ACTOR_H - SOLDIER_MUZZLE.frame * scale) / 2 + SOLDIER_MUZZLE.y * scale;
+  return { sx, sy };
+}
+// vojakov special = jeden silný výstrel: cast frame drží MIERENIE (frame 0 Shot_2 + laser sight),
+// výšľah (framy 1–3) sa prehrá RAZ v posledných SOLDIER_FIRE_MS. MUSÍ sedieť so serverovým SOLDIER_AIM_MS;
+// trvanie laseru (AIM − FIRE = 2300 ms) musí sedieť s CSS animáciou soldier-aim.
+const SOLDIER_AIM_MS   = 2600;
+const SOLDIER_FIRE_MS  = 300;  // výšľah: 3 framy @ SOLDIER_FIRE_FPS, dohrá presne na konci mierenia
+const SOLDIER_FIRE_FPS = 10;
+// slabý „laser sight" počas mierenia: tenká červená linka z hlavne na zvolenú bunku (chvenie → lock-on)
+// + pulzujúci zameriavací terčík na cieli; zhasne v momente výstrelu (nahradí ho plný lúč soldier_beam)
+function spawnSoldierAim(fromSlot, cell, holdMs) {
+  const p = state?.[fromSlot];
+  if (!Array.isArray(cell) || !p || p.x == null) return; // skrytý strelec (labyrint) — bez laseru
+  const t = cellToPx(cell[0], cell[1]);
+  const tx = t.left + TILE_W / 2, ty = t.top + TILE_H / 2;
+  const { sx, sy } = soldierGunOrigin(fromSlot, tx); // špička hlavne
+  const dist = Math.hypot(tx - sx, ty - sy), ang = Math.atan2(ty - sy, tx - sx) * 180 / Math.PI;
+  const wrap = document.createElement("div");
+  wrap.className = "soldier-aim-wrap";
+  Object.assign(wrap.style, { position: "absolute", left: sx + "px", top: (sy - 1) + "px", width: dist + "px", height: "2px", transform: `rotate(${ang}deg)`, pointerEvents: "none", zIndex: 8 });
+  const line = document.createElement("div");
+  line.className = "soldier-aim";
+  wrap.appendChild(line);
+  const dot = document.createElement("div");
+  dot.className = "soldier-aim-dot";
+  Object.assign(dot.style, { position: "absolute", left: tx + "px", top: ty + "px", pointerEvents: "none", zIndex: 8 });
+  actorsEl.appendChild(wrap);
+  actorsEl.appendChild(dot);
+  setTimeout(() => { wrap.remove(); dot.remove(); }, Math.max(0, (holdMs || SOLDIER_AIM_MS) - SOLDIER_FIRE_MS));
+}
 function spawnSoldierBeam(fromSlot, cell, holdMs) {
   const p = state?.[fromSlot];
   if (!Array.isArray(cell)) return;
   if (!p || p.x == null) { spawnExplosionAt(cell, fromSlot); return; } // skrytý strelec (labyrint) — aspoň dopad
-  const s = cellToPx(p.x, p.y), t = cellToPx(cell[0], cell[1]);
-  const sx = s.left + TILE_W / 2 + pairShift(fromSlot), sy = s.top + TILE_H * 0.42; // výška zbrane
+  const t = cellToPx(cell[0], cell[1]);
   const tx = t.left + TILE_W / 2, ty = t.top + TILE_H / 2;
+  const { sx, sy } = soldierGunOrigin(fromSlot, tx); // špička hlavne — identický origin ako laser sight
   const dist = Math.hypot(tx - sx, ty - sy), ang = Math.atan2(ty - sy, tx - sx) * 180 / Math.PI;
   const wrap = document.createElement("div");
   wrap.className = "soldier-beam-wrap";
@@ -3054,7 +3103,12 @@ function schedulePlayTimeline(timeline) {
           facingOverride[e.from] = { sx: tcell[0] < px ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
         }
       }
-      // Vojak: po stredovej Shot_2 animácii letí zo zbrane tenký červený lúč na zvolenú bunku + výbuch;
+      // Vojak: mierenie — slabý laser sight z hlavne na zvolenú bunku + pulzujúci terčík; laser zhasne
+      // v momente výšľahu na konci cast framu (veľký sprite rieši raf cez dataset.soldierAim)
+      if (e.kind === "special" && (e.from === "p1" || e.from === "p2") && state?.[e.from]?.char === "soldier") {
+        spawnSoldierAim(e.from, Array.isArray(e.cells) ? e.cells[0] : null, frameHold);
+      }
+      // Vojak: po výstrele letí zo zbrane tenký červený lúč na zvolenú bunku + výbuch;
       // zásah (hit/block/mirror frame) padne až po tomto frame — server drží SOLDIER_BEAM_MS
       if (e.kind === "soldier_beam" && (e.from === "p1" || e.from === "p2")) {
         spawnSoldierBeam(e.from, e.cell, frameHold);
@@ -4679,6 +4733,12 @@ function raf() {
       : (aSt.key === "victory" || aSt.key === "casting")
         ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
         : currentAnim(slot);
+    // Vojak pri caste specialu: mieriaca póza (frame 0) drží, výšľah raz na konci — v synchróne
+    // s veľkým stredovým overlayom (rovnaké SOLDIER_AIM/FIRE časovanie, čas od setAnim)
+    if (st.char === "soldier" && aSt.key === "casting" && !stoned) {
+      const fireT = (now - (aSt.start || 0)) - (SOLDIER_AIM_MS - SOLDIER_FIRE_MS);
+      anim = { file: SPECIAL_ANIMS.soldier.file, fps: SOLDIER_FIRE_FPS, frameIndex: fireT <= 0 ? 0 : 1 + Math.floor(fireT / 1000 * SOLDIER_FIRE_FPS) };
+    }
     // Escanor: počas premeny hraj Transform; pred premenou (idle) hraj slabú formu WeakIdle;
     // víťazstvo = STREDOVÁ special animácia na jeho postavičke (WinSunBoard: zdvih slnka raz, potom ústa + preblik)
     if (st.char === "escanor" && !stoned && !lyingDead) {
@@ -4895,6 +4955,17 @@ function raf() {
     const ctx  = cvs.getContext("2d");
     const dir  = cvs.dataset.dir;
     const file = cvs.dataset.file;
+    // vojakov special: mieriaca póza (frame 0) drží, výšľah (framy 1–3) sa prehrá RAZ v posledných
+    // SOLDIER_FIRE_MS mierenia (tesne pred soldier_beam framom) + krátky biely záblesk (CSS soldier-fire)
+    if (cvs.dataset.soldierAim) {
+      const fireT = (now - Number(cvs.dataset.born)) - (SOLDIER_AIM_MS - SOLDIER_FIRE_MS);
+      if (fireT > 0) cvs.classList.add("soldier-fire");
+      const idx = fireT <= 0 ? 0 : 1 + Math.floor(fireT / 1000 * SOLDIER_FIRE_FPS); // drawSprite clampne na posledný frame
+      ensureSpriteMeta(dir, file)
+        .then(meta => drawSprite(ctx, meta, { file, fps: SOLDIER_FIRE_FPS, frameIndex: idx }, 0, cvs.width, cvs.height))
+        .catch(()=>{});
+      return;
+    }
     const anim = { file, fps: Number(cvs.dataset.fps) || SPECIAL_FPS, loop: true };
     ensureSpriteMeta(dir, file)
       .then(meta => drawSprite(ctx, meta, anim, performance.now(), cvs.width, cvs.height))
