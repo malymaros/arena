@@ -1891,6 +1891,7 @@ function renderHUD() {
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
   renderPrideHud("p1"); renderPrideHud("p2");
   renderMoonHud("p1"); renderMoonHud("p2");
+  syncWolfSpecialBtn(); // dmg na special tlačidle drž v sync s HUD fázou mesiaca (aj per-frame počas kola)
   updateGoldenButton();
 }
 
@@ -1912,6 +1913,21 @@ function renderMoonHud(slot) {
     hydratePix(dmgEl);
   }
   dmgEl.classList.remove("hidden");
+}
+
+// Vlkolak: dmg na SPECIAL tlačidle musí sedieť so zobrazenou fázou mesiaca (HUD ikonou). Prepočítava sa preto
+// pri každom renderHUD (aj per-frame počas prehrávania) — nie len raz pri príchode state eventu: vtedy s[me]
+// nesie počiatočný frame kola (schedulePlayTimeline ho premutuje späť), takže po zmene fázy ostávalo tlačidlo
+// celé plánovanie na starom dmg. Zdroj = state[me].moon, rovnaký ako HUD ikona → obe sa preklopia naraz.
+function syncWolfSpecialBtn() {
+  if (!specialBtn || ghostCharAt() !== "werewolf") return;
+  const lvl = Math.max(0, Math.min(3, state?.[me]?.moon || 0));
+  if (specialBtn.dataset.wolfMoon === String(lvl)) return;
+  specialBtn.dataset.wolfMoon = String(lvl);
+  const dmg = WOLF_MOON_DMG[lvl];
+  specialBtn.title = `Special (−5 mana, ${dmg} dmg by moon phase) — charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`;
+  const cost = specialBtn.querySelector(".cost");
+  if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
 }
 
 // Escanor: pride level (ikona+číslo) vľavo, rozsah abilitky pri aktuálnom pride (minimapka) vpravo v HUD widgete.
@@ -2427,7 +2443,7 @@ function escChargeMul(slot) { return escFxMul(slot) * Math.pow(1.2, -3); }
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
 // vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
-const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke
+const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági)
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2 || p1.x !== p2.x || p1.y !== p2.y) return 0;
@@ -4629,10 +4645,10 @@ socket.on("state", (s) => {
       specialBtn.title = "Special (−5 mana, 10 dmg) — pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 10${miniPix("☠️")}`; hydratePix(cost); }
     } else if (specChar === "werewolf") {
-      // Vlkolak: charge jedným z 8 smerov — dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP)
-      const wolfDmg = WOLF_MOON_DMG[Math.max(0, Math.min(3, s[me]?.moon || 0))];
-      specialBtn.title = `Special (−5 mana, ${wolfDmg} dmg by moon phase) — charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`;
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${wolfDmg}${miniPix("☠️")}`; hydratePix(cost); }
+      // Vlkolak: charge jedným z 8 smerov — dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP).
+      // Prekreslenie rieši syncWolfSpecialBtn (aj per-frame v renderHUD); tu vynúť čerstvý prepočet.
+      delete specialBtn.dataset.wolfMoon;
+      syncWolfSpecialBtn();
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {

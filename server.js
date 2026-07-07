@@ -112,6 +112,11 @@ const SOLDIER_AIM_MS   = 2600;
 // jeden frame drží let lúča aj nábeh výbuchu, zásah (hit/block/mirror) padne až po ňom.
 // MUSÍ sedieť s klientskou choreografiou spawnSoldierBeam v client.js.
 const SOLDIER_BEAM_MS  = 900;
+// Vojakov basic granát: zásah (červené políčko + „-HP" float) NEMÁ padnúť pri dolete granátu, ale až keď
+// na cieľovej bunke VYBUCHNE a výbuch je vidieť. Klient kreslí výbuch CHARGE_STEP_MS po stiahnutí granátu;
+// tento konštantný odklad navyše posunie hit frame tak, aby padol AŽ po nábehu výbuchu (Explosion.png má
+// 9 framov @ 12 fps = 750 ms, guľa kulminuje ~⅓ dnu). Reálne ms — výbuchová FX nie je škálovaná ANIM_SLOW.
+const SOLDIER_GRENADE_BLAST_MS = 360;
 // Escanor special: server podrží zásah o dĺžku klientskej choreografie (WinSun→CruelSunHold→slnko→SunBurst),
 // aby dmg dopadol AŽ po dokončení animácie. MUSÍ sedieť s klientskou choreografiou v client.js (runEscanorSpecial).
 const ESC_SPECIAL_MS   = 4625;
@@ -903,6 +908,14 @@ function doBasic(slot, dir, tl) {
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
     }
     if (fx.length) { anyCharge = true; pushStateFrame(tl, fx, CHARGE_STEP_MS); }
+    // Vojak: granát nezasiahne v momente doletu, ale až keď na cieľovej bunke VYBUCHNE a výbuch je vidieť.
+    // Keď let končí zásahom súpera (player/stacked), vlož prázdny frame: ten na klientovi stiahne granát
+    // (spustí odpočet výbuchu — výbuch nabehne CHARGE_STEP_MS po ňom) a jeho delayMs = CHARGE_STEP_MS +
+    // SOLDIER_GRENADE_BLAST_MS posunie hit frame tak, aby červené políčko a „-HP" padli AŽ po nábehu výbuchu.
+    // Netýka sa preletu cez klona-návnadu (granát letí ďalej).
+    if (me.char === "soldier" && hits.some(h => h.target === "player" || h.target === "stacked")) {
+      pushStateFrame(tl, [], CHARGE_STEP_MS + SOLDIER_GRENADE_BLAST_MS);
+    }
     // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
     // (h.shot.dist sa počíta z klonovej bunky) × rovnaké násobiče (Last Stand ×2 / Last Hope ×4, maze ×2).
     const rawOf = (h) => Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
