@@ -102,14 +102,14 @@ const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", 
 // (choose_team vo fáze team_select); tím je fixný na celú sériu a určuje kľúče mageHp/mageMana danej osoby.
 const TEAM_SIZE = 3;
 // časový limit na ťah — vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
-const TIMER_OPTIONS = new Set(["off", "10", "30", "60", "quickdraw"]);
+const TIMER_OPTIONS = new Set(["off", "30", "60", "120", "quickdraw"]);
 
 // predvolené nastavenia (predvyplnia lobby na klientovi)
 const DEFAULT_CONFIG = {
   format: "single",                              // "single" | "bo3" | "tournament"
   tilesPerRound: 1,                              // 1 | 2 | 3 — koľko tiles sa spawne na konci kola
   tileWeights: { dmg: 75, heal: 12, mana: 8, ik: 5 }, // % šanca typu, spolu 100
-  timer: "30",                                   // "off" | "10" | "30" | "60" | "quickdraw"
+  timer: "30",                                   // "off" | "30" | "60" | "120" | "quickdraw"
 };
 
 // celkové spomalenie animácií kola (1 = pôvodné tempo); MUSÍ sedieť s client.js ANIM_SLOW
@@ -1791,7 +1791,7 @@ function endOfRoundTiles() {
 /* -------------------- Turn timer (server-side enforcement) -------------------- */
 // časovač beží na serveri (nezávisle od fokusu tabu); klient si robí len vlastný displej + skorší auto-lock.
 // backstop tu garantuje, že kolo sa vyhodnotí, aj keď je niektorý tab na pozadí (throttle rAF) alebo odpojený.
-const QUICKDRAW_MS = 10000;
+const QUICKDRAW_MS = 60000;
 const TIMER_GRACE_MS = 2500; // server strieľa o čosi neskôr než klient, nech foreground tab stihne auto-lock s rozpracovanou frontou
 let turnTimer = null;
 let turnDeadline = null; // Date.now() času, kedy má klient odpočítavať/auto-locknúť (bez grace); zdieľané s klientom
@@ -1856,7 +1856,7 @@ function randomSoldierTarget(slot) {
 // naplánuj backstop pre práve začínajúce kolo; extraMs = čas, kým klient dohrá timeline (počas neho neplánuje)
 function beginPlanningTimer(extraMs = 0) {
   const t = game.config?.timer;
-  if (t === "10" || t === "30" || t === "60") {
+  if (t === "30" || t === "60" || t === "120") {
     armTurnTimer(extraMs + parseInt(t, 10) * 1000);
   } else {
     clearTurnTimer(); // "off"/"quickdraw" -> teraz žiadny limit (quickdraw sa nasadí až po locku)
