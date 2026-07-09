@@ -793,6 +793,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   height: calc(4 * 1.7em);
   display: flex; align-items: center; justify-content: center;
 }
+/* ikony (flame/drop) v popise — zarovnať na stred riadku (inak sedia prinízko) */
+.ca-desc .pix-ico.mini { vertical-align: middle; margin: 0 1px; }
 /* dmg + mana, výraznejšie pod popisom útoku */
 .ca-stats {
   display: flex; align-items: center; justify-content: center;
