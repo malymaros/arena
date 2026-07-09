@@ -3563,9 +3563,13 @@ function updateCharSelectHp(s) {
   selEl.classList.toggle("no-paging", !!charSelectHp);
   selEl.classList.toggle("roster-mode", !!charSelectHp);
   if (charSelectHp && (charPage !== 0 || hiddenMode)) setCharPage(0); // roster-mode zatvára aj easter-egg stránku
-  // setCharPage sa pri otvorení na stránke 0 nevolá — nadpis drž v synce s režimom aj tu (Hidden nechaj tak)
+  // setCharPage sa pri otvorení na stránke 0 nevolá — nadpis drž v synce s režimom aj tu;
+  // na Hidden stránke cez setHiddenTitle (textContent by zmazal per-písmenové spany neónu)
   const titleEl = document.getElementById("char-page-title");
-  if (titleEl) titleEl.textContent = charSelectHp ? "Your Team" : (hiddenMode ? "Hidden" : CHAR_PAGES[charPage].title);
+  if (titleEl) {
+    if (hiddenMode && !charSelectHp) setHiddenTitle();
+    else titleEl.textContent = charSelectHp ? "Your Team" : CHAR_PAGES[charPage].title;
+  }
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
     if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
@@ -3886,7 +3890,7 @@ const charPrevBtn = document.getElementById("char-page-prev");
 const charNextBtn = document.getElementById("char-page-next");
 const charPageTitle = document.getElementById("char-page-title");
 function setCharPage(p) {
-  hiddenMode = false; selEl.classList.remove("hidden-mode"); // každé normálne stránkovanie opúšťa easter-egg stránku
+  hiddenMode = false; selEl.classList.remove("hidden-mode"); stopHiddenFx(); // každé normálne stránkovanie opúšťa easter-egg stránku aj jej efekty
   if (selEl.classList.contains("no-paging")) p = 0; // tournament — roster-mode zlúči karty, stránkovanie je vypnuté
   charPage = Math.max(0, Math.min(CHAR_PAGES.length - 1, p));
   selEl.querySelectorAll(".char-cards").forEach(el =>
@@ -3929,12 +3933,63 @@ function showHiddenPage() {
   selEl.classList.add("hidden-mode");
   selEl.querySelectorAll(".char-cards").forEach(el =>
     el.classList.toggle("hidden", el.dataset.page !== "hidden"));
-  if (charPageTitle) charPageTitle.textContent = "Hidden";
+  startHiddenFx(); // nadpis po písmenách (dohasínajúci neón) + občasný glitch + mutujúci text kariet
   charPrevBtn?.classList.add("off");
   charNextBtn?.classList.remove("off");
   clearAbilityPreview();
   hiddenRune?.classList.remove("near", "lit");
   if (hiddenRune) hiddenRune.style.opacity = "0";
+}
+
+/* nepravidelné efekty otvorenej Hidden stránky:
+   1) nadpis „Hidden" rozbitý na spany — každé písmeno má vlastnú náhodnú fázu letter-die (pokazený neón),
+   2) celý char-select občas (3,5–9 s) preblikne rovnakým cs-glitch ako pri vstupe cez runu,
+   3) „Coming soon" na kartách sa každý tick mutuje na glitchnutý secret text (náhodné znaky).
+   Všetko sa vypína cez stopHiddenFx() — volá ho setCharPage, ktorý Hidden stránku vždy zatvára. */
+const HIDDEN_GLITCH_CHARS = "#@$%&*+=/\\<>[]{}01?";
+let hiddenGlitchTimer = 0, hiddenMutateTimer = 0;
+function setHiddenTitle() {
+  if (!charPageTitle || charPageTitle.dataset.hiddenTitle === "1") return; // spany už stoja — neresetuj im fázy
+  charPageTitle.dataset.hiddenTitle = "1";
+  charPageTitle.textContent = "";
+  for (const ch of "Hidden") {
+    const s = document.createElement("span");
+    s.className = "hidden-letter";
+    s.textContent = ch;
+    s.style.animationDuration = (4 + Math.random() * 6).toFixed(2) + "s"; // každé písmeno zhasína vo vlastnom rytme
+    s.style.animationDelay = (-Math.random() * 10).toFixed(2) + "s";
+    charPageTitle.appendChild(s);
+  }
+}
+function startHiddenFx() {
+  setHiddenTitle();
+  clearTimeout(hiddenGlitchTimer);
+  (function tick() {
+    hiddenGlitchTimer = setTimeout(() => {
+      if (!hiddenMode || selEl.classList.contains("hidden")) return;
+      selEl.classList.add("cs-glitch");
+      setTimeout(() => selEl.classList.remove("cs-glitch"), 520); // musí sedieť s trvaním cs-glitch (.5s)
+      tick();
+    }, 3500 + Math.random() * 5500);
+  })();
+  clearInterval(hiddenMutateTimer);
+  hiddenMutateTimer = setInterval(() => {
+    if (!hiddenMode || selEl.classList.contains("hidden")) return;
+    selEl.querySelectorAll('.char-cards[data-page="hidden"] .char-name').forEach(el => {
+      let out = "";
+      for (const ch of "Coming soon")
+        out += (ch !== " " && Math.random() < 0.14)
+          ? HIDDEN_GLITCH_CHARS[Math.floor(Math.random() * HIDDEN_GLITCH_CHARS.length)]
+          : ch;
+      el.textContent = out;
+    });
+  }, 130);
+}
+function stopHiddenFx() {
+  clearTimeout(hiddenGlitchTimer);
+  clearInterval(hiddenMutateTimer);
+  if (charPageTitle) delete charPageTitle.dataset.hiddenTitle; // ďalšie otvorenie postaví spany nanovo
+  selEl.querySelectorAll('.char-cards[data-page="hidden"] .char-name').forEach(el => el.textContent = "Coming soon");
 }
 hiddenRune?.addEventListener("click", () => {
   if (!runeActive()) return;

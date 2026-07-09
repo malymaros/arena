@@ -976,6 +976,20 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   0%, 91%, 95%, 100% { opacity: 1; }
   93%, 97%           { opacity: .35; }
 }
+/* jednotlivé písmená nadpisu „Hidden" ako pokazený neón — každé občas zaprská a na chvíľu zhasne;
+   duration/delay randomizuje client.js per písmeno (setHiddenTitle), nech nezhasínajú naraz */
+#char-select.hidden-mode .char-page-title .hidden-letter {
+  display: inline-block;
+  animation: letter-die 7s linear infinite;
+}
+@keyframes letter-die {
+  0%, 84% { opacity: 1; }
+  85.5%   { opacity: .1; }  /* zaprskanie */
+  87%     { opacity: 1; }
+  88%     { opacity: .1; }  /* zhasnutie na chvíľu */
+  95%     { opacity: .1; }
+  97%, 100% { opacity: 1; }
+}
 .char-cards[data-page="hidden"] .char-card.soon {
   background: #2c2438;
   box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
