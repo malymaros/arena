@@ -3562,10 +3562,10 @@ function updateCharSelectHp(s) {
   // a skryje karty mimo tímu + placeholder; kľúče mageHp = presne vlastný tím
   selEl.classList.toggle("no-paging", !!charSelectHp);
   selEl.classList.toggle("roster-mode", !!charSelectHp);
-  if (charSelectHp && charPage !== 0) setCharPage(0);
-  // setCharPage sa pri otvorení na stránke 0 nevolá — nadpis drž v synce s režimom aj tu
+  if (charSelectHp && (charPage !== 0 || hiddenMode)) setCharPage(0); // roster-mode zatvára aj easter-egg stránku
+  // setCharPage sa pri otvorení na stránke 0 nevolá — nadpis drž v synce s režimom aj tu (Hidden nechaj tak)
   const titleEl = document.getElementById("char-page-title");
-  if (titleEl) titleEl.textContent = charSelectHp ? "Your Team" : CHAR_PAGES[charPage].title;
+  if (titleEl) titleEl.textContent = charSelectHp ? "Your Team" : (hiddenMode ? "Hidden" : CHAR_PAGES[charPage].title);
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
     if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
@@ -3886,6 +3886,7 @@ const charPrevBtn = document.getElementById("char-page-prev");
 const charNextBtn = document.getElementById("char-page-next");
 const charPageTitle = document.getElementById("char-page-title");
 function setCharPage(p) {
+  hiddenMode = false; selEl.classList.remove("hidden-mode"); // každé normálne stránkovanie opúšťa easter-egg stránku
   if (selEl.classList.contains("no-paging")) p = 0; // tournament — roster-mode zlúči karty, stránkovanie je vypnuté
   charPage = Math.max(0, Math.min(CHAR_PAGES.length - 1, p));
   selEl.querySelectorAll(".char-cards").forEach(el =>
@@ -3897,8 +3898,51 @@ function setCharPage(p) {
   charNextBtn?.classList.toggle("off", charPage === CHAR_PAGES.length - 1);
   clearAbilityPreview(); // náhľad špeciálu patrí karte z predošlej stránky
 }
-charPrevBtn?.addEventListener("click", () => setCharPage(charPage - 1));
-charNextBtn?.addEventListener("click", () => setCharPage(charPage + 1));
+// na Hidden stránke je ľavá šípka vypnutá a pravá vracia na str. 0 (Hidden je „naľavo od všetkého")
+charPrevBtn?.addEventListener("click", () => { if (!hiddenMode) setCharPage(charPage - 1); });
+charNextBtn?.addEventListener("click", () => setCharPage(hiddenMode ? 0 : charPage + 1));
+
+/* ---------- Easter egg: skrytá stránka „Hidden" ---------- */
+// Runa v ľavom hornom rohu sa zjavuje podľa blízkosti kurzora — len keď je char-select viditeľný,
+// nejde o turnajový roster-mode (tam sa stránkovanie núti na „Your Team") a Hidden ešte nie je otvorená.
+// Klik spustí glitch prechod (cs-glitch) a uprostred neho prepne karty na blok data-page="hidden".
+// Stránka nie je v CHAR_PAGES, takže šípky sa na ňu nedostanú a setCharPage ju vždy zatvorí.
+let hiddenMode = false;
+const hiddenRune = document.getElementById("hidden-rune");
+const RUNE_RADIUS = 260; // px od ľavého horného rohu, odkiaľ sa runa začína zjavovať
+let hiddenFound = false; // po prvom objavení (localStorage) ostáva runa trvalo slabo viditeľná
+try { hiddenFound = localStorage.getItem("arenaHiddenFound") === "1"; } catch {}
+function runeActive() {
+  return !selEl.classList.contains("hidden") && !selEl.classList.contains("roster-mode") && !hiddenMode;
+}
+document.addEventListener("mousemove", (e) => {
+  if (!hiddenRune) return;
+  if (!runeActive()) { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); return; }
+  const t = Math.max(0, 1 - Math.hypot(e.clientX, e.clientY) / RUNE_RADIUS);
+  // kvadratika — runa sa naplno rozsvieti až tesne pri rohu; po objavení drží slabý základ
+  hiddenRune.style.opacity = String(Math.max(hiddenFound ? 0.12 : 0, t * t));
+  hiddenRune.classList.toggle("near", t > 0.25);
+  hiddenRune.classList.toggle("lit", t > 0.75);
+});
+function showHiddenPage() {
+  hiddenMode = true;
+  selEl.classList.add("hidden-mode");
+  selEl.querySelectorAll(".char-cards").forEach(el =>
+    el.classList.toggle("hidden", el.dataset.page !== "hidden"));
+  if (charPageTitle) charPageTitle.textContent = "Hidden";
+  charPrevBtn?.classList.add("off");
+  charNextBtn?.classList.remove("off");
+  clearAbilityPreview();
+  hiddenRune?.classList.remove("near", "lit");
+  if (hiddenRune) hiddenRune.style.opacity = "0";
+}
+hiddenRune?.addEventListener("click", () => {
+  if (!runeActive()) return;
+  if (!hiddenFound) { hiddenFound = true; try { localStorage.setItem("arenaHiddenFound", "1"); } catch {} }
+  selEl.classList.add("cs-glitch");
+  setTimeout(showHiddenPage, 240); // prepnutie v strede glitchu — musí sedieť s trvaním cs-glitch (.5s)
+  setTimeout(() => selEl.classList.remove("cs-glitch"), 520);
+});
 
 /* ---------- Controls ---------- */
 const moveBtn    = document.getElementById("move-btn");
@@ -4308,8 +4352,8 @@ function applyPhaseUI(s) {
   if (needChar || needTeam) {
     updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom); v drafte null → bez statov
     selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
-    if (selEl.classList.contains("hidden")) { teamPick = []; charPage = 1; } // nové otvorenie — od stránky Mages (str. 1), čistý draft
-    setCharPage(charPage); // vždy zosynchronizuj stránku/šípky/nadpis — aj po Ctrl+F5 priamo do char-selectu (inak chýba ľavá šípka)
+    if (selEl.classList.contains("hidden")) { teamPick = []; charPage = 1; hiddenMode = false; } // nové otvorenie — od stránky Mages (str. 1), čistý draft, bez easter-egg stránky
+    if (!hiddenMode) setCharPage(charPage); // sync stránky/šípok/nadpisu — aj po Ctrl+F5; state update nesmie zhodiť otvorenú Hidden stránku
     if (needTeam) syncTeamUi();
     else selEl.querySelectorAll(".char-card.picked").forEach(c => { c.classList.remove("picked"); c.querySelector(".pick-badge")?.remove(); });
     hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber

@@ -933,6 +933,62 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 }
 .char-card.soon .char-name { color: #8f97a3; }
 
+/* ---------- Easter egg: skrytá stránka „Hidden" ---------- */
+/* runa (kľúčová dierka) v ľavom hornom rohu — opacity riadi client.js podľa vzdialenosti kurzora;
+   .near povolí klik (inak je roh neviditeľne klikateľný), .lit pri tesnej blízkosti pulzuje */
+.hidden-rune {
+  position: fixed; top: 12px; left: 12px; z-index: 30;
+  width: 56px; height: 56px; padding: 8px;
+  color: #b17aff;
+  opacity: 0; pointer-events: none;
+  transition: opacity .15s linear;
+  filter: drop-shadow(0 0 6px rgba(177,122,255,.8));
+  cursor: pointer;
+}
+.hidden-rune svg { width: 100%; height: 100%; display: block; }
+.hidden-rune.near { pointer-events: auto; }
+.hidden-rune.lit { animation: rune-pulse 1.1s ease-in-out infinite; }
+@keyframes rune-pulse {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(177,122,255,.8)); transform: scale(1); }
+  50%      { filter: drop-shadow(0 0 18px rgba(210,170,255,1)); transform: scale(1.1); }
+}
+
+/* glitch prechod pri kliknutí na runu — krátke CRT trhnutie celého char-selectu,
+   uprostred animácie client.js prepne stránku na Hidden */
+#char-select.cs-glitch { animation: cs-glitch .5s steps(1, end); }
+@keyframes cs-glitch {
+  0%   { transform: translate(0, 0);      filter: none; }
+  12%  { transform: translate(-7px, 3px); filter: hue-rotate(80deg) saturate(2.5); }
+  26%  { transform: translate(6px, -4px); filter: invert(.18) contrast(1.3); }
+  42%  { transform: translate(-4px, 0);   filter: hue-rotate(-70deg) saturate(2); }
+  58%  { transform: translate(5px, 3px);  filter: none; }
+  74%  { transform: translate(-3px, -2px);filter: saturate(3) contrast(1.5); }
+  100% { transform: translate(0, 0);      filter: none; }
+}
+
+/* skin Hidden stránky — fialová „tajomná" varianta placeholder kariet + blikajúci nadpis */
+#char-select.hidden-mode .char-page-title {
+  color: #b17aff;
+  text-shadow: 3px 3px 0 rgba(0,0,0,.7), 0 0 14px rgba(177,122,255,.55);
+  animation: hidden-flicker 3.2s linear infinite;
+}
+@keyframes hidden-flicker {
+  0%, 91%, 95%, 100% { opacity: 1; }
+  93%, 97%           { opacity: .35; }
+}
+.char-cards[data-page="hidden"] .char-card.soon {
+  background: #2c2438;
+  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 18px rgba(177,122,255,.3);
+}
+.char-cards[data-page="hidden"] .char-card.soon:hover {
+  transform: none;
+  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 18px rgba(177,122,255,.3);
+}
+.char-cards[data-page="hidden"] .soon-mark { font-size: 36px; color: #b17aff; text-shadow: 4px 4px 0 rgba(0,0,0,.6), 0 0 12px rgba(177,122,255,.5); }
+.char-cards[data-page="hidden"] .char-name { color: #9d86c4; }
+
 .char-name {
   position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 8px;
   background: linear-gradient(transparent, rgba(0,0,0,.7));
