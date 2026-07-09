@@ -1673,7 +1673,9 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     pushStateFrame(tl, [{ kind: "tile_proc", tile: tile.type, cell: [p.x, p.y] }], 600);
     game.tiles.splice(idx, 1); // jediné spotrebovateľné políčka
     if (tile.type === "heal") {
-      const healed = Math.min(START_HP, p.hp + 1) - p.hp;
+      // Lightning: heal dlaždica ju lieči na plné HP (ostatní +1)
+      const healAmount = p.char === "lightning" ? START_HP : p.hp + 1;
+      const healed = Math.min(START_HP, healAmount) - p.hp;
       p.hp += healed;
       if (healed > 0) {
         pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed }], SMALL_DELAY_MS);

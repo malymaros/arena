@@ -3745,7 +3745,7 @@ const ABILITY_PREVIEW = {
   // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
   escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror and falls when you use them" },
   fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Immune to <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
-  lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
+  lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
   medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
