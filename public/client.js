@@ -401,7 +401,7 @@ const portraitFill = (char, base) => base * (PORTRAIT_SCALE[char] ?? 1);
 
 const CHAR_META = {
   fire:      { name: "Fire Wizard",      dir: "fire" },
-  lightning: { name: "Lightning Mage",   dir: "lightning" },
+  lightning: { name: "Lightning Mage",   dir: "lightning", dirP2: "lightning_2" },
   wanderer:  { name: "Wanderer Magician",dir: "wanderer" },
   // Medúza: pravá strana (p2) má NATÍVNU tmavú paletu (Medusa2) namiesto CSS alt-color filtra;
   // Charge.png = prefarbený fire fireball (zeleno-žltý / fialový) vygenerovaný per paleta
