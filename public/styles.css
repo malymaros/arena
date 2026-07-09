@@ -1338,6 +1338,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   #char-select.p2-side canvas.char-canvas{ filter: saturate(.22) brightness(1.4); }
   /* Postavy s natívnou p2 paletou nepoužívajú dodatočný alt-color filter. */
   #char-select.p2-side canvas.char-canvas[data-char="fire"]{ filter: none; }
+  #char-select.p2-side canvas.char-canvas[data-char="wanderer"]{ filter: none; }
   #char-select.p2-side canvas.char-canvas[data-char="lightning"]{ filter: none; }
   #char-select.p2-side canvas.char-canvas[data-char="medusa"]{ filter: none; }
   #char-select.p2-side canvas.char-canvas[data-char="minotaur"]{ filter: none; }
