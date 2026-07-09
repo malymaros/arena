@@ -794,7 +794,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   display: flex; align-items: center; justify-content: center;
 }
 /* ikony (flame/drop) v popise — posadené vyššie, bez bočnej medzery (medzeru dáva text, kde treba) */
-.ca-desc .pix-ico.mini { vertical-align: 4px; margin: 0; }
+.ca-desc .pix-ico.mini { vertical-align: 2px; margin: 0; }
 /* dmg + mana, výraznejšie pod popisom útoku */
 .ca-stats {
   display: flex; align-items: center; justify-content: center;
