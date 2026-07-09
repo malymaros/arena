@@ -3742,9 +3742,9 @@ const ABILITY_PREVIEW = {
   // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview;
   // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
   escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror and falls when you use them" },
-  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row · Passive: immune to Damage tiles" },
+  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Immune to <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
-  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours · Passive: +2 mana each round" },
+  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `+2 <span class="pix-ico mini" data-pix="drop"></span> each round<br>Range: diagonal neighbours` },
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
   medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
   minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands. Their steps weave a thread; stepping on it reveals your silhouette" },
@@ -3801,7 +3801,11 @@ function renderAbilityPreview(char) {
   const caMoon = document.getElementById("ca-moon");
   if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
-  document.getElementById("ca-text").textContent = def.desc;
+  // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → innerHTML + hydratácia ikon
+  const caTextEl = document.getElementById("ca-text");
+  caTextEl.innerHTML = def.desc;
+  caTextEl.querySelectorAll(".pix-ico[data-pix]").forEach(el => { el.innerHTML = pixSvg(el.dataset.pix); });
+  hydratePix(caTextEl); // prípadné [data-emoji] ikony
   const stats = document.getElementById("ca-stats");
   stats.innerHTML = def.dmg != null
     ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span></span>`
