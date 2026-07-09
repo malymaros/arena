@@ -50,8 +50,8 @@ const EFFECT_COLORS = new Set([
 const HAIR_COLORS = new Set(["244,210,156", "160,134,98"]);
 const SKIN_HAIR_COLORS = new Set(["244,210,156", "160,134,98"]);
 const HAIR_PALETTE = new Map([
-  ["244,210,156", [222,  58,  62]],
-  ["160,134,98",  [120,  34,  42]],
+  ["244,210,156", [170,  64,  46]],
+  ["160,134,98",  [ 92,  36,  32]],
 ]);
 const SKIN_FALLBACK = new Map([
   ["244,210,156", [252, 239, 232]],
@@ -62,8 +62,8 @@ const HEAD_SKIN_SHADOW = new Map([
   ["125,56,51", [220, 188, 184]],
 ]);
 const LOWER_BLACK_STRIP = new Map([
-  ["171,81,48", [  3,  18,  16]],
-  ["169,81,48", [  3,  18,  16]],
+  ["171,81,48", [  6,  62,  48]],
+  ["169,81,48", [  6,  62,  48]],
 ]);
 const BOOT_COLORS = new Map([
   ["66,36,51", [  4,   4,   5]],
