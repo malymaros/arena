@@ -1678,7 +1678,8 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       const healed = Math.min(START_HP, healAmount) - p.hp;
       p.hp += healed;
       if (healed > 0) {
-        pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed }], SMALL_DELAY_MS);
+        // Lightning full-heal pasívka: klient ukáže „SUPER HEAL" float namiesto obyčajného +N HP
+        pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed, super: p.char === "lightning" }], SMALL_DELAY_MS);
       } else {
         pushStateFrame(tl, [], SMALL_DELAY_MS); // pri plnom HP sa spotrebuje naprázdno
       }

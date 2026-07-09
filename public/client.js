@@ -3512,7 +3512,9 @@ function schedulePlayTimeline(timeline) {
         else spawnFloat(e.target, "🛡️ BLOCKED", bcls);
       }
       if (e.kind === "heal" && (e.target === "p1" || e.target === "p2")) {
-        spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
+        // Lightning na heal dlaždici (full-heal pasívka) — „SUPER HEAL" ako Fire Wizardov IMMUNE
+        if (e.super) spawnFloat(e.target, "SUPER HEAL", "superheal-float");
+        else spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
       }
       } catch (err) { console.error("effect handler zlyhal", e?.kind, err); }
     }
