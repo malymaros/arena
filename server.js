@@ -17,11 +17,21 @@ const io = new Server(httpServer, {
   connectionStateRecovery: { maxDisconnectionDuration: 2 * 60 * 1000, skipMiddlewares: true },
 });
 
-// no-store: prehliadač vždy načíta čerstvé statické súbory (žiadny tvrdý refresh po zmene client.js/index.html)
+// Statika s rozumným kešovaním (predtým no-store → prehliadač sťahoval všetkých ~33 MB
+// sprite sheetov pri KAŽDOM načítaní; plocha sa preto zobrazovala pomaly zakaždým):
+//  - assets/ a arenas/ (sprite sheety, pozadia — menia sa zriedka): kešuj 1 h, potom revaliduj
+//  - index.html, client.js/css (kód — mení sa pri deployi): vždy revaliduj cez ETag,
+//    prehliadač si tak po deployi hneď vyzdvihne novú verziu, no bez zmeny dostane rýchle 304
 app.use(express.static(path.join(__dirname, "public"), {
-  etag: false,
-  lastModified: false,
-  setHeaders: (res) => res.setHeader("Cache-Control", "no-store"),
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    if (/[\\/](assets|arenas)[\\/]/.test(filePath)) {
+      res.setHeader("Cache-Control", "public, max-age=3600");
+    } else {
+      res.setHeader("Cache-Control", "no-cache");
+    }
+  },
 }));
 
 const PORT = process.env.PORT || 3000;
