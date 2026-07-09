@@ -296,10 +296,14 @@
     <div id="char-ability" class="char-ability hidden">
       <div class="ca-title" id="ca-title"></div>
       <div class="ca-grid" id="ca-grid"></div>
-      <!-- Escanor: pride level pod mini-doskou — lev + číslo ako v HUD widgete, cyklí spolu s náhľadom zóny -->
-      <div class="ca-pride hidden" id="ca-pride"><img src="/assets/pride_lion_0.png" alt="Pride" /><span class="pride-num">0</span></div>
-      <!-- Vlkolak: fáza mesiaca + dmg pod mini-doskou — cyklí 0→3 (naplní client.js syncCaMoon) -->
-      <div class="ca-moon hidden" id="ca-moon"><img src="/assets/moon_0.png" alt="Moon" /><span class="ca-moon-dmg"></span></div>
+      <!-- pride/moon riadok — vždy prítomný fixný slot (nech centrovanie panelu neskáče podľa postavy);
+           vnútri sa pride (Escanor) a moon (Vlkolak) prepínajú cez .hidden, prázdny slot drží výšku -->
+      <div class="ca-extra">
+        <!-- Escanor: pride level pod mini-doskou — lev + číslo ako v HUD widgete, cyklí spolu s náhľadom zóny -->
+        <div class="ca-pride hidden" id="ca-pride"><img src="/assets/pride_lion_0.png" alt="Pride" /><span class="pride-num">0</span></div>
+        <!-- Vlkolak: fáza mesiaca + dmg pod mini-doskou — cyklí 0→3 (naplní client.js syncCaMoon) -->
+        <div class="ca-moon hidden" id="ca-moon"><img src="/assets/moon_0.png" alt="Moon" /><span class="ca-moon-dmg"></span></div>
+      </div>
       <div class="ca-text" id="ca-text"></div>
       <div class="ca-stats" id="ca-stats"></div>
     </div>
