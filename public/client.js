@@ -3801,9 +3801,10 @@ function renderAbilityPreview(char) {
   const caMoon = document.getElementById("ca-moon");
   if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
-  // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → innerHTML + hydratácia ikon
+  // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → obal do JEDNÉHO divu (.ca-text je flex,
+  // inak by sa každý textový kúsok/ikona stali samostatným flex-itemom a text sa rozhádže), potom hydratuj ikony
   const caTextEl = document.getElementById("ca-text");
-  caTextEl.innerHTML = def.desc;
+  caTextEl.innerHTML = `<div class="ca-desc">${def.desc}</div>`;
   caTextEl.querySelectorAll(".pix-ico[data-pix]").forEach(el => { el.innerHTML = pixSvg(el.dataset.pix); });
   hydratePix(caTextEl); // prípadné [data-emoji] ikony
   const stats = document.getElementById("ca-stats");
