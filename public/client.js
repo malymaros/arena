@@ -421,7 +421,8 @@ const CHAR_META = {
   // (P1 mesačná modrá, P2 krvavá červená) — tools/sprites-werewolf
   werewolf:  { name: "Werewolf",         dir: "Werewolf_1", dirP2: "Werewolf_2" },
   // Hidden stránka (easter egg): zatiaľ LEN idle ukážky na kartách, nedajú sa zvoliť ani hrať.
-  // Countess Vampire je plánovaná pre P1, Onre pre P2 — párovanie/palety doriešime pri implementácii.
+  // Postavy sú viazané na stranu: Countess Vampire patrí VÝHRADNE P1, Onre VÝHRADNE P2
+  // (karty per strana skrýva CSS cez data-side; Onre má na p2-side výnimku z albino filtra).
   countess:  { name: "Countess Vampire", dir: "Countess_Vampire" },
   onre:      { name: "Onre",             dir: "Onre" }
 };

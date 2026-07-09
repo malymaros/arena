@@ -1002,6 +1002,9 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 }
 .char-cards[data-page="hidden"] .soon-mark { font-size: 36px; color: #b17aff; text-shadow: 4px 4px 0 rgba(0,0,0,.6), 0 0 12px rgba(177,122,255,.5); }
 .char-cards[data-page="hidden"] .char-name { color: #9d86c4; }
+/* nové postavy na Hidden stránke sú viazané na stranu hráča: P1 vidí len Countess Vampire, P2 len Onre */
+#char-select:not(.p2-side) .char-card[data-side="p2"] { display: none; }
+#char-select.p2-side .char-card[data-side="p1"] { display: none; }
 /* šípka späť z Hidden stránky (na Experimental) vo fialovom skine stránky */
 #char-select.hidden-mode .char-arrow {
   background: #2c2438; color: #b17aff;
@@ -1432,6 +1435,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   #char-select.p2-side canvas.char-canvas[data-char="escanor"]{ filter: none; }
   #char-select.p2-side canvas.char-canvas[data-char="soldier"]{ filter: none; }
   #char-select.p2-side canvas.char-canvas[data-char="werewolf"]{ filter: none; }
+  /* Onre je natívna P2 postava (Hidden stránka) — žiadny albino filter */
+  #char-select.p2-side canvas.char-canvas[data-char="onre"]{ filter: none; }
   /* hráč vpravo (p2): celý výber orientovaný na opačnú stranu — postavy v kartách aj mini-caster
      v náhľade špeciálu hľadia doľava (zrkadlovo k ľavému hráčovi); zónu zrkadlí renderAbilityPreview */
   #char-select.p2-side canvas.char-canvas{ transform: scaleX(-1); }
