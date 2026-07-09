@@ -3902,6 +3902,9 @@ function setCharPage(p) {
   // krajné šípky sú neviditeľné (visibility) — layout kariet sa pri prepnutí nehýbe
   charPrevBtn?.classList.toggle("off", charPage === 0);
   charNextBtn?.classList.toggle("off", charPage === CHAR_PAGES.length - 1);
+  // tooltip šípky = názov CIEĽOVEJ stránky (nie „Back")
+  if (charPrevBtn) charPrevBtn.title = charPage > 0 ? CHAR_PAGES[charPage - 1].title : "";
+  if (charNextBtn) charNextBtn.title = charPage < CHAR_PAGES.length - 1 ? CHAR_PAGES[charPage + 1].title : "";
   clearAbilityPreview(); // náhľad špeciálu patrí karte z predošlej stránky
 }
 // na Hidden stránke je ľavá šípka vypnutá a pravá vracia na str. 0 (Hidden je „naľavo od všetkého")
@@ -3938,6 +3941,7 @@ function showHiddenPage() {
   startHiddenFx(); // nadpis po písmenách (dohasínajúci neón) + občasný glitch + mutujúci text kariet
   charPrevBtn?.classList.add("off");
   charNextBtn?.classList.remove("off");
+  if (charNextBtn) charNextBtn.title = CHAR_PAGES[0].title; // z Hidden sa pravou šípkou vracia na str. 0
   clearAbilityPreview();
   hiddenRune?.classList.remove("near", "lit");
   if (hiddenRune) hiddenRune.style.opacity = "0";
