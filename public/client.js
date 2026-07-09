@@ -4256,6 +4256,11 @@ lockBtn.addEventListener("click", () => {
 
 /* ---------- Retry ---------- */
 retryBtn.addEventListener("click", () => { socket.emit("retry"); });
+// „Leave the room" — opustí roomku a vráti sa na room-browser (server pošle „rooms")
+document.getElementById("leave-room")?.addEventListener("click", () => {
+  goOverlay.classList.add("hidden");
+  socket.emit("leave_room");
+});
 
 /* ---------- Phase UI (lobby / waiting / char-select) ---------- */
 const otherSlot = () => (me === "p1" ? "p2" : me === "p2" ? "p1" : null);

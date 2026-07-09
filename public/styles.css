@@ -993,6 +993,10 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     inset 0 3px 0 rgba(255,255,255,.3),
     inset 0 -4px 0 rgba(0,0,0,.35);
 }
+.go-buttons { display: flex; flex-direction: column; gap: 14px; align-items: center; pointer-events: none; }
+/* „Leave the room" — neutrálna sivá, odlíšená od zeleného Play again */
+.retry.leave { background: #5a5d66; font-size: 11px; padding: 13px 22px 15px; }
+.retry.leave:hover { background: #6a6e78; }
 .retry:hover { background: #379e3d; }
 .retry:active {
   transform: translateY(3px);

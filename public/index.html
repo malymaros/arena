@@ -415,7 +415,10 @@
 
   <!-- Game over — verdikt sa píše do hud-turn, tu je len Play again v strede -->
   <div id="gameover" class="gameover hidden">
-    <button id="retry" class="retry">Play again?</button>
+    <div class="go-buttons">
+      <button id="retry" class="retry">Play again?</button>
+      <button id="leave-room" class="retry leave">Leave the room</button>
+    </div>
   </div>
 
   <!-- Room browser — po logine; zatiaľ 1 roomka (create / join / spectate) -->

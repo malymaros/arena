@@ -2441,6 +2441,20 @@ io.on("connection", (socket) => {
     socket.emit("state", snapshot());
   });
 
+  // Opusti roomku (napr. po skončení zápasu) → miesto sa uvoľní hneď, hráč ide späť na room-browser
+  socket.on("leave_room", () => {
+    if (!person) return;
+    const p = person;
+    if (personSockets[p] === socket) personSockets[p] = null;
+    personIds[p] = null; personFreedAt[p] = 0; personNames[p] = null; // dobrovoľný odchod → bez grace
+    person = null;
+    socket.data.person = null;
+    clearTurnTimer();
+    browsing.add(socket);
+    socket.emit("rooms", roomsSnapshot());
+    if (roomEmpty()) destroyRoom(); else broadcastRooms(); // ak ostal sám nikto → zruš; inak uprav počet
+  });
+
   // úvodná obrazovka: host nastaví formát + tiles + časový limit a spustí zápas
   socket.on("configure_match", (raw) => {
     if (person !== "A") return;          // konfiguruje len host
