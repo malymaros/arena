@@ -396,7 +396,7 @@ const FX_OFFSET_X = { lightning: 0.18 };
 // Normalizácia veľkosti postavy v KARTÁCH výberu a HUD PORTRÉTE: mágovia vypĺňajú frame len z ~51 %
 // výšky (veľa vzduchu), Medúza 59 % a Minotaur 72 % — pri rovnakom fill preto pôsobia príliš veľkí.
 // Násobič ich zmenšuje na porovnateľnú výšku postavy; na BOARDE ostávajú zámerne väčší (bez násobiča).
-const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7 };
+const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7, countess: 0.93, onre: 0.93 };
 const portraitFill = (char, base) => base * (PORTRAIT_SCALE[char] ?? 1);
 
 const CHAR_META = {
@@ -419,7 +419,11 @@ const CHAR_META = {
   soldier:   { name: "Soldier",          dir: "soldier", dirP2: "soldier_2" },
   // Vlkolak: natívna p2 paleta (Werewolf_2, teplejší odtieň); Charge.png = prefarbený fire fireball per paleta
   // (P1 mesačná modrá, P2 krvavá červená) — tools/sprites-werewolf
-  werewolf:  { name: "Werewolf",         dir: "Werewolf_1", dirP2: "Werewolf_2" }
+  werewolf:  { name: "Werewolf",         dir: "Werewolf_1", dirP2: "Werewolf_2" },
+  // Hidden stránka (easter egg): zatiaľ LEN idle ukážky na kartách, nedajú sa zvoliť ani hrať.
+  // Countess Vampire je plánovaná pre P1, Onre pre P2 — párovanie/palety doriešime pri implementácii.
+  countess:  { name: "Countess Vampire", dir: "Countess_Vampire" },
+  onre:      { name: "Onre",             dir: "Onre" }
 };
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
@@ -3636,7 +3640,8 @@ function drawCharSelectFrame(now) {
     const dir = charDirFor(key, me); // hráč vpravo vidí Medúzu v natívnej tmavej palete (Medusa2)
     if (!dir) return;
     // mŕtvy mág (tournament): dead póza mága + death démon prekrytý cez okno karty
-    if (isMageDead(key)) {
+    // (len skutočné hrateľné karty — preview karty Hidden stránky nemajú data-char na karte a roster stav)
+    if (isMageDead(key) && cvs.closest(".char-card")?.dataset.char) {
       ensureSpriteMeta(dir, ANIM_DEF.dead.file)
         .then(meta => {
           drawSprite(ctx, meta, ANIM_DEF.dead, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52);
@@ -3950,7 +3955,7 @@ function showHiddenPage() {
 /* nepravidelné efekty otvorenej Hidden stránky:
    1) nadpis „Hidden" rozbitý na spany — každé písmeno má vlastnú náhodnú fázu letter-die (pokazený neón),
    2) celý char-select občas (3,5–9 s) preblikne rovnakým cs-glitch ako pri vstupe cez runu,
-   3) „Coming soon" na kartách sa každý tick mutuje na glitchnutý secret text (náhodné znaky).
+   3) názvy kariet (mená postáv aj „Coming soon") sa každý tick mutujú na glitchnutý secret text (náhodné znaky).
    Všetko sa vypína cez stopHiddenFx() — volá ho setCharPage, ktorý Hidden stránku vždy zatvára. */
 const HIDDEN_GLITCH_CHARS = "#@$%&*+=/\\<>[]{}01?";
 let hiddenGlitchTimer = 0, hiddenMutateTimer = 0;
@@ -3982,8 +3987,10 @@ function startHiddenFx() {
   hiddenMutateTimer = setInterval(() => {
     if (!hiddenMode || selEl.classList.contains("hidden")) return;
     selEl.querySelectorAll('.char-cards[data-page="hidden"] .char-name').forEach(el => {
+      // pôvodné meno karty si zapamätaj pri prvom ticku — mutuje sa vždy z originálu, nie z už zglitchnutého textu
+      const base = el.dataset.baseName ?? (el.dataset.baseName = el.textContent);
       let out = "";
-      for (const ch of "Coming soon")
+      for (const ch of base)
         out += (ch !== " " && Math.random() < 0.14)
           ? HIDDEN_GLITCH_CHARS[Math.floor(Math.random() * HIDDEN_GLITCH_CHARS.length)]
           : ch;
@@ -3995,7 +4002,9 @@ function stopHiddenFx() {
   clearTimeout(hiddenGlitchTimer);
   clearInterval(hiddenMutateTimer);
   if (charPageTitle) delete charPageTitle.dataset.hiddenTitle; // ďalšie otvorenie postaví spany nanovo
-  selEl.querySelectorAll('.char-cards[data-page="hidden"] .char-name').forEach(el => el.textContent = "Coming soon");
+  selEl.querySelectorAll('.char-cards[data-page="hidden"] .char-name').forEach(el => {
+    if (el.dataset.baseName != null) el.textContent = el.dataset.baseName; // vráť originálne meno karty
+  });
 }
 hiddenRune?.addEventListener("click", () => {
   if (!runeActive()) return;
