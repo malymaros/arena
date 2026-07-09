@@ -2,7 +2,8 @@
 //   1) vygeneruje public/assets/soldier/Charge.png — kotúľajúci sa granát (8 rotačných framov 64×64,
 //      klient ho cez CHARGE_ANIM cyklí počas letu = granát sa točí „po zemi")
 //   2) prefarbí uniformu na ČIERNU do public/assets/soldier_2/ (P2 paleta): nízkosaturované
-//      hnedo-olivové tóny uniformy → tmavé šedé; koža/puška/oči/výbuchy (výrazne oranžové, r−b>60)
+//      hnedo-olivové tóny uniformy → tmavé šedé; puška → biela/strieborná; koža/oči/výbuchy
+//      (výrazne oranžové, r−b>60)
 //      a úplne tmavé pixely ostávajú. Explosion.png sa kopíruje bez zmeny (oheň je spoločný).
 // Spustenie: node tools/sprites-soldier/build.cjs
 const fs = require("fs"), path = require("path"), { PNG } = require("pngjs");
@@ -61,15 +62,28 @@ function buildCharge() {
   console.log("Charge.png (granát, 8 framov) -> assets/soldier/");
 }
 
-/* ---------- 2) P2 recolor — uniforma na čiernu ---------- */
-// pravidlo per pixel: ponechaj priehľadné, výrazne oranžové (koža/drevo pušky/oči/úsťový plameň:
-// r − b > 60) a veľmi svetlé (>200 luminancie, np. jadro výbuchu); zvyšok (uniforma, helma, vesta,
-// rukavice) → grayscale × 0.55 = uhľovo čierna so zachovaným tieňovaním
+/* ---------- 2) P2 recolor — uniforma na čiernu, puška na bielu ---------- */
+// pravidlo per pixel: ponechaj priehľadné, výrazne oranžové (koža/oči/úsťový plameň: r − b > 60)
+// a veľmi svetlé (>200 luminancie, np. jadro výbuchu); zvyšok (uniforma, helma, vesta, rukavice)
+// → grayscale × 0.55 = uhľovo čierna so zachovaným tieňovaním. Dva hnedé tóny pušky mapujeme
+// pred oranžovou výnimkou na bielu/striebornú, aby bola P2 zbraň čitateľná na čiernej uniforme.
+function recolorP2Gun(data, i, r, g, b) {
+  if (r === 198 && g === 133 && b === 86) {
+    data[i] = 245; data[i + 1] = 245; data[i + 2] = 235;
+    return true;
+  }
+  if (r === 140 && g === 91 && b === 62) {
+    data[i] = 172; data[i + 1] = 178; data[i + 2] = 178;
+    return true;
+  }
+  return false;
+}
 function recolorBlack(data) {
   for (let i = 0; i < data.length; i += 4) {
     if (data[i + 3] < 20) continue;
     const r = data[i], g = data[i + 1], b = data[i + 2];
-    if (r - b > 60) continue;                       // koža / puška / oheň
+    if (recolorP2Gun(data, i, r, g, b)) continue;
+    if (r - b > 60) continue;                       // koža / oči / oheň
     const lum = 0.3 * r + 0.55 * g + 0.15 * b;
     if (lum > 200) continue;                        // jadro záblesku
     const v = Math.round(lum * 0.55);
