@@ -5,6 +5,16 @@ Stack: **Ampere A1 Always Free VM** (Ubuntu) → **Node** ako **systemd** služb
 
 Súbory v repe (`deploy/`): `arena.service`, `Caddyfile`.
 
+> ### 🟢 Aktuálne nasadenie (produkcia)
+> Hra **už beží** na **https://arena.marosmaly.sk**.
+> - **VM:** Oracle Ampere A1.Flex (Always Free, AD-2), Ubuntu — public IP `138.2.172.142`
+> - **SSH:** `ssh -i C:\Users\maly\.ssh\oracle_arena_b.key ubuntu@138.2.172.142`
+> - **App:** systemd služba `arena` (`/home/ubuntu/arena`, `PORT=3000`), **Caddy** HTTPS proxy
+> - **Nová verzia (najčastejší úkon):** viď [sekcia 8 – Update](#8-update--prevádzka)
+>
+> Zvyšok tohto dokumentu je **kompletný postup od nuly** — použi ho, ak sa robí nová VM
+> alebo migrácia (napr. presun z platenej trial inštancie na Always Free shape).
+
 ---
 
 ## Prehľad krokov
@@ -60,14 +70,34 @@ Z tvojho PC (PowerShell), s cestou k stiahnutému privátnemu kľúču:
 ssh -i C:\cesta\k\privatnemu-kluc.key ubuntu@<PUBLIC_IP>
 ```
 
-> Ak kľúč hlási „permissions too open", oprav ACL alebo skopíruj kľúč do `%USERPROFILE%\.ssh\`.
+> **Windows — „UNPROTECTED PRIVATE KEY FILE":** OpenSSH odmietne kľúč s voľnými právami.
+> Skopíruj ho do `%USERPROFILE%\.ssh\` a zamkni práva:
+> ```powershell
+> icacls "$env:USERPROFILE\.ssh\mojkluc.key" /inheritance:r
+> icacls "$env:USERPROFILE\.ssh\mojkluc.key" /grant:r "$($env:USERNAME):(R)"
+> ```
 
-Ubuntu obrazy na Oracle majú **navyše iptables**, ktoré blokujú všetko okrem SSH — treba otvoriť porty aj v OS (druhá najčastejšia chyba):
+Ubuntu obrazy na Oracle majú **navyše iptables**, ktoré blokujú všetko okrem SSH — treba otvoriť porty aj v OS (druhá najčastejšia chyba).
+
+> ⚠️ **POZOR na poradie pravidiel** (na toto sme sa reálne zasekli): v INPUT reťazi je
+> na konci `REJECT ... reject-with icmp-host-prohibited`, ktorý zhodí všetko, čo sa k nemu
+> dostane. Nové `ACCEPT` pravidlá musia byť **PRED** týmto REJECT. Fixné `-I INPUT 6`
+> nie je spoľahlivé — poloha REJECT sa medzi obrazmi líši (u nás bol na riadku 5, takže
+> insert na pozíciu 6 padol AŽ ZA REJECT a porty ostali zavreté). Preto pravidlá
+> vkladáme dynamicky priamo pred REJECT:
 
 ```bash
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+# vloz ACCEPT pre 80 aj 443 tesne PRED REJECT pravidlo
+REJ=$(sudo iptables -L INPUT --line-numbers -n | awk '/REJECT/{print $1; exit}')
+sudo iptables -I INPUT "$REJ" -m state --state NEW -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT "$REJ" -m state --state NEW -p tcp --dport 443 -j ACCEPT
+
+# perzistencia cez reboot
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
 sudo netfilter-persistent save
+
+# kontrola — ACCEPT pre dpt:80/443 MUSI byt nad riadkom REJECT
+sudo iptables -L INPUT -n --line-numbers
 ```
 
 ---

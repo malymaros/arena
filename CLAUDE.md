@@ -17,6 +17,18 @@ npm test         # integration tests — boots the server on :3996, drives 2 soc
 
 Environment variables: `PORT` (default 3000), `ADMIN_KEY` (optional password for admin reset; if unset, reset is open), `FORCE_FIRST_STARTER` (`A`|`B` — pins the otherwise random game-1 starter; used by the tests).
 
+## Deployment
+
+Production runs on **Oracle Cloud Always Free** at **https://arena.marosmaly.sk** (Ampere A1 VM, IP `138.2.172.142`). The app runs as the systemd service `arena` (`/home/ubuntu/arena`, `PORT=3000`), fronted by **Caddy** as an HTTPS reverse proxy (auto Let's Encrypt + transparent Socket.IO WebSocket passthrough). Deploy assets live in `deploy/` (`arena.service`, `Caddyfile`).
+
+**Full step-by-step guide (from scratch + migration): `docs/DEPLOY_ORACLE.md`.** It covers the two non-obvious gotchas the hard way: ports must be opened in **both** the VCN Security List **and** the OS iptables (the `ACCEPT` rules must sit **before** the trailing `REJECT`), and Always-Free ARM capacity is often exhausted (retry / other AD / x86 micro fallback).
+
+**Deploy a new version** (after `git push` to `main`):
+```
+ssh -i C:\Users\maly\.ssh\oracle_arena_b.key ubuntu@138.2.172.142 "cd ~/arena && git pull && npm install --omit=dev && sudo systemctl restart arena"
+```
+Live logs: `journalctl -u arena -f`. Caddy config lives at `/etc/caddy/Caddyfile`; restart with `sudo systemctl restart caddy` after edits.
+
 ## Architecture
 
 Two files contain all the logic:
