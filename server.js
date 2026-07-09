@@ -50,6 +50,7 @@ const START_POS = { p1: { x: 0, y: 1 }, p2: { x: BOARD.w - 1, y: 1 } };
 const START_HP = 10;
 const START_MANA = 6; // vyšší štart = mind games od 1. kola (special hrozba vs golden shield counter)
 const MAX_MANA = 10;
+const WANDERER_MANA_REGEN = 2; // Pútnik (wanderer): pasívne +N many na konci každého kola, ak ešte žije a je aktívny
 
 const BASIC_COST    = 1;
 const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: vedľa 3, ďalej 2, najďalej 1 (vlastné políčko basic nezasahuje)
@@ -1698,7 +1699,16 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     // (kaster labyrintu dostáva tile dmg/IK normálne ako mimo labyrintu — mazeBuff už nedáva imunitu na dlaždice)
     let dmg = 0, tileType = null;
     if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
-    else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) { dmg = 1; tileType = "dmg"; }
+    else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) {
+      if (p.char === "fire") {
+        // Fire Wizard je imunný voči Damage dlaždiciam — ohnivé políčko mu nedá dmg (IK ho stále zabije).
+        // Ukáž rozsvietené políčko + IMMUNE, ale žiadny zásah.
+        pushStateFrame(tl, [{ kind: "tile_proc", tile: "dmg", cell: [p.x, p.y] }], 600);
+        pushStateFrame(tl, [{ kind: "immune", target: slot, cell: [p.x, p.y] }], SMALL_DELAY_MS);
+      } else {
+        dmg = 1; tileType = "dmg";
+      }
+    }
     if (dmg > 0) {
       const d = recvDmg(slot, dmg);
       // tile dmg labyrint bežne NEkončí — výnimka je smrteľný zásah: pred finálnym dmg sa prehrá
@@ -2146,6 +2156,18 @@ function resolveTurn() {
     for (const slot of ["p1", "p2"]) {
       const p = game.players[slot];
       if (p.char === "werewolf") p.moon = moonLevelFor(p.hp);
+    }
+
+    // Pútnik (wanderer): pasívne +WANDERER_MANA_REGEN many na konci kola — len ak ešte žije a je aktívny
+    // (rovnaká fáza ako Escanorova pýcha / vlkolakov mesiac). Čierna recharge animácia (dark:true).
+    for (const slot of ["p1", "p2"]) {
+      const p = game.players[slot];
+      if (p.char !== "wanderer" || p.hp <= 0) continue;
+      const gain = Math.min(MAX_MANA - p.mana, WANDERER_MANA_REGEN);
+      if (gain > 0) {
+        p.mana += gain;
+        pushStateFrame(tl, [{ kind: "recharge", from: slot, cells: [[p.x, p.y]], amount: gain, dark: true }], SMALL_DELAY_MS);
+      }
     }
 
     // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)

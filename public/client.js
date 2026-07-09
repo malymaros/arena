@@ -1058,13 +1058,13 @@ function spawnFloat(slot, text, className) {
   setTimeout(() => el.remove(), 1000);
 }
 
-function spawnManaFloat(slot, amount = 4, gold = false) {
+function spawnManaFloat(slot, amount = 4, gold = false, dark = false) {
   const target = state?.[slot];
   if (!target || target.x == null) return;
   const { left, top } = cellToPx(target.x, target.y);
 
   const el = document.createElement("div");
-  el.className = gold ? "mana-float gold" : "mana-float"; // golden mana = ten istý efekt, len zlatý
+  el.className = dark ? "mana-float dark" : gold ? "mana-float gold" : "mana-float"; // golden = zlatý, Pútnik = čierny
   el.textContent = `+${amount} MANA`;
   el.style.left = (left + TILE_W / 2) + "px";
   el.style.top  = (top + 8 - floatOffsetFor(slot)) + "px";
@@ -1362,15 +1362,15 @@ function clearProjectiles() {
 
 // „Goku" nabíjacia aura pri recharge — naviazaná na postavu (sleduje ju per-frame v rafe);
 // anchor "clone" ju ukotví na viditeľný tieňový klon (recharge nesmie prezradiť pravého Naruta)
-function spawnChargeAura(slot, gold = false, red = false, anchor = "actor") {
+function spawnChargeAura(slot, gold = false, red = false, anchor = "actor", dark = false) {
   const p = state?.[slot];
   if (anchor === "clone" && (!p?.clone || cloneEls[slot].style.display === "none")) return;
   // labyrint: skrytý súper (x null) auru vôbec nedostane — placeChargeAura by ju nemal kam ukotviť
   // a neumiestnená by svietila v rohu boardu (napr. červená Last Hope aura skrytého Minotaura)
   if (!p || p.x == null) return;
   const cont = document.createElement("div");
-  // golden mana = rovnaká aura, len zlatá; Last Hope ultra mód = červená
-  cont.className = red ? "charge-aura red" : gold ? "charge-aura gold" : "charge-aura";
+  // golden mana = zlatá; Last Hope ultra mód = červená; Pútnikova pasívna mana = čierna
+  cont.className = dark ? "charge-aura dark" : red ? "charge-aura red" : gold ? "charge-aura gold" : "charge-aura";
   cont.dataset.slot = slot;            // raf podľa toho auru drží na interpolovanej pozícii postavy
   if (anchor === "clone") cont.dataset.anchor = "clone";
   placeChargeAura(cont, slot);
@@ -3302,12 +3302,17 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "recharge" && (e.from === "p1" || e.from === "p2")) {
         const amt = (typeof e.amount === "number" ? e.amount : 4);
-        spawnManaFloat(e.from, amt);
-        spawnChargeAura(e.from); // „Goku" nabíjacia aura na postave
+        const dark = !!e.dark; // Pútnikova pasívna mana = tá istá animácia, len celá v čiernej
+        spawnManaFloat(e.from, amt, false, dark);
+        spawnChargeAura(e.from, false, false, "actor", dark); // „Goku" nabíjacia aura na postave
         if (state?.[e.from]?.char === "soldier") setAnim(e.from, "recharge", frameHold); // Vojak má vlastnú recharge pózu
         // klon sa „nabíja" naprázdno tiež — aura+float na oboch, nech recharge neprezradí pravého
-        cloneFloat(e.from, `+${amt}`, "mana-float");
-        spawnChargeAura(e.from, false, false, "clone");
+        cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
+        spawnChargeAura(e.from, false, false, "clone", dark);
+      }
+      // Fire Wizard imunný voči dmg dlaždici — IMMUNE float namiesto zásahu
+      if (e.kind === "immune" && (e.target === "p1" || e.target === "p2")) {
+        spawnFloat(e.target, "IMMUNE", "immune-float");
       }
       // skamenený ťah — akcia sa nevykonala: prečiarkni práve zaznamenaný badge/beat + STONED float
       if (e.kind === "stoned" && (e.target === "p1" || e.target === "p2")) {
@@ -3737,9 +3742,9 @@ const ABILITY_PREVIEW = {
   // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview;
   // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
   escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror and falls when you use them" },
-  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row" },
+  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: "Whole row · Passive: immune to Damage tiles" },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: "Opposite-colour cells" },
-  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours" },
+  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: "Diagonal neighbours · Passive: +2 mana each round" },
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
   medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
   minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands. Their steps weave a thread; stepping on it reveals your silhouette" },

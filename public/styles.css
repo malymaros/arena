@@ -1640,10 +1640,12 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .dmg-float {  color: #ff5a5a; }
   .mana-float { color: #57a9ff; }
   .mana-float.gold { color: #ffd54f; } /* golden mana — rovnaký float, len zlatý */
+  /* Pútnikova pasívna mana — čierny float (svetlý halo kvôli čitateľnosti na tmavej aréne) */
+  .mana-float.dark { color: #17171d; text-shadow: 0 0 5px rgba(215,215,225,.9), 0 0 2px rgba(255,255,255,.65); }
 
   /* štítové a heal bubliny */
   .heal-float{ color: #5eff8a; }
-  .shield-float, .block-float, .mirror-float, .heal-float{
+  .shield-float, .block-float, .mirror-float, .heal-float, .immune-float{
     position: absolute;
     z-index: 5;
     font-weight: 900;
@@ -1653,6 +1655,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     white-space: nowrap;
     animation: floatUp .9s ease-out forwards;
   }
+  /* Fire Wizard imunný voči dmg dlaždici — „IMMUNE" (štítovo svetlomodrá) */
+  .immune-float { color: #9fe8ff; text-shadow: 0 0 6px rgba(90,180,255,.9), 0 2px 0 rgba(0,0,0,.5); }
   .shield-float { color: #4dd0e1; }
   .block-float  { color: #4dd0e1; }
   .mirror-float { color: #ce93d8; }
@@ -1731,6 +1735,18 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .charge-aura.red .ca-streak{
     background: linear-gradient(to top, rgba(255,60,60,0), #ff5a5a 45%, #ffd6d6);
     box-shadow: 0 0 6px rgba(255,50,50,.95);
+  }
+  /* čierna varianta nabíjacej aury — Pútnikova pasívna mana (svetlý lem kvôli čitateľnosti na tmavej aréne) */
+  .charge-aura.dark .ca-core{
+    background: radial-gradient(ellipse at center, rgba(28,28,34,.95), rgba(8,8,12,.5) 45%, rgba(0,0,0,0) 72%);
+  }
+  .charge-aura.dark .ca-ring{
+    border-color: rgba(15,15,20,.95);
+    box-shadow: 0 0 12px rgba(0,0,0,.9), 0 0 5px rgba(190,190,200,.55);
+  }
+  .charge-aura.dark .ca-streak{
+    background: linear-gradient(to top, rgba(0,0,0,0), #16161c 45%, #55555f);
+    box-shadow: 0 0 6px rgba(0,0,0,.95), 0 0 2px rgba(200,200,210,.45);
   }
 
   /* death summon — golden recharge stav: žiari LEN widget hráča (vlajka a korunky NIE).
