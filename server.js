@@ -36,6 +36,10 @@ app.use(express.static(path.join(__dirname, "public"), {
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
+// Heslá pre vstup do hry (rozdáva admin): čiarkou oddelený zoznam. Zatiaľ natvrdo "hamara"
+// (default), prepísateľné cez env PLAYER_KEYS=heslo1,heslo2 (napr. systemd deploy/arena.service).
+// POZOR: repo je verejné → tento default je viditeľný; na reálne tajné heslo nastav env a zmaž default.
+const PLAYER_KEYS = new Set((process.env.PLAYER_KEYS || "hamara").split(",").map(s => s.trim()).filter(Boolean));
 // biely (p1, vľavo) začína hru 1 (v sérii sa štartér hier strieda) — losuje sa, KTO z osôb A/B
 // je biely (startMatch); testy si osobu na slote p1 vedia zafixovať cez env (A alebo B)
 const FORCE_FIRST_STARTER = ["A", "B"].includes(process.env.FORCE_FIRST_STARTER) ? process.env.FORCE_FIRST_STARTER : null;
@@ -172,8 +176,16 @@ let personSockets = { A: null, B: null };
 // trvalá identita hráča: token z klientovho localStorage → po reconnecte mu vrátime jeho slot
 // (rieši „spadol mu socket, vrátil sa ako divák a server prestal brať jeho lock_in")
 let personIds = { A: null, B: null };       // token klienta priradený osobe A/B
+let personNames = { A: null, B: null };     // validované zobrazované meno osoby (A–Z, max 8) — verejné, ide do snapshotu
 let personFreedAt = { A: 0, B: 0 };         // kedy sa slot uvoľnil (grace, počas ktorej ho cudzí klient neobsadí)
 const RECLAIM_GRACE_MS = 60 * 1000;         // koľko sekúnd drží slot pre pôvodného hráča po výpadku
+// Roomka: zatiaľ len 1 naraz. Vznikne cez create_room (tvorca = host = osoba A), zanikne keď sa obaja
+// hráči odpoja (po grace okne na reconnect). Kým neexistuje, príchodzí vidia „create room"; kým existuje,
+// vidia ju s počtom hráčov a Join/Spectate.
+let roomExists = false;
+let roomDestroyTimer = null;
+const browsing = new Set();                 // sockety na room-browseri (ešte neposadené, nie diváci)
+let pendingMatchConfig = null;              // host stlačil START, ale 2. hráč ešte nie je → čaká sa; po jeho príchode sa spustí
 let game = null;
 
 function newPlayer(slot) {
@@ -421,6 +433,10 @@ function snapshot() {
     phase: game.phase,
     config: game.config ? { ...game.config, tileWeights: { ...game.config.tileWeights } } : null,
     series: seriesSnapshot(),
+    // zobrazované mená hráčov per slot (verejné — netreba redigovať; labyrint mená nemaskuje)
+    names: { p1: personNames[game.seats.p1] || null, p2: personNames[game.seats.p2] || null },
+    // host stlačil START, no 2. hráč ešte nie je → klient hosta ukáže „čakám na druhého hráča"
+    awaitingOpponent: pendingMatchConfig != null,
     board: { ...game.board },
     p1: cloneActor(game.players.p1),
     p2: cloneActor(game.players.p2),
@@ -762,8 +778,14 @@ function forceResetAll() {
   personSockets.B = null;
   personIds.A = null;
   personIds.B = null;
+  personNames.A = null;
+  personNames.B = null;
   personFreedAt.A = 0;
   personFreedAt.B = 0;
+  if (roomDestroyTimer) { clearTimeout(roomDestroyTimer); roomDestroyTimer = null; }
+  roomExists = false;
+  pendingMatchConfig = null;
+  browsing.clear();
   newGame();
   io.emit("reset");
   io.emit("state", snapshot());
@@ -2297,31 +2319,127 @@ app.get("/admin/reset-all", (req, res) => {
 });
 
 /* -------------------- IO -------------------- */
+// Validácia zobrazovaného mena: 1–8 znakov anglickej abecedy, nič iné (žiadne emoji/diakritika/medzery).
+function validateName(raw) {
+  if (typeof raw !== "string") return null;
+  const n = raw.trim();
+  return /^[A-Za-z]{1,8}$/.test(n) ? n : null;
+}
+
+// Je osoba p „nažive" — má živý socket, alebo ešte beží jej grace okno (môže sa vrátiť reconnectom)?
+function personAlive(p) {
+  return !!personSockets[p] || (!!personIds[p] && Date.now() - personFreedAt[p] <= RECLAIM_GRACE_MS);
+}
+// Snapshot roomky pre room-browser (počet hráčov, či sa dá vytvoriť/pripojiť)
+function roomsSnapshot() {
+  const players = ["A", "B"].filter(personAlive).length;
+  return { exists: roomExists, players, max: 2, canCreate: !roomExists, canJoin: roomExists && players < 2, phase: game.phase };
+}
+// pošli aktuálny stav roomky všetkým na room-browseri (nie posadeným hráčom ani divákom)
+function broadcastRooms() {
+  const snap = roomsSnapshot();
+  for (const s of browsing) { try { s.emit("rooms", snap); } catch {} }
+}
+// obaja hráči preč (ani jeden nažive) → roomka je prázdna
+function roomEmpty() { return !personAlive("A") && !personAlive("B"); }
+// po odpojení naplánuj kontrolu: ak sú po grace obaja stále preč, roomku zruš
+function scheduleRoomDestroyCheck() {
+  if (!roomExists) return;
+  if (roomDestroyTimer) clearTimeout(roomDestroyTimer);
+  roomDestroyTimer = setTimeout(() => {
+    roomDestroyTimer = null;
+    if (roomExists && roomEmpty()) destroyRoom();
+  }, RECLAIM_GRACE_MS + 500);
+}
+// zruš roomku: vyčisti osoby a stav, čerstvá hra; browser klienti aj prípadní diváci uvidia „create room"
+function destroyRoom() {
+  clearTurnTimer();
+  roomExists = false;
+  pendingMatchConfig = null;
+  personSockets.A = null; personSockets.B = null;
+  personIds.A = null; personIds.B = null;
+  personNames.A = null; personNames.B = null;
+  personFreedAt.A = 0; personFreedAt.B = 0;
+  newGame();
+  io.emit("rooms", roomsSnapshot()); // aj divákom — vrátia sa na room-browser
+}
+// ak host čaká (stlačil START pred príchodom súpera) a sú už obaja → spusti zápas (color roll)
+function maybeStartPending() {
+  if (pendingMatchConfig && personAlive("A") && personAlive("B") && game.phase === "lobby") {
+    const cfg = pendingMatchConfig;
+    pendingMatchConfig = null;
+    startMatch(cfg);
+  }
+}
+
+// Brána: heslo (ak je nejaké nastavené) + platné meno. Odmietnuté spojenie klient dostane ako `connect_error`
+// s message "bad_pass" / "bad_name". Pozn.: pri connectionStateRecovery sa middleware preskočí (skipMiddlewares),
+// vtedy sa meno neprepisuje (guard v connection handleri) — recovnutý socket už bol overený.
+io.use((socket, next) => {
+  const pass = socket.handshake.auth?.pass;
+  if (PLAYER_KEYS.size && !PLAYER_KEYS.has(pass)) return next(new Error("bad_pass"));
+  const name = validateName(socket.handshake.auth?.name);
+  if (!name) return next(new Error("bad_name"));
+  socket.data.pendingName = name;
+  next();
+});
+
 io.on("connection", (socket) => {
-  // identita = osoba A/B (A = host); slot je fixný na celú sériu (A=p1, B=p2)
+  // identita = osoba A/B (A = host = tvorca roomky); slot p1/p2 sa losuje pri štarte zápasu
   const cid = socket.handshake.auth?.id || null; // trvalý token klienta (localStorage)
   let person = null;
-  // 1) reclaim: tento token už patrí hráčovi → vráť mu jeho slot (aj keď ho ešte drží mŕtvy socket / beží grace)
-  if (cid && personIds.A === cid) person = "A";
-  else if (cid && personIds.B === cid) person = "B";
-  // 2) inak obsaď voľný slot — voľný = bez živého socketu A po uplynutí grace pôvodného hráča
-  if (!person) {
-    const now = Date.now();
-    const isFree = (p) => !personSockets[p] && (!personIds[p] || now - personFreedAt[p] > RECLAIM_GRACE_MS);
-    if (isFree("A")) person = "A";
-    else if (isFree("B")) person = "B";
-  }
-  if (person) {
-    const old = personSockets[person];
-    if (old && old !== socket) { try { old.disconnect(true); } catch {} } // odpoj mŕtvy/starý socket toho istého hráča
-    personSockets[person] = socket;
-    personIds[person] = cid; // zapamätaj token (pri reclaime ten istý, pri novom hráčovi nový)
-  }
-  socket.data.person = person;
+  const isFree = (p) => !personSockets[p] && (!personIds[p] || Date.now() - personFreedAt[p] > RECLAIM_GRACE_MS);
 
-  if (person) socket.emit("you_are", { slot: slotForPerson(person), isHost: person === "A" });
-  else socket.emit("spectator"); // obe osoby obsadené — tretí a ďalší len dostanú info, že hra beží
-  socket.emit("state", person ? snapshotFor(person) : snapshot()); // pri pripojení počas char-selectu maskuj súperov pick
+  // posadí tento socket ako osobu A/B: zapamätá token+meno, pošle mu identitu a stav
+  function seat(p) {
+    const old = personSockets[p];
+    if (old && old !== socket) { try { old.disconnect(true); } catch {} } // odpoj starý/mŕtvy socket tej istej osoby
+    personSockets[p] = socket;
+    personIds[p] = cid;
+    if (socket.data.pendingName) personNames[p] = socket.data.pendingName; // pri recovery pendingName prázdne → drž pôvodné
+    person = p;
+    socket.data.person = p;
+    browsing.delete(socket);
+    socket.emit("you_are", { slot: slotForPerson(p), isHost: p === "A" });
+    socket.emit("state", snapshotFor(p)); // počas char-selectu maskuje súperov pick
+    if (p === "B") maybeStartPending(); // 2. hráč dorazil → ak host čakal, spusti zápas
+  }
+
+  // reclaim: token už patrí hráčovi v ŽIJÚCEJ roomke → vráť ho rovno na miesto (obíď room-browser)
+  if (roomExists && cid && personIds.A === cid) seat("A");
+  else if (roomExists && cid && personIds.B === cid) seat("B");
+  else {
+    // nový príchod → room-browser (create/join/spectate); miesto sa pridelí až explicitne
+    socket.data.person = null;
+    browsing.add(socket);
+    socket.emit("rooms", roomsSnapshot());
+  }
+  broadcastRooms();
+
+  // Vytvor roomku — tvorca = host (osoba A); zatiaľ je možná len 1 roomka naraz
+  socket.on("create_room", () => {
+    if (person || roomExists) return;
+    roomExists = true;
+    newGame();     // čerstvé lobby
+    seat("A");     // tvorca sa stáva hostom a nastaví parametre zápasu
+    broadcastRooms();
+  });
+
+  // Pripoj sa do existujúcej roomky ako 2. hráč (osoba B)
+  socket.on("join_room", () => {
+    if (person || !roomExists) return;
+    if (isFree("B")) { seat("B"); broadcastRooms(); }
+    else if (isFree("A")) { seat("A"); broadcastRooms(); } // host odišiel, B ostal → nový hráč obsadí A
+    else socket.emit("join_denied", "full");
+  });
+
+  // Sleduj existujúcu roomku ako divák
+  socket.on("spectate_room", () => {
+    if (person || !roomExists) return;
+    browsing.delete(socket);
+    socket.emit("spectator");
+    socket.emit("state", snapshot());
+  });
 
   // úvodná obrazovka: host nastaví formát + tiles + časový limit a spustí zápas
   socket.on("configure_match", (raw) => {
@@ -2329,7 +2447,12 @@ io.on("connection", (socket) => {
     if (game.phase !== "lobby") return;  // len pred začiatkom zápasu
     const config = sanitizeConfig(raw);
     if (!config) return;
-    startMatch(config);
+    if (personAlive("B")) {
+      startMatch(config);                // súper je tu → rovno štart (color roll)
+    } else {
+      pendingMatchConfig = config;       // súper ešte nie je → zapamätaj config a čakaj naňho
+      socket.emit("state", snapshotFor("A")); // host uvidí „čakám na druhého hráča" (awaitingOpponent)
+    }
   });
 
   // turnajový draft: hráč naslepo potvrdí tím TEAM_SIZE unikátnych postáv z poolu CHARS (raz za zápas);
@@ -2437,11 +2560,16 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    browsing.delete(socket);
     const wasPlayer = personSockets.A === socket || personSockets.B === socket;
     // uvoľni len živý socket; personIds zámerne NEmažeme → hráč si po reconnecte (do grace) vyžiada svoj slot späť
     if (personSockets.A === socket) { personSockets.A = null; personFreedAt.A = Date.now(); }
     if (personSockets.B === socket) { personSockets.B = null; personFreedAt.B = Date.now(); }
-    if (wasPlayer) clearTurnTimer(); // bez hráča nemá zmysel auto-resolve; odpojenie diváka časovač neruší
+    if (wasPlayer) {
+      clearTurnTimer();            // bez hráča nemá zmysel auto-resolve; odpojenie diváka časovač neruší
+      scheduleRoomDestroyCheck();  // ak sa obaja odpojili → po grace roomku zruš
+    }
+    broadcastRooms();              // ostatní na room-browseri vidia aktuálny počet hráčov
   });
 });
 

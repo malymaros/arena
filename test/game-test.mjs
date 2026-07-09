@@ -5,6 +5,7 @@ import { io } from "socket.io-client";
 
 const PORT = 3996;
 const URL = `http://localhost:${PORT}`;
+let serverProc = null; // spawnutý server — kill aj pri zlyhaní (inak ostane bežať a drží port → zablokuje ďalší beh)
 
 let failures = 0;
 function check(cond, label, detail = "") {
@@ -16,7 +17,8 @@ function startServer() {
   const proc = spawn(process.execPath, ["server.js"], {
     // FORCE_FIRST_STARTER: v produkcii sa osoby losujú na sloty (p1 = biely, začína každú hru) —
     // testy fixujú osobu A (host) na p1, aby deterministické scenáre (golden akcie nestartéra, démon startera…) sedeli
-    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A" },
+    // PLAYER_KEYS: explicitné testovacie heslo (server vyžaduje heslo; default je "hamara") — deterministické, nezávislé od dev prostredia
+    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass" },
     stdio: "ignore",
   });
   return new Promise((resolve) => setTimeout(() => resolve(proc), 1200));
@@ -24,7 +26,10 @@ function startServer() {
 
 function connect() {
   return new Promise((resolve, reject) => {
-    const sock = io(URL, { transports: ["websocket"] });
+    // server odteraz vyžaduje platné meno (a heslo ak PLAYER_KEYS nastavené — v testoch prázdne);
+    // meno = náhodné 1–8 znakov a–z, nech prejde validáciou middleware
+    const name = "T" + Math.random().toString(36).replace(/[^a-z]/g, "").slice(0, 5) + "x";
+    const sock = io(URL, { transports: ["websocket"], auth: { name, pass: "testpass" } });
     // pomalší boot servera nesmie zhodiť test — socket.io sa retryne samo; reject až po celkovom timeoute
     const killer = setTimeout(() => { sock.close(); reject(new Error("connect timeout")); }, 15000);
     const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0 };
@@ -39,6 +44,16 @@ function connect() {
     });
     sock.on("game_over", (g) => { ctx.gameOver = g; });
     sock.on("connect", () => { clearTimeout(killer); setTimeout(() => resolve(ctx), 300); });
+  });
+}
+
+function waitFor(cond, timeoutMs = 5000, label = "condition") {
+  return new Promise((resolve, reject) => {
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      if (cond()) { clearInterval(iv); resolve(); }
+      else if (Date.now() - t0 > timeoutMs) { clearInterval(iv); reject(new Error("waitFor timeout: " + label)); }
+    }, 30);
   });
 }
 
@@ -144,10 +159,15 @@ const DEMON = { type: "demon" };
 const LHOPE = { type: "last_hope" };
 
 async function main() {
-  const server = await startServer();
+  serverProc = await startServer();
   const c1 = await connect();
   const c2 = await connect();
-  check(c1.slot === "p1" && c2.slot === "p2", "sloty pridelené p1/p2");
+  // po logine sa už neposadzuje automaticky — c1 vytvorí roomku (host = osoba A), c2 sa pripojí (osoba B)
+  c1.sock.emit("create_room");
+  await waitFor(() => c1.slot, 5000, "c1 create_room → you_are");
+  c2.sock.emit("join_room");
+  await waitFor(() => c2.slot, 5000, "c2 join_room → you_are");
+  check(c1.slot === "p1" && c2.slot === "p2", "sloty pridelené p1/p2 (create/join)");
 
   /* ---------- Test 1: basic na vzdialenosť 3 → 1 dmg ---------- */
   await freshGame(c1, c2);
@@ -1559,9 +1579,9 @@ async function main() {
   }
 
   c1.sock.close(); c2.sock.close();
-  server.kill();
+  serverProc?.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);
   process.exit(failures === 0 ? 0 : 1);
 }
 
-main().catch(e => { console.error(e); process.exit(2); });
+main().catch(e => { console.error(e); try { serverProc?.kill(); } catch {} process.exit(2); });

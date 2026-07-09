@@ -394,6 +394,9 @@
   <!-- Druhý hráč čaká, kým host nastaví zápas -->
   <div id="lobby-wait" class="lobby-wait hidden">Waiting for host to set up the match…</div>
 
+  <!-- Host stlačil START, no druhý hráč ešte nie je v roomke -->
+  <div id="host-wait" class="lobby-wait hidden">Waiting for the second player…</div>
+
   <!-- Turnajový draft: tím potvrdený, čaká sa na súperov výber -->
   <div id="team-wait" class="lobby-wait hidden">TEAM LOCKED<br />Waiting for opponent's team…</div>
 
@@ -413,6 +416,33 @@
   <!-- Game over — verdikt sa píše do hud-turn, tu je len Play again v strede -->
   <div id="gameover" class="gameover hidden">
     <button id="retry" class="retry">Play again?</button>
+  </div>
+
+  <!-- Room browser — po logine; zatiaľ 1 roomka (create / join / spectate) -->
+  <div id="rooms" class="rooms hidden">
+    <div class="rooms-card">
+      <h1 class="rooms-title">ARENA</h1>
+      <p class="rooms-sub">Rooms</p>
+      <div id="rooms-list" class="rooms-list"></div>
+    </div>
+  </div>
+
+  <!-- Prihlásenie — meno + heslo (brána pred pripojením); ostane skryté, kým JS nerozhodne -->
+  <div id="login" class="login hidden">
+    <form id="login-form" class="login-card">
+      <h1 class="login-title">ARENA</h1>
+      <label class="login-field">
+        <span class="login-label">NAME</span>
+        <input id="login-name" name="username" type="text" maxlength="8" autocapitalize="off"
+               autocomplete="username" spellcheck="false" placeholder="max 8 letters a–z" />
+      </label>
+      <label class="login-field">
+        <span class="login-label">PASSWORD</span>
+        <input id="login-pass" name="password" type="password" autocomplete="current-password" placeholder="password from admin" />
+      </label>
+      <div id="login-error" class="login-error hidden"></div>
+      <button type="submit" class="login-btn">ENTER</button>
+    </form>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

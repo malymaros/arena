@@ -9,7 +9,100 @@ try {
     localStorage.setItem("arenaId", arenaId);
   }
 } catch { arenaId = null; } // localStorage zakázaný (napr. privátny režim) → bez reclaimu, len bežné pripojenie
-const socket = io({ auth: { id: arenaId } });
+// autoConnect:false — najprv login (meno + heslo), potom socket.connect() s auth údajmi.
+// Všetky socket.on(...) handlery sa registrujú normálne aj na nepripojený socket.
+const socket = io({ auth: { id: arenaId }, autoConnect: false });
+
+/* ---------- Prihlásenie (meno + heslo) — brána pred pripojením ---------- */
+(function initLogin() {
+  const NAME_RE = /^[A-Za-z]{1,8}$/;
+  const loginEl = document.getElementById("login");
+  const nameInp = document.getElementById("login-name");
+  const passInp = document.getElementById("login-pass");
+  const form    = document.getElementById("login-form");
+  const errEl   = document.getElementById("login-error");
+  const showErr = (m) => { if (errEl) { errEl.textContent = m; errEl.classList.remove("hidden"); } };
+  const hideErr = () => errEl?.classList.add("hidden");
+
+  // sanitizácia mena za behu: povolené len A–Z/a–z, max 8 znakov
+  nameInp?.addEventListener("input", () => { nameInp.value = nameInp.value.replace(/[^A-Za-z]/g, "").slice(0, 8); });
+
+  const connectWith = (name, pass) => { socket.auth = { id: arenaId, name, pass }; socket.connect(); };
+
+  // tichý reconnect po refreshi (údaje z tejto session — sessionStorage, nie localStorage, kvôli heslu)
+  let saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem("arenaLogin") || "null"); } catch {}
+  if (saved && NAME_RE.test(saved.name || "")) connectWith(saved.name, saved.pass || "");
+  else loginEl?.classList.remove("hidden");
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = (nameInp?.value || "").trim();
+    const pass = passInp?.value || "";
+    if (!NAME_RE.test(name)) { showErr("Name: 1–8 letters a–z, no spaces or symbols."); return; }
+    try { sessionStorage.setItem("arenaLogin", JSON.stringify({ name, pass })); } catch {}
+    hideErr();
+    connectWith(name, pass);
+  });
+
+  socket.on("connect", () => { hideErr(); loginEl?.classList.add("hidden"); });
+  // middleware odmietnutie = fatálne (socket.io neskúša znova); dočasné sieťové chyby ignorujeme (retry beží sám)
+  socket.on("connect_error", (err) => {
+    const m = err && err.message;
+    if (m === "bad_pass" || m === "bad_name") {
+      try { sessionStorage.removeItem("arenaLogin"); } catch {}
+      loginEl?.classList.remove("hidden");
+      showErr(m === "bad_pass" ? "Wrong password." : "Invalid name (1–8 letters a–z).");
+    }
+  });
+})();
+
+/* ---------- Room browser (po logine) — zatiaľ 1 roomka: create / join / spectate ---------- */
+const roomsEl     = document.getElementById("rooms");
+const roomsListEl = document.getElementById("rooms-list");
+function hideRooms() { roomsEl?.classList.add("hidden"); }
+function renderRooms(info) {
+  if (!roomsListEl) return;
+  roomsListEl.innerHTML = "";
+  if (!info || info.canCreate) {
+    // žiadna roomka → vytvor (staneš sa hostom a nastavíš parametre)
+    const b = document.createElement("button");
+    b.className = "room-btn create";
+    b.textContent = "CREATE ROOM";
+    b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
+    roomsListEl.appendChild(b);
+  } else {
+    // existujúca roomka → Join (voľné miesto) alebo Spectate (plná)
+    const card = document.createElement("div");
+    card.className = "room-card";
+    const label = document.createElement("div");
+    label.className = "room-label";
+    label.innerHTML = `ROOM 1 <span class="room-count">${info.players}/${info.max}</span>`;
+    const b = document.createElement("button");
+    if (info.canJoin) {
+      b.className = "room-btn join";
+      b.textContent = "JOIN";
+      b.addEventListener("click", () => { b.disabled = true; socket.emit("join_room"); });
+    } else {
+      b.className = "room-btn spectate";
+      b.textContent = "SPECTATE";
+      b.addEventListener("click", () => { b.disabled = true; socket.emit("spectate_room"); });
+    }
+    card.appendChild(label);
+    card.appendChild(b);
+    roomsListEl.appendChild(card);
+  }
+}
+socket.on("rooms", (info) => {
+  document.getElementById("login")?.classList.add("hidden");
+  // browsing socket nedostáva state → herné obrazovky (viditeľné by default) treba schovať, nech neprebliknú spod room-browsera
+  ["char-select", "lobby", "lobby-wait", "host-wait", "team-wait", "spectator", "gameover", "intermission"].forEach(id =>
+    document.getElementById(id)?.classList.add("hidden"));
+  renderRooms(info);
+  roomsEl?.classList.remove("hidden");
+});
+// miesto sa medzičasom zaplnilo — server pošle aj čerstvý „rooms", ktorý prekreslí na Spectate
+socket.on("join_denied", () => { /* rooms event prekreslí kartu */ });
 
 const gridEl   = document.getElementById("grid");
 const actorsEl = document.getElementById("actors");
@@ -53,6 +146,7 @@ const retryBtn = document.getElementById("retry");
 
 const lobbyEl     = document.getElementById("lobby");
 const lobbyWaitEl = document.getElementById("lobby-wait");
+const hostWaitEl  = document.getElementById("host-wait");
 const intermissionEl = document.getElementById("intermission");
 const crownsP1El = document.getElementById("crowns-p1");
 const crownsP2El = document.getElementById("crowns-p2");
@@ -1874,6 +1968,13 @@ function renderHUD() {
   hudBoxP2.classList.toggle("me", me === "p2");
   hudBoxP1.classList.toggle("foe", me === "p2");
   hudBoxP2.classList.toggle("foe", me === "p1");
+  // divák (me == null) nemá „svoj" box → obe strany dostanú neutrálny štítok s menom (trieda .watch)
+  hudBoxP1.classList.toggle("watch", !me);
+  hudBoxP2.classList.toggle("watch", !me);
+  // štítok nad widgetom = meno hráča (::before content: attr(data-name)); fallback pre chýbajúce meno
+  const tagName = (slot) => state?.names?.[slot] || (slot === me ? "YOU" : me ? "OPPONENT" : (slot === "p1" ? "P1" : "P2"));
+  hudBoxP1.dataset.name = tagName("p1");
+  hudBoxP2.dataset.name = tagName("p2");
 
 
   // tournament × labyrint: hlavy magov skryté u oboch, kým kliatba beží — renderHUD beží per frame,
@@ -4163,13 +4264,19 @@ function applyPhaseUI(s) {
   const phase = s?.phase || "playing";
   const controls = document.querySelector(".controls-row");
 
-  // lobby: host vidí nastavenia, druhý hráč čaká
+  // lobby: host vidí nastavenia; po START ak súper nie je → „čakám na druhého hráča"; druhý hráč čaká na hosta
   if (phase === "lobby" && !isSpectator) {
-    if (isHost) { showLobby(s); lobbyWaitEl.classList.add("hidden"); }
-    else { lobbyEl.classList.add("hidden"); lobbyWaitEl.classList.remove("hidden"); }
+    if (isHost) {
+      if (s?.awaitingOpponent) { lobbyEl.classList.add("hidden"); hostWaitEl?.classList.remove("hidden"); }
+      else { showLobby(s); hostWaitEl?.classList.add("hidden"); }
+      lobbyWaitEl.classList.add("hidden");
+    } else {
+      lobbyEl.classList.add("hidden"); lobbyWaitEl.classList.remove("hidden"); hostWaitEl?.classList.add("hidden");
+    }
   } else {
     lobbyEl.classList.add("hidden");
     lobbyWaitEl.classList.add("hidden");
+    hostWaitEl?.classList.add("hidden");
   }
 
   // turnajový draft: kým nepotvrdím tím, char-select beží v team-mode (toggle výber + confirm);
@@ -4470,6 +4577,7 @@ function showIntermission(gameWinner, series) {
 socket.on("you_are", (info) => {
   if (info && typeof info === "object") { me = info.slot; isHost = !!info.isHost; }
   else { me = info; } // spätná kompat.
+  hideRooms(); // posadený hráč (join/create alebo reclaim) → preč z room-browsera
 });
 
 /* ---------- Losovanie farieb (po configure_match) ---------- */
@@ -4513,6 +4621,7 @@ socket.on("color_roll", () => {
 let isSpectator = false;
 socket.on("spectator", () => {
   isSpectator = true;
+  hideRooms();
   document.getElementById("spectator")?.classList.remove("hidden");
   selEl.classList.add("hidden");
   stopCharSelectPreview();

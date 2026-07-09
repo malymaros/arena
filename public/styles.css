@@ -1589,7 +1589,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .hud-box.me .bar-num.mana-num{ color: #0d47a1; text-shadow: 0 1px 2px rgba(255,236,170,.55); }
   .hud-box.me .bar-num.hp-num  { color: #8e0000; text-shadow: 0 1px 2px rgba(255,236,170,.55); }
   .hud-box.me::before,
-  .hud-box.foe::before{
+  .hud-box.foe::before,
+  .hud-box.watch::before{
     position: absolute;
     top: -14px; left: 50%; transform: translateX(-50%);
     padding: 2px 16px;
@@ -1601,15 +1602,19 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     border: none;
     z-index: 2;
   }
+  /* štítok = meno hráča (data-name nastavuje JS zo state.names; fallback YOU/OPPONENT ak meno chýba) */
   .hud-box.me::before{
-    content: "YOU";
+    content: attr(data-name);
     background: linear-gradient(180deg, #ffd54f 0 3px, #d4a017 3px 100%);
     color: #2a2000;
+    text-transform: uppercase;
   }
-  .hud-box.foe::before{
-    content: "OPPONENT";
+  .hud-box.foe::before,
+  .hud-box.watch::before{
+    content: attr(data-name);
     background: linear-gradient(180deg, #4a4d55 0 3px, #2c2e34 3px 100%);
     color: #cfd4dc;
+    text-transform: uppercase;
   }
   
   /* ---- plávajúce bubliny nad postavou ---- */
@@ -2125,4 +2130,72 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .board.fx-shake{ animation: fx-shake .45s ease-in-out; }
 
   /* štít/mirror sa už nekreslia na bunku — pulzujúci glow je per-postavu (JS actorFilter) */
+
+/* ---------- Prihlásenie (meno + heslo) ---------- */
+.login{
+  position: fixed; inset: 0; z-index: 10001; overflow: auto;
+  background: rgba(0,0,0,.86);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
+}
+.login.hidden{ display: none; }
+.login-card{
+  background: #121315; border: 1px solid #2a2b2e; box-shadow: 0 0 0 2px #000, 0 12px 40px rgba(0,0,0,.6);
+  border-radius: 4px; padding: 28px 28px; width: min(420px, 94vw);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.login-title{ font-size: 30px; color: #ffb300; text-align: center; margin: 0;
+  text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.5); letter-spacing: 3px; }
+.login-sub{ font-size: 10px; color: #9aa; text-align: center; margin: 0 0 6px; letter-spacing: 1px; }
+.login-field{ display: flex; flex-direction: column; gap: 6px; }
+.login-label{ font-size: 10px; color: #cfd2d6; letter-spacing: 1px; }
+.login-field input{
+  padding: 12px 12px; background: #0c0e12; color: #fff; border: none; box-sizing: border-box;
+  box-shadow: 0 0 0 2px #000; border-radius: 2px; font-family: inherit; font-size: 12px; letter-spacing: 1px;
+}
+.login-field input:focus{ outline: none; box-shadow: 0 0 0 2px #ffb300; }
+.login-error{ font-size: 9px; color: #ff6b6b; line-height: 1.5; letter-spacing: .5px; }
+.login-error.hidden{ display: none; }
+.login-btn{
+  width: 100%; margin-top: 4px; padding: 16px; cursor: pointer; border: none; border-radius: 2px;
+  background: #ffb300; color: #2a1c00; font-family: inherit; font-size: 14px; letter-spacing: 2px;
+  text-shadow: 1px 1px 0 rgba(255,255,255,.25);
+  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
+}
+.login-btn:hover{ background: #ffc333; }
+.login-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
+
+/* ---------- Room browser ---------- */
+.rooms{
+  position: fixed; inset: 0; z-index: 10000; overflow: auto;
+  background: rgba(0,0,0,.92);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
+}
+.rooms.hidden{ display: none; }
+.rooms-card{
+  background: #121315; border: 1px solid #2a2b2e; box-shadow: 0 0 0 2px #000, 0 12px 40px rgba(0,0,0,.6);
+  border-radius: 4px; padding: 28px; width: min(440px, 94vw);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.rooms-title{ font-size: 30px; color: #ffb300; text-align: center; margin: 0;
+  text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.5); letter-spacing: 3px; }
+.rooms-sub{ font-size: 10px; color: #9aa; text-align: center; margin: 0 0 4px; letter-spacing: 1px; }
+.rooms-list{ display: flex; flex-direction: column; gap: 12px; }
+.room-card{
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: #1c1d20; box-shadow: 0 0 0 2px #000; border-radius: 2px; padding: 14px 16px;
+}
+.room-label{ font-size: 12px; color: #cfd2d6; letter-spacing: 1px; }
+.room-count{ color: #ffb300; margin-left: 8px; }
+.room-btn{
+  padding: 14px 18px; cursor: pointer; border: none; border-radius: 2px;
+  font-family: inherit; font-size: 12px; letter-spacing: 2px; color: #2a1c00;
+  background: #ffb300; box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
+}
+.room-btn.create{ width: 100%; padding: 18px; font-size: 14px; }
+.room-btn.spectate{ background: #6a6d75; color: #10141a; }
+.room-btn:hover{ filter: brightness(1.1); }
+.room-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
+.room-btn:disabled{ opacity: .6; cursor: default; }
   
