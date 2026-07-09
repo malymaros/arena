@@ -400,7 +400,7 @@ const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7 };
 const portraitFill = (char, base) => base * (PORTRAIT_SCALE[char] ?? 1);
 
 const CHAR_META = {
-  fire:      { name: "Fire Wizard",      dir: "fire" },
+  fire:      { name: "Fire Wizard",      dir: "fire", dirP2: "fire_2" },
   lightning: { name: "Lightning Mage",   dir: "lightning", dirP2: "lightning_2" },
   wanderer:  { name: "Wanderer Magician",dir: "wanderer" },
   // Medúza: pravá strana (p2) má NATÍVNU tmavú paletu (Medusa2) namiesto CSS alt-color filtra;
