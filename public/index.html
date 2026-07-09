@@ -228,8 +228,8 @@
     <button id="demon-btn" class="btn act demon hidden" title="Demon Attack (−10 mana) - 10 damage to every cell except the one you stand on. Counts as one of your 3 actions; only in your FINAL ROUND."><img class="ls-ico" src="/assets/last_stand.png" alt="Demon" /><span class="cost">−10<span class="pix-ico mini" data-emoji="💧"></span></span></button>
   </div>
 
-  <!-- Character select -->
-  <div id="char-select" class="char-select">
+  <!-- Character select — skryté by default, nech pri načítaní nepreblikne pred loginom (JS ho zobrazí pri hre) -->
+  <div id="char-select" class="char-select hidden">
     <!-- výber postáv je stránkovaný: str. 0 = základní magovia, str. 1 = experimentálne postavy -->
     <div class="char-page-title" id="char-page-title">Mages</div>
     <div class="char-pager">
