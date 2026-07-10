@@ -475,7 +475,7 @@ const ANIM_DEF = {
   // neloopové → kreslené relatívnym časom (VAMP_ONESHOT_KEYS), inak by viseli na poslednom frame.
   // fps ladené tak, aby sa švih prehral CELÝ v rámci svojho beatu (VAMP_TRAP_STRIKE/HEAL_BEAT_MS)
   vattack1:   { file: "Attack_1.png", fps: 10, loop: false }, // 6f = 600 ms
-  vattack2:   { file: "Attack_2.png", fps: 5,  loop: false }, // 3f = 600 ms
+  vattack2:   { file: "Attack_2.png", fps: 6,  loop: false }, // 3f = 500 ms
   vattack3:   { file: "Attack_3.png", fps: 6,  loop: false }, // 1-framová póza — animácia je let véčka (BLOOD_FX 3)
   vattack4:   { file: "Attack_4.png", fps: 8,  loop: false }, // 6f = 750 ms
   scream:     { file: "Scream.png",   fps: 8,  loop: false }  // 7f = 875 ms (zmestí sa do TELEPORT_IN)
@@ -1160,18 +1160,20 @@ function spawnClonePuff(cell) {
   }
 }
 
-// Countess: k útokom Attack_1–4 patria prislúchajúce Blood_Charge_1–4 PROJEKTILY (viď Downloads gif /
-// vampire_attack_guide): postava odohrá švih a v správnom momente z nej VYLETÍ krvavá strela, ktorá
-// letí vpred do súpera — 1 = bolt z ruky, 2 = kvapky, 3 = véčko, 4 = vlna pri zemi. Strela počas letu
-// cykluje svoje 4 framy a na konci letu zmizne (dopad ukáže hit frame). delay = kedy počas útočnej
-// animácie strela opúšťa ruku. Blood_Charge_4 má neštvorcové framy (4×64×48) → explicitné frames.
+// Countess: k útokom Attack_1–4 patria prislúchajúce Blood_Charge_1–4 — kompozícia je NATÍVNA podľa
+// referenčného gifu (zmerané, sedí 1:1): charge frame sa ukotví na PEVNÝ bod vo frame postavy
+// (ox/oy v 128-space, mierka = mierka postavy) a prehrá svoje 4 framy — POHYB strely je zapečený
+// priamo v stripe (grafika putuje naprieč framom: bolt letí z ruky, véčko/vlna prúdia vpred).
+// Žiadne dodatočné škálovanie ani lietanie elementu. Blood_Charge_4 má framy 64×48.
 const BLOOD_FX = {
-  1: { frames: 4, fps: 12, delay: 350, y: -0.12, dist: 0.80, size: 0.50 }, // bolt z ruky (throw frame ~4/6)
-  2: { frames: 4, fps: 10, delay: 250, y: -0.05, dist: 0.60, size: 0.55 }, // kvapky
-  3: { frames: 4, fps: 10, delay: 120, y: -0.18, dist: 0.70, size: 0.50 }, // véčko (Attack_3 je 1-framová póza — animácia je let véčka)
-  4: { frames: 4, fps: 12, delay: 280, y:  0.26, dist: 0.85, size: 0.60 }, // vlna pri zemi
+  1: { file: "Blood_Charge_1.png", fw: 48, ox: 86, oy: 50 }, // bolt pri vystretej ruke (Attack_1)
+  2: { file: "Blood_Charge_2.png", fw: 48, ox: 75, oy: 42 }, // kvapky pred ňou (Attack_2)
+  3: { file: "Blood_Charge_3.png", fw: 48, ox: 76, oy: 43 }, // véčko pred tvárou (Attack_3)
+  4: { file: "Blood_Charge_4.png", fw: 64, ox: 70, oy: 51 }, // vlna v úrovni hrude (Attack_4)
 };
-function spawnBloodFx(slot, n, durMs) {
+const BLOOD_FPS = 10;
+// fromMs = od ktorého momentu útočnej animácie sa charge zjaví (Attack_1: až pri vystretí ruky)
+function spawnBloodFx(slot, n, durMs, fromMs = 0) {
   const def = BLOOD_FX[n];
   if (!def) return;
   const launchGen = playGen; // medzitým začaté nové prehrávanie zruší odložený launch
@@ -1180,38 +1182,40 @@ function spawnBloodFx(slot, n, durMs) {
     const p = state?.[slot];
     if (!p || p.x == null) return;
     const facing = currentFacing(slot, computeFacing(state?.p1, state?.p2)) || 1;
+    // geometria postavy — presne ako positionActors + drawSprite (128px frame, fill .95, anchorY .5)
+    const s = Math.min(ACTOR_W, ACTOR_H) / 128 * 0.95;
     const { left, top } = cellToPx(p.x, p.y);
-    const size = Math.round(TILE_H * def.size);
-    // štart pri tele postavy (jej pairShift na zdieľanej bunke), let vpred v smere pohľadu
-    const sx = left + TILE_W / 2 + pairShift(slot) + facing * TILE_W * 0.10 - size / 2;
-    const sy = top + TILE_H / 2 + TILE_H * def.y - size / 2;
-    const flightMs = Math.max(300, Math.min(550, (durMs || 800) - def.delay - 60));
+    const actorLeft = left - (ACTOR_W - TILE_W) / 2;
+    const actorTop  = top - (ACTOR_H - TILE_H);
+    const frameTop  = actorTop + (ACTOR_H - 128 * s) / 2;
+    // stred charge framu v 128-space; horizontálne zrkadlenie okolo stredu postavy (x=64) podľa facingu
+    const ccx = def.ox + def.fw / 2, ccy = def.oy + 24;
+    const bx = actorLeft + ACTOR_W / 2 + pairShift(slot) + facing * (ccx - 64) * s;
+    const by = frameTop + ccy * s;
+    const cw = Math.round(def.fw * s), ch = Math.round(48 * s);
     const el = document.createElement("canvas");
-    el.width = size; el.height = size; el.className = "blood-fx";
-    Object.assign(el.style, { position: "absolute", left: sx + "px", top: sy + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
+    el.width = cw; el.height = ch; el.className = "blood-fx";
+    Object.assign(el.style, { position: "absolute", left: Math.round(bx - cw / 2) + "px", top: Math.round(by - ch / 2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
     actorsEl.appendChild(el);
-    // let vpred (WAAPI translate — scaleX(-1) v transformoch by prevrátil aj smer, preto flip kreslíme v canvase)
-    el.animate(
-      [{ transform: "translate(0,0)" }, { transform: `translate(${(facing * TILE_W * def.dist).toFixed(0)}px, 0)` }],
-      { duration: flightMs, easing: "linear", fill: "forwards" }
-    );
     const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
-    const file = `Blood_Charge_${n}.png`;
-    ensureSpriteMeta("Countess_Vampire", file).then(m => {
+    const holdMs = Math.max(200, (durMs || 800) - fromMs);
+    ensureSpriteMeta("Countess_Vampire", def.file).then(m => {
       const t0 = performance.now();
       const step = () => {
         if (!el.isConnected) return;
         const t = performance.now() - t0;
-        if (t >= flightMs) { el.remove(); return; }
+        if (t >= holdMs) { el.remove(); return; }
+        const idx = Math.floor(t / 1000 * BLOOD_FPS) % 4;
+        ctx.clearRect(0, 0, cw, ch);
         ctx.save();
-        if (facing < 0) { ctx.translate(size, 0); ctx.scale(-1, 1); } // sprite kreslený doprava
-        drawSprite(ctx, m, { file, frames: def.frames, fps: def.fps, loop: true }, t, size, size);
+        if (facing < 0) { ctx.translate(cw, 0); ctx.scale(-1, 1); } // sprite kreslený doprava
+        ctx.drawImage(m.img, idx * def.fw, 0, def.fw, 48, 0, 0, cw, ch);
         ctx.restore();
         requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
     }).catch(() => el.remove());
-  }, def.delay);
+  }, fromMs);
 }
 
 // zničenie pasce (Countess/Onre) — krvavo-fialový oblak: značka praskne a rozplynie sa.
@@ -3437,7 +3441,9 @@ function schedulePlayTimeline(timeline) {
         setAnim(e.from, key, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
         if (state?.[e.from]?.char === "countess") {
-          spawnBloodFx(e.from, key === "vattack1" ? 1 : 4, frameHold); // vampstrike = alias Attack_4 → vlna
+          // Attack_1: bolt sa zjaví pri vystretí ruky (frame 5 @10fps = 500 ms); vampstrike = alias Attack_4 → vlna hneď
+          if (key === "vattack1") spawnBloodFx(e.from, 1, frameHold, 500);
+          else spawnBloodFx(e.from, 4, frameHold);
         }
       }
       // Countess: liečivé beaty po trap zásahu (Attack_2 → Attack_3 → Attack_4) — HP sa doplnia až po
