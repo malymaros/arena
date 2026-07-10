@@ -158,6 +158,11 @@ const TELEPORT_OUT_MS  = Math.round(650 * ANIM_SLOW);
 const TELEPORT_IN_MS   = Math.round(650 * ANIM_SLOW);
 // Labyrint: odhalenie PRED zásahom, ktorý ho určite ukončí — skrytý súper sa zjaví (fade ako démon/teleport)
 const LAB_REVEAL_MS    = Math.round(700 * ANIM_SLOW);
+// Pasca (Countess/Onre) — trigger choreografia: po teleporte úder Attack_1 (dmg dopadne až po ňom);
+// Countess potom lieči NIE naraz so zásahom — beaty Attack_2→Attack_3→Attack_4 a až po nich +3 HP.
+// Časy musia pokryť klientske animácie (Attack_1 ~600 ms, Attack_4 ~750 ms @ 8–10 fps).
+const VAMP_TRAP_STRIKE_MS = Math.round(500 * ANIM_SLOW);
+const VAMP_HEAL_BEAT_MS   = Math.round(450 * ANIM_SLOW);
 // Naruto: summon klona — po pečatiach (special beaty) hrá Naruto + 2 kópie po bokoch Special_2 animáciu
 const CLONE_SUMMON_MS  = Math.round(1300 * ANIM_SLOW);
 
@@ -1278,14 +1283,25 @@ function triggerTrap(ownerSlot, tl) {
     return true;
   }
   o.mana -= MELEE_COST;
-  pushStateFrame(tl, [{ kind: "vamp_strike", from: ownerSlot, cell: [cell.x, cell.y] }], WOLF_STRIKE_MS);
+  // trigger úder = Attack_1 (podľa vampire_attack_guide) — Onreho zjavenie s výkrikom (Scream)
+  // hrá klient už počas trap_tp_in framu; dmg dopadne až po údere
+  pushStateFrame(tl, [{ kind: "vamp_strike", from: ownerSlot, cell: [cell.x, cell.y], anim: "vattack1" }], VAMP_TRAP_STRIKE_MS);
   const raw = VAMP_MELEE_DMG * dealMul(ownerSlot) * labyrinthMul(ownerSlot);
   // trap-melee je akcia castera → zasiahnutá figúra spotrebuje prípadnú armovanú obranu (whiff naprázdno nie)
   const foeShieldArmed = foe.shield, foeMirrorArmed = foe.mirror;
   if (playerHere) {
     const landed = !foeShieldArmed && !foeMirrorArmed;
     applyHit(foeS, raw, tl, "melee");
-    if (landed && !winnerNow()) vampBonus(ownerSlot, tl);
+    if (landed && !winnerNow()) {
+      // Countess: heal sa NEdeje naraz so zásahom — najprv beaty Attack_2 → Attack_3 → Attack_4,
+      // až po nich sa doplnia HP (Onre drainuje hneď — jeho choreografia je len Scream + Attack_1)
+      if (o.char === "countess") {
+        for (const a of ["vattack2", "vattack3", "vattack4"]) {
+          pushStateFrame(tl, [{ kind: "vamp_heal_cast", from: ownerSlot, anim: a }], VAMP_HEAL_BEAT_MS);
+        }
+      }
+      vampBonus(ownerSlot, tl);
+    }
   } else if (cloneHere) {
     applyHitOnClone(foeS, raw, tl, "melee");
   } else {

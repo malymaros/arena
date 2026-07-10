@@ -469,8 +469,18 @@ const ANIM_DEF = {
   // Countess/Onre: beh melee-charge (Run) + seknutie na bunke terča (VampStrike.png → alias Attack_4/Attack_3);
   // neloopové seknutie kreslí raf relatívnym časom (drawT) ako wolfstrike
   vamprun:    { file: "Run.png", fps: 12, loop: true },
-  vampstrike: { file: "VampStrike.png", fps: 8, loop: false }
+  vampstrike: { file: "VampStrike.png", fps: 8, loop: false },
+  // trigger pasce (podľa vampire_attack_guide): úder = Attack_1; Countess potom lieči cez beaty
+  // Attack_2→Attack_3→Attack_4; Onre sa na bunke pasce zjavuje s výkrikom (Scream). Všetko
+  // neloopové → kreslené relatívnym časom (VAMP_ONESHOT_KEYS), inak by viseli na poslednom frame.
+  vattack1:   { file: "Attack_1.png", fps: 10, loop: false },
+  vattack2:   { file: "Attack_2.png", fps: 8,  loop: false },
+  vattack3:   { file: "Attack_3.png", fps: 6,  loop: false },
+  vattack4:   { file: "Attack_4.png", fps: 8,  loop: false },
+  scream:     { file: "Scream.png",   fps: 8,  loop: false }
 };
+// neloopové one-shot animácie kreslené relatívnym časom od setAnim (hrajú RAZ od frame 0, potom držia pózu)
+const VAMP_ONESHOT_KEYS = new Set(["wolfstrike", "vampstrike", "vattack1", "vattack2", "vattack3", "vattack4", "scream"]);
 const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
 const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
 
@@ -3364,9 +3374,15 @@ function schedulePlayTimeline(timeline) {
         const sx = e.dir === "left" ? -1 : e.dir === "right" ? 1 : 0;
         if (sx) facingOverride[e.from] = { sx, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Countess/Onre: seknutie na bunke terča (po dobehnutí charge / teleporte pasce)
+      // Countess/Onre: seknutie na bunke terča — po dobehnutí charge (VampStrike) alebo po teleporte
+      // pasce (anim hint zo servera: vattack1 = Attack_1 podľa attack guide)
       if (e.kind === "vamp_strike" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, "vampstrike", frameHold);
+        setAnim(e.from, e.anim && ANIM_DEF[e.anim] ? e.anim : "vampstrike", frameHold);
+        lastAttackEndAt[e.from] = performance.now() + frameHold;
+      }
+      // Countess: liečivé beaty po trap zásahu (Attack_2 → Attack_3 → Attack_4) — HP sa doplnia až po nich
+      if (e.kind === "vamp_heal_cast" && (e.from === "p1" || e.from === "p2")) {
+        setAnim(e.from, e.anim && ANIM_DEF[e.anim] ? e.anim : "vattack2", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
       // pasca položená — značku kreslí renderGrid zo state[slot].trap; float vidí len caster
@@ -3389,12 +3405,16 @@ function schedulePlayTimeline(timeline) {
         if (p && p.x != null) spawnClonePuff([p.x, p.y]);
         fadeActor(e.from, 1, 0, frameHold);
       }
-      // …a objaví sa na bunke pasce (IN) — pozíciu snapni (teleport nesmie kĺzať cez board)
+      // …a objaví sa na bunke pasce (IN) — pozíciu snapni (teleport nesmie kĺzať cez board);
+      // Onre sa zjavuje s výkrikom (Scream) — bez behania, rovno na bunke pasce
       if (e.kind === "trap_tp_in" && (e.from === "p1" || e.from === "p2")) {
         positionActors(state, true);
         const p = state?.[e.from];
         if (p && p.x != null) spawnClonePuff([p.x, p.y]);
         fadeActor(e.from, 0, 1, frameHold);
+        // zjavenie bez behania: Onre s výkrikom (Scream), Countess v idle — zruš auto-run z posunu pozície
+        if (state?.[e.from]?.char === "onre") setAnim(e.from, "scream", frameHold);
+        else setAnim(e.from, "idle");
       }
       // trigger bez many na útok — teleport prebehol, úder nepadol (LOW MANA float bez prečiarknutia)
       if (e.kind === "trap_no_mana" && (e.target === "p1" || e.target === "p2")) {
@@ -5253,7 +5273,7 @@ function raf() {
     const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
     const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
                 : escWinsun ? (now - (animState[slot].start || 0))
-                : (aSt.key === "wolfstrike" || aSt.key === "vampstrike") ? (now - (aSt.start || 0)) // seknutie hrá RAZ od frame 0, potom drží dopadovú pózu
+                : VAMP_ONESHOT_KEYS.has(aSt.key) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty) hrá RAZ od frame 0, potom drží pózu
                 : (stoned ? 0 : now);
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
