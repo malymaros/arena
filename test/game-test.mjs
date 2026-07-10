@@ -1271,6 +1271,25 @@ async function main() {
   check(tl[tl.length - 1].p1.clone === null, "T51: klon je preč zo stavu");
   invariantCheck(tl, "T51");
 
+  /* ---------- Test 51b: zónový special DO stacknutého páru — klon pohltí CLONE_DMG, majiteľ berie zvyšok ---------- */
+  // (rovnaké pravidlo ako pri prestrelenej strele/melee — hlásené na Escanorovom speciáli, wanderer má identických 8 dmg)
+  await freshNaruto("wanderer");
+  // R1: p1 summon + posun doprava (pár stackovaný na (1,1)); p2 (3,1) sa posunie na (2,1)
+  tl = await playRound(c1, c2, [SP, R, M("right")], [M("left"), R, S]);
+  // R2 (starter p2): p2 vystúpi na (2,0) — diagonálne k páru — a kastne special (8 dmg) na nekrytý pár:
+  // klon zomrie za 1, Naruto dostane 8−1=7, oboje v JEDNOM beate
+  tl = await playRound(c1, c2, [R, M("left"), S], [M("up"), SP, R]);
+  const t51bHits = sumEffects(tl).hits.filter(h => h.target === "p1");
+  check(t51bHits.length === 1 && t51bHits[0].dmg === 7 && !t51bHits[0].parts,
+    "T51b: klon pohltil 1, Naruto dostal zvyšok zóny (7)", `hits=${JSON.stringify(t51bHits)}`);
+  check(fxOf(tl, "clone_die").length === 1, "T51b: stacknutý klon zomrel so zásahom");
+  const t51bFrame = tl.find(f => (f.effects || []).some(e => e.kind === "clone_die"));
+  check((t51bFrame?.effects || []).some(e => e.kind === "hit" && e.target === "p1"),
+    "T51b: hit aj clone_die v jednom beate", `fx=${JSON.stringify(t51bFrame?.effects)}`);
+  check(tl[tl.length - 1].p1.hp === 3, "T51b: p1 HP 10−7=3", `hp=${tl[tl.length - 1].p1.hp}`);
+  check(tl[tl.length - 1].p1.clone === null, "T51b: klon je preč zo stavu");
+  invariantCheck(tl, "T51b");
+
   /* ---------- Test 52: klon × labyrint — mirror match (Naruto lovec s klonom, Minotaur prekliaty) ---------- */
   await freshNaruto("minotaur");
   // p1 summon + mirror; p2 (minotaur) sa priblíži a kolo zavŕši specialom → odraz: prekliaty je Minotaur,

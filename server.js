@@ -1472,7 +1472,8 @@ function applyHitPairDefended(ownerSlot, rawDmg, tl, kind = "basic", fromClone =
 
 // Jedna akcia zasiahne obrancu (ownerSlot) a VOLITEĽNE aj jeho tieňového klona (includeClone) — keďže Naruto
 // a klon sú „tá istá postava" so zdieľanou obranou, ich reakcie idú do SPOLOČNÝCH beatov (blok / mirror-lúč /
-// hit sa prehrajú NARAZ, nie sekvenčne). ownerDmg = dmg na Naruta; klon vždy „stojí za" flat CLONE_DMG×buff.
+// hit sa prehrajú NARAZ, nie sekvenčne). ownerDmg = dmg na Naruta; klon STACKNUTÝ na jeho bunke z neho
+// pohltí CLONE_DMG (bez obrany), klon-návnada na vlastnej bunke netlmí nič.
 function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
   const o = game.players[ownerSlot];
   const withClone = !!(includeClone && o.clone);
@@ -1514,8 +1515,11 @@ function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
     endLabyrinths(tl);
     return;
   }
-  // bez obrany: Naruto berie plný ownerDmg a klon (ak zasiahnutý) zaniká — VŠETKO v jednom beate
-  const d = recvDmg(ownerSlot, ownerDmg);
+  // bez obrany: klon STACKNUTÝ na majiteľovej bunke pohltí CLONE_DMG zo zásahu a majiteľ berie len
+  // zvyšok (rovnaké pravidlo ako prestrelený stacknutý pár pri streľbe/melee); klon-návnada zasiahnutý
+  // zónou na VLASTNEJ bunke nič netlmí (majiteľ berie plný dmg) — klon zaniká, VŠETKO v jednom beate
+  const stacked = withClone && o.clone.x === o.x && o.clone.y === o.y;
+  const d = recvDmg(ownerSlot, stacked ? Math.max(0, ownerDmg - CLONE_DMG) : ownerDmg);
   o.hp = Math.max(0, o.hp - d);
   const fx = [];
   if (d > 0) fx.push({ kind: "hit", target: ownerSlot, dmg: d });
@@ -2043,10 +2047,6 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       }
     }
     if (dmg > 0) {
-      // vlastný klon STACKNUTÝ na IK bunke pohltí CLONE_DMG (zomrie) a majiteľovi prejde len zvyšok —
-      // rovnaké pravidlo ako prestrelený stacknutý pár; dmg tile ostáva ako doteraz (kozmetický -1, klon prežíva)
-      const stackedClone = tileType === "ik" && p.clone && p.clone.x === p.x && p.clone.y === p.y;
-      if (stackedClone) dmg = Math.max(0, dmg - CLONE_DMG);
       const d = recvDmg(slot, dmg);
       // tile dmg labyrint bežne NEkončí — výnimka je smrteľný zásah: pred finálnym dmg sa prehrá
       // rovnaká postupnosť ako pri akciovom zásahu (reveal PRED animáciou, koniec labyrintu po hite),
@@ -2055,7 +2055,6 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       if (lethalInLab) revealLabyrinths(tl);
       // najprv zvýrazni vyhodnocované políčko, potom zásah (½ ak má hráč last stand buff — platí aj na tile/IK)
       pushStateFrame(tl, [{ kind: "tile_proc", tile: tileType, cell: [p.x, p.y] }], 600);
-      if (stackedClone) killClone(slot, tl); // klon sa rozplynie ešte pred dopadom zvyšku na majiteľa
       p.hp = Math.max(0, p.hp - d);
       pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d }], SMALL_DELAY_MS);
       if (lethalInLab) endLabyrinths(tl);
