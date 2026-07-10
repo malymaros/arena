@@ -1180,6 +1180,35 @@ async function main() {
   check(tl[tl.length - 1].p2.hp === 0, "T48c: p2 padol (16 dmg)", `hp=${tl[tl.length - 1].p2.hp}`);
   invariantCheck(tl, "T48c");
 
+  /* ---------- Test 48d: melee DO stacknutého páru — klon pohltí len CLONE_DMG, zvyšok prejde na Naruta ---------- */
+  // (rovnaké pravidlo ako prestrelená strela — klon na majiteľovej bunke nie je plný bait)
+  await freshNaruto();
+  // R1: p1 summon + posun doprava (pár stackovaný na (1,1)); p2 dash na (1,1) a uhne dole na (1,2)
+  tl = await playRound(c1, c2, [SP, R, M("right")], [D("left"), M("down"), R]);
+  // R2 (starter p2): p2 vstúpi na bunku páru a sekne PRV než p1 koná — klon zomrie za 1, Naruto dostane 8−1=7
+  tl = await playRound(c1, c2, [R, M("right"), S], [M("up"), ML, R]);
+  check(fxOf(tl, "clone_die").length === 1, "T48d: melee zabil stacknutého klona (clone_die)");
+  const t48dHits = sumEffects(tl).hits.filter(h => h.target === "p1");
+  check(t48dHits.length === 1 && t48dHits[0].dmg === 7 && !t48dHits[0].parts,
+    "T48d: klon pohltil 1, Naruto dostal zvyšok melee (7)", `hits=${JSON.stringify(t48dHits)}`);
+  check(tl[tl.length - 1].p1.hp === 3, "T48d: p1 HP 10−7=3", `hp=${tl[tl.length - 1].p1.hp}`);
+  check(tl[tl.length - 1].p1.clone === null, "T48d: klon je preč zo stavu");
+  invariantCheck(tl, "T48d");
+
+  /* ---------- Test 48e: melee do KRYTÉHO stacknutého páru — jedna obrana, jeden blok, klon prežije ---------- */
+  // stav z T48d: p1 (2,1) hp 3, p2 (1,1). R3 (starter p1): recast klona na (2,1) — pár stackovaný, p2 pristúpi
+  tl = await playRound(c1, c2, [SP, R, S], [M("right"), R, S]);
+  // R4 (starter p2): p1 (nestartér) si predradí golden shield; p2 melee na pár = JEDEN zlatý blok, žiadny dmg
+  tl = await playRound(c1, c2, [G, R, M("right"), A("right")], [ML, R, S]);
+  const t48eBlocks = fxOf(tl, "block").filter(e => e.target === "p1");
+  check(t48eBlocks.length === 1 && t48eBlocks[0].gold === true,
+    "T48e: krytý pár = jeden zlatý blok (applyHitPairDefended)", `blocks=${JSON.stringify(t48eBlocks)}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p1").length === 0, "T48e: žiadny dmg cez golden shield");
+  check(tl[tl.length - 1].p1.hp === 3, "T48e: p1 HP nezmenené (3)", `hp=${tl[tl.length - 1].p1.hp}`);
+  check(fxOf(tl, "clone_die").length === 0 && tl[tl.length - 1].p1.clone !== null,
+    "T48e: klon krytý obranou prežil", `clone=${JSON.stringify(tl[tl.length - 1].p1.clone)}`);
+  invariantCheck(tl, "T48e");
+
   /* ---------- Test 49: súperov mirror — odraz klonovej strely zničí KLONA (nie HP Naruta) ---------- */
   await freshNaruto();
   tl = await playRound(c1, c2, [SP, M("up"), R], [R, S, M("down")]); // p1 (0,0), klon (0,2), p2 (3,2)
