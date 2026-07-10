@@ -1159,6 +1159,49 @@ function spawnClonePuff(cell) {
   }
 }
 
+// Countess: k útokom Attack_1–4 patria prislúchajúce Blood_Charge_1–4 FX (viď vampire_attack_guide):
+// 1 = krvavý bolt letiaci vpred, 2 = krvavé kvapky stúpajúce pri tele, 3 = véčko pred tvárou,
+// 4 = krvavá vlna pri zemi letiaca vpred. FX sa prehrá RAZ na bunke postavy (offset + drift per typ),
+// otočené v smere pohľadu. Blood_Charge_4 má neštvorcové framy (4×64×48) → explicitné frames.
+const BLOOD_FX = {
+  1: { frames: 4, fps: 10, dx: 0.42, dy: -0.15, drift: 0.55, size: 0.55 }, // bolt vpred
+  2: { frames: 4, fps: 8,  dx: 0.18, dy: -0.10, drift: 0,    size: 0.60 }, // kvapky pri tele
+  3: { frames: 4, fps: 8,  dx: 0.30, dy: -0.30, drift: 0,    size: 0.55 }, // véčko pred tvárou
+  4: { frames: 4, fps: 10, dx: 0.40, dy:  0.22, drift: 0.60, size: 0.65 }, // vlna pri zemi vpred
+};
+function spawnBloodFx(slot, n, durMs) {
+  const p = state?.[slot];
+  const def = BLOOD_FX[n];
+  if (!p || p.x == null || !def) return;
+  const facing = computeFacing(state?.p1, state?.p2)[slot] || 1;
+  const { left, top } = cellToPx(p.x, p.y);
+  const size = Math.round(TILE_H * def.size);
+  const sx = left + TILE_W / 2 + facing * TILE_W * def.dx - size / 2;
+  const sy = top + TILE_H / 2 + TILE_H * def.dy - size / 2;
+  const el = document.createElement("canvas");
+  el.width = size; el.height = size; el.className = "blood-fx";
+  Object.assign(el.style, { position: "absolute", left: sx + "px", top: sy + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
+  if (facing < 0) el.style.transform = "scaleX(-1)"; // sprite kreslený doprava
+  actorsEl.appendChild(el);
+  const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  const file = `Blood_Charge_${n}.png`;
+  const animDur = def.frames * 1000 / def.fps;
+  const dur = Math.min(durMs || animDur, Math.max(animDur, 500));
+  const driftPx = facing * TILE_W * def.drift;
+  ensureSpriteMeta("Countess_Vampire", file).then(m => {
+    const t0 = performance.now();
+    const step = () => {
+      if (!el.isConnected) return;
+      const t = performance.now() - t0;
+      if (t >= dur) { el.remove(); return; }
+      if (driftPx) el.style.left = (sx + driftPx * (t / dur)) + "px"; // bolt/vlna letia vpred
+      drawSprite(ctx, m, { file, frames: def.frames, frameIndex: Math.min(def.frames - 1, Math.floor(t / 1000 * def.fps)) }, 0, size, size);
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }).catch(() => el.remove());
+}
+
 // zničenie pasce (Countess/Onre) — krvavo-fialový oblak: značka praskne a rozplynie sa.
 // Vidia ho OBAJA hráči (zámer — súper sa dozvie, že riziko pasce pominulo). Čisto kozmetické, self-remove.
 function spawnTrapBreak(cell) {
@@ -3375,15 +3418,25 @@ function schedulePlayTimeline(timeline) {
         if (sx) facingOverride[e.from] = { sx, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
       // Countess/Onre: seknutie na bunke terča — po dobehnutí charge (VampStrike) alebo po teleporte
-      // pasce (anim hint zo servera: vattack1 = Attack_1 podľa attack guide)
+      // pasce (anim hint zo servera: vattack1 = Attack_1 podľa attack guide). K Countessiným útokom
+      // Attack_1–4 patria prislúchajúce Blood_Charge FX (spawnBloodFx).
       if (e.kind === "vamp_strike" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, e.anim && ANIM_DEF[e.anim] ? e.anim : "vampstrike", frameHold);
+        const key = e.anim && ANIM_DEF[e.anim] ? e.anim : "vampstrike";
+        setAnim(e.from, key, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
+        if (state?.[e.from]?.char === "countess") {
+          spawnBloodFx(e.from, key === "vattack1" ? 1 : 4, frameHold); // vampstrike = alias Attack_4 → vlna
+        }
       }
-      // Countess: liečivé beaty po trap zásahu (Attack_2 → Attack_3 → Attack_4) — HP sa doplnia až po nich
+      // Countess: liečivé beaty po trap zásahu (Attack_2 → Attack_3 → Attack_4) — HP sa doplnia až po
+      // nich; každý beat sprevádza jeho Blood_Charge FX
       if (e.kind === "vamp_heal_cast" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, e.anim && ANIM_DEF[e.anim] ? e.anim : "vattack2", frameHold);
+        const key = e.anim && ANIM_DEF[e.anim] ? e.anim : "vattack2";
+        setAnim(e.from, key, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
+        if (state?.[e.from]?.char === "countess") {
+          spawnBloodFx(e.from, key === "vattack2" ? 2 : key === "vattack3" ? 3 : 4, frameHold);
+        }
       }
       // pasca položená — značku kreslí renderGrid zo state[slot].trap; float vidí len caster
       // (súperovi server trap_set efekt aj trap v dátach rediguje)
@@ -3463,6 +3516,8 @@ function schedulePlayTimeline(timeline) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
         setAnim(e.from, state?.[e.from]?.char === "medusa" ? "attack1_loop" : "attack2_loop", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
+        // Countess: k Attack_2 patrí Blood_Charge_2 (krvavé kvapky) — pri každom melee beate
+        if (state?.[e.from]?.char === "countess") spawnBloodFx(e.from, 2, frameHold);
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", frameHold);
