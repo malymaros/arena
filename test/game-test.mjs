@@ -1578,6 +1578,177 @@ async function main() {
       "T56i: swap-in vlkolaka s HP 5 → moon hneď 2", `char=${t56iLast.char}, hp=${t56iLast.hp}, moon=${t56iLast.moon}`);
   }
 
+  /* ================= Countess Vampire (p1) / Onre (p2) — side postavy ================= */
+  const fxOf2 = (timeline, kind) => timeline.flatMap(f => (f.effects || []).filter(e => e.kind === kind));
+  const VSP = (x, y) => ({ type: "special", cell: { x, y } });    // pasca na zvolenej bunke
+  const VML = (dir) => ({ type: "melee", dir });                  // melee so smerom (charge / center)
+  // dmg:100 — žiadne heal/mana/IK tiles (deterministickejšie; dmg tile dáva max 1 dmg šum)
+  async function freshVamp(p2char = "onre") {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1, { tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0 } });
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "countess");
+    c2.sock.emit("choose_character", p2char);
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  /* ---------- TV1: viazanie na stranu — countess len p1, onre len p2, turnaj bez nich ---------- */
+  {
+    c1.sock.emit("retry");
+    await new Promise(r => setTimeout(r, 150));
+    configureMatch(c1);
+    await new Promise(r => setTimeout(r, 150));
+    c1.sock.emit("choose_character", "onre");     // zlá strana — musí sa odmietnuť
+    c2.sock.emit("choose_character", "countess"); // zlá strana — musí sa odmietnuť
+    await new Promise(r => setTimeout(r, 250));
+    check(!c1.lastState?.p1?.char && !c2.lastState?.p2?.char,
+      "TV1: side postavy na zlej strane odmietnuté", `p1=${c1.lastState?.p1?.char}, p2=${c2.lastState?.p2?.char}`);
+    c1.sock.emit("choose_character", "countess");
+    c2.sock.emit("choose_character", "onre");
+    await new Promise(r => setTimeout(r, 250));
+    check(c1.lastState?.p1?.char === "countess" && c1.lastState?.p2?.char === "onre",
+      "TV1: správna strana prešla (countess p1, onre p2)");
+  }
+
+  /* ---------- TV2: diagonálny basic — dist 1 diagonálne = 3 dmg ---------- */
+  await freshVamp();
+  // kolo 1: onre sa presunie na (1,0) — dash left (3,1)→(1,1) + move up; countess whiff útok do steny
+  tl = await playRound(c1, c2, [S, R, A("up_left")], [D("left"), M("up"), R]);
+  check(tl[tl.length - 1].p2.x === 1 && tl[tl.length - 1].p2.y === 0, "TV2: onre na (1,0)");
+  // kolo 2 (starter p2): countess strieľa up_right z (0,1) → (1,0) = onre, dist 1 → 3 dmg
+  tl = await playRound(c1, c2, [A("up_right"), R, S], [R, S, M("right")]);
+  const tv2Hits = sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 3);
+  check(tv2Hits.length === 1, "TV2: diagonálny basic dist=1 dáva 3 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "TV2");
+
+  /* ---------- TV3: Onre melee-charge (drain) + Countess melee center (heal) ---------- */
+  await freshVamp();
+  // kolo 1: countess R (mana 10); onre charge left (3,1)→ zastaví na countess (0,1): 3 dmg, drain 3
+  tl = await playRound(c1, c2, [R, S, A("up_left")], [VML("left"), R, S]);
+  const tv3Hit = sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 3);
+  check(tv3Hit.length === 1, "TV3: onre charge trafil countess za 3", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  const tv3Drain = fxOf2(tl, "mana_drain");
+  check(tv3Drain.length === 1 && tv3Drain[0].drained === 3 && tv3Drain[0].gained === 3,
+    "TV3: drain −3 many súperovi, +3 sebe", `drain=${JSON.stringify(tv3Drain)}`);
+  check(tl[tl.length - 1].p2.x === 0 && tl[tl.length - 1].p2.y === 1,
+    "TV3: onre ostal stáť na bunke countess (0,1)", `pos=${tl[tl.length - 1].p2.x},${tl[tl.length - 1].p2.y}`);
+  check(fxOf2(tl, "vamp_charge").length === 1 && fxOf2(tl, "vamp_strike").length === 1,
+    "TV3: charge + strike efekty prítomné");
+  invariantCheck(tl, "TV3");
+  // kolo 2 (starter p2): countess melee CENTER na zdieľanej bunke — 3 dmg + heal +3 (hp 7 → 10)
+  tl = await playRound(c1, c2, [VML("center"), R, S], [R, S, M("right")]);
+  const tv3bHit = sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 3);
+  const tv3Heal = fxOf2(tl, "heal").filter(e => e.target === "p1");
+  check(tv3bHit.length === 1, "TV3: melee center dáva 3 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tv3Heal.length === 1 && tv3Heal[0].amount === 3, "TV3: countess sa vyliečila +3 HP", `heal=${JSON.stringify(tv3Heal)}`);
+  invariantCheck(tl, "TV3b");
+
+  /* ---------- TV4: mirror imunita — súperov mirror sa správa ako štít (nič neodráža) ---------- */
+  await freshVamp();
+  // kolo 1: onre a1 = mirror; countess a2 = melee-charge right → BLOCK (žiadny odraz, žiadny dmg, žiadny heal)
+  tl = await playRound(c1, c2, [R, VML("right"), S], [MI, R, S]);
+  const tv4Blocks = fxOf2(tl, "block").filter(e => e.target === "p2");
+  const tv4Mirrors = fxOf2(tl, "mirror");
+  const tv4Hits = sumEffects(tl).hits.filter(h => h.dmg === 3);
+  check(tv4Blocks.length === 1, "TV4: mirror sa voči countess správal ako štít (block)", `blocks=${tv4Blocks.length}`);
+  check(tv4Mirrors.length === 0, "TV4: žiadny odrazový beam", `mirrors=${tv4Mirrors.length}`);
+  check(tv4Hits.length === 0, "TV4: žiadny dmg (ani odrazený)", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(fxOf2(tl, "heal").length === 0, "TV4: blok = žiadny heal bonus");
+  check(tl[tl.length - 1].p1.x === 3 && tl[tl.length - 1].p1.y === 1,
+    "TV4: countess aj pri bloku ostala na bunke terča", `pos=${tl[tl.length - 1].p1.x},${tl[tl.length - 1].p1.y}`);
+  invariantCheck(tl, "TV4");
+
+  /* ---------- TV5: pasca — súper na ňu vstúpi → teleport + zásah; redakcia pre súpera ---------- */
+  await freshVamp();
+  // kolo 1: countess položí pascu na (2,1) a nechá si 5 many (R); onre stojí
+  tl = await playRound(c1, c2, [VSP(2, 1), R, M("up")], [R, S, A("up_left")]);
+  check(fxOf2(tl, "trap_set").length === 1, "TV5: trap_set v timeline castera");
+  check(tl[tl.length - 1].p1.trap && tl[tl.length - 1].p1.trap.x === 2, "TV5: pasca v stave castera");
+  // redakcia: súperova timeline trap_set nemá a trap v jeho pohľade je null
+  const tv5Opp = c2.lastTimeline;
+  check(!!tv5Opp && fxOf2(tv5Opp, "trap_set").length === 0, "TV5: súper trap_set NEvidí");
+  check(!!tv5Opp && tv5Opp.every(f => !f.p1.trap), "TV5: súper pascu v dátach NEvidí");
+  // kolo 2 (starter p2): onre vstúpi na (2,1) → trigger: teleport countess + melee 3 dmg
+  tl = await playRound(c1, c2, [R, S, A("up_left")], [M("left"), R, S]);
+  check(fxOf2(tl, "trap_trigger").length === 1, "TV5: pasca sa spustila");
+  check(fxOf2(tl, "trap_tp_in").length === 1, "TV5: teleport na bunku pasce");
+  const tv5Hits = sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 3);
+  check(tv5Hits.length === 1, "TV5: trap-melee trafil stojaceho súpera za 3", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tl[tl.length - 1].p1.x === 2 && tl[tl.length - 1].p1.y === 1,
+    "TV5: countess stojí na bunke pasce", `pos=${tl[tl.length - 1].p1.x},${tl[tl.length - 1].p1.y}`);
+  check(tl[tl.length - 1].p1.trap === null, "TV5: pasca sa triggerom spotrebovala");
+  invariantCheck(tl, "TV5");
+
+  /* ---------- TV6: pasca — súper ňou len PREBEHNE → teleport + úder naprázdno (mana preč) ---------- */
+  await freshVamp();
+  tl = await playRound(c1, c2, [VSP(2, 1), R, M("up")], [R, S, A("up_left")]); // countess mana 5, pos (0,0)
+  // kolo 2 (starter p2): onre dash left (3,1)→(1,1) PREBEHNE cez (2,1) → trigger, strike do prázdna
+  tl = await playRound(c1, c2, [R, S, A("up_left")], [D("left"), R, S]);
+  check(fxOf2(tl, "trap_trigger").length === 1, "TV6: prebehnutie pascu triggerlo");
+  check(fxOf2(tl, "vamp_strike").length === 1, "TV6: úder naprázdno sa odohral");
+  check(sumEffects(tl).hits.filter(h => h.dmg === 3).length === 0, "TV6: nikto nedostal 3 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tl[tl.length - 1].p1.x === 2 && tl[tl.length - 1].p1.y === 1, "TV6: countess teleportnutá na bunku pasce");
+  // mana: po kole 1 = 5; trigger −4 = 1; potom R +4 = 5, S −2 = 3, attack −1 = 2
+  check(tl[tl.length - 1].p1.mana === 2, "TV6: 4 many za úder naprázdno strhnuté", `mana=${tl[tl.length - 1].p1.mana}`);
+  invariantCheck(tl, "TV6");
+
+  /* ---------- TV7: pasca bez many — teleport prebehne, útok nie ---------- */
+  await freshVamp();
+  // countess minie manu: special (5) + attack (1) = 0 many
+  tl = await playRound(c1, c2, [VSP(2, 1), A("up_right"), M("up")], [R, S, A("up_left")]);
+  check(tl[tl.length - 1].p1.mana === 0, "TV7: countess bez many", `mana=${tl[tl.length - 1].p1.mana}`);
+  // kolo 2: onre vstúpi na pascu → teleport ÁNO, útok NIE (trap_no_mana)
+  tl = await playRound(c1, c2, [R, S, M("down")], [M("left"), R, S]);
+  check(fxOf2(tl, "trap_tp_in").length === 1, "TV7: teleport prebehol aj bez many");
+  check(fxOf2(tl, "trap_no_mana").length === 1, "TV7: trap_no_mana efekt");
+  check(fxOf2(tl, "vamp_strike").length === 0, "TV7: bez many žiadny úder");
+  check(sumEffects(tl).hits.filter(h => h.dmg === 3).length === 0, "TV7: žiadny trap dmg");
+  invariantCheck(tl, "TV7");
+
+  /* ---------- TV8: vlastný vstup na vlastnú pascu ju zničí (deštrukciu vidia obaja) ---------- */
+  await freshVamp();
+  tl = await playRound(c1, c2, [VSP(1, 1), R, S], [R, S, A("up_left")]);
+  // kolo 2: countess vstúpi na vlastnú pascu (0,1)→(1,1) → trap_break
+  tl = await playRound(c1, c2, [M("right"), R, S], [R, S, A("up_left")]);
+  check(fxOf2(tl, "trap_break").length === 1, "TV8: vlastný vstup pascu zničil");
+  check(fxOf2(tl, "trap_trigger").length === 0, "TV8: žiadny trigger");
+  check(tl[tl.length - 1].p1.trap === null, "TV8: pasca preč zo stavu");
+  check(!!c2.lastTimeline && fxOf2(c2.lastTimeline, "trap_break").length === 1,
+    "TV8: deštrukciu vidí aj súper");
+  invariantCheck(tl, "TV8");
+
+  /* ---------- TV9: petrifikovaný caster — súperov prechod pascu ZNIČÍ (nie trigger) ---------- */
+  await freshVamp("medusa");
+  // kolo 1: countess položí pascu na (2,1); medúza ju skamení (special left z (3,1) pokrýva (0,1))
+  tl = await playRound(c1, c2, [VSP(2, 1), R, M("up")], [R, SPL, S]);
+  check(fxOf2(tl, "petrify").filter(e => e.target === "p1").length === 1, "TV9: countess skamenená");
+  const tv9Stone = tl[tl.length - 1].p1.stone;
+  check(tv9Stone > 0, "TV9: kameň prenesený do ďalšieho kola", `stone=${tv9Stone}`);
+  // kolo 2 (starter p2): medúza vstúpi na (2,1) — pasca sa ZNIČÍ (caster je socha), žiadny teleport
+  const tv9q1 = [...Array.from({ length: Math.min(3, tv9Stone) }, () => STONED),
+    ...[R, S].slice(0, 3 - Math.min(3, tv9Stone))];
+  tl = await playRound(c1, c2, tv9q1, [M("left"), R, S]);
+  check(fxOf2(tl, "trap_break").length === 1, "TV9: prechod cez pascu skamenenej ju zničil");
+  check(fxOf2(tl, "trap_trigger").length === 0 && fxOf2(tl, "trap_tp_in").length === 0,
+    "TV9: žiadny trigger ani teleport");
+  check(tl[tl.length - 1].p1.trap === null, "TV9: pasca preč zo stavu");
+  invariantCheck(tl, "TV9");
+
+  /* ---------- TV10: labyrint × pasca — trigger na stojaceho lovca odhalí a ukončí labyrint ---------- */
+  await freshVamp("minotaur");
+  // kolo 1: countess pasca (2,1) + R (mana 5); minotaur ju zaklial do labyrintu
+  tl = await playRound(c1, c2, [VSP(2, 1), R, M("up")], [R, SP, S]);
+  check(tl[tl.length - 1].p1.labyrinth === true, "TV10: countess v labyrinte");
+  // kolo 2 (starter p2): minotaur vstúpi na (2,1) → trigger → reveal PRED animáciou → hit → koniec labyrintu
+  tl = await playRound(c1, c2, [R, S, A("up_left")], [M("left"), R, S]);
+  check(fxOf2(tl, "labyrinth_reveal").filter(e => e.target === "p1").length === 1,
+    "TV10: istý trap zásah odhalil labyrint pred animáciou");
+  const tv10Hits = sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 3);
+  check(tv10Hits.length === 1, "TV10: stojaci lovec trafený za 3", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(fxOf2(tl, "labyrinth_end").filter(e => e.target === "p1").length === 1, "TV10: zásah ukončil labyrint");
+  invariantCheck(tl, "TV10");
+
   c1.sock.close(); c2.sock.close();
   serverProc?.kill();
   console.log(failures === 0 ? "\nVŠETKY TESTY PREŠLI" : `\nZLYHANÍ: ${failures}`);

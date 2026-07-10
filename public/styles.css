@@ -386,6 +386,19 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .wolf-picker .wolf-center{ grid-area: c; }
 #wolf-picker .arrow{ background: #6a1b9a; } /* fialová ako special */
 
+/* Countess/Onre: diagonálny aim picker — 4 rohy 3×3 mriežky (kríž prázdny) */
+.dir-picker.diag-picker{ grid-template-areas: "ul . ur" ". . ." "dl . dr"; }
+.diag-picker .arrow.ul{ grid-area: ul; }
+.diag-picker .arrow.ur{ grid-area: ur; }
+.diag-picker .arrow.dl{ grid-area: dl; }
+.diag-picker .arrow.dr{ grid-area: dr; }
+#aim-picker-diag .arrow{ background: #b71c1c; } /* červená ako basic attack */
+
+/* Countess/Onre: melee picker — kríž (4 smery charge) + stred (úder na vlastnej bunke) */
+.dir-picker.vamp-picker{ grid-template-areas: ". up ." "left c right" ". down ."; }
+.vamp-picker .arrow.center{ grid-area: c; background: #7b1020; }
+#vamp-picker .arrow{ background: #ad1457; } /* krvavá — melee s healom/drainom */
+
 /* Vojak: mini mapa plochy na výber cieľovej bunky specialu (stĺpce nastaví buildCellPicker podľa board.w) */
 .dir-picker.cell-picker{ grid-template-areas: none; gap: 3px; }
 .cell-picker .mini-target{
@@ -396,6 +409,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .cell-picker .mini-target:hover:not(:disabled){ background: #7b1fa2; } /* fialová ako special */
 .cell-picker .mini-target.own{ background: #14324a; color: #5bc0ff; cursor: not-allowed; opacity: .85; } /* moja (ghost) bunka */
 .cell-picker .mini-target.foe{ background: #47201f; color: #ff8a7a; cursor: not-allowed; opacity: .85; } /* súperova aktuálna bunka / jeho klon */
+/* Countess/Onre: bunka s už položenou pascou v pickeri (recast ju nahradí — pokojne aj tá istá) */
+.cell-picker .mini-target.trap-here{ background: #5a1030; color: #ff7ab0; }
 
 /* Colors */
 .btn.mana    { background: #1565c0; } /* Recharge (+4) — modrá ako mana bar */
@@ -1002,6 +1017,17 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 }
 .char-cards[data-page="hidden"] .soon-mark { font-size: 36px; color: #b17aff; text-shadow: 4px 4px 0 rgba(0,0,0,.6), 0 0 12px rgba(177,122,255,.5); }
 .char-cards[data-page="hidden"] .char-name { color: #9d86c4; }
+/* hrateľné karty Hidden stránky (Countess/Onre) — fialový skin ako .soon, ale klikateľné (hover lift) */
+.char-card.hidden-char {
+  cursor: pointer; background: #2c2438;
+  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 18px rgba(177,122,255,.3);
+}
+.char-card.hidden-char:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 26px rgba(177,122,255,.5);
+}
 /* nové postavy na Hidden stránke sú viazané na stranu hráča: P1 vidí len Countess Vampire, P2 len Onre */
 #char-select:not(.p2-side) .char-card[data-side="p2"] { display: none; }
 #char-select.p2-side .char-card[data-side="p1"] { display: none; }
@@ -2323,4 +2349,40 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .room-btn:hover{ filter: brightness(1.1); }
 .room-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
 .room-btn:disabled{ opacity: .6; cursor: default; }
+
+/* ---------- Countess/Onre: pasca ---------- */
+/* statická hlava postavy v strede bunky — vidí ju len caster (server súperovi trap rediguje);
+   jemné pulzovanie, nech je značka čitateľná aj na tile podfarbení */
+.trap-marker{
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 44px; height: 44px; pointer-events: none; z-index: 2;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 6px rgba(173, 20, 87, .9));
+  animation: trap-pulse 1.6s ease-in-out infinite;
+}
+@keyframes trap-pulse{
+  0%, 100% { opacity: .85; transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.12); }
+}
+/* trigger — bunka pasce sa rozžiari (od tohto momentu ju vidia obaja) */
+.cell.trap-flash{
+  animation: trap-flash .9s ease-out;
+}
+@keyframes trap-flash{
+  0%   { box-shadow: inset 0 0 0 4px #ff2e6d, inset 0 0 42px rgba(255, 46, 109, .85); }
+  100% { box-shadow: inset 0 0 0 0 rgba(255, 46, 109, 0); }
+}
+/* floaty pasce a Onre drainu */
+.trap-float{
+  position: absolute; transform: translateX(-50%);
+  color: #ff7ab0; font-weight: 900; font-size: 14px; letter-spacing: 1px;
+  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(255, 46, 109, .8);
+  animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9;
+}
+.drain-float{
+  position: absolute; transform: translateX(-50%);
+  color: #b17aff; font-weight: 900; font-size: 15px; letter-spacing: 1px;
+  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(122, 79, 208, .9);
+  animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9;
+}
   

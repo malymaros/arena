@@ -173,8 +173,25 @@
             <button class="btn arrow right" data-act="attack:right" title="Shoot Right">→</button>
             <button class="btn arrow down"  data-act="attack:down"  title="Shoot Down">↓</button>
           </div>
+          <!-- Countess/Onre: diagonálny basic — 4 diagonálne smery namiesto ortogonálnych -->
+          <div id="aim-picker-diag" class="dir-picker diag-picker hidden">
+            <button class="btn arrow ul" data-act="attack:up_left"    title="Shoot Up-Left">↖</button>
+            <button class="btn arrow ur" data-act="attack:up_right"   title="Shoot Up-Right">↗</button>
+            <button class="btn arrow dl" data-act="attack:down_left"  title="Shoot Down-Left">↙</button>
+            <button class="btn arrow dr" data-act="attack:down_right" title="Shoot Down-Right">↘</button>
+          </div>
         </div>
-        <button class="btn act melee" data-act="melee" title="Melee (−4 mana, 8 dmg, hits only an opponent on your cell)"><span class="pix-ico" data-emoji="🗡️"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span> 8<span class="pix-ico mini" data-emoji="☠️"></span></span></button>
+        <!-- Melee — Countess/Onre si vyberajú smer charge (4 smery) alebo stred (úder na vlastnej bunke) -->
+        <div class="move-wrap">
+          <button id="melee-btn" class="btn act melee" title="Melee (−4 mana, 8 dmg, hits only an opponent on your cell)"><span class="pix-ico" data-emoji="🗡️"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span> 8<span class="pix-ico mini" data-emoji="☠️"></span></span></button>
+          <div id="vamp-picker" class="dir-picker vamp-picker hidden">
+            <button class="btn arrow up"     data-act="melee:up"     title="Charge Up">↑</button>
+            <button class="btn arrow left"   data-act="melee:left"   title="Charge Left">←</button>
+            <button class="btn arrow center" data-act="melee:center" title="Strike your own cell">◎</button>
+            <button class="btn arrow right"  data-act="melee:right"  title="Charge Right">→</button>
+            <button class="btn arrow down"   data-act="melee:down"   title="Charge Down">↓</button>
+          </div>
+        </div>
         <!-- Special — Medúza si navyše vyberá smer pohľadu (vľavo/vpravo), ostatní kliknú priamo -->
         <div class="move-wrap">
           <button id="special-btn" class="btn act special" title="Special (−5 mana)"><span class="pix-ico" data-emoji="✨"></span><span class="cost">−5<span class="pix-ico mini" data-emoji="💧"></span></span></button>
@@ -292,14 +309,15 @@
       <div class="char-cards hidden" data-page="hidden">
         <!-- nové postavy sú viazané na STRANU hráča: P1 vidí LEN Countess Vampire, P2 LEN Onre
              (karta druhej strany je skrytá cez CSS podľa #char-select.p2-side + data-side).
-             Zatiaľ len idle ukážka, nedajú sa zvoliť: data-char je LEN na canvase (kreslenie),
-             nie na karte, takže klik ani hover-preview nič nerobia. -->
-        <div class="char-card soon" data-side="p1">
+             Hrateľné len v single/bo3 — v turnaji sa na Hidden stránku nedá dostať (runeActive). -->
+        <div class="char-card hidden-char" data-char="countess" data-side="p1">
           <canvas class="char-canvas" width="220" height="240" data-char="countess"></canvas>
+          <div class="char-stats hidden" data-char="countess"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Countess Vampire</div>
         </div>
-        <div class="char-card soon" data-side="p2">
+        <div class="char-card hidden-char" data-char="onre" data-side="p2">
           <canvas class="char-canvas" width="220" height="240" data-char="onre"></canvas>
+          <div class="char-stats hidden" data-char="onre"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Onre</div>
         </div>
         <div class="char-card soon"><div class="soon-mark">???</div><div class="char-name">Coming soon</div></div>
