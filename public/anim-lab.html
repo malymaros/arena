@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Anim Lab — Countess / Onre</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  /* DOČASNÁ ladiaca stránka animácií Countess Vampire + Onre — nie je linkovaná z hry.
+     Každá karta = jeden typ animácie s live parametrami (fps; pri blood charge aj delay/dist/výška/veľkosť).
+     Hodnoty v kartách zodpovedajú herným parametrom (ANIM_DEF fps, BLOOD_FX) — výhrady píš per karta. */
+  body { margin: 0; padding: 18px; background: #14161b; color: #dfe3ea; font: 13px/1.45 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 26px 0 10px; color: #ffb300; }
+  .note { color: #8b93a3; margin-bottom: 10px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .card { background: #1d2027; border: 1px solid #2c313c; border-radius: 8px; padding: 10px; width: 300px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; color: #fff; display: flex; justify-content: space-between; }
+  .card h3 small { color: #7f8797; font-weight: 400; }
+  canvas.stage { width: 280px; height: 190px; background: #23262e; border-radius: 4px; image-rendering: pixelated; display: block; }
+  .ctrls { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 8px; align-items: center; }
+  .ctrls label { color: #9aa2b2; font-size: 11px; display: flex; align-items: center; gap: 4px; }
+  .ctrls input[type=number] { width: 52px; background: #12141a; color: #fff; border: 1px solid #343a47; border-radius: 4px; padding: 2px 4px; font: inherit; }
+  .ctrls button { background: #2e3440; color: #fff; border: 1px solid #454d5e; border-radius: 4px; padding: 3px 10px; cursor: pointer; font: inherit; }
+  .ctrls button:hover { background: #3a4150; }
+  .seq { border-color: #7a4fd0; }
+  .seq h3 { color: #b17aff; }
+  .global { position: sticky; top: 0; background: #14161bee; padding: 8px 0; z-index: 5; display: flex; gap: 16px; align-items: center; }
+  .global input[type=range] { width: 180px; }
+</style>
+</head>
+<body>
+<h1>Anim Lab — Countess Vampire &amp; Onre <small style="color:#7f8797">(dočasná ladiaca stránka)</small></h1>
+<div class="note">Každá karta hrá jeden typ animácie v slučke (one-shot s pauzou medzi opakovaniami). Parametre sa dajú meniť naživo —
+pri výhradách sa odkazuj na názov karty. Fialové karty sú zložené HERNÉ sekvencie s hernými časmi beatov.</div>
+<div class="global">
+  <label>Rýchlosť <input type="range" id="speed" min="0.2" max="1.5" step="0.1" value="1" /> <span id="speedv">1.0×</span></label>
+  <button id="restart">↻ Reštart všetkých</button>
+</div>
+
+<h2>Countess Vampire</h2>
+<div class="grid" id="grid-countess"></div>
+
+<h2>Onre</h2>
+<div class="grid" id="grid-onre"></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const IMG = {}; // cache
+
+function load(dir, file) {
+  const key = dir + "/" + file;
+  if (IMG[key]) return IMG[key];
+  const img = new Image();
+  img.src = "/assets/" + dir + "/" + file;
+  IMG[key] = img;
+  return img;
+}
+
+// ---- definície kariet ---------------------------------------------------
+// anim: { file, fps, frames? (ak neštvorcové), once? (one-shot s pauzou) }
+// blood: { n, delay, dist, y, size, fps } — projektil vypustený počas útoku (herné BLOOD_FX)
+const COUNTESS = "Countess_Vampire", ONRE = "Onre";
+const CARDS = {
+  countess: [
+    { t: "Idle",     anim: { file: "Idle.png",   fps: 6 } },
+    { t: "Walk",     anim: { file: "Walk.png",   fps: 10 } },
+    { t: "Run (melee charge beh)", anim: { file: "Run.png", fps: 12 } },
+    { t: "Attack_1 + Blood_Charge_1", anim: { file: "Attack_1.png", fps: 10, once: true },
+      blood: { n: 1, delay: 350, dist: 190, y: -22, size: 92, fps: 12 } },
+    { t: "Attack_2 + Blood_Charge_2", anim: { file: "Attack_2.png", fps: 5, once: true },
+      blood: { n: 2, delay: 250, dist: 140, y: -9, size: 102, fps: 10 } },
+    { t: "Attack_3 + Blood_Charge_3", anim: { file: "Attack_3.png", fps: 6, once: true },
+      blood: { n: 3, delay: 120, dist: 165, y: -33, size: 92, fps: 10 } },
+    { t: "Attack_4 + Blood_Charge_4", anim: { file: "Attack_4.png", fps: 8, once: true },
+      blood: { n: 4, delay: 280, dist: 200, y: 48, size: 111, fps: 12 } },
+    { t: "Jump",     anim: { file: "Jump.png",   fps: 10, once: true } },
+    { t: "Hurt",     anim: { file: "Hurt.png",   fps: 8,  once: true } },
+    { t: "Dead",     anim: { file: "Dead.png",   fps: 7,  once: true } },
+    { t: "Blood_Charge_1 (samotný)", fx: { file: "Blood_Charge_1.png", frames: 4, fps: 10 } },
+    { t: "Blood_Charge_2 (samotný)", fx: { file: "Blood_Charge_2.png", frames: 4, fps: 10 } },
+    { t: "Blood_Charge_3 (samotný)", fx: { file: "Blood_Charge_3.png", frames: 4, fps: 10 } },
+    { t: "Blood_Charge_4 (samotný)", fx: { file: "Blood_Charge_4.png", frames: 4, fps: 10 } },
+    { t: "TRAP SEKVENCIA (herná)", seq: "countess" },
+  ],
+  onre: [
+    { t: "Idle",     anim: { file: "Idle.png",   fps: 6 } },
+    { t: "Walk",     anim: { file: "Walk.png",   fps: 10 } },
+    { t: "Run (melee charge beh)", anim: { file: "Run.png", fps: 12 } },
+    { t: "Attack_1 (trap úder)", anim: { file: "Attack_1.png", fps: 10, once: true } },
+    { t: "Attack_2 (melee center)", anim: { file: "Attack_2.png", fps: 10, once: true } },
+    { t: "Attack_3 (melee charge seknutie)", anim: { file: "Attack_3.png", fps: 8, once: true } },
+    { t: "Scream (zjavenie na pasci)", anim: { file: "Scream.png", fps: 8, once: true } },
+    { t: "Flight",   anim: { file: "Flight.png", fps: 8 } },
+    { t: "Hurt",     anim: { file: "Hurt.png",   fps: 8, once: true } },
+    { t: "Dead",     anim: { file: "Dead.png",   fps: 7, once: true } },
+    { t: "Charge (projektil basic)", fx: { file: "Charge.png", frames: 4, fps: 10 } },
+    { t: "TRAP SEKVENCIA (herná)", seq: "onre" },
+  ],
+};
+
+// herné časy beatov (server VAMP_TRAP_STRIKE_MS / VAMP_HEAL_BEAT_MS / TELEPORT_IN_MS)
+const GAME = { tpIn: 1170, strike: 900, healBeat: 810 };
+
+const GAP_MS = 500; // pauza medzi opakovaniami one-shot animácií
+let speed = 1;
+let epoch = performance.now(); // globálny reštart
+
+function frameCount(img, explicit) {
+  if (explicit) return explicit;
+  if (!img.naturalWidth) return 1;
+  return Math.max(1, Math.round(img.naturalWidth / img.naturalHeight));
+}
+function drawStrip(ctx, img, frames, idx, x, y, h, flip = false) {
+  if (!img.naturalWidth) return;
+  const fw = img.naturalWidth / frames, fh = img.naturalHeight;
+  const scale = h / fh, w = fw * scale;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  if (flip) { ctx.translate(x + w / 2, 0); ctx.scale(-1, 1); ctx.translate(-(x + w / 2), 0); }
+  ctx.drawImage(img, Math.round(idx) * fw, 0, fw, fh, x, y, w, h);
+  ctx.restore();
+}
+function stageBg(ctx, W, H) {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#23262e"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#3a3f4b"; ctx.beginPath(); ctx.moveTo(0, H - 18); ctx.lineTo(W, H - 18); ctx.stroke(); // zem
+  ctx.strokeStyle = "#2c313c"; ctx.beginPath(); ctx.moveTo(W - 60, H - 18); ctx.lineTo(W - 60, 30); ctx.stroke(); // "súper" línia
+  ctx.fillStyle = "#565f70"; ctx.fillText("cieľ", W - 74, 24);
+}
+
+function makeCard(dir, def, grid) {
+  const card = document.createElement("div");
+  card.className = "card" + (def.seq ? " seq" : "");
+  const W = 280, H = 190;
+  card.innerHTML = `<h3>${def.t}</h3><canvas class="stage" width="${W}" height="${H}"></canvas><div class="ctrls"></div>`;
+  grid.appendChild(card);
+  const cvs = $("canvas", card), ctx = cvs.getContext("2d"), ctrls = $(".ctrls", card);
+  let start = performance.now();
+  const addNum = (label, val, min, max, stepv, onch) => {
+    const l = document.createElement("label");
+    l.innerHTML = `${label} <input type="number" value="${val}" min="${min}" max="${max}" step="${stepv}">`;
+    const inp = $("input", l);
+    inp.addEventListener("input", () => onch(parseFloat(inp.value) || 0));
+    ctrls.appendChild(l);
+  };
+  const addBtn = (label, fn) => {
+    const b = document.createElement("button");
+    b.textContent = label; b.addEventListener("click", fn); ctrls.appendChild(b);
+  };
+  addBtn("↻", () => { start = performance.now(); });
+  card._restart = () => { start = performance.now(); };
+
+  if (def.seq) {
+    // zložená herná trap sekvencia: zjavenie (fade/scream) → Attack_1 + BC1 → [heal beaty A2/A3/A4 + BC]
+    const isC = def.seq === "countess";
+    const seq = [];
+    seq.push({ label: "zjavenie", ms: GAME.tpIn, anim: isC ? { file: "Idle.png", fps: 6 } : { file: "Scream.png", fps: 8, once: true }, fade: true });
+    seq.push({ label: "Attack_1", ms: GAME.strike, anim: { file: "Attack_1.png", fps: 10, once: true }, blood: isC ? CARDS.countess[3].blood : null });
+    if (isC) {
+      seq.push({ label: "Attack_2", ms: GAME.healBeat, anim: { file: "Attack_2.png", fps: 5, once: true }, blood: CARDS.countess[4].blood });
+      seq.push({ label: "Attack_3", ms: GAME.healBeat, anim: { file: "Attack_3.png", fps: 6, once: true }, blood: CARDS.countess[5].blood });
+      seq.push({ label: "Attack_4", ms: GAME.healBeat, anim: { file: "Attack_4.png", fps: 8, once: true }, blood: CARDS.countess[6].blood, heal: true });
+    }
+    const total = seq.reduce((a, s) => a + s.ms, 0) + 900;
+    card._draw = (now) => {
+      const t = ((now - Math.max(start, epoch)) * speed) % total;
+      stageBg(ctx, W, H);
+      let acc = 0, cur = seq[0], curT = 0;
+      for (const s of seq) { if (t < acc + s.ms) { cur = s; curT = t - acc; break; } acc += s.ms; cur = null; }
+      ctx.fillStyle = "#8b93a3"; ctx.fillText(cur ? cur.label : "…pauza", 8, 16);
+      if (!cur) return;
+      const img = load(dir, cur.anim.file);
+      const frames = frameCount(img);
+      const idx = cur.anim.once ? Math.min(frames - 1, Math.floor(curT / 1000 * cur.anim.fps))
+                                : Math.floor(curT / 1000 * cur.anim.fps) % frames;
+      ctx.globalAlpha = cur.fade ? Math.min(1, curT / (cur.ms * 0.6)) : 1;
+      drawStrip(ctx, img, frames, idx, 40, H - 18 - 150, 150);
+      ctx.globalAlpha = 1;
+      if (cur.blood && curT >= cur.blood.delay) {
+        const b = cur.blood;
+        const flight = Math.max(300, Math.min(550, cur.ms - b.delay - 60));
+        const bt = curT - b.delay;
+        if (bt < flight) {
+          const bimg = load(COUNTESS, "Blood_Charge_" + b.n + ".png");
+          const bidx = Math.floor(bt / 1000 * b.fps) % 4;
+          drawStrip(ctx, bimg, 4, bidx, 95 + (bt / flight) * b.dist, H - 18 - 75 + b.y - b.size / 2, b.size);
+        }
+      }
+      if (cur.heal && curT > cur.ms - 300) { ctx.fillStyle = "#66ff88"; ctx.font = "bold 14px system-ui"; ctx.fillText("+3 HP", 60, 40); ctx.font = "13px system-ui"; }
+    };
+    return;
+  }
+
+  if (def.fx) {
+    // samostatný FX strip (blood charge / projektil) — zväčšený, v slučke
+    const st = { fps: def.fx.fps };
+    addNum("fps", st.fps, 1, 30, 1, v => st.fps = v);
+    card._draw = (now) => {
+      const t = (now - Math.max(start, epoch)) * speed;
+      stageBg(ctx, W, H);
+      const img = load(dir, def.fx.file);
+      const idx = Math.floor(t / 1000 * st.fps) % def.fx.frames;
+      drawStrip(ctx, img, def.fx.frames, idx, W / 2 - 60, H / 2 - 60, 120);
+    };
+    return;
+  }
+
+  // bežná animácia (voliteľne s blood charge projektilom)
+  const st = { fps: def.anim.fps, blood: def.blood ? { ...def.blood } : null };
+  addNum("fps", st.fps, 1, 30, 1, v => st.fps = v);
+  if (st.blood) {
+    addNum("delay", st.blood.delay, 0, 2000, 10, v => st.blood.delay = v);
+    addNum("dist", st.blood.dist, 0, 400, 5, v => st.blood.dist = v);
+    addNum("výška", st.blood.y, -120, 120, 1, v => st.blood.y = v);
+    addNum("veľkosť", st.blood.size, 20, 240, 2, v => st.blood.size = v);
+  }
+  card._draw = (now) => {
+    const t = (now - Math.max(start, epoch)) * speed;
+    stageBg(ctx, W, H);
+    const img = load(dir, def.anim.file);
+    const frames = frameCount(img);
+    const animMs = frames / st.fps * 1000;
+    let idx;
+    if (def.anim.once) {
+      const cyc = t % (animMs + GAP_MS);
+      idx = Math.min(frames - 1, Math.floor(cyc / 1000 * st.fps));
+      if (cyc > animMs) idx = frames - 1;
+      // blood projektil v rámci cyklu
+      if (st.blood && cyc >= st.blood.delay) {
+        const b = st.blood;
+        const flight = Math.max(300, Math.min(550, animMs + GAP_MS - b.delay - 60));
+        const bt = cyc - b.delay;
+        if (bt < flight) {
+          const bimg = load(COUNTESS, "Blood_Charge_" + b.n + ".png");
+          const bidx = Math.floor(bt / 1000 * b.fps) % 4;
+          drawStrip(ctx, bimg, 4, bidx, 95 + (bt / flight) * b.dist, H - 18 - 75 + b.y - b.size / 2, b.size);
+        }
+      }
+    } else {
+      idx = Math.floor(t / 1000 * st.fps) % frames;
+    }
+    drawStrip(ctx, img, frames, idx, 40, H - 18 - 150, 150);
+  };
+}
+
+const cards = [];
+for (const def of CARDS.countess) { makeCard(COUNTESS, def, $("#grid-countess")); }
+for (const def of CARDS.onre)     { makeCard(ONRE, def, $("#grid-onre")); }
+document.querySelectorAll(".card").forEach(c => cards.push(c));
+
+$("#speed").addEventListener("input", (e) => { speed = parseFloat(e.target.value); $("#speedv").textContent = speed.toFixed(1) + "×"; });
+$("#restart").addEventListener("click", () => { epoch = performance.now(); cards.forEach(c => c._restart && c._restart()); });
+
+(function loop() {
+  const now = performance.now();
+  for (const c of cards) if (c._draw) c._draw(now);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
