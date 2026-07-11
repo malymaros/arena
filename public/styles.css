@@ -348,17 +348,6 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
 }
 #dash-picker.vamp-charge .arrow{ background: #7a4fd0; } /* šípky charge v rovnakej fialovej */
-.btn.act.special.hidden-question{
-  background: #2c2438;
-  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
-    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 14px rgba(177,122,255,.35);
-  animation: hidden-flicker 3.2s linear infinite;
-}
-.btn.act.special.hidden-question:not(:disabled):hover{
-  box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
-    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
-}
-
 /* výber smeru pre Move — popup nad tlačidlom v tvare kríža */
 .move-wrap{ position: relative; }
 .dir-picker{

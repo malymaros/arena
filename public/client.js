@@ -4379,7 +4379,7 @@ function syncDashBtn(char) {
   dashPicker?.classList.toggle("vamp-charge", side);
   const ico = dashBtn.querySelector(".pix-ico");
   const want = side ? "❔" : "🏃";
-  if (ico && ico.dataset.emoji !== want) { ico.dataset.emoji = want; ico.innerHTML = ""; pixelizeEmoji(ico); }
+  if (ico && ico.dataset.emoji !== want) { ico.dataset.emoji = want; ico.innerHTML = ""; delete ico.dataset.done; pixelizeEmoji(ico); }
   dashBtn.title = !side ? DASH_TITLE_DEFAULT
     : char === "countess"
       ? "Charge — rush in a direction; stops at the first foe and strikes (pure reposition if none, stays on the target's cell even when blocked). A landed hit heals you (blocked = nothing)"
@@ -5248,11 +5248,9 @@ socket.on("state", (s) => {
   // label special podľa mága — v turnaji po naplánovanom swape platí nový mág (ghostCharAt), nie ten na štarte kola
   const specChar = ghostCharAt();
   if (specChar && specialBtn) {
-    const sideSpecial = specChar === "countess" || specChar === "onre";
-    specialBtn.classList.toggle("hidden-question", sideSpecial);
+    specialBtn.classList.remove("hidden-question");
     const specIco = specialBtn.querySelector(".pix-ico:not(.mini)");
-    const specWant = sideSpecial ? "❔" : "✨";
-    if (specIco && specIco.dataset.emoji !== specWant) { specIco.dataset.emoji = specWant; specIco.innerHTML = ""; pixelizeEmoji(specIco); }
+    if (specIco && specIco.dataset.emoji !== "✨") { specIco.dataset.emoji = "✨"; specIco.innerHTML = ""; delete specIco.dataset.done; pixelizeEmoji(specIco); }
     const cost = specialBtn.querySelector(".cost");
     if (specChar === "medusa") {
       // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
