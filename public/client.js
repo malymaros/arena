@@ -3652,6 +3652,10 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "tile_consume" && Array.isArray(e.cell)) {
         spawnTileConsumeFx(e.cell);
       }
+      // Pútnik použil mirror → nedostal pasívnu manu; float, nech hráč vie prečo
+      if (e.kind === "wanderer_no_regen" && (e.target === "p1" || e.target === "p2")) {
+        spawnFloat(e.target, "🪞 MIRROR USED", "wander-nomana-float");
+      }
       // skamenený ťah — akcia sa nevykonala: prečiarkni práve zaznamenaný badge/beat + STONED float
       if (e.kind === "stoned" && (e.target === "p1" || e.target === "p2")) {
         const acted = lastActed[e.target];
@@ -4095,7 +4099,7 @@ const ABILITY_PREVIEW = {
   escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
   fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Boost range ±1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
-  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
+  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round he doesn't use mirror +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
   medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
   minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands, where you hunt with 2× dmg. Their steps weave a thread; stepping on it reveals your silhouette" },

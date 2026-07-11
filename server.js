@@ -50,7 +50,7 @@ const START_POS = { p1: { x: 0, y: 1 }, p2: { x: BOARD.w - 1, y: 1 } };
 const START_HP = 10;
 const START_MANA = 6; // vyšší štart = mind games od 1. kola (special hrozba vs golden shield counter)
 const MAX_MANA = 10;
-const WANDERER_MANA_REGEN = 2; // Pútnik (wanderer): pasívne +N many na konci každého kola, ak ešte žije a je aktívny
+const WANDERER_MANA_REGEN = 2; // Pútnik (wanderer): pasívne +N many na konci každého kola, ak ešte žije, je aktívny a NEpoužil mirror
 
 const BASIC_COST    = 1;
 const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: vedľa 3, ďalej 2, najďalej 1 (vlastné políčko basic nezasahuje)
@@ -2426,6 +2426,14 @@ function resolveTurn() {
     escUsedDefense[slot] = !!p.golden || !!p.goldenMirror ||
       (p.queue || []).some(a => a && (a.type === "shield" || a.type === "mirror"));
   }
+  // Pútnik (wanderer): ak v tomto kole použil mirror (obyčajný ALEBO golden), pasívna +many na konci kola NEpríde.
+  // Zachyť PRED spracovaním kola — golden flag aj fronta (golden predťah) sa počas kola menia/miznú (ako pri Escanorovi).
+  const wandererUsedMirror = {};
+  for (const slot of ["p1", "p2"]) {
+    const p = game.players[slot];
+    if (p.char !== "wanderer") continue;
+    wandererUsedMirror[slot] = !!p.goldenMirror || (p.queue || []).some(a => a && a.type === "mirror");
+  }
   // doom: zachyť na začiatku kola — true len v buffnutom (poslednom) kole, NIE v aktivačnom (vtedy sa nastaví až v gold fáze)
   const doomSlot = game.players.p1.lastStandDoom ? "p1" : game.players.p2.lastStandDoom ? "p2" : null;
 
@@ -2627,11 +2635,16 @@ function resolveTurn() {
       if (p.char === "werewolf") p.moon = moonLevelFor(p.hp);
     }
 
-    // Pútnik (wanderer): pasívne +WANDERER_MANA_REGEN many na konci kola — len ak ešte žije a je aktívny
-    // (rovnaká fáza ako Escanorova pýcha / vlkolakov mesiac). Čierna recharge animácia (dark:true).
+    // Pútnik (wanderer): pasívne +WANDERER_MANA_REGEN many na konci kola — len ak ešte žije, je aktívny
+    // a v tomto kole NEpoužil mirror (obyčajný ani golden). Čierna recharge animácia (dark:true).
     for (const slot of ["p1", "p2"]) {
       const p = game.players[slot];
       if (p.char !== "wanderer" || p.hp <= 0) continue;
+      if (wandererUsedMirror[slot]) {
+        // použil mirror → žiadna pasívna mana; oznám hráčovi dôvod (float „MIRROR USED")
+        pushStateFrame(tl, [{ kind: "wanderer_no_regen", target: slot }], SMALL_DELAY_MS);
+        continue;
+      }
       const gain = Math.min(MAX_MANA - p.mana, WANDERER_MANA_REGEN);
       if (gain > 0) {
         p.mana += gain;
