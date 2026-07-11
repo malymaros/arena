@@ -433,6 +433,13 @@ const CHAR_META = {
   countess:  { name: "Vampire", dir: "Countess_Vampire" },
   onre:      { name: "Onryō",   dir: "Onre", dirP2: "Onre" }
 };
+// side-postavy viazané na slot (zrkadlo serverového SIDE_CHARS); v turnaji sa dajú draftnúť, ale
+// swap DO/Z nich je zakázaný — v HUD hlavách to reprezentuje glitch (viď renderMageHeads)
+const SIDE_CHARS = { countess: "p1", onre: "p2" };
+function sideCharForSlot(slot) {
+  for (const k in SIDE_CHARS) if (SIDE_CHARS[k] === slot) return k;
+  return null;
+}
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
   const m = CHAR_META[char];
@@ -3943,6 +3950,7 @@ function updateCharSelectHp(s) {
       }
     }
   });
+  syncRosterGlitch(); // Your Team: rozbehni/zastav glitch mena side-postavy (Countess/Onre)
 }
 
 function isMageDead(key) {
@@ -4035,10 +4043,12 @@ function startCharSelectPreview() {
   document.getElementById("char-ability")?.classList.add("hidden");
   if (charPreviewRaf) cancelAnimationFrame(charPreviewRaf);
   charPreviewRaf = requestAnimationFrame(drawCharSelectFrame);
+  syncRosterGlitch(); // spusti glitch side-postavy — tu už je výber viditeľný (updateCharSelectHp beží kým je selEl ešte .hidden)
 }
 function stopCharSelectPreview() {
   if (charPreviewRaf) cancelAnimationFrame(charPreviewRaf);
   charPreviewRaf = 0;
+  syncRosterGlitch(); // zastav glitch mena side-postavy pri zatvorení výberu (a vráť originál)
 }
 
 selEl.addEventListener("click", (e) => {
@@ -4058,7 +4068,8 @@ selEl.addEventListener("click", (e) => {
 const teamConfirmBtn = document.getElementById("team-confirm");
 const teamWaitEl = document.getElementById("team-wait");
 function toggleTeamPick(key) {
-  if (key === "countess" || key === "onre") return; // side postavy nie sú v turnajovom poole (poistka k runeActive)
+  // side-postavu smie draftnúť len jej vlastná strana (p1 → countess, p2 → onre); druhej strany je zakázaná
+  if (SIDE_CHARS[key] && key !== sideCharForSlot(me)) return;
   const i = teamPick.indexOf(key);
   if (i >= 0) teamPick.splice(i, 1);
   else if (teamPick.length < TEAM_SIZE) teamPick.push(key);
@@ -4273,10 +4284,10 @@ const RUNE_RADIUS = 260; // px od ľavého horného rohu, odkiaľ sa runa začí
 let hiddenFound = false; // po prvom objavení (localStorage) ostáva runa trvalo slabo viditeľná
 try { hiddenFound = localStorage.getItem("arenaHiddenFound") === "1"; } catch {}
 function runeActive() {
-  // turnaj Hidden stránku nepustí vôbec: roster-mode (výber postavy z tímu) ani team-mode (draft) —
-  // Countess/Onre nie sú v turnajovom poole a draft by sa s nimi zasekol
-  return !selEl.classList.contains("hidden") && !selEl.classList.contains("roster-mode")
-    && !selEl.classList.contains("team-mode") && !hiddenMode;
+  // turnaj: v DRAFTE (team-mode) runu PUSTÍME — side-postavu (svojej strany) si tam draftneš cez rovnaký
+  // easter-egg ako v single/bo3 (ostáva „tajná"). Roster-mode (výber maga z už draftnutého tímu) ju nepustí:
+  // tam sa side-karta zobrazuje priamo v zlúčenom rade kariet, runa je zbytočná a kolidovala by s ním.
+  return !selEl.classList.contains("hidden") && !selEl.classList.contains("roster-mode") && !hiddenMode;
 }
 document.addEventListener("mousemove", (e) => {
   if (!hiddenRune) return;
@@ -4354,6 +4365,48 @@ function stopHiddenFx() {
   selEl.querySelectorAll('.char-cards[data-page="hidden"] .char-name').forEach(el => {
     if (el.dataset.baseName != null) el.textContent = el.dataset.baseName; // vráť originálne meno karty
   });
+}
+/* „Your Team" (roster-mode): karta side-postavy (Countess/Onre) glitchuje rovnako ako Hidden screen —
+   mutuje písmená mena z originálu na náhodné glitch znaky a občas glitchne aj štvorček (canvas).
+   V drafte cez runu to už rieši hiddenMutateTimer; tu je paralelný ticker pre roster-mode.
+   Kartu cieli podľa členstva v charSelectHp (vlastný tím) — nezávisle na off-roster/display triedach,
+   aby glitchol OBE postavy rovnako (p1 Vampire aj p2 Onryō). Zdieľa dataset.baseName s hidden fx. */
+let rosterGlitchTimer = 0;
+function rosterGlitchCards() {
+  // v „Your Team" (roster-mode) vezmi OBE hidden-char karty (Countess aj Onre) — len jedna je reálne
+  // viditeľná (druhú stranu skrýva data-side:none, nedraftnutú off-roster:none), tá neviditeľná sa mutuje
+  // neškodne mimo obraz. Žiadna závislosť na off-roster/charSelectHp/layout → glitchne vždy tú viditeľnú.
+  if (!selEl.classList.contains("roster-mode") || hiddenMode || selEl.classList.contains("hidden")) return [];
+  return [...selEl.querySelectorAll(".char-card.hidden-char")];
+}
+function syncRosterGlitch() {
+  const cards = rosterGlitchCards();
+  if (cards.length && !rosterGlitchTimer) {
+    rosterGlitchTimer = setInterval(() => {
+      const live = rosterGlitchCards();
+      if (!live.length) { clearInterval(rosterGlitchTimer); rosterGlitchTimer = 0; return; }
+      live.forEach(card => {
+        const el = card.querySelector(".char-name");
+        if (el) {
+          const base = el.dataset.baseName ?? (el.dataset.baseName = el.textContent);
+          let out = "";
+          for (const ch of base)
+            out += (ch !== " " && Math.random() < 0.14)
+              ? HIDDEN_GLITCH_CHARS[Math.floor(Math.random() * HIDDEN_GLITCH_CHARS.length)]
+              : ch;
+          el.textContent = out;
+        }
+        card.classList.toggle("glitch-flash", Math.random() < 0.16); // občasný glitch štvorčeka (canvas)
+      });
+    }, 130);
+  } else if (!cards.length && rosterGlitchTimer) {
+    clearInterval(rosterGlitchTimer); rosterGlitchTimer = 0;
+    selEl.querySelectorAll(".char-card.hidden-char").forEach(card => {
+      card.classList.remove("glitch-flash");
+      const el = card.querySelector(".char-name");
+      if (el && el.dataset.baseName != null) el.textContent = el.dataset.baseName; // vráť originálne meno
+    });
+  }
 }
 hiddenRune?.addEventListener("click", () => {
   if (!runeActive()) return;
@@ -4901,21 +4954,33 @@ function renderMageHeads() {
     const dead = state?.mageDead?.[slot] || [];
     const cur = state?.[slot]?.char || null;
     const mineSlot = slot === me;
+    // side-postava (Countess/Onre) v rostri tejto strany a či je práve nasadená — swap DO/Z nej je zakázaný,
+    // čo reprezentuje GLITCH: (a) je nasadená → celá zvyšná lavička glitchuje (nedá sa od nej odísť),
+    // (b) je na lavičke → jej hlava glitchuje (nedá sa k nej prísť). Neklikateľné, fialové, s glitch HP.
+    const sideChar = mageOrderFor(slot).find(c => SIDE_CHARS[c]) || null;
+    const curIsSide = !!sideChar && cur === sideChar;
     return mageOrderFor(slot).map(char => {
       const isDead = dead.includes(char);
       const isCurrent = cur === char;
+      // corrupt = táto hlava je „zamknutá" side-postavou (glitch); mŕtvy mág glitch nemá (má lebku)
+      const corrupt = !isDead && !!sideChar && (curIsSide ? !isCurrent : char === sideChar);
       const armed = mineSlot && myQueue.some(a => a.type === "swap" && a.to === char);
-      // Last Stand pakt: buffnutý hráč vo final kole nestrieda — jeho lavička nie je klikateľná
-      const clickable = mineSlot && !!cur && !isDead && !isCurrent && !uiLocked() && !state?.[slot]?.lastStandBuff;
+      // Last Stand pakt: buffnutý hráč vo final kole nestrieda — jeho lavička nie je klikateľná;
+      // glitchujúca (corrupt) hlava tiež nie je klikateľná (nedá sa swapnúť do/zo side-postavy)
+      const clickable = mineSlot && !!cur && !isDead && !isCurrent && !corrupt && !uiLocked() && !state?.[slot]?.lastStandBuff;
       let cls = "mhead";
       if (isDead) cls += " dead";
       if (isCurrent) cls += " current";
+      if (corrupt) cls += " corrupt";
       if (armed) cls += " armed";
       if (clickable) cls += " clickable";
       // HP/mana nad hlavou (mŕtvy mág ich nemá; súperova lavička je skrytá → prázdny riadok pre zarovnanie)
       const st = isDead ? null : headStats(slot, char, isCurrent);
+      // corrupt hlava: HP/mana prepísané glitch znakmi (ticker ich potom mutuje) — data-* drží ikonu
       const statsHtml = st
-        ? `<span class="mh-stats"><span class="mh-hp">${pixSvg("heart")}${st.hp ?? "?"}</span><span class="mh-mana">${pixSvg("drop")}${st.mana ?? "?"}</span></span>`
+        ? (corrupt
+            ? `<span class="mh-stats"><span class="mh-hp">${pixSvg("heart")}<span class="mh-glitch">##</span></span><span class="mh-mana">${pixSvg("drop")}<span class="mh-glitch">##</span></span></span>`
+            : `<span class="mh-stats"><span class="mh-hp">${pixSvg("heart")}${st.hp ?? "?"}</span><span class="mh-mana">${pixSvg("drop")}${st.mana ?? "?"}</span></span>`)
         : `<span class="mh-stats empty"></span>`;
       const face = isDead ? pixSvg("skull") : mageHeadHtml(char, "mh-canvas" + (usesAltColor(char, slot) ? " alt-color" : ""), slot);
       return `<span class="${cls}" data-slot="${slot}" data-char="${char}" title="${CHAR_META[char]?.name || char}">${statsHtml}<span class="mh-face">${face}</span></span>`;
@@ -4925,7 +4990,31 @@ function renderMageHeads() {
   crownsP2El.innerHTML = buildSide("p2");
   crownsP1El.classList.remove("hidden"); crownsP2El.classList.remove("hidden");
   crownsP1El.classList.add("mage-heads"); crownsP2El.classList.add("mage-heads");
+  syncMageGlitch(); // spusti/zastav glitch ticker podľa toho, či nejaká hlava je corrupt
   // hlavy (canvas.mage-head) animuje raf
+}
+// glitch ticker pre corrupt hlavy (zamknuté side-postavou): kým existuje .mhead.corrupt, mutuje ich
+// HP/mana text náhodnými znakmi a občas prebliká celé hlavy — v štýle Hidden stránky
+let mageGlitchTimer = 0;
+function syncMageGlitch() {
+  const any = document.querySelector(".series-crowns .mhead.corrupt");
+  if (any && !mageGlitchTimer) {
+    mageGlitchTimer = setInterval(() => {
+      const nodes = document.querySelectorAll(".series-crowns .mhead.corrupt .mh-glitch");
+      if (!nodes.length) { clearInterval(mageGlitchTimer); mageGlitchTimer = 0; return; }
+      nodes.forEach(el => {
+        let out = "";
+        for (let i = 0; i < 2; i++) out += HIDDEN_GLITCH_CHARS[Math.floor(Math.random() * HIDDEN_GLITCH_CHARS.length)];
+        el.textContent = out;
+      });
+      // občasný silnejší preblik celej hlavy (fialový glitch flash)
+      document.querySelectorAll(".series-crowns .mhead.corrupt").forEach(h => {
+        h.classList.toggle("flash", Math.random() < 0.22);
+      });
+    }, 120);
+  } else if (!any && mageGlitchTimer) {
+    clearInterval(mageGlitchTimer); mageGlitchTimer = 0;
+  }
 }
 
 // klik na hlavu (moja strana, živý ne-aktuálny mág) = toggle swap akcie vo fronte — presne ako démon button
@@ -4938,6 +5027,7 @@ function toggleSwap(char) {
   if (state?.[me]?.lastStandBuff) return;                    // Last Stand pakt: vo final kole sa nestrieda
   if ((state?.mageDead?.[me] || []).includes(char)) return; // mŕtveho maga nemožno nasadiť
   if (state?.[me]?.char === char) return;                    // aktuálneho maga nemožno vymeniť za seba
+  if (SIDE_CHARS[char] || SIDE_CHARS[state?.[me]?.char]) return; // side-postavu nemožno swapnúť ani odswapnúť (glitch)
   const idx = myQueue.findIndex(a => a.type === "swap" && a.to === char);
   if (idx >= 0) { myQueue.splice(idx, 1); }                  // opätovný klik = odober z fronty
   else {

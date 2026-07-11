@@ -76,8 +76,15 @@ function moonLevelFor(hp) {
   return 3;
 }
 // Countess Vampire / Onre: postavy viazané na SLOT (countess len p1/biela, onre len p2/čierna) —
-// nie sú v CHARS (turnajový pool), choose_character ich pustí len správnej strane a len mimo turnaja
+// nie sú v CHARS (turnajový pool). Mimo turnaja ich choose_character pustí správnej strane;
+// V TURNAJI si ich hráč môže draftnúť ako jedného z 3 magov (len svoju stranu) — swap DO/Z nich je
+// však zakázaný (odlišná sémantika akcií: diagonálny basic, charge, pasca), viď validQueue/doSwap.
 const SIDE_CHARS = { countess: "p1", onre: "p2" };
+// side-postava priradená slotu (inverzia SIDE_CHARS) — p1 → countess, p2 → onre; inak null
+function sideCharForSlot(slot) {
+  for (const k in SIDE_CHARS) if (SIDE_CHARS[k] === slot) return k;
+  return null;
+}
 // ich basic attack strieľa DIAGONÁLNE (4 diagonálne smery namiesto ortogonálnych; falloff nezmenený —
 // na 3-riadkovej ploche má diagonála max 2 kroky, takže dmg je vždy 3 alebo 2)
 const DIAG_DIRS = { up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
@@ -778,8 +785,12 @@ function validQueue(queue, slot) {
     if (game.players[slot]?.lastStandBuff) return false;
     const person = game.seats[slot];
     const startChar = game.players[slot]?.char; // aktuálny mág na začiatku kola
+    // Side-postavy (Countess/Onre) sa nedajú swapnúť ANI odsvapnúť — majú odlišnú sémantiku akcií
+    // (diagonálny basic, charge namiesto dashu, pasca), takže mid-round výmena je nekoherentná
+    if (SIDE_CHARS[startChar]) return false;                        // z nej sa nedá odísť
     const seen = new Set();
     for (const a of swaps) {
+      if (SIDE_CHARS[a.to]) return false;                          // k nej sa nedá prísť
       if (!rosterFor(slot).includes(a.to)) return false;           // mág mimo draftnutého tímu
       if (a.to === startChar) return false;                        // návrat na východiskového maga nie je dovolený
       if ((game.mageHp[person]?.[a.to] ?? 0) <= 0) return false;   // mŕtveho maga nemožno nasadiť
@@ -2045,6 +2056,8 @@ function doSwap(slot, to, tl) {
   const person = game.seats[slot];
   const from = me.char;
   if (!game.mageHp || !rosterFor(slot).includes(to) || to === from) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
+  // poistka k validQueue: side-postavu nemožno swapnúť ani odswapnúť (odlišná sémantika akcií)
+  if (SIDE_CHARS[from] || SIDE_CHARS[to]) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
   if ((game.mageHp[person]?.[to] ?? 0) <= 0) { pushInvalid(tl, slot, SMALL_DELAY_MS); return; }
   // labyrint mohol padnúť v tomto kole PO naplánovaní swapu (Minotaurov special skôr v poradí) —
   // počas kliatby je výmena zakázaná pre obe strany, naplánovaný swap prepadne ako invalid
@@ -2982,7 +2995,11 @@ io.on("connection", (socket) => {
     if (!Array.isArray(keys) || keys.length !== TEAM_SIZE) return;
     const team = keys.map(String);
     if (new Set(team).size !== TEAM_SIZE) return;    // bez duplicít v tíme
-    if (!team.every(k => CHARS.includes(k))) return; // len známe postavy
+    // len známe postavy z poolu + PRÍPADNE vlastná side-postava (p1 → countess, p2 → onre); tímom teda
+    // môže prejsť nanajvýš 1 side-postava a len tá viazaná na môj slot (druhej strany je odmietnutá)
+    const slot = slotForPerson(person);
+    const mySide = sideCharForSlot(slot);
+    if (!team.every(k => CHARS.includes(k) || k === mySide)) return;
     game.roster[person] = team;
     if (game.roster.A && game.roster.B) finishTeamSelect();
     else emitStateMasked(); // súper uvidí rosterReady („opponent is ready"), nie samotný tím
@@ -2992,9 +3009,9 @@ io.on("connection", (socket) => {
     if (!person) return;
     if (game.phase !== "playing") return;       // postava sa volí len v hernej fáze (pred kolami)
     const slot = slotForPerson(person);
-    // Countess/Onre: viazané na STRANU (countess len p1/biela, onre len p2/čierna) a LEN mimo turnaja
-    // (nie sú v CHARS = turnajovom poole; mageHp existuje len v turnaji)
-    const sideOk = SIDE_CHARS[key] === slot && !game.mageHp;
+    // Countess/Onre: viazané na STRANU (countess len p1/biela, onre len p2/čierna). Mimo turnaja hocikedy
+    // pre svoju stranu; v turnaji len ak si ich hráč draftol do svojho rosteru (mageHp existuje len v turnaji)
+    const sideOk = SIDE_CHARS[key] === slot && (!game.mageHp || rosterFor(slot).includes(key));
     if (!CHARS.includes(key) && !sideOk) return;
     const me = game.players[slot];
     if (me.char) return;                          // postava sa pre danú hru volí raz
