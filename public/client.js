@@ -4077,7 +4077,7 @@ const ABILITY_PREVIEW = {
   // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview;
   // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
   escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
-  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Range: whole row<br>Boost range +-1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles` },
+  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Boost range ±1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
