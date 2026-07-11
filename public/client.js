@@ -1548,6 +1548,14 @@ function _deathFogPuff(ms, dir) {
 /* ---------- Last Stand — napojenie na server timeline ---------- */
 // Stredový démon (hmlový nábeh/zmiznutie) ako flourish summon/banish; HP/manu riadi server cez frames.
 // Trvalý golden stav (žiara + aura + démon za postavou) riadi raf podľa state[slot].lastStandBuff.
+// WAAPI hygiena stredových overlayov (deathCenter/hopeCenter): fill-forwards animácia po dobehnutí
+// NESMIE ostať na elemente visieť — neskorší cancel (hideDeathCenter na konci hry / ďalšia choreografia)
+// by mohol odkryť staršiu fill animáciu držiacu opacity 1 a démon by sa VRÁTIL na plochu (reprodukované:
+// banish smrť po démon útoku — na obrazovke porazeného ostal démon visieť v strede cez GAME OVER).
+// Preto sa koncový stav po dobehnutí zapíše do inline štýlu a animácia sa hneď zruší.
+function pinOnFinish(el, anim, styles) {
+  anim.onfinish = () => { Object.assign(el.style, styles); anim.cancel(); };
+}
 let _lsRealActive = false; // beží reálny buffnutý stav (na upratanie po smrti/výhre)
 let _lsAuraAt = 0;         // throttle recharge aury v rafe
 let _lsBanishing = false;  // počas banishu nepripínaj démona za postavu (ide do stredu)
@@ -1560,10 +1568,11 @@ function lsCenterAppear() {
   deathCenter.style.left = cx + "px"; deathCenter.style.top = cy + "px";
   deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
   _deathFogPuff(1400, "in");
-  deathCenter.animate([
+  const a = deathCenter.animate([
     { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
     { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
   ], { duration: 700, easing: "ease-out", fill: "forwards" });
+  pinOnFinish(deathCenter, a, { opacity: "1", filter: "blur(0px)", transform: "translate(-50%,-50%) scale(1)" });
 }
 function lsCenterDisappear() {
   _deathFogPuff(700, "out");
@@ -1571,7 +1580,7 @@ function lsCenterDisappear() {
     { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
     { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
   ], { duration: 700, easing: "ease-in", fill: "forwards" });
-  a.onfinish = () => { deathCenter.style.opacity = "0"; };
+  pinOnFinish(deathCenter, a, { opacity: "0" });
 }
 
 // Démon útok — veľký démon v strede (100 % väčší než summon = scale 2); zvyšok kreslí raf do deathCenter
@@ -1581,10 +1590,11 @@ function demonCenterAppear() {
   deathCenter.style.left = cx + "px"; deathCenter.style.top = cy + "px";
   deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
   _deathFogPuff(1000, "in");
-  deathCenter.animate([
+  const a = deathCenter.animate([
     { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(1.1)" },
     { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(2)" },
   ], { duration: 700, easing: "ease-out", fill: "forwards" });
+  pinOnFinish(deathCenter, a, { opacity: "1", filter: "blur(0px)", transform: "translate(-50%,-50%) scale(2)" });
 }
 function demonCenterDisappear() {
   _deathFogPuff(700, "out");
@@ -1592,7 +1602,7 @@ function demonCenterDisappear() {
     { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(2)" },
     { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(1.4)" },
   ], { duration: 700, easing: "ease-in", fill: "forwards" });
-  a.onfinish = () => { deathCenter.style.opacity = "0"; };
+  pinOnFinish(deathCenter, a, { opacity: "0" });
 }
 
 // Last Hope — červená „hope" postava v strede (analógia k lsCenterAppear, len červená hmla a hope sprite)
@@ -1613,10 +1623,11 @@ function hopeCenterAppear() {
   hopeCenter.style.left = cx + "px"; hopeCenter.style.top = cy + "px";
   hopeFog.style.left = cx + "px"; hopeFog.style.top = cy + "px";
   _hopeFogPuff(1400, "in");
-  hopeCenter.animate([
+  const a = hopeCenter.animate([
     { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
     { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
   ], { duration: 700, easing: "ease-out", fill: "forwards" });
+  pinOnFinish(hopeCenter, a, { opacity: "1", filter: "blur(0px)", transform: "translate(-50%,-50%) scale(1)" });
 }
 function hopeCenterDisappear() {
   _hopeFogPuff(700, "out");
@@ -1624,7 +1635,7 @@ function hopeCenterDisappear() {
     { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
     { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
   ], { duration: 700, easing: "ease-in", fill: "forwards" });
-  a.onfinish = () => { hopeCenter.style.opacity = "0"; };
+  pinOnFinish(hopeCenter, a, { opacity: "0" });
 }
 function hideHopeCenter() {
   hopeCenter.getAnimations().forEach(a => a.cancel());
