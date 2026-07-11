@@ -357,7 +357,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
   animation: hidden-question-glitch 1.35s steps(2, end) infinite;
 }
-.btn.act.dash.vamp-charge:not(:disabled):hover{
+.btn.act.dash.vamp-charge:not(:disabled):not(.locked-ui):not(.locked-perm):not(.locked-golden):hover{
   box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
 }
@@ -565,6 +565,22 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   position: relative;
   filter: grayscale(.75) brightness(.55);
   cursor: not-allowed;
+}
+.btn.act.dash.vamp-charge.locked-ui,
+.btn.act.dash.vamp-charge.locked-perm,
+.btn.act.dash.vamp-charge.locked-golden,
+.btn.act.dash.vamp-charge:disabled{
+  animation: none;
+  box-shadow: 0 0 0 3px #342c40, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.03),
+    inset 0 -4px 0 rgba(0,0,0,.55);
+}
+.btn.act.dash.vamp-charge.locked-ui .pix-ico.charge-mark,
+.btn.act.dash.vamp-charge.locked-perm .pix-ico.charge-mark,
+.btn.act.dash.vamp-charge.locked-golden .pix-ico.charge-mark,
+.btn.act.dash.vamp-charge:disabled .pix-ico.charge-mark{
+  animation: none;
+  color: #9a8aac;
+  text-shadow: 2px 2px 0 #000;
 }
 .btn.locked-ui::after, .btn.locked-perm::after, .btn.locked-golden::after{
   content: "🔒";
@@ -2447,10 +2463,12 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   text-shadow: 2px 2px 0 #000, 0 0 10px rgba(255, 46, 109, .8);
   animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9;
 }
+/* úbytok many na SÚPEROVI — červený (strata), nech sa nepletie s modrým „+N MANA" prírastkom Onryō;
+   prízračne modrý halo drží Onryō tému */
 .drain-float{
   position: absolute; transform: translateX(-50%);
-  color: #b17aff; font-weight: 900; font-size: 15px; letter-spacing: 1px;
-  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(122, 79, 208, .9);
+  color: #ff5a5a; font-weight: 900; font-size: 18px; letter-spacing: 0;
+  text-shadow: 2px 2px 0 #000, 0 0 12px rgba(87, 169, 255, .75);
   animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9;
 }
   

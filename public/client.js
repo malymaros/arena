@@ -1132,7 +1132,8 @@ function spawnCellFloat(cell, text, className) {
 
 // zánik klona — poriadny oblak dymu (kage bunshin puff): niekoľko dymových gúľ vyletí do strán a nahor,
 // stredové jadro sa roztiahne. Čisto kozmetické, self-remove; puffne raz (späť už nepreblikne — cloneDead).
-function spawnClonePuff(cell) {
+// blood=true prefarbí dym do krvavočervenej — teleport pasce Vampire/Onryō (sýtejšia než ružový trap_break)
+function spawnClonePuff(cell, blood = false) {
   if (!Array.isArray(cell)) return;
   const { left, top } = cellToPx(cell[0], cell[1]);
   const cx = left + TILE_W / 2, cy = top + TILE_H * 0.55;
@@ -1146,7 +1147,9 @@ function spawnClonePuff(cell) {
     el.style.borderRadius = "50%";
     el.style.pointerEvents = "none";
     el.style.zIndex = String(z);
-    el.style.background = "radial-gradient(circle, rgba(240,240,245,.95), rgba(190,192,200,.6) 55%, rgba(160,162,172,0) 72%)";
+    el.style.background = blood
+      ? "radial-gradient(circle, rgba(255,58,72,.95), rgba(150,12,28,.6) 55%, rgba(80,6,16,0) 72%)"
+      : "radial-gradient(circle, rgba(240,240,245,.95), rgba(190,192,200,.6) 55%, rgba(160,162,172,0) 72%)";
     actorsEl.appendChild(el);
     return el;
   };
@@ -2520,7 +2523,8 @@ function cellsForSpecialPreview(meState, dir){
   } else if (char === "soldier" || char === "countess" || char === "onre"){
     // cieľová bunka je súčasť AKCIE (cell), nie odvoditeľná z pozície — hover fronty ju rieši
     // attachQueueHover, prehrávanie číta sp.cells zo servera, char-select ABILITY_PREVIEW.target
-    // (Countess/Onre: pasca — cast beaty navyše cieľovú bunku zámerne NEzvýrazňujú, pasca je tajná)
+    // (Countess/Onre: pasca — cast bliká CELOU plochou ako Minotaurov, server posiela plné cells;
+    // cieľová bunka samotná sa nikdy nezvýrazní, pasca je tajná)
     return cells;
   } else if (char === "werewolf"){
     // dráha charge: z pozície zvoleným z 8 smerov po PRVÚ figúru súpera (aj jeho klon) alebo okraj —
@@ -3492,9 +3496,10 @@ function schedulePlayTimeline(timeline) {
         spawnTrapBreak(e.cell);
       }
       // teleport pasce: caster zmizne na svojej bunke (OUT — pozícia sa mení až IN frame-om)…
+      // oblak je krvavočervený (blood=true) — téma Vampire/Onryō, nie Narutov biely dym
       if (e.kind === "trap_tp_out" && (e.from === "p1" || e.from === "p2")) {
         const p = state?.[e.from];
-        if (p && p.x != null) spawnClonePuff([p.x, p.y]);
+        if (p && p.x != null) spawnClonePuff([p.x, p.y], true);
         fadeActor(e.from, 1, 0, frameHold);
       }
       // …a objaví sa na bunke pasce (IN) — pozíciu snapni (teleport nesmie kĺzať cez board);
@@ -3502,7 +3507,7 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "trap_tp_in" && (e.from === "p1" || e.from === "p2")) {
         positionActors(state, true);
         const p = state?.[e.from];
-        if (p && p.x != null) spawnClonePuff([p.x, p.y]);
+        if (p && p.x != null) spawnClonePuff([p.x, p.y], true);
         fadeActor(e.from, 0, 1, frameHold);
         // zjavenie bez behania: Onre s výkrikom (Scream), Countess v idle — zruš auto-run z posunu pozície
         if (state?.[e.from]?.char === "onre") setAnim(e.from, "scream", frameHold);
@@ -3520,10 +3525,13 @@ function schedulePlayTimeline(timeline) {
           setTimeout(() => bar.classList.remove("low-warn"), 1000);
         }
       }
-      // Onre: drain many — súperovi červený úbytok, Onremu modrý prírastok (HP/mana bary zo snapshotov)
+      // Onre: drain many — súperovi ČERVENÝ „−N MANA" (strata), Onremu modrý „+N MANA" (prírastok);
+      // rovnaké znenie ako gain float, nech je z textu aj farby jasné, komu efekt patrí. Prírastok je
+      // oneskorený — po charge stoja obaja na TEJ ISTEJ bunke a floaty by sa prekryli; takto sa číta
+      // sekvencia „súper stráca → Onryō získava"
       if (e.kind === "mana_drain" && (e.target === "p1" || e.target === "p2")) {
-        spawnFloat(e.target, `-${e.drained ?? 0} MANA`, "drain-float");
-        if (e.from && (e.gained ?? 0) > 0) spawnManaFloat(e.from, e.gained);
+        spawnFloat(e.target, `−${e.drained ?? 0} MANA`, "drain-float");
+        if (e.from && (e.gained ?? 0) > 0) setTimeout(() => spawnManaFloat(e.from, e.gained), 400);
       }
       // Vojak: počas mierenia (aj lúča) je otočený k ZVOLENEJ bunke, nie na súpera
       if ((e.kind === "special" || e.kind === "soldier_beam") && (e.from === "p1" || e.from === "p2") && state?.[e.from]?.char === "soldier") {
@@ -4082,8 +4090,9 @@ const ABILITY_PREVIEW = {
   // mesiaca cykluje pod mini-doskou (moonCycle — ako Escanorov pride náhľad), preto žiadny effect/stats riadok
   werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
   // Countess/Onre: pasca — náhľad ukazuje príkladovú cieľovú bunku (target) ako Vojak
-  countess:  { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
-  onre:      { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
+  // bonus ikona (heal/drain) sa ukazuje v stats riadku pri dmg (3☠️❤️ / 3☠️💧), nie v texte popisu
+  countess:  { caster: { x: 0, y: 1 }, dmg: 3, bonus: "❤️", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
+  onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -4139,7 +4148,7 @@ function renderAbilityPreview(char) {
   hydratePix(caTextEl); // prípadné [data-emoji] ikony
   const stats = document.getElementById("ca-stats");
   stats.innerHTML = def.dmg != null
-    ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span></span>`
+    ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span>${def.bonus ? `<span class="pix-ico" data-emoji="${def.bonus}"></span>` : ""}</span>` // Countess/Onre: bonus ikona (heal ❤️ / drain 💧) hneď za lebkou
     : def.effect
       ? `<span class="ca-dmg"><span class="ca-num">${def.effect.num ?? ""}</span><span class="pix-ico" data-emoji="${def.effect.emoji ?? "✨"}"></span></span>` // bez dmg — ikona efektu (kameň/labyrint)
       : ""; // ani dmg, ani effect (vlkolak — dmg cykluje pod mini-doskou) → žiadny stats riadok
@@ -4377,7 +4386,7 @@ function syncDashBtn(char) {
     ico.textContent = "???";
     if (cost) {
       const bonus = char === "countess" ? miniPix("❤️") : miniPix("💧");
-      cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")} 4${bonus}`;
+      cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}${bonus}`;
       hydratePix(cost);
     }
   } else if (ico) {
@@ -5304,7 +5313,8 @@ socket.on("state", (s) => {
       // Vampire/Onryō: pasca — teleport + bezplatný úder pri súperovom vstupe/prechode
       const bonus = specChar === "countess" ? "heals you" : "drains the foe's mana into yours";
       specialBtn.title = `Special (−5 mana, 3 dmg) — set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit ${bonus}. Only one trap — recasting replaces it`;
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 3${miniPix("☠️")}`; hydratePix(cost); }
+      const bonusIcon = specChar === "countess" ? miniPix("❤️") : miniPix("💧");
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 3${miniPix("☠️")}${bonusIcon}`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {

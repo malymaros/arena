@@ -1225,7 +1225,7 @@ function vampBonus(slot, tl, amount, hpSource = amount) {
 }
 
 // Melee Vampire/Onryō: úder LEN na vlastnej bunke (bez smeru) — VAMP_MELEE_DMG, bez bonusu.
-// Vampire = jednotný A1 úder; Onryō = pôvodná dramaturgia bežného melee (3 beaty).
+// Vampire opakuje A1 v troch beat-och ako Onryō melee; dmg padá až po celej choreografii.
 function doVampMelee(slot, tl) {
   const me  = game.players[slot];
   const opS = other(slot);
@@ -1237,7 +1237,9 @@ function doVampMelee(slot, tl) {
   const playerHere = !cloneHere && !!(op && op.x === me.x && op.y === me.y);
   if (playerHere) revealLabyrinths(tl);
   if (me.char === "countess") {
-    pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y], anim: "va1" }], VAMP_TRAP_STRIKE_MS);
+    for (let r = 0; r < MELEE_REPEAT; r++) {
+      pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y], anim: "va1" }], VAMP_TRAP_STRIKE_MS);
+    }
   } else {
     for (let r = 0; r < MELEE_REPEAT; r++) {
       pushStateFrame(tl, [{ kind: "melee", from: slot, cells: [[me.x, me.y]] }], SPECIAL_BEAT_MS);
@@ -1902,14 +1904,18 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   if (SIDE_CHARS[actor.char]) {
     if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !inBounds(cell.x, cell.y)) { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
-    // cast BEZ zvýraznených buniek — blikajúca cieľová bunka by súperovi prezradila polohu pasce.
+    // cast bliká CELOU plochou (ako Minotaurov special) — pasca môže byť hocikde, plný blik jej polohu
+    // neprezradí (blikajúca len cieľová bunka by áno).
     // Countess: JEDEN dlhý frame — A5 (celá útočná sekvencia) sa hrá RAZ od frame 0; beaty by ju
     // reštartovali. Onre: pôvodné beaty (Scream loop reštart nevadí).
+    const castCells = [];
+    for (let y = 0; y < game.board.h; y++)
+      for (let x = 0; x < game.board.w; x++) castCells.push([x, y]);
     if (actor.char === "countess") {
-      pushStateFrame(tl, [{ kind: "special", from: slot, cells: [] }], VAMP_CAST_MS);
+      pushStateFrame(tl, [{ kind: "special", from: slot, cells: castCells }], VAMP_CAST_MS);
     } else {
       for (let r = 0; r < SPECIAL_REPEAT; r++) {
-        pushStateFrame(tl, [{ kind: "special", from: slot, cells: [] }], SPECIAL_BEAT_MS);
+        pushStateFrame(tl, [{ kind: "special", from: slot, cells: castCells }], SPECIAL_BEAT_MS);
       }
     }
     actor.trap = { x: cell.x, y: cell.y };

@@ -1704,6 +1704,7 @@ async function main() {
   const tv3bHit = sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 8);
   const tv3Heal = fxOf2(tl, "heal").filter(e => e.target === "p1");
   check(tv3bHit.length === 1, "TV3: melee dáva 8 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(fxOf2(tl, "vamp_strike").length === 3, "TV3: vampire melee opakuje A1 animáciu v 3 beatoch");
   check(tv3Heal.length === 0, "TV3: vampire melee už nelieči", `heal=${JSON.stringify(tv3Heal)}`);
   check(tl[tl.length - 1].p1.hp === 6, "TV3: vampire po melee ostáva na 6 HP", `hp=${tl[tl.length - 1].p1.hp}`);
   invariantCheck(tl, "TV3b");
