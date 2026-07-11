@@ -2502,7 +2502,11 @@ function cellsForSpecialPreview(meState, dir){
       for (let cx = x + sgn; cx >= 0 && cx < board.w; cx += sgn) cells.push([cx, cy]);
     }
   } else if (char === "fire"){
-    for (let cx=0; cx<board.w; cx++) cells.push([cx, y]);
+    // celý riadok; ak (ghost) pozícia stojí na Damage dlaždici, rozšír o riadky ±1 (zrkadlí fireOnDmgTile na serveri)
+    const onDmg = (state?.tiles || []).some(t => t.type === "dmg" && t.x === x && t.y === y);
+    const y0 = onDmg ? Math.max(0, y - 1) : y;
+    const y1 = onDmg ? Math.min(board.h - 1, y + 1) : y;
+    for (let cy=y0; cy<=y1; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
   } else if (char === "lightning"){
     // všetky políčka opačnej "šachovej" farby než na ktorej stojí
     const par = (x + y) % 2;
@@ -3632,10 +3636,6 @@ function schedulePlayTimeline(timeline) {
         cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
         spawnChargeAura(e.from, false, false, "clone", dark);
       }
-      // Fire Wizard imunný voči dmg dlaždici — IMMUNE float namiesto zásahu
-      if (e.kind === "immune" && (e.target === "p1" || e.target === "p2")) {
-        spawnFloat(e.target, "IMMUNE", "immune-float");
-      }
       // skamenený ťah — akcia sa nevykonala: prečiarkni práve zaznamenaný badge/beat + STONED float
       if (e.kind === "stoned" && (e.target === "p1" || e.target === "p2")) {
         const acted = lastActed[e.target];
@@ -3832,7 +3832,7 @@ function schedulePlayTimeline(timeline) {
         else spawnFloat(e.target, "🛡️ BLOCKED", bcls);
       }
       if (e.kind === "heal" && (e.target === "p1" || e.target === "p2")) {
-        // Lightning na heal dlaždici (full-heal pasívka) — „SUPER HEAL" ako Fire Wizardov IMMUNE
+        // Lightning na heal dlaždici (full-heal pasívka) — „SUPER HEAL" float
         if (e.super) spawnFloat(e.target, "SUPER HEAL", "superheal-float");
         else spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
       }
@@ -4077,7 +4077,7 @@ const ABILITY_PREVIEW = {
   // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview;
   // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
   escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
-  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Immune to <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
+  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Range: whole row<br>Boost range +-1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles` },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
   // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava

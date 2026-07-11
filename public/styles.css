@@ -1858,7 +1858,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 
   /* štítové a heal bubliny */
   .heal-float{ color: #5eff8a; }
-  .shield-float, .block-float, .mirror-float, .heal-float, .immune-float, .superheal-float{
+  .shield-float, .block-float, .mirror-float, .heal-float, .superheal-float{
     position: absolute;
     z-index: 5;
     font-weight: 900;
@@ -1868,8 +1868,6 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     white-space: nowrap;
     animation: floatUp .9s ease-out forwards;
   }
-  /* Fire Wizard imunný voči dmg dlaždici — „IMMUNE" (štítovo svetlomodrá) */
-  .immune-float { color: #9fe8ff; text-shadow: 0 0 6px rgba(90,180,255,.9), 0 2px 0 rgba(0,0,0,.5); }
   /* Lightning full-heal na heal dlaždici — „SUPER HEAL" (sýtejšia zelená s glowom, väčší než bežný heal) */
   .superheal-float { color: #7dffa8; font-size: 22px; text-shadow: 0 0 8px rgba(94,255,138,.95), 0 2px 0 rgba(0,0,0,.5); }
   .shield-float { color: #4dd0e1; }

@@ -565,6 +565,12 @@ function medusaCells(me, dir) {
   }
   return cells;
 }
+// Fire Wizard stojí na Damage dlaždici? Vtedy sa jeho special rozšíri o riadky ±1
+// (dlaždice sú trvalé a vznikli v predošlých kolách, takže existujú v čase resolveTurn).
+function fireOnDmgTile(me) {
+  return !!me && me.char === "fire" &&
+    game.tiles.some(t => t.type === "dmg" && t.x === me.x && t.y === me.y);
+}
 function specialDamageAndHit(players, slot) {
   const me   = players[slot];
   const foeS = slot === "p1" ? "p2" : "p1";
@@ -572,8 +578,9 @@ function specialDamageAndHit(players, slot) {
   if (!me || !foe) return { dmg:0, hit:null };
 
   switch (me.char) {
-    case "fire":      // celá lajna (riadok)
-      return me.y === foe.y ? { dmg:5, hit:foeS } : { dmg:0, hit:null };
+    case "fire":      // celý riadok; na Damage dlaždici sa rozšíri o riadky ±1 (zo stredného = celá doska)
+      { const hitZone = fireOnDmgTile(me) ? Math.abs(me.y - foe.y) <= 1 : me.y === foe.y;
+        return hitZone ? { dmg:5, hit:foeS } : { dmg:0, hit:null }; }
     case "lightning": // všetky políčka opačnej "šachovej" farby než na ktorej stojí
       return ((me.x + me.y) % 2) !== ((foe.x + foe.y) % 2) ? { dmg:3, hit:foeS } : { dmg:0, hit:null };
     case "wanderer":  // len diagonála 1
@@ -586,7 +593,7 @@ function specialDamageAndHit(players, slot) {
 // musí sedieť so specialDamageAndHit aj s cellsForSpecialPreview v client.js)
 function specialZoneHas(me, x, y) {
   switch (me.char) {
-    case "fire":      return y === me.y;
+    case "fire":      return fireOnDmgTile(me) ? Math.abs(me.y - y) <= 1 : y === me.y;
     case "lightning": return ((me.x + me.y) % 2) !== ((x + y) % 2);
     case "wanderer":  return Math.abs(me.x - x) === 1 && Math.abs(me.y - y) === 1;
     default:          return false;
@@ -2136,14 +2143,9 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     let dmg = 0, tileType = null;
     if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
     else if (game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) {
-      if (p.char === "fire") {
-        // Fire Wizard je imunný voči Damage dlaždiciam — ohnivé políčko mu nedá dmg (IK ho stále zabije).
-        // Ukáž rozsvietené políčko + IMMUNE, ale žiadny zásah.
-        pushStateFrame(tl, [{ kind: "tile_proc", tile: "dmg", cell: [p.x, p.y] }], 600);
-        pushStateFrame(tl, [{ kind: "immune", target: slot, cell: [p.x, p.y] }], SMALL_DELAY_MS);
-      } else {
-        dmg = 1; tileType = "dmg";
-      }
+      // Fire Wizard už NIE je imunný voči Damage dlaždiciam — dostane bežný 1 dmg;
+      // výmenou mu státie na ohnivom políčku rozšíri special o riadky ±1 (viď fireOnDmgTile).
+      dmg = 1; tileType = "dmg";
     }
     if (dmg > 0) {
       const d = recvDmg(slot, dmg);
