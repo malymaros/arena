@@ -343,6 +343,20 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 14px rgba(177,122,255,.35);
   animation: hidden-flicker 3.2s linear infinite;
 }
+.btn.act.dash.vamp-charge .pix-ico.charge-mark{
+  width: 44px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 900;
+  color: #d8c2ff;
+  letter-spacing: 0;
+  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
+  animation: hidden-question-glitch 1.35s steps(2, end) infinite;
+}
 .btn.act.dash.vamp-charge:not(:disabled):hover{
   box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
@@ -615,11 +629,15 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .q-badge.hidden-question{
   background: #2c2438;
   color: #d8c2ff;
-  font-size: 24px;
+  font-size: 17px;
   font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  letter-spacing: 0;
   text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
   box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(154,111,240,.8), 0 0 14px rgba(177,122,255,.45);
-  animation: hidden-flicker 3.2s linear infinite;
+  animation: hidden-flicker 3.2s linear infinite, hidden-question-glitch 1.35s steps(2, end) infinite;
 }
 .q-badge.stoned  { background: #4a4d55; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(190,195,205,.4); filter: grayscale(.3); } /* skamenený pass ťah */
 /* súperov DETERMINISTICKY prenesený stun — nie skrytý „?", ale plný kamenný beat (kaster vidí dokedy súper stojí) */
@@ -1009,6 +1027,24 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 @keyframes hidden-flicker {
   0%, 91%, 95%, 100% { opacity: 1; }
   93%, 97%           { opacity: .35; }
+}
+@keyframes hidden-question-glitch {
+  0%, 100% {
+    color: #d8c2ff;
+    text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
+  }
+  22% {
+    color: #7afff2;
+    text-shadow: -2px 1px 0 #000, 2px 0 0 rgba(255,88,216,.75), 0 0 12px rgba(122,255,242,.75);
+  }
+  41% {
+    color: #ff5bd6;
+    text-shadow: 2px -1px 0 #000, -2px 0 0 rgba(122,255,242,.7), 0 0 12px rgba(255,91,214,.75);
+  }
+  63% {
+    color: #fff76a;
+    text-shadow: 1px 2px 0 #000, 2px 0 0 rgba(177,122,255,.8), 0 0 10px rgba(255,247,106,.7);
+  }
 }
 /* jednotlivé písmená nadpisu „Hidden" ako pokazený neón — každé občas zaprská a na chvíľu zhasne;
    duration/delay randomizuje client.js per písmeno (setHiddenTitle), nech nezhasínajú naraz */
@@ -1640,11 +1676,15 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .a-badge.hidden-question{
     background: #2c2438;
     color: #d8c2ff;
-    font-size: 22px;
+    font-size: 14px;
     font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    letter-spacing: 0;
     text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
     box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(154,111,240,.75), 0 0 12px rgba(177,122,255,.4);
-    animation: hidden-flicker 3.2s linear infinite;
+    animation: hidden-flicker 3.2s linear infinite, hidden-question-glitch 1.35s steps(2, end) infinite;
   }
   .a-badge.golden_shield { background: #8a6d00; }
   .a-badge.golden_mirror { background: #8a6d00; }

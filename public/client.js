@@ -2194,11 +2194,9 @@ function displayDir(action, ownerSlot) {
 }
 function actionIcon(action, ownerSlot) {
   const arr = (a) => ARROW_DIR[displayDir(a, ownerSlot)] || "";
-  const ownerChar = state?.[ownerSlot]?.char;
-  const side = ownerChar === "countess" || ownerChar === "onre";
   switch (action?.type) {
     case "move":     return `🚶${arr(action)}`;
-    case "dash":     return side ? "❔" : `🏃${arr(action)}`;
+    case "dash":     return `🏃${arr(action)}`;
     case "recharge": return "🙏";
     case "attack":   return `🏹${arr(action)}`;
     case "melee":    return "🗡️";
@@ -2208,7 +2206,7 @@ function actionIcon(action, ownerSlot) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return side ? "❔" : `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — len čistý badge
+    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — len čistý badge
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
@@ -2262,10 +2260,7 @@ function appendActionLog(slot, action) {
   }
   const el = log.querySelector(".a-slot.slot-act");
   if (el) {
-    const ownerChar = state?.[slot]?.char;
-    const hiddenSide = ownerChar === "countess" || ownerChar === "onre";
-    const hiddenAction = hiddenSide && (action?.type === "dash" || action?.type === "special");
-    el.className = `a-badge ${action?.type || ""}${hiddenAction ? " hidden-question" : ""}`;
+    el.className = `a-badge ${action?.type || ""}`;
     el.textContent = actionIcon(action, slot);
   }
   return el;
@@ -2923,17 +2918,13 @@ function positionActors(s, immediate = false) {
 function actionBadgeView(a, ownerSlot) {
   const arrow = ARROW_DIR;
   const dd = ARROW_DIR[displayDir(a, ownerSlot)] || ""; // Narutov vertikálny smer (move/dash/attack) súperovi anonymizovaný (↕)
-  const ownerChar = state?.[ownerSlot]?.char;
-  const hiddenSide = ownerChar === "countess" || ownerChar === "onre";
   switch (a?.type) {
     case "move":          return { cls: "move",    text: `🚶${dd || "?"}` };
-    case "dash":          return hiddenSide ? { cls: "dash hidden-question", text: "❔" } : { cls: "dash", text: `🏃${dd || "?"}` };
+    case "dash":          return { cls: "dash", text: `🏃${dd || "?"}` };
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
-    case "special":       return hiddenSide
-      ? { cls: "special hidden-question", text: "❔" }
-      : { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
+    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
@@ -4091,8 +4082,8 @@ const ABILITY_PREVIEW = {
   // mesiaca cykluje pod mini-doskou (moonCycle — ako Escanorov pride náhľad), preto žiadny effect/stats riadok
   werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
   // Countess/Onre: pasca — náhľad ukazuje príkladovú cieľovú bunku (target) ako Vojak
-  countess:  { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Her strikes feed on blood (a landed hit heals her); mirrors are mere shields against her" },
-  onre:      { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Her strikes drain the foe's mana into hers; mirrors are mere shields against her" },
+  countess:  { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
+  onre:      { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -4368,7 +4359,7 @@ const meleeBtn = document.getElementById("melee-btn"); // melee má picker (Coun
 const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker };
 const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn };
 
-// Vampire/Onryō: dash slot = CHARGE — tlačidlo dostane fialový „Hidden" skin s preblikávaním a ❔
+// Vampire/Onryō: dash slot = CHARGE — tlačidlo dostane fialový „Hidden" skin s preblikávaním a ???
 // namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
 // Attack tooltip navyše vysvetlí odraz strely. Volané zo state handlera pri každom snapshote.
 const DASH_TITLE_DEFAULT   = "Dash - move up to 2 cells in a direction (−4 mana)";
@@ -4378,12 +4369,33 @@ function syncDashBtn(char) {
   dashBtn.classList.toggle("vamp-charge", side);
   dashPicker?.classList.toggle("vamp-charge", side);
   const ico = dashBtn.querySelector(".pix-ico");
-  const want = side ? "❔" : "🏃";
-  if (ico && ico.dataset.emoji !== want) { ico.dataset.emoji = want; ico.innerHTML = ""; delete ico.dataset.done; pixelizeEmoji(ico); }
+  const cost = dashBtn.querySelector(".cost");
+  if (ico && side) {
+    delete ico.dataset.emoji;
+    delete ico.dataset.done;
+    ico.classList.add("charge-mark");
+    ico.textContent = "???";
+    if (cost) {
+      const bonus = char === "countess" ? miniPix("❤️") : miniPix("💧");
+      cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")} 4${bonus}`;
+      hydratePix(cost);
+    }
+  } else if (ico) {
+    ico.classList.remove("charge-mark");
+    if (cost) { cost.innerHTML = `−4${miniPix("💧")}`; hydratePix(cost); }
+    if (ico.dataset.emoji !== "🏃") {
+      ico.dataset.emoji = "🏃";
+      ico.innerHTML = "";
+      delete ico.dataset.done;
+      pixelizeEmoji(ico);
+    } else if (!ico.dataset.done) {
+      pixelizeEmoji(ico);
+    }
+  }
   dashBtn.title = !side ? DASH_TITLE_DEFAULT
     : char === "countess"
-      ? "Charge — rush in a direction; stops at the first foe and strikes (pure reposition if none, stays on the target's cell even when blocked). A landed hit heals you (blocked = nothing)"
-      : "Charge — rush in a direction; stops at the first foe and strikes (pure reposition if none, stays on the target's cell even when blocked). A landed hit drains the foe's mana into yours (blocked = nothing)";
+      ? "Charge — rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit heals up to 4 HP (blocked = nothing)"
+      : "Charge — rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit drains up to 4 mana into yours (blocked = nothing)";
   attackBtn.title = side
     ? "Range Attack — a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance"
     : ATTACK_TITLE_DEFAULT;
@@ -5227,7 +5239,7 @@ socket.on("state", (s) => {
 
   // dash/attack tlačidlá podľa mága — Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
   syncDashBtn(s[me]?.char);
-  // label melee podľa mága — Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō bonus
+  // label melee podľa mága — Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō majú center strike bez bonusu
   const mineMelee = s[me];
   if (mineMelee?.char && meleeBtn) {
     const mCost = meleeBtn.querySelector(".cost");
@@ -5235,10 +5247,10 @@ socket.on("state", (s) => {
       meleeBtn.title = "Melee (−4 mana, 4 dmg, hits your cell + all diagonal neighbours)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(mCost); }
     } else if (mineMelee.char === "countess") {
-      meleeBtn.title = "Melee — strike your own cell. A landed hit heals you (blocked = nothing)";
+      meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
     } else if (mineMelee.char === "onre") {
-      meleeBtn.title = "Melee — strike your own cell. A landed hit drains the foe's mana into yours (blocked = nothing)";
+      meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
     } else {
       meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
@@ -5250,7 +5262,18 @@ socket.on("state", (s) => {
   if (specChar && specialBtn) {
     specialBtn.classList.remove("hidden-question");
     const specIco = specialBtn.querySelector(".pix-ico:not(.mini)");
-    if (specIco && specIco.dataset.emoji !== "✨") { specIco.dataset.emoji = "✨"; specIco.innerHTML = ""; delete specIco.dataset.done; pixelizeEmoji(specIco); }
+    specialBtn.classList.remove("vamp-charge");
+    if (specIco) {
+      specIco.classList.remove("charge-mark");
+      if (specIco.dataset.emoji !== "✨") {
+        specIco.dataset.emoji = "✨";
+        specIco.innerHTML = "";
+        delete specIco.dataset.done;
+        pixelizeEmoji(specIco);
+      } else if (!specIco.dataset.done) {
+        pixelizeEmoji(specIco);
+      }
+    }
     const cost = specialBtn.querySelector(".cost");
     if (specChar === "medusa") {
       // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
@@ -5278,10 +5301,10 @@ socket.on("state", (s) => {
       delete specialBtn.dataset.wolfMoon;
       syncWolfSpecialBtn();
     } else if (specChar === "countess" || specChar === "onre") {
-      // Vampire/Onryō: pasca — teleport + úder (za ďalšiu manu) pri súperovom vstupe/prechode
+      // Vampire/Onryō: pasca — teleport + bezplatný úder pri súperovom vstupe/prechode
       const bonus = specChar === "countess" ? "heals you" : "drains the foe's mana into yours";
-      specialBtn.title = `Special (−5 mana) — set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike — the strike costs extra mana; a landed hit ${bonus}. Only one trap — recasting replaces it`;
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🪤`; hydratePix(cost); }
+      specialBtn.title = `Special (−5 mana, 3 dmg) — set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit ${bonus}. Only one trap — recasting replaces it`;
+      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 3${miniPix("☠️")}`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {

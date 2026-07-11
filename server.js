@@ -82,14 +82,13 @@ const SIDE_CHARS = { countess: "p1", onre: "p2" };
 // na 3-riadkovej ploche má diagonála max 2 kroky, takže dmg je vždy 3 alebo 2)
 const DIAG_DIRS = { up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
 const DIAG_DIR_KEYS = Object.keys(DIAG_DIRS);
-// ich melee nesie smer: charge v 4 smeroch ALEBO úder na vlastnej bunke ("center") — obe 3 dmg + bonus
+// ich melee je úder na vlastnej bunke bez bonusu; charge v 4 smeroch nesie silnejší bonus.
 // Vampire/Onryō kit: melee = úder LEN na vlastnej bunke (bez smeru); charge nahrádza dash — pohybové
-// melee 4 smermi po prvú figúru/okraj; trap úder si drží pôvodné hodnoty. Bonus (Vampire HP heal /
-// Onryō mana drain+gain) padá LEN keď dmg reálne dopadne.
+// melee 4 smermi po prvú figúru/okraj; trap úder si drží pôvodné hodnoty. Charge/trap bonus
+// (Vampire HP heal / Onryō mana drain+gain) padá LEN keď dmg reálne dopadne.
 const VAMP_MELEE_DMG    = 8;
-const VAMP_MELEE_BONUS  = 4;
 const VAMP_CHARGE_DMG   = 4;
-const VAMP_CHARGE_BONUS = 2;
+const VAMP_CHARGE_BONUS = 4;
 const VAMP_TRAP_DMG     = 3;
 const VAMP_TRAP_BONUS   = 3;
 // diagonálny basic: strela sa RAZ odrazí od ktorejkoľvek steny (biliard — od bočnej letí späť),
@@ -1197,12 +1196,12 @@ function doMelee(slot, tl) {
 
 /* ---- Vampire / Onryō: melee + charge + pasca ---- */
 // bonus po REÁLNE dopadnutom dmg (nie pri bloku — mirror sa voči nim správa tiež ako blok):
-// Vampire +amount HP (cap 10); Onryō vysaje súperovi amount many (limit = koľko súper reálne má)
-// a rovnaký objem si pridá (vlastný cap 10 — presah prepadá, súperovi sa strhne celý drain).
-// Vampire NElieči naraz so zásahom — najprv beaty A2 → A3 → A4 (jednotná choreografia pre melee,
-// charge aj trigger pasce), až po nich sa doplnia HP; Onryō drainuje hneď.
-// amount: melee VAMP_MELEE_BONUS, charge VAMP_CHARGE_BONUS, trap VAMP_TRAP_BONUS.
-function vampBonus(slot, tl, amount) {
+// Vampire lieči zo skutočne spôsobeného HP lossu; Onryō najprv odoberie súperovu manu.
+// Caster si potom doplní len to, čo sa zmestí do capu — presah prepadá.
+// Vampire NElieči naraz so zásahom — pri charge/trap bonuse najprv idú beaty A2 → A3 → A4,
+// až po nich sa doplnia HP; Onryō drainuje hneď.
+// amount: charge VAMP_CHARGE_BONUS, trap VAMP_TRAP_BONUS.
+function vampBonus(slot, tl, amount, hpSource = amount) {
   const p = game.players[slot];
   const foeS = other(slot);
   const foe = game.players[foeS];
@@ -1210,7 +1209,7 @@ function vampBonus(slot, tl, amount) {
     for (const a of ["va2", "va3", "va4"]) {
       pushStateFrame(tl, [{ kind: "vamp_heal_cast", from: slot, anim: a }], VAMP_HEAL_BEAT_MS);
     }
-    const healed = Math.min(START_HP, p.hp + amount) - p.hp;
+    const healed = Math.min(amount, Math.max(0, hpSource), START_HP - p.hp);
     if (healed > 0) {
       p.hp += healed;
       pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed }], SMALL_DELAY_MS);
@@ -1225,10 +1224,8 @@ function vampBonus(slot, tl, amount) {
   pushStateFrame(tl, [{ kind: "mana_drain", from: slot, target: foeS, drained, gained }], SMALL_DELAY_MS);
 }
 
-// Melee Vampire/Onryō: úder LEN na vlastnej bunke (bez smeru) — VAMP_MELEE_DMG + VAMP_MELEE_BONUS.
-// Bonus LEN keď dmg reálne dopadne (block/mirror-imunitný blok = nič; zabitý klon-návnada = nič).
-// Vampire = jednotný A1 úder (dmg dopadne až po ňom, potom heal beaty vo vampBonus);
-// Onryō = pôvodná dramaturgia bežného melee (3 beaty), drain hneď po zásahu.
+// Melee Vampire/Onryō: úder LEN na vlastnej bunke (bez smeru) — VAMP_MELEE_DMG, bez bonusu.
+// Vampire = jednotný A1 úder; Onryō = pôvodná dramaturgia bežného melee (3 beaty).
 function doVampMelee(slot, tl) {
   const me  = game.players[slot];
   const opS = other(slot);
@@ -1247,9 +1244,7 @@ function doVampMelee(slot, tl) {
     }
   }
   if (playerHere) {
-    const landed = !op.shield && !op.mirror; // mirror imunita = blok, bonus nepadá
     applyHit(opS, raw, tl, "melee");
-    if (landed && !winnerNow()) vampBonus(slot, tl, VAMP_MELEE_BONUS);
   } else if (cloneHere) {
     applyHitOnClone(opS, raw, tl, "melee"); // klon-návnada zožerie úder celý (ako bežný melee/vlkolak)
   }
@@ -1292,8 +1287,9 @@ function doVampCharge(slot, dir, tl) {
     ...(me.char === "countess" ? { anim: "va1" } : {}) }], WOLF_STRIKE_MS);
   if (target === "player") {
     const landed = !op.shield && !op.mirror;
+    const hpBefore = op.hp;
     applyHit(opS, raw, tl, "melee");
-    if (landed && !winnerNow()) vampBonus(slot, tl, VAMP_CHARGE_BONUS);
+    if (landed) vampBonus(slot, tl, VAMP_CHARGE_BONUS, hpBefore - op.hp);
   } else {
     applyHitOnClone(opS, raw, tl, "melee");
   }
@@ -1352,9 +1348,9 @@ function resolveTrapsAfterAction(tl) {
   }
 }
 
-// spustenie pasce: VŽDY ju spotrebuje a caster sa na bunku VŽDY teleportne (aj bez many na útok);
-// melee (3 dmg + bonus, ďalšie 4 many) padne len ak na manu má — súper, čo bunkou len prebehol, dostane
-// úder naprázdno (mana je preč = zámerný spôsob counterovania pasce). Petrifikovaný caster netriggeruje —
+// spustenie pasce: VŽDY ju spotrebuje a caster sa na bunku VŽDY teleportne; triggerovaný
+// melee úder (3 dmg + bonus) už nestojí ďalšiu manu. Súper, čo bunkou len prebehol, dostane
+// úder naprázdno. Petrifikovaný caster netriggeruje —
 // súperov prechod pascu ZNIČÍ (rovnaká deštrukcia ako vlastný vstup). Vracia true, ak prebehol teleport.
 function triggerTrap(ownerSlot, tl) {
   const o = game.players[ownerSlot];
@@ -1369,22 +1365,15 @@ function triggerTrap(ownerSlot, tl) {
   // kto na bunke stojí PO dokončení akcie: klon-návnada absorbuje úder pred súperom (ako melee)
   const cloneHere  = !!(foe?.clone && foe.clone.x === cell.x && foe.clone.y === cell.y);
   const playerHere = !cloneHere && !!(foe && foe.x === cell.x && foe.y === cell.y);
-  const canAttack = o.mana >= MELEE_COST;
   // istý zásah reálneho hráča (aj do štítu/mirror-bloku) odhalí prípadný labyrint PRED animáciou triggera;
   // whiff naprázdno ani zabitý klon-návnada labyrint neodhaľujú/nekončia
-  if (canAttack && playerHere) revealLabyrinths(tl);
+  if (playerHere) revealLabyrinths(tl);
   // pasca sa rozžiari — od tohto momentu ju vidia OBAJA (súper sa dozvedá, kde bola)
   pushStateFrame(tl, [{ kind: "trap_trigger", from: ownerSlot, cell: [cell.x, cell.y] }], SMALL_DELAY_MS);
   // teleport VŽDY: out na pôvodnej bunke → in na bunke pasce (thread labyrintu ráta aj teleport bunku)
   pushStateFrame(tl, [{ kind: "trap_tp_out", from: ownerSlot }], TELEPORT_OUT_MS);
   o.x = cell.x; o.y = cell.y;
   pushStateFrame(tl, [{ kind: "trap_tp_in", from: ownerSlot }, ...trackSteps(ownerSlot, [[cell.x, cell.y]])], TELEPORT_IN_MS);
-  if (!canAttack) {
-    // bez many útok nepríde — vlastný efekt namiesto "invalid" (ten by prečiarkol posledný badge SÚPEROVEJ akcie)
-    pushStateFrame(tl, [{ kind: "trap_no_mana", target: ownerSlot }], SMALL_DELAY_MS);
-    return true;
-  }
-  o.mana -= MELEE_COST;
   // trigger úder: Countess = A1 (jednotná choreografia s melee), Onre = Attack_1 — jeho zjavenie
   // s výkrikom (Scream) hrá klient už počas trap_tp_in framu; dmg dopadne až po údere
   pushStateFrame(tl, [{ kind: "vamp_strike", from: ownerSlot, cell: [cell.x, cell.y],
@@ -1394,9 +1383,10 @@ function triggerTrap(ownerSlot, tl) {
   const foeShieldArmed = foe.shield, foeMirrorArmed = foe.mirror;
   if (playerHere) {
     const landed = !foeShieldArmed && !foeMirrorArmed;
+    const hpBefore = foe.hp;
     applyHit(foeS, raw, tl, "melee");
     // Vampirine heal beaty (A2→A3→A4) + doplnenie HP rieši vampBonus; Onryō drainuje hneď
-    if (landed && !winnerNow()) vampBonus(ownerSlot, tl, VAMP_TRAP_BONUS);
+    if (landed) vampBonus(ownerSlot, tl, VAMP_TRAP_BONUS, hpBefore - foe.hp);
   } else if (cloneHere) {
     applyHitOnClone(foeS, raw, tl, "melee");
   } else {
