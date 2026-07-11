@@ -1242,6 +1242,51 @@ function vampBonus(slot, tl, amount, hpSource = amount) {
   pushStateFrame(tl, [{ kind: "mana_drain", from: slot, target: foeS, drained, gained }], SMALL_DELAY_MS);
 }
 
+// Dopad Vampire/Onryō melee-typu úderu (own-cell melee / charge / trap) na bunku, kde caster PRÁVE stojí.
+// Rieši všetky varianty s Narutovým klonom rovnako ako doMelee (stackedMelee):
+//   • samotný hráč      → applyHit (+ bonus z REÁLNE spôsobeného HP lossu)
+//   • klon-návnada sám   → applyHitOnClone (zožerie úder celý, žiadny bonus)
+//   • stacknutý pár       → s obranou kryje pár ako JEDNA postava (applyHitPairDefended, bez bonusu);
+//     bez obrany klon pohltí CLONE_DMG (zomrie) a ZVYŠOK úderu prejde na majiteľa (bonus z tohto zvyšku)
+// Predtým stacknutý pár zabíjal len klona a majiteľ nedostal nič — chyba (klon nemal byť plný bait
+// na vlastnej bunke). bonusAmount 0 = melee bez heal/drain bonusu. consumeDefense: len trap beží mimo
+// resolveTurn slučky (ktorá inak spotrebuje súperovu obranu za akciu castera), tak si ju spotrebuje sám.
+// Vracia true, ak úder na niečo dopadol (na rozlíšenie whiffu naprázdno).
+function vampMeleeLand(ownerSlot, raw, bonusAmount, tl, consumeDefense = false) {
+  const me   = game.players[ownerSlot];
+  const foeS = other(ownerSlot);
+  const foe  = game.players[foeS];
+  const foeAt   = !!(foe && foe.x === me.x && foe.y === me.y);
+  const cloneAt = !!(foe?.clone && foe.clone.x === me.x && foe.clone.y === me.y);
+  const stacked    = foeAt && cloneAt;   // Naruto + klon na jednej bunke
+  const playerHere = foeAt && !cloneAt;  // len hráč (klon inde alebo žiadny)
+  const decoyHere  = cloneAt && !foeAt;  // klon-návnada sám
+  const shieldArmed = foe.shield, mirrorArmed = foe.mirror;
+  const defended = shieldArmed || mirrorArmed;
+  if (stacked) {
+    if (defended) {
+      applyHitPairDefended(foeS, raw, tl, "melee", false); // obrana kryje pár ako jednu postavu
+    } else {
+      const hpBefore = foe.hp;
+      applyHitOnClone(foeS, CLONE_DMG, tl, "melee");        // klon pohltí CLONE_DMG a zomrie
+      const through = Math.max(0, raw - CLONE_DMG);
+      if (through > 0 && !winnerNow()) applyHit(foeS, through, tl, "melee"); // zvyšok na majiteľa
+      if (bonusAmount > 0) vampBonus(ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
+    }
+  } else if (playerHere) {
+    const hpBefore = foe.hp;
+    applyHit(foeS, raw, tl, "melee");
+    if (bonusAmount > 0 && !defended) vampBonus(ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
+  } else if (decoyHere) {
+    applyHitOnClone(foeS, raw, tl, "melee");                // klon-návnada zožerie úder celý
+  }
+  if (consumeDefense && (playerHere || stacked || decoyHere)) {
+    if (shieldArmed) { foe.shield = false; foe.shieldGold = false; }
+    if (mirrorArmed) { foe.mirror = false; foe.mirrorGold = false; }
+  }
+  return playerHere || stacked || decoyHere;
+}
+
 // Melee Vampire/Onryō: úder LEN na vlastnej bunke (bez smeru) — VAMP_MELEE_DMG, bez bonusu.
 // Vampire opakuje A1 v troch beat-och ako Onryō melee; dmg padá až po celej choreografii.
 function doVampMelee(slot, tl) {
@@ -1251,9 +1296,8 @@ function doVampMelee(slot, tl) {
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
   const raw = VAMP_MELEE_DMG * dealMul(slot) * labyrinthMul(slot);
-  const cloneHere  = !!(op?.clone && op.clone.x === me.x && op.clone.y === me.y);
-  const playerHere = !cloneHere && !!(op && op.x === me.x && op.y === me.y);
-  if (playerHere) revealLabyrinths(tl);
+  // reálny zásah hráča (aj stacknutého páru s klonom) odhalí labyrint PRED údermi
+  if (op && op.x === me.x && op.y === me.y) revealLabyrinths(tl);
   if (me.char === "countess") {
     for (let r = 0; r < MELEE_REPEAT; r++) {
       pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y], anim: "va1" }], VAMP_TRAP_STRIKE_MS);
@@ -1263,11 +1307,7 @@ function doVampMelee(slot, tl) {
       pushStateFrame(tl, [{ kind: "melee", from: slot, cells: [[me.x, me.y]] }], SPECIAL_BEAT_MS);
     }
   }
-  if (playerHere) {
-    applyHit(opS, raw, tl, "melee");
-  } else if (cloneHere) {
-    applyHitOnClone(opS, raw, tl, "melee"); // klon-návnada zožerie úder celý (ako bežný melee/vlkolak)
-  }
+  vampMeleeLand(slot, raw, 0, tl); // own-cell melee bez heal/drain bonusu; klon-návnada/stacknutý pár rieši helper
 }
 
 // Charge Vampire/Onryō (nahrádza dash, rovnaká cena): pohybové melee — beh zvoleným smerom po PRVÚ
@@ -1284,35 +1324,30 @@ function doVampCharge(slot, dir, tl) {
   me.mana -= DASH_COST;
   const raw = VAMP_CHARGE_DMG * dealMul(slot) * labyrinthMul(slot);
 
-  // dráha: krok za krokom po okraj; stop na prvej figúre (klon-návnada pred súperom)
-  let x = me.x, y = me.y, target = null; // null | "clone" | "player"
+  // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár)
+  let x = me.x, y = me.y, hit = false;
   const path = [];
   while (inBounds(x + delta[0], y + delta[1])) {
     x += delta[0]; y += delta[1];
     path.push([x, y]);
-    if (op?.clone && op.clone.x === x && op.clone.y === y) { target = "clone"; break; }
-    if (op && op.x === x && op.y === y) { target = "player"; break; }
+    const cloneAt = op?.clone && op.clone.x === x && op.clone.y === y;
+    const foeAt   = op && op.x === x && op.y === y;
+    if (cloneAt || foeAt) { hit = true; break; }
   }
   if (!path.length) {
     pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
     return;
   }
-  if (target === "player") revealLabyrinths(tl); // istý zásah (aj do štítu) — odhaľ labyrint pred behom
   me.x = path[path.length - 1][0];
   me.y = path[path.length - 1][1];
+  // istý zásah reálneho hráča (aj stacknutého páru, aj do obrany) — odhaľ labyrint pred behom
+  if (op && op.x === me.x && op.y === me.y) revealLabyrinths(tl);
   pushStateFrame(tl, [{ kind: "vamp_charge", from: slot, dir }, ...trackSteps(slot, path)], MOVE_DELAY_MS);
-  if (!target) return; // dobehla na okraj bez terča — len presun
+  if (!hit) return; // dobehla na okraj bez terča — len presun
   // Vampire seká A1 (jednotný úder podľa attack guide), Onryō pôvodný vampstrike (alias Attack_3)
   pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y],
     ...(me.char === "countess" ? { anim: "va1" } : {}) }], WOLF_STRIKE_MS);
-  if (target === "player") {
-    const landed = !op.shield && !op.mirror;
-    const hpBefore = op.hp;
-    applyHit(opS, raw, tl, "melee");
-    if (landed) vampBonus(slot, tl, VAMP_CHARGE_BONUS, hpBefore - op.hp);
-  } else {
-    applyHitOnClone(opS, raw, tl, "melee");
-  }
+  vampMeleeLand(slot, raw, VAMP_CHARGE_BONUS, tl); // hráč / klon-návnada / stacknutý pár rieši helper
 }
 
 // Countess/Onre sú IMÚNNE voči mirroru: súperov mirror sa voči ich dmg správa ako obyčajný štít
@@ -1382,12 +1417,9 @@ function triggerTrap(ownerSlot, tl) {
     pushStateFrame(tl, [{ kind: "trap_break", from: ownerSlot, cell: [cell.x, cell.y] }], SMALL_DELAY_MS);
     return false;
   }
-  // kto na bunke stojí PO dokončení akcie: klon-návnada absorbuje úder pred súperom (ako melee)
-  const cloneHere  = !!(foe?.clone && foe.clone.x === cell.x && foe.clone.y === cell.y);
-  const playerHere = !cloneHere && !!(foe && foe.x === cell.x && foe.y === cell.y);
-  // istý zásah reálneho hráča (aj do štítu/mirror-bloku) odhalí prípadný labyrint PRED animáciou triggera;
-  // whiff naprázdno ani zabitý klon-návnada labyrint neodhaľujú/nekončia
-  if (playerHere) revealLabyrinths(tl);
+  // istý zásah reálneho hráča (aj stacknutého páru s klonom, aj do štítu/mirror-bloku) odhalí prípadný
+  // labyrint PRED animáciou triggera; whiff naprázdno ani zabitý klon-návnada labyrint neodhaľujú/nekončia
+  if (foe && foe.x === cell.x && foe.y === cell.y) revealLabyrinths(tl);
   // pasca sa rozžiari — od tohto momentu ju vidia OBAJA (súper sa dozvedá, kde bola)
   pushStateFrame(tl, [{ kind: "trap_trigger", from: ownerSlot, cell: [cell.x, cell.y] }], SMALL_DELAY_MS);
   // teleport VŽDY: out na pôvodnej bunke → in na bunke pasce (thread labyrintu ráta aj teleport bunku)
@@ -1399,23 +1431,11 @@ function triggerTrap(ownerSlot, tl) {
   pushStateFrame(tl, [{ kind: "vamp_strike", from: ownerSlot, cell: [cell.x, cell.y],
     anim: o.char === "countess" ? "va1" : "vattack1" }], VAMP_TRAP_STRIKE_MS);
   const raw = VAMP_TRAP_DMG * dealMul(ownerSlot) * labyrinthMul(ownerSlot);
-  // trap-melee je akcia castera → zasiahnutá figúra spotrebuje prípadnú armovanú obranu (whiff naprázdno nie)
-  const foeShieldArmed = foe.shield, foeMirrorArmed = foe.mirror;
-  if (playerHere) {
-    const landed = !foeShieldArmed && !foeMirrorArmed;
-    const hpBefore = foe.hp;
-    applyHit(foeS, raw, tl, "melee");
-    // Vampirine heal beaty (A2→A3→A4) + doplnenie HP rieši vampBonus; Onryō drainuje hneď
-    if (landed) vampBonus(ownerSlot, tl, VAMP_TRAP_BONUS, hpBefore - foe.hp);
-  } else if (cloneHere) {
-    applyHitOnClone(foeS, raw, tl, "melee");
-  } else {
-    pushStateFrame(tl, [], SMALL_DELAY_MS); // súper bunkou len prebehol — úder naprázdno
-  }
-  if (playerHere || cloneHere) {
-    if (foeShieldArmed) { foe.shield = false; foe.shieldGold = false; }
-    if (foeMirrorArmed) { foe.mirror = false; foe.mirrorGold = false; }
-  }
+  // trap-melee je akcia castera mimo resolveTurn slučky → zásah si spotrebuje súperovu obranu sám
+  // (consumeDefense). Heal beaty A2→A3→A4 + doplnenie HP / mana drain rieši vampBonus vnútri helpera;
+  // stacknutý pár Naruto+klon: klon pohltí CLONE_DMG, zvyšok prejde na Naruta a bonus je z toho zvyšku.
+  const hitSomething = vampMeleeLand(ownerSlot, raw, VAMP_TRAP_BONUS, tl, true);
+  if (!hitSomething) pushStateFrame(tl, [], SMALL_DELAY_MS); // súper bunkou len prebehol — úder naprázdno
   return true;
 }
 
