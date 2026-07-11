@@ -3875,10 +3875,15 @@ function updateCharSelectHp(s) {
     if (hiddenMode && !charSelectHp) setHiddenTitle();
     else titleEl.textContent = charSelectHp ? "Your Team" : CHAR_PAGES[charPage].title;
   }
+  // poradie kariet = poradie draftu (rovnako ako hlavy v HUD — state.roster); stránky sú zlúčené
+  // cez display:contents, takže karty sú flex itemy pageru a stačí im nastaviť `order` (1..N)
+  const draftOrder = charSelectHp ? (s?.roster?.[me] || Object.keys(charSelectHp)) : null;
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
     if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
     card.classList.toggle("off-roster", !!charSelectHp && !(key in charSelectHp));
+    const orderIdx = draftOrder ? draftOrder.indexOf(key) : -1;
+    card.style.order = orderIdx >= 0 ? String(orderIdx + 1) : "";
     const statsEl = card.querySelector(".char-stats");
     const hpEl = card.querySelector(".char-hp");
     const manaEl = card.querySelector(".char-mana");

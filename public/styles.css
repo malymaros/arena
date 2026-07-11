@@ -724,6 +724,9 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .char-select.roster-mode .char-cards { display: contents; }
 .char-select.roster-mode .char-card.off-roster,
 .char-select.roster-mode .char-card.soon { display: none; }
+/* karty tímu dostávajú flex `order` 1..N podľa poradia draftu (JS v updateCharSelectHp);
+   pravá (skrytá) šípka musí ostať za nimi, ľavá drží order 0 pred nimi */
+.char-select.roster-mode #char-page-next { order: 100; }
 
 /* turnajový draft (team-mode): confirm tlačidlo pod kartami; mimo draftu je lišta skrytá.
    Dizajn = jazyk char-selectu: slate podklad, oranžový pixel rám s tvrdým čiernym obrysom,
