@@ -2493,7 +2493,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
    jemné pulzovanie, nech je značka čitateľná aj na tile podfarbení */
 .trap-marker{
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: 44px; height: 44px; pointer-events: none; z-index: 2;
+  width: 88px; height: 88px; pointer-events: none; z-index: 2;
   image-rendering: pixelated;
   filter: drop-shadow(0 0 6px rgba(173, 20, 87, .9));
   animation: trap-pulse 1.6s ease-in-out infinite;

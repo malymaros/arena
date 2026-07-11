@@ -2457,7 +2457,7 @@ function renderTrapMarkers(s) {
     if (!cellEl) continue;
     const cvs = document.createElement("canvas");
     cvs.className = "trap-marker";
-    cvs.width = 44; cvs.height = 44;
+    cvs.width = 88; cvs.height = 88;
     if (usesAltColor(char, sl)) cvs.classList.add("alt-color");
     cellEl.appendChild(cvs);
     drawTrapHead(cvs, char, sl);
