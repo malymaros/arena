@@ -335,6 +335,19 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
    obrana = cyan, zdroje = modrá, golden = zlatá; silnejší ťah = tmavší odtieň rodiny */
 .btn.move{ background: #757575; } /* Move — neutrálna šedá */
 .btn.dash{ background: #616161; } /* Dash (−2) — o odtieň tmavšia než move */
+/* Vampire/Onryō: dash slot = charge — fialový „Hidden" skin (rovnaká paleta a preblikávanie ako
+   Hidden stránka), ikona ❔ namiesto bežca; triedu prepína syncDashBtn podľa zvoleného mága */
+.btn.act.dash.vamp-charge{
+  background: #2c2438;
+  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 14px rgba(177,122,255,.35);
+  animation: hidden-flicker 3.2s linear infinite;
+}
+.btn.act.dash.vamp-charge:not(:disabled):hover{
+  box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
+}
+#dash-picker.vamp-charge .arrow{ background: #7a4fd0; } /* šípky charge v rovnakej fialovej */
 
 /* výber smeru pre Move — popup nad tlačidlom v tvare kríža */
 .move-wrap{ position: relative; }
@@ -393,11 +406,6 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .diag-picker .arrow.dl{ grid-area: dl; }
 .diag-picker .arrow.dr{ grid-area: dr; }
 #aim-picker-diag .arrow{ background: #b71c1c; } /* červená ako basic attack */
-
-/* Countess/Onre: melee picker — kríž (4 smery charge) + stred (úder na vlastnej bunke) */
-.dir-picker.vamp-picker{ grid-template-areas: ". up ." "left c right" ". down ."; }
-.vamp-picker .arrow.center{ grid-area: c; background: #7b1020; }
-#vamp-picker .arrow{ background: #ad1457; } /* krvavá — melee s healom/drainom */
 
 /* Vojak: mini mapa plochy na výber cieľovej bunky specialu (stĺpce nastaví buildCellPicker podľa board.w) */
 .dir-picker.cell-picker{ grid-template-areas: none; gap: 3px; }

@@ -394,7 +394,7 @@ const SPECIAL_ANIMS = {
   escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder — plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
   soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // loop len pre victory/preview — pri caste NECYKLÍ: mierenie (frame 0 + laser sight) → jeden výšľah → lúč (SOLDIER_AIM/FIRE)
   werewolf:  { file: "Run+Attack.png",   fps: SPECIAL_FPS, loop: true }, // rozbeh charge — veľký stredový sprite hrá LEN Run+Attack (Attack_2 seknutie je na malej figúre pri dopade)
-  countess:  { file: "Attack_2.png",     fps: SPECIAL_FPS, loop: true }, // kladenie pasce — krvavé tŕne (cieľová bunka sa NEzvýrazňuje, pasca je tajná)
+  countess:  { file: "A5.png",           fps: SPECIAL_FPS, loop: true }, // kladenie pasce — celá útočná sekvencia A1–A4 (17f); pri caste sa hrá RAZ od frame 0 (server drží jeden dlhý VAMP_CAST_MS frame), loop len pre victory/preview. Cieľová bunka sa NEzvýrazňuje, pasca je tajná
   onre:      { file: "Scream.png",       fps: SPECIAL_FPS, loop: true }, // kladenie pasce — prízračný výkrik
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
@@ -427,11 +427,11 @@ const CHAR_META = {
   // Vlkolak: natívna p2 paleta (Werewolf_2, teplejší odtieň); Charge.png = prefarbený fire fireball per paleta
   // (P1 mesačná modrá, P2 krvavá červená) — tools/sprites-werewolf
   werewolf:  { name: "Werewolf",         dir: "Werewolf_1", dirP2: "Werewolf_2" },
-  // Hidden stránka (easter egg): postavy viazané na stranu — Countess Vampire VÝHRADNE P1, Onre VÝHRADNE P2
+  // Hidden stránka (easter egg): postavy viazané na stranu — Vampire VÝHRADNE P1, Onryō VÝHRADNE P2
   // (karty per strana skrýva CSS cez data-side; hrateľné len v single/bo3, turnaj Hidden stránku nepustí).
   // Onre hrá vždy vpravo vo svojej natívnej palete → dirP2 = ten istý priečinok (žiadny albino filter).
-  countess:  { name: "Countess Vampire", dir: "Countess_Vampire" },
-  onre:      { name: "Onre",             dir: "Onre", dirP2: "Onre" }
+  countess:  { name: "Vampire", dir: "Countess_Vampire" },
+  onre:      { name: "Onryō",   dir: "Onre", dirP2: "Onre" }
 };
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
@@ -475,18 +475,21 @@ const ANIM_DEF = {
   // neloopové seknutie kreslí raf relatívnym časom (drawT) ako wolfstrike
   vamprun:    { file: "Run.png", fps: 12, loop: true },
   vampstrike: { file: "VampStrike.png", fps: 8, loop: false },
-  // trigger pasce (podľa vampire_attack_guide): úder = Attack_1; Countess potom lieči cez beaty
-  // Attack_2→Attack_3→Attack_4; Onre sa na bunke pasce zjavuje s výkrikom (Scream). Všetko
-  // neloopové → kreslené relatívnym časom (VAMP_ONESHOT_KEYS), inak by viseli na poslednom frame.
-  // fps ladené tak, aby sa švih prehral CELÝ v rámci svojho beatu (VAMP_TRAP_STRIKE/HEAL_BEAT_MS)
-  vattack1:   { file: "Attack_1.png", fps: 10, loop: false }, // 6f = 600 ms
-  vattack2:   { file: "Attack_2.png", fps: 6,  loop: false }, // 3f = 500 ms
-  vattack3:   { file: "Attack_3.png", fps: 6,  loop: false }, // 1-framová póza — animácia je let véčka (BLOOD_FX 3)
-  vattack4:   { file: "Attack_4.png", fps: 8,  loop: false }, // 6f = 750 ms
+  // Countess melee/pasca (podľa vampire_attack_guide): úder = A1 (krvavý bolt zapečený vo framoch),
+  // po dopadnutom dmg liečivé beaty A2→A3→A4 a až po nich +HP — jednotné pre charge melee, center
+  // melee aj trigger pasce. Onreho trigger úder ostáva Attack_1; na bunke pasce sa zjavuje s výkrikom
+  // (Scream). Všetko neloopové → kreslené relatívnym časom (VAMP_ONESHOT_KEYS), inak by viseli na
+  // poslednom frame. fps ladené tak, aby sa švih prehral CELÝ v rámci svojho beatu
+  // (VAMP_TRAP_STRIKE/WOLF_STRIKE 900 ms, VAMP_HEAL_BEAT 810 ms)
+  vattack1:   { file: "Attack_1.png", fps: 10, loop: false }, // Onre trap úder: 6f = 600 ms
+  va1:        { file: "A1.png", fps: 7, loop: false }, // úder + bolt: 6f = 857 ms
+  va2:        { file: "A2.png", fps: 4, loop: false }, // heal beat 1 (kvapky): 3f = 750 ms
+  va3:        { file: "A3.png", fps: 3, loop: false }, // heal beat 2 (véčko): 2f = 667 ms
+  va4:        { file: "A4.png", fps: 8, loop: false }, // heal beat 3 (vlna): 6f = 750 ms
   scream:     { file: "Scream.png",   fps: 8,  loop: false }  // 7f = 875 ms (zmestí sa do TELEPORT_IN)
 };
 // neloopové one-shot animácie kreslené relatívnym časom od setAnim (hrajú RAZ od frame 0, potom držia pózu)
-const VAMP_ONESHOT_KEYS = new Set(["wolfstrike", "vampstrike", "vattack1", "vattack2", "vattack3", "vattack4", "scream"]);
+const VAMP_ONESHOT_KEYS = new Set(["wolfstrike", "vampstrike", "vattack1", "va1", "va2", "va3", "va4", "scream"]);
 const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
 const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
 
@@ -569,9 +572,10 @@ const SPRITE_FILE_ALIAS = {
   // Vlkolak (prefix chytí Werewolf_1 aj _2): melee = Attack_3; natívny Attack_2 je rezervovaný pre
   // seknutie charge specialu (kľúč wolfstrike žiada fiktívny WolfStrike.png → mapuje sa naň)
   "Werewolf_": { "Attack_2.png": "Attack_3.png", "WolfStrike.png": "Attack_2.png" },
-  // Countess: projektil = krvavá strela (Blood_Charge_1); seknutie melee-charge = krvavá vlna (Attack_4)
-  "Countess_Vampire": { "Charge.png": "Blood_Charge_1.png", "VampStrike.png": "Attack_4.png" },
-  // Onre: Charge.png generuje tools/sprites-countess-onre (prízračný recolor); seknutie = Attack_3
+  // Vampire: Charge.png generuje tools/sprites-countess-onre (centrovaná červená strela);
+  // VampStrike sa u nej už nepoužíva (úder = A1), alias ostáva pre istotu
+  "Countess_Vampire": { "VampStrike.png": "Attack_4.png" },
+  // Onryō: Charge.png generuje tools/sprites-countess-onre (prízračný recolor); seknutie charge = Attack_3
   "Onre": { "VampStrike.png": "Attack_3.png" },
 };
 function spriteFileFor(charDir, file) {
@@ -818,6 +822,13 @@ function updateSpecialCenter(casts) {
     // raz na konci mierenia (čas od vzniku canvasu = od začiatku cast framu)
     if (caster.char === "soldier" && !sp.file) {
       cvs.dataset.soldierAim = "1";
+      cvs.dataset.born = String(performance.now());
+    }
+    // one-shot stredový sprite (Countess A-sheety): hrá RAZ od vzniku canvasu (= od začiatku svojho
+    // frame-u) a drží posledný frame — absolútny loop by naratívnu sekvenciu začal v strede.
+    // Platí pre melee/heal casty (sp.once) aj pre jej trap cast (special bez sp.file → A5)
+    if (sp.once || (caster.char === "countess" && !sp.file)) {
+      cvs.dataset.once = "1";
       cvs.dataset.born = String(performance.now());
     }
 
@@ -1165,63 +1176,8 @@ function spawnClonePuff(cell) {
   }
 }
 
-// Countess: k útokom Attack_1–4 patria prislúchajúce Blood_Charge_1–4 — kompozícia je NATÍVNA podľa
-// referenčného gifu (zmerané, sedí 1:1): charge frame sa ukotví na PEVNÝ bod vo frame postavy
-// (ox/oy v 128-space, mierka = mierka postavy) a prehrá svoje 4 framy — POHYB strely je zapečený
-// priamo v stripe (grafika putuje naprieč framom: bolt letí z ruky, véčko/vlna prúdia vpred).
-// Žiadne dodatočné škálovanie ani lietanie elementu. Blood_Charge_4 má framy 64×48.
-const BLOOD_FX = {
-  1: { file: "Blood_Charge_1.png", fw: 48, ox: 86, oy: 50 }, // bolt pri vystretej ruke (Attack_1)
-  2: { file: "Blood_Charge_2.png", fw: 48, ox: 75, oy: 42 }, // kvapky pred ňou (Attack_2)
-  3: { file: "Blood_Charge_3.png", fw: 48, ox: 76, oy: 43 }, // véčko pred tvárou (Attack_3)
-  4: { file: "Blood_Charge_4.png", fw: 64, ox: 70, oy: 51 }, // vlna v úrovni hrude (Attack_4)
-};
-const BLOOD_FPS = 10;
-// fromMs = od ktorého momentu útočnej animácie sa charge zjaví (Attack_1: až pri vystretí ruky)
-function spawnBloodFx(slot, n, durMs, fromMs = 0) {
-  const def = BLOOD_FX[n];
-  if (!def) return;
-  const launchGen = playGen; // medzitým začaté nové prehrávanie zruší odložený launch
-  setTimeout(() => {
-    if (launchGen !== playGen) return;
-    const p = state?.[slot];
-    if (!p || p.x == null) return;
-    const facing = currentFacing(slot, computeFacing(state?.p1, state?.p2)) || 1;
-    // geometria postavy — presne ako positionActors + drawSprite (128px frame, fill .95, anchorY .5)
-    const s = Math.min(ACTOR_W, ACTOR_H) / 128 * 0.95;
-    const { left, top } = cellToPx(p.x, p.y);
-    const actorLeft = left - (ACTOR_W - TILE_W) / 2;
-    const actorTop  = top - (ACTOR_H - TILE_H);
-    const frameTop  = actorTop + (ACTOR_H - 128 * s) / 2;
-    // stred charge framu v 128-space; horizontálne zrkadlenie okolo stredu postavy (x=64) podľa facingu
-    const ccx = def.ox + def.fw / 2, ccy = def.oy + 24;
-    const bx = actorLeft + ACTOR_W / 2 + pairShift(slot) + facing * (ccx - 64) * s;
-    const by = frameTop + ccy * s;
-    const cw = Math.round(def.fw * s), ch = Math.round(48 * s);
-    const el = document.createElement("canvas");
-    el.width = cw; el.height = ch; el.className = "blood-fx";
-    Object.assign(el.style, { position: "absolute", left: Math.round(bx - cw / 2) + "px", top: Math.round(by - ch / 2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
-    actorsEl.appendChild(el);
-    const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
-    const holdMs = Math.max(200, (durMs || 800) - fromMs);
-    ensureSpriteMeta("Countess_Vampire", def.file).then(m => {
-      const t0 = performance.now();
-      const step = () => {
-        if (!el.isConnected) return;
-        const t = performance.now() - t0;
-        if (t >= holdMs) { el.remove(); return; }
-        const idx = Math.floor(t / 1000 * BLOOD_FPS) % 4;
-        ctx.clearRect(0, 0, cw, ch);
-        ctx.save();
-        if (facing < 0) { ctx.translate(cw, 0); ctx.scale(-1, 1); } // sprite kreslený doprava
-        ctx.drawImage(m.img, idx * def.fw, 0, def.fw, 48, 0, 0, cw, ch);
-        ctx.restore();
-        requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    }).catch(() => el.remove());
-  }, fromMs);
-}
+// (Pozn.: krvavé Blood_Charge efekty k útokom už NIE sú samostatné overlay FX — sú zapečené priamo
+// vo framoch A-sheetov A1–A5, generovaných v tools/sprites-countess-onre/build.cjs podľa attack guide.)
 
 // zničenie pasce (Countess/Onre) — krvavo-fialový oblak: značka praskne a rozplynie sa.
 // Vidia ho OBAJA hráči (zámer — súper sa dozvie, že riziko pasce pominulo). Čisto kozmetické, self-remove.
@@ -1435,14 +1391,6 @@ function spawnOrMoveProjectile(c, s) {
     if (usesAltColor(charKey, c.from)) el.classList.add("alt-color"); // p2 paleta (Medúza/Naruto natívne)
     el.dataset.dir = dirKey;
     el.style.width = px + "px"; el.style.height = px + "px";
-    // sprite mieri doprava — ostatné smery flip/rotácia; orientácia je fixná počas letu (netranzicuje sa);
-    // diagonály (Countess/Onre) = rotácia o 45° od horizontály
-    const orient = {
-      left: "scaleX(-1)", up: "rotate(-90deg)", down: "rotate(90deg)",
-      up_right: "rotate(-45deg)", down_right: "rotate(45deg)",
-      up_left: "scaleX(-1) rotate(45deg)", down_left: "scaleX(-1) rotate(-45deg)",
-    }[c.dir] || "";
-    el.style.transform = `translate(-50%, -50%) ${orient}`.trim();
     // vznikni na bunke strelca a odtiaľ plynule kĺž na prvú bunku letu (nie zlietni z rohu (0,0));
     // klonova strela štartuje z KLONOVEJ bunky, nie z Narutovej
     const st = s?.[c.from];
@@ -1460,6 +1408,15 @@ function spawnOrMoveProjectile(c, s) {
   entry.charKey = charKey;    // Vojak: na konci letu granát vybuchne (retireProjectile)
   entry.from = c.from;
   entry.lastCell = c.cell;    // posledná bunka letu = miesto výbuchu (zásah súpera/klona alebo okraj plochy)
+  // sprite mieri doprava — ostatné smery flip/rotácia; nastavuje sa KAŽDÝ krok, lebo strela
+  // Vampire/Onryō mení smer po odraze od steny (transform sa netranzicuje → okamžitý flip špicu);
+  // diagonály = rotácia o 45° od horizontály
+  const orient = {
+    left: "scaleX(-1)", up: "rotate(-90deg)", down: "rotate(90deg)",
+    up_right: "rotate(-45deg)", down_right: "rotate(45deg)",
+    up_left: "scaleX(-1) rotate(45deg)", down_left: "scaleX(-1) rotate(-45deg)",
+  }[c.dir] || "";
+  entry.el.style.transform = `translate(-50%, -50%) ${orient}`.trim();
   entry.el.style.left = dst.left + "px"; // nová cieľová bunka → CSS ju plynule dokĺže za --charge-ms
   entry.el.style.top  = (dst.top + yOff) + "px";
 }
@@ -2231,7 +2188,7 @@ function actionIcon(action, ownerSlot) {
     case "dash":     return `🏃${arr(action)}`;
     case "recharge": return "🙏";
     case "attack":   return `🏹${arr(action)}`;
-    case "melee":    return `🗡️${ARROW_DIR[action.dir] || ""}`; // smer: Countess/Onre (charge/center)
+    case "melee":    return "🗡️";
     case "shield":   return "🛡️";
     case "mirror":   return "🪞";
     case "golden_shield": return "🛡️";
@@ -2377,6 +2334,12 @@ function renderGrid(s, effects = []) {
     if (e?.kind === "wolf_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
     // Countess/Onre: seknutie po charge/teleporte — zvýrazni bunku terča; trigger pasce — bunka sa rozžiari
     if (e?.kind === "vamp_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
+    // Countess: úder (A1) aj liečivé beaty (A2/A3/A4) sa zrkadlia do veľkého stredového spritu —
+    // one-shot od začiatku svojho beatu (once), nie absolútny loop; Onre stredový overlay nemá
+    if ((e?.kind === "vamp_strike" || e?.kind === "vamp_heal_cast") && s?.[e.from]?.char === "countess") {
+      const def = ANIM_DEF[e.anim] ?? ANIM_DEF.va1;
+      meleeCasts.push({ from: e.from, file: def.file, fps: def.fps, once: true });
+    }
     if (e?.kind === "trap_trigger" && Array.isArray(e.cell)) trapFlashCells.push(e.cell);
   }
 
@@ -2587,11 +2550,10 @@ function cellsForMeleePreview(p, char){
   });
   return cells;
 }
-// dráha melee-charge Countess/Onre: z pozície zvoleným smerom po prvú VIDITEĽNÚ figúru súpera (aj klon)
-// alebo okraj — zrkadlí doVampMelee na serveri (skrytý súper v labyrinte má x null → beh na okraj)
+// dráha charge Vampire/Onryō (dash slot): z pozície zvoleným smerom po prvú VIDITEĽNÚ figúru súpera
+// (aj klon) alebo okraj — zrkadlí doVampCharge na serveri (skrytý súper v labyrinte má x null → beh na okraj)
 function cellsForVampChargePreview(p, dir, foe){
   if (!p) return [];
-  if (dir === "center") return [[p.x, p.y]];
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
   if (!delta) return [];
   const cells = [];
@@ -2627,10 +2589,20 @@ function simulatedPositions(){
       if (inB(nx, ny)){ x = nx; y = ny; }
     }
     if (a.type === "dash" && d){
-      // až 2 políčka, na okraji sa skráti (zrkadlí server)
-      for (let s = 0; s < 2; s++){
-        const nx = x + d[0], ny = y + d[1];
-        if (inB(nx, ny)){ x = nx; y = ny; }
+      if (char === "countess" || char === "onre"){
+        // Vampire/Onryō: dash = charge — beh po prvú VIDITEĽNÚ figúru súpera alebo okraj
+        // (skrytý súper v labyrinte má x null → beh na okraj; zrkadlí server validQueue)
+        const foe = state?.[otherSlot()];
+        while (inB(x + d[0], y + d[1])){
+          x += d[0]; y += d[1];
+          if (foe && foe.x != null && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
+        }
+      } else {
+        // až 2 políčka, na okraji sa skráti (zrkadlí server)
+        for (let s = 0; s < 2; s++){
+          const nx = x + d[0], ny = y + d[1];
+          if (inB(nx, ny)){ x = nx; y = ny; }
+        }
       }
     }
     // vlkolakov charge special hýbe kasterom: stop na prvej VIDITEĽNEJ figúre súpera alebo na okraji
@@ -2641,17 +2613,6 @@ function simulatedPositions(){
         const foe = state?.[otherSlot()];
         while (inB(x + wd[0], y + wd[1])){
           x += wd[0]; y += wd[1];
-          if (foe && foe.x != null && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
-        }
-      }
-    }
-    // Countess/Onre melee-charge hýbe kasterom rovnako (4 smery; center pozíciu nemení)
-    if (a.type === "melee" && (char === "countess" || char === "onre") && a.dir && a.dir !== "center"){
-      const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
-      if (d){
-        const foe = state?.[otherSlot()];
-        while (inB(x + d[0], y + d[1])){
-          x += d[0]; y += d[1];
           if (foe && foe.x != null && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
         }
       }
@@ -2703,9 +2664,37 @@ function ghostCharAt(idx = myQueue.length) {
   return char;
 }
 
-// dráha basic útoku zvoleným smerom z danej pozície (po okraj boardu) — aj diagonály (Countess/Onre)
-function cellsForAimPreview(meState, dir){
+// Vampire/Onryō: lomená dráha diagonálnej strely — RAZ sa odrazí od ktorejkoľvek steny (od bočnej
+// letí späť), roh neodráža (koniec letu), tvrdý limit VAMP_SHOT_RANGE buniek. MUSÍ sedieť so
+// serverovým vampShotRoute (server.js) — preview aj skutočný let idú po rovnakých bunkách.
+const VAMP_SHOT_RANGE = 3;
+function vampShotRoute(x, y, dir){
+  let [dx, dy] = { up_left:[-1,-1], up_right:[1,-1], down_left:[-1,1], down_right:[1,1] }[dir] || [];
+  if (dx === undefined) return [];
+  const route = [];
+  let bounced = false;
+  const inB = (px, py) => px >= 0 && py >= 0 && px < board.w && py < board.h;
+  while (route.length < VAMP_SHOT_RANGE){
+    let nx = x + dx, ny = y + dy;
+    if (!inB(nx, ny)){
+      if (bounced) break; // druhý kontakt so stenou — koniec letu
+      const outX = nx < 0 || nx >= board.w, outY = ny < 0 || ny >= board.h;
+      if (outX && outY) break; // roh sa neodráža
+      bounced = true;
+      if (outX) dx = -dx; else dy = -dy;
+      nx = x + dx; ny = y + dy;
+      if (!inB(nx, ny)) break;
+    }
+    x = nx; y = ny;
+    route.push([x, y]);
+  }
+  return route;
+}
+// dráha basic útoku zvoleným smerom z danej pozície (po okraj boardu); Vampire/Onryō diagonály
+// idú po lomenej bounce dráhe (char sa dodáva kvôli nej)
+function cellsForAimPreview(meState, dir, char){
   if (!meState) return [];
+  if (char === "countess" || char === "onre") return vampShotRoute(meState.x, meState.y, dir);
   const delta = WOLF_DIRS_CLIENT[dir];
   if (!delta) return [];
   const cells = [];
@@ -2923,7 +2912,7 @@ function actionBadgeView(a, ownerSlot) {
     case "dash":          return { cls: "dash",    text: `🏃${dd || "?"}` };
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
-    case "melee":         return { cls: "melee",   text: `🗡️${arrow[a.dir] || ""}` }; // smer: Countess/Onre (charge/center)
+    case "melee":         return { cls: "melee",   text: "🗡️" };
     case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
@@ -2943,7 +2932,14 @@ function actionBadgeView(a, ownerSlot) {
 // hover náhľad dosahu pre moje útok/special/melee badge (z ghost pozície v danom kroku)
 function attachQueueHover(el, a, idx) {
   if (a.type === "attack") {
-    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForAimPreview(p, a.dir)); });
+    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForAimPreview(p, a.dir, ghostCharAt(idx))); });
+    el.addEventListener("mouseleave", clearPreviewCells);
+  } else if (a.type === "dash") {
+    // Vampire/Onryō: dash = charge — hover ukáže dráhu behu (stop na viditeľnej figúre súpera)
+    el.addEventListener("mouseenter", () => {
+      const p = ghostPos(idx); const char = ghostCharAt(idx);
+      if (p && (char === "countess" || char === "onre")) showPreviewCells(cellsForVampChargePreview(p, a.dir, state?.[otherSlot()]));
+    });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special") {
     // pride: Escanorova zóna závisí od AKTUÁLNEHO pride levelu (rovnako ako hover na šípkach pickeru) —
@@ -2959,10 +2955,7 @@ function attachQueueHover(el, a, idx) {
   } else if (a.type === "melee") {
     el.addEventListener("mouseenter", () => {
       const p = ghostPos(idx); if (!p) return;
-      const char = ghostCharAt(idx);
-      // Countess/Onre: smerový charge ukáž ako dráhu (stop na viditeľnej figúre), center = vlastná bunka
-      if (a.dir && (char === "countess" || char === "onre")) showPreviewCells(cellsForVampChargePreview(p, a.dir, state?.[otherSlot()]));
-      else showPreviewCells(cellsForMeleePreview(p, char));
+      showPreviewCells(cellsForMeleePreview(p, ghostCharAt(idx)));
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "demon") {
@@ -3151,10 +3144,8 @@ function updateActionButtons() {
   dashBtn.disabled = dashUsed;
   if (dashUsed) dashPicker.classList.add("hidden");
   if (attackUsed) aimPickerDiag?.classList.add("hidden"); // diagonálny aim picker (Countess/Onre)
-  // melee už nemá data-act (kvôli vamp pickeru Countess/Onre) — zneaktívni ho rovnako ako move/attack/dash
   const meleeUsed = myQueue.some(a => a.type === "melee");
   if (meleeBtn) meleeBtn.disabled = meleeUsed;
-  if (meleeUsed) vampPicker?.classList.add("hidden");
   // special už nemá data-act (kvôli Medúzinmu pickeru) — zneaktívni ho rovnako ako move/attack/dash
   const specialUsed = myQueue.some(a => a.type === "special");
   specialBtn.disabled = specialUsed;
@@ -3460,28 +3451,20 @@ function schedulePlayTimeline(timeline) {
         const sx = e.dir === "left" ? -1 : e.dir === "right" ? 1 : 0;
         if (sx) facingOverride[e.from] = { sx, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Countess/Onre: seknutie na bunke terča — po dobehnutí charge (VampStrike) alebo po teleporte
-      // pasce (anim hint zo servera: vattack1 = Attack_1 podľa attack guide). K Countessiným útokom
-      // Attack_1–4 patria prislúchajúce Blood_Charge FX (spawnBloodFx).
+      // Countess/Onre: seknutie na bunke terča — po dobehnutí charge alebo po teleporte pasce.
+      // Anim hint zo servera: Countess = va1 (A1 — krvavý bolt zapečený vo framoch, žiadne extra FX),
+      // Onre trap = vattack1 (Attack_1), Onre charge = default vampstrike (alias Attack_3)
       if (e.kind === "vamp_strike" && (e.from === "p1" || e.from === "p2")) {
         const key = e.anim && ANIM_DEF[e.anim] ? e.anim : "vampstrike";
         setAnim(e.from, key, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
-        if (state?.[e.from]?.char === "countess") {
-          // Attack_1: bolt sa zjaví pri vystretí ruky (frame 5 @10fps = 500 ms); vampstrike = alias Attack_4 → vlna hneď
-          if (key === "vattack1") spawnBloodFx(e.from, 1, frameHold, 500);
-          else spawnBloodFx(e.from, 4, frameHold);
-        }
       }
-      // Countess: liečivé beaty po trap zásahu (Attack_2 → Attack_3 → Attack_4) — HP sa doplnia až po
-      // nich; každý beat sprevádza jeho Blood_Charge FX
+      // Countess: liečivé beaty po dopadnutom melee/trap dmg (A2 → A3 → A4, krvavé efekty vo framoch) —
+      // HP sa doplnia až po nich
       if (e.kind === "vamp_heal_cast" && (e.from === "p1" || e.from === "p2")) {
-        const key = e.anim && ANIM_DEF[e.anim] ? e.anim : "vattack2";
+        const key = e.anim && ANIM_DEF[e.anim] ? e.anim : "va2";
         setAnim(e.from, key, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
-        if (state?.[e.from]?.char === "countess") {
-          spawnBloodFx(e.from, key === "vattack2" ? 2 : key === "vattack3" ? 3 : 4, frameHold);
-        }
       }
       // pasca položená — značku kreslí renderGrid zo state[slot].trap; float vidí len caster
       // (súperovi server trap_set efekt aj trap v dátach rediguje)
@@ -3559,10 +3542,9 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
+        // (Countess sem už nechodí — jej center melee je jednotný vamp_strike s A1)
         setAnim(e.from, state?.[e.from]?.char === "medusa" ? "attack1_loop" : "attack2_loop", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
-        // Countess: k Attack_2 patrí Blood_Charge_2 (krvavé kvapky) — pri každom melee beate
-        if (state?.[e.from]?.char === "countess") spawnBloodFx(e.from, 2, frameHold);
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", frameHold);
@@ -4089,8 +4071,8 @@ const ABILITY_PREVIEW = {
   // mesiaca cykluje pod mini-doskou (moonCycle — ako Escanorov pride náhľad), preto žiadny effect/stats riadok
   werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
   // Countess/Onre: pasca — náhľad ukazuje príkladovú cieľovú bunku (target) ako Vojak
-  countess:  { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "Set a hidden trap on ANY cell. When the foe enters or passes it, you teleport there and strike (3 dmg for 4 mana; a landed hit heals you +3 HP). Foe's mirror acts as a mere shield against her" },
-  onre:      { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "Set a hidden trap on ANY cell. When the foe enters or passes it, you teleport there and strike (3 dmg for 4 mana; a landed hit drains 3 of the foe's mana into yours). Foe's mirror acts as a mere shield against him" },
+  countess:  { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Her strikes feed on blood (a landed hit heals her); mirrors are mere shields against her" },
+  onre:      { caster: { x: 0, y: 1 }, dmg: 3, target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Her strikes drain the foe's mana into hers; mirrors are mere shields against her" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -4353,7 +4335,6 @@ const specialPicker = document.getElementById("special-picker"); // smer pohľad
 const cellPicker    = document.getElementById("cell-picker");    // Vojak/Countess/Onre — mini mapa plochy na výber cieľovej bunky
 const wolfPicker    = document.getElementById("wolf-picker");    // Vlkolak — 8 smerov charge (aj diagonály)
 const aimPickerDiag = document.getElementById("aim-picker-diag"); // Countess/Onre — diagonálny basic (4 smery)
-const vampPicker    = document.getElementById("vamp-picker");     // Countess/Onre — melee charge (4 smery) + stred
 
 function shakeBtn(btn) {
   btn.classList.add("shake");
@@ -4362,10 +4343,31 @@ function shakeBtn(btn) {
 
 // otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
 // odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
-let openPicker = null; // null | "move" | "attack" | "attack_diag" | "dash" | "melee_vamp" | "special" | "special_cell" | "special_wolf"
+let openPicker = null; // null | "move" | "attack" | "attack_diag" | "dash" | "special" | "special_cell" | "special_wolf"
 const meleeBtn = document.getElementById("melee-btn"); // melee má picker (Countess/Onre) → vlastné id a handler
-const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, melee_vamp: vampPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker };
-const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, melee_vamp: meleeBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn };
+const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn };
+
+// Vampire/Onryō: dash slot = CHARGE — tlačidlo dostane fialový „Hidden" skin s preblikávaním a ❔
+// namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
+// Attack tooltip navyše vysvetlí odraz strely. Volané zo state handlera pri každom snapshote.
+const DASH_TITLE_DEFAULT   = "Dash - move up to 2 cells in a direction (−4 mana)";
+const ATTACK_TITLE_DEFAULT = "Range Attack - choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)";
+function syncDashBtn(char) {
+  const side = char === "countess" || char === "onre";
+  dashBtn.classList.toggle("vamp-charge", side);
+  dashPicker?.classList.toggle("vamp-charge", side);
+  const ico = dashBtn.querySelector(".pix-ico");
+  const want = side ? "❔" : "🏃";
+  if (ico && ico.dataset.emoji !== want) { ico.dataset.emoji = want; ico.innerHTML = ""; pixelizeEmoji(ico); }
+  dashBtn.title = !side ? DASH_TITLE_DEFAULT
+    : char === "countess"
+      ? "Charge — rush in a direction; stops at the first foe and strikes (pure reposition if none, stays on the target's cell even when blocked). A landed hit heals you (blocked = nothing)"
+      : "Charge — rush in a direction; stops at the first foe and strikes (pure reposition if none, stays on the target's cell even when blocked). A landed hit drains the foe's mana into yours (blocked = nothing)";
+  attackBtn.title = side
+    ? "Range Attack — a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance"
+    : ATTACK_TITLE_DEFAULT;
+}
 
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
@@ -4422,10 +4424,8 @@ attackBtn.addEventListener("click", () => {
   togglePicker((c === "countess" || c === "onre") ? "attack_diag" : "attack", attackBtn, "attack");
 });
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
-// Melee: Countess/Onre si vyberajú smer charge / stred; ostatní pridajú akciu priamo
+// Melee: priama akcia bez pickera (Vampire/Onryō sekajú tiež len na vlastnej bunke)
 meleeBtn?.addEventListener("click", () => {
-  const c = ghostCharAt();
-  if (c === "countess" || c === "onre") { togglePicker("melee_vamp", meleeBtn, "melee"); return; }
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(meleeBtn); return; }
   if (myQueue.length >= 3 || myQueue.some(a => a.type === "melee")) { shakeBtn(meleeBtn); return; }
@@ -4658,7 +4658,7 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     if (type === "dash")      myQueue.push({ type: "dash", dir: arg });
     if (type === "recharge")  myQueue.push({ type: "recharge" });
     if (type === "attack")    myQueue.push({ type: "attack", dir: arg });
-    if (type === "melee")     myQueue.push(arg ? { type: "melee", dir: arg } : { type: "melee" }); // smer (šípky vamp pickera) volia Countess/Onre
+    if (type === "melee")     myQueue.push({ type: "melee" });
     if (type === "special")   myQueue.push(arg ? { type: "special", dir: arg } : { type: "special" }); // smer (←/→) volí len Medúza
     if (type === "shield")    myQueue.push({ type: "shield" });
     if (type === "mirror")    myQueue.push({ type: "mirror" });
@@ -4943,12 +4943,11 @@ function autoLockTimeout() {
   if (goldenArmed) used.add("shield");
   if (goldenMirrorArmed) used.add("mirror");
   const pool = ["recharge", "shield", "mirror", "melee", "special", "move", "dash", "attack"].filter(t => !used.has(t));
-  const sideChar = ghostCharAt() === "countess" || ghostCharAt() === "onre"; // diagonálny attack, melee so smerom, pasca s bunkou
+  const sideChar = ghostCharAt() === "countess" || ghostCharAt() === "onre"; // diagonálny attack, pasca s bunkou (dash/melee generické)
   const DIAG_KEYS = ["up_left", "up_right", "down_left", "down_right"];
   while (myQueue.length < 3 && pool.length) {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
     if (t === "attack" && sideChar) myQueue.push({ type: t, dir: DIAG_KEYS[Math.floor(Math.random() * 4)] });
-    else if (t === "melee" && sideChar) { const md = ["up", "down", "left", "right", "center"]; myQueue.push({ type: t, dir: md[Math.floor(Math.random() * md.length)] }); }
     else if (t === "special" && sideChar) myQueue.push({ type: t, cell: { x: (Math.random() * board.w) | 0, y: (Math.random() * board.h) | 0 } }); // pasca — ľubovoľná bunka
     else if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
     else if (t === "special" && (ghostCharAt() === "medusa" || ghostCharAt() === "escanor")) myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
@@ -5206,7 +5205,9 @@ socket.on("state", (s) => {
   }
   // počas prehrávania snapshot bez timeline nevykresľuj — framy bežiacej timeline majú prednosť
 
-  // label melee podľa mága — Medúza má širší dosah (diagonály) za nižší dmg; Countess/Onre charge + bonus
+  // dash/attack tlačidlá podľa mága — Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
+  syncDashBtn(s[me]?.char);
+  // label melee podľa mága — Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō bonus
   const mineMelee = s[me];
   if (mineMelee?.char && meleeBtn) {
     const mCost = meleeBtn.querySelector(".cost");
@@ -5214,11 +5215,11 @@ socket.on("state", (s) => {
       meleeBtn.title = "Melee (−4 mana, 4 dmg, hits your cell + all diagonal neighbours)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(mCost); }
     } else if (mineMelee.char === "countess") {
-      meleeBtn.title = "Melee (−4 mana, 3 dmg) — charge in a direction (stops at the first foe; pure reposition if none) or strike your own cell. A landed hit heals you +3 HP (blocked = nothing)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 3${miniPix("☠️")} +3${miniPix("❤️")}`; hydratePix(mCost); }
+      meleeBtn.title = "Melee — strike your own cell. A landed hit heals you (blocked = nothing)";
+      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")} +${miniPix("❤️")}`; hydratePix(mCost); }
     } else if (mineMelee.char === "onre") {
-      meleeBtn.title = "Melee (−4 mana, 3 dmg) — charge in a direction (stops at the first foe; pure reposition if none) or strike your own cell. A landed hit drains 3 of the foe's mana into yours (blocked = nothing)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 3${miniPix("☠️")} +3${miniPix("💧")}`; hydratePix(mCost); }
+      meleeBtn.title = "Melee — strike your own cell. A landed hit drains the foe's mana into yours (blocked = nothing)";
+      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")} +${miniPix("💧")}`; hydratePix(mCost); }
     } else {
       meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
@@ -5254,9 +5255,9 @@ socket.on("state", (s) => {
       delete specialBtn.dataset.wolfMoon;
       syncWolfSpecialBtn();
     } else if (specChar === "countess" || specChar === "onre") {
-      // Countess/Onre: pasca — teleport + melee (3 dmg + bonus za ďalšie 4 many) pri súperovom vstupe/prechode
-      const bonus = specChar === "countess" ? "heals you +3 HP" : "drains 3 of the foe's mana into yours";
-      specialBtn.title = `Special (−5 mana) — set a hidden trap on ANY cell (even the foe's current one). When the foe enters or passes it, you teleport there and strike (3 dmg for another 4 mana; a landed hit ${bonus}). Only one trap — recasting replaces it`;
+      // Vampire/Onryō: pasca — teleport + úder (za ďalšiu manu) pri súperovom vstupe/prechode
+      const bonus = specChar === "countess" ? "heals you" : "drains the foe's mana into yours";
+      specialBtn.title = `Special (−5 mana) — set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike — the strike costs extra mana; a landed hit ${bonus}. Only one trap — recasting replaces it`;
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🪤`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
@@ -5353,10 +5354,13 @@ function raf() {
     else if (!lyingDead && aSt.key === "dead") { aSt.key = "idle"; aSt.until = 0; }
     // skamenená postava = zamrznutá socha (fixný idle frame; sivý nádych rieši actorFilter); smrť má prednosť
     const stoned = (st.stone || 0) > 0 && !lyingDead;
+    // Countess pri caste pasce: A5 (naratívna sekvencia) sa hrá RAZ od frame 0 — relatívny čas nižšie;
+    // absolútny loop by začal v strede sekvencie (victory/preview loop ostáva)
+    const vampCast = st.char === "countess" && aSt.key === "casting";
     let anim = stoned
       ? ANIM_DEF.idle
       : (aSt.key === "victory" || aSt.key === "casting")
-        ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
+        ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: !vampCast }
         : currentAnim(slot);
     // Vojak pri caste specialu: mieriaca póza (frame 0) drží, výšľah raz na konci — v synchróne
     // s veľkým stredovým overlayom (rovnaké SOLDIER_AIM/FIRE časovanie, čas od setAnim)
@@ -5378,7 +5382,7 @@ function raf() {
     const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
     const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
                 : escWinsun ? (now - (animState[slot].start || 0))
-                : VAMP_ONESHOT_KEYS.has(aSt.key) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty) hrá RAZ od frame 0, potom drží pózu
+                : (VAMP_ONESHOT_KEYS.has(aSt.key) || vampCast) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast) hrá RAZ od frame 0, potom drží pózu
                 : (stoned ? 0 : now);
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
@@ -5456,7 +5460,7 @@ function raf() {
     const mine = state?.[me];
     const gp = ghostPos();
     const show = mine && mine.char && !mine.locked && !playing && gp &&
-                 myQueue.some(a => a.type === "move" || a.type === "dash" || a.type === "special" || a.type === "melee") && // special: vlkolakov charge; melee: Countess/Onre charge
+                 myQueue.some(a => a.type === "move" || a.type === "dash" || a.type === "special") && // special: vlkolakov charge; dash: aj charge Vampire/Onryō
                  (gp.x !== mine.x || gp.y !== mine.y);
     if (!show) {
       ctx.clearRect(0, 0, actorGhost.width, actorGhost.height);
@@ -5610,6 +5614,15 @@ function raf() {
         .catch(()=>{});
       return;
     }
+    // one-shot (Countess A-sheety): frame index od vzniku canvasu, drawSprite clampne na posledný frame
+    if (cvs.dataset.once) {
+      const fps = Number(cvs.dataset.fps) || SPECIAL_FPS;
+      const idx = Math.floor((now - Number(cvs.dataset.born)) / 1000 * fps);
+      ensureSpriteMeta(dir, file)
+        .then(meta => drawSprite(ctx, meta, { file, fps, frameIndex: idx }, 0, cvs.width, cvs.height))
+        .catch(()=>{});
+      return;
+    }
     const anim = { file, fps: Number(cvs.dataset.fps) || SPECIAL_FPS, loop: true };
     ensureSpriteMeta(dir, file)
       .then(meta => drawSprite(ctx, meta, anim, performance.now(), cvs.width, cvs.height))
@@ -5757,8 +5770,9 @@ if (meleeBtn) {
   });
   meleeBtn.addEventListener("mouseleave", clearPreviewCells);
 }
-// hover preview dráhy melee-charge Countess/Onre na šípkach vamp pickera (stred = vlastná bunka)
-vampPicker?.querySelectorAll("button[data-act]").forEach(btn => {
+// hover preview dráhy charge Vampire/Onryō na šípkach dash pickera (dash = charge; stop na
+// viditeľnej figúre súpera) — pre ostatné postavy dash hover nič neukazuje (čistý pohyb)
+dashPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
   btn.addEventListener("mouseenter", () => {
     const p = ghostPos();
@@ -5768,12 +5782,12 @@ vampPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
-// hover preview dráhy diagonálnej strely (Countess/Onre) na šípkach diag aim pickera
+// hover preview lomenej dráhy diagonálnej strely (Vampire/Onryō) na šípkach diag aim pickera
 aimPickerDiag?.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
   btn.addEventListener("mouseenter", () => {
     const p = ghostPos();
-    if (p) showPreviewCells(cellsForAimPreview(p, dir));
+    if (p) showPreviewCells(cellsForAimPreview(p, dir, ghostCharAt()));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });

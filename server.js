@@ -83,9 +83,18 @@ const SIDE_CHARS = { countess: "p1", onre: "p2" };
 const DIAG_DIRS = { up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
 const DIAG_DIR_KEYS = Object.keys(DIAG_DIRS);
 // ich melee nesie smer: charge v 4 smeroch ALEBO úder na vlastnej bunke ("center") — obe 3 dmg + bonus
-const VAMP_MELEE_DIRS = new Set(["up", "down", "left", "right", "center"]);
-const VAMP_MELEE_DMG = 3;
-const VAMP_BONUS = 3; // Countess +3 HP / Onre −3 many súperovi a +3 sebe — LEN keď dmg reálne dopadne
+// Vampire/Onryō kit: melee = úder LEN na vlastnej bunke (bez smeru); charge nahrádza dash — pohybové
+// melee 4 smermi po prvú figúru/okraj; trap úder si drží pôvodné hodnoty. Bonus (Vampire HP heal /
+// Onryō mana drain+gain) padá LEN keď dmg reálne dopadne.
+const VAMP_MELEE_DMG    = 8;
+const VAMP_MELEE_BONUS  = 4;
+const VAMP_CHARGE_DMG   = 4;
+const VAMP_CHARGE_BONUS = 2;
+const VAMP_TRAP_DMG     = 3;
+const VAMP_TRAP_BONUS   = 3;
+// diagonálny basic: strela sa RAZ odrazí od ktorejkoľvek steny (biliard — od bočnej letí späť),
+// roh neodráža (strela končí), tvrdý limit letu = 3 bunky → dmg presne 3/2/1 podľa vzdialenosti
+const VAMP_SHOT_RANGE = 3;
 const STONE_ACTIONS = 2; // Medúzin special: zasiahnutý súper preskočí najbližšie 2 základné akcie (kameň)
 // Minotaurov special (labyrint) nemá číselnú konštantu — trvá, kým jeden hráč nezasiahne druhého (viď endLabyrinths)
 const CLONE_DMG = 1; // Narutov klon: koľko pohltí na zdieľanej bunke (jednorazový bait), kým zvyšok strely prejde na Naruta. Útok aj odraz mirrorom dávajú PLNÝ dmg ako Naruto (viď doBasic/doMelee/applyHitOnClone)
@@ -158,11 +167,15 @@ const TELEPORT_OUT_MS  = Math.round(650 * ANIM_SLOW);
 const TELEPORT_IN_MS   = Math.round(650 * ANIM_SLOW);
 // Labyrint: odhalenie PRED zásahom, ktorý ho určite ukončí — skrytý súper sa zjaví (fade ako démon/teleport)
 const LAB_REVEAL_MS    = Math.round(700 * ANIM_SLOW);
-// Pasca (Countess/Onre) — trigger choreografia: po teleporte úder Attack_1 (dmg dopadne až po ňom);
-// Countess potom lieči NIE naraz so zásahom — beaty Attack_2→Attack_3→Attack_4 a až po nich +3 HP.
-// Časy musia pokryť klientske animácie (Attack_1 ~600 ms, Attack_4 ~750 ms @ 8–10 fps).
+// Countess melee/pasca choreografia (podľa vampire_attack_guide, A-sheety s krvavými efektmi zapečenými
+// vo framoch): úder = A1 (dmg dopadne až po ňom), potom liečivé beaty A2→A3→A4 a až po nich +3 HP —
+// jednotné pre charge melee, center melee aj trigger pasce. Onre má pôvodnú choreografiu (Attack_1/vampstrike,
+// drain hneď po zásahu). Časy musia pokryť klientske A-animácie (A1 6f @7fps ~857 ms, A4 6f @8fps ~750 ms).
 const VAMP_TRAP_STRIKE_MS = Math.round(500 * ANIM_SLOW);
 const VAMP_HEAL_BEAT_MS   = Math.round(450 * ANIM_SLOW);
+// Countess kladenie pasce: JEDEN dlhý cast frame (nie beaty) — stredová aj malá postava hrajú celé A5
+// (17 framov) RAZ od frame 0; dĺžka = 17f @ SPECIAL_FPS 6 v client.js (musí sedieť, inak sa A5 usekne)
+const VAMP_CAST_MS = Math.round(17 * 1000 / 6);
 // Naruto: summon klona — po pečatiach (special beaty) hrá Naruto + 2 kópie po bokoch Special_2 animáciu
 const CLONE_SUMMON_MS  = Math.round(1300 * ANIM_SLOW);
 
@@ -772,13 +785,12 @@ function validQueue(queue, slot) {
   if (goldenPre === "golden_shield" && types.includes("shield")) return false;
   if (goldenPre === "golden_mirror" && types.includes("mirror")) return false;
   {
-    // Countess/Onre: basic strieľa DIAGONÁLNE (4 diagonálne smery), melee nesie smer (4 smery + center);
-    // ostatné postavy: attack ortogonálne, melee bez smeru. Side postavy nie sú v turnaji → char je fixný.
+    // Vampire/Onryō: basic strieľa DIAGONÁLNE (4 diagonálne smery); melee je bez smeru (vlastná bunka)
+    // a dash = charge (rovnaké 4 smery ako dash). Side postavy nie sú v turnaji → char je fixný.
     const side = !!SIDE_CHARS[game.players[slot]?.char];
     for (const a of q) {
       if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
       if (a.type === "attack" && !(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
-      if (a.type === "melee" && side && !VAMP_MELEE_DIRS.has(a.dir)) return false;
     }
   }
   // Vojak: special nesie cieľovú bunku {x,y}. Cieľ nesmie byť súperova AKTUÁLNA bunka (ani jeho tieňový
@@ -795,7 +807,18 @@ function validQueue(queue, slot) {
       if (a.type === "swap" && a.to) simChar = a.to; // v turnaji môže special hádzať až swapnutý mág
       const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
       if (a.type === "move" && d && inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
-      if (a.type === "dash" && d) for (let s = 0; s < 2; s++) if (inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
+      // Vampire/Onryō: dash = charge — beh po prvú VIDITEĽNÚ figúru súpera alebo okraj (zrkadlí
+      // klientský ghost; v labyrinte je súper skrytý → beh na okraj); ostatní dashujú max 2 bunky
+      if (a.type === "dash" && d) {
+        if (SIDE_CHARS[simChar]) {
+          while (inBounds(sx + d[0], sy + d[1])) {
+            sx += d[0]; sy += d[1];
+            if (!meP?.labyrinth && foe && ((foe.x === sx && foe.y === sy) || (foe.clone && foe.clone.x === sx && foe.clone.y === sy))) break;
+          }
+        } else {
+          for (let s = 0; s < 2; s++) if (inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
+        }
+      }
       // Vlkolakov charge hýbe kasterom — simuluj presun (stop na prvej VIDITEĽNEJ figúre súpera alebo na
       // okraji; v labyrinte je súper skrytý → beh na okraj, zrkadlí klientský ghost). Ovplyvňuje ghost
       // pozíciu neskoršieho Vojakovho specialu po turnajovom swape.
@@ -822,17 +845,6 @@ function validQueue(queue, slot) {
       if (a.type === "special" && SIDE_CHARS[simChar]) {
         const c = a.cell;
         if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
-      }
-      // Countess/Onre: smerový melee-charge hýbe kasterom (stop na prvej VIDITEĽNEJ figúre alebo okraji)
-      // — drž ghost pozíciu presnú pre prípadné ďalšie akcie (zrkadlí klientský simulatedPositions)
-      if (a.type === "melee" && SIDE_CHARS[simChar] && a.dir && a.dir !== "center") {
-        const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
-        if (d) {
-          while (inBounds(sx + d[0], sy + d[1])) {
-            sx += d[0]; sy += d[1];
-            if (!meP?.labyrinth && foe && ((foe.x === sx && foe.y === sy) || (foe.clone && foe.clone.x === sx && foe.clone.y === sy))) break;
-          }
-        }
       }
     }
   }
@@ -915,6 +927,8 @@ function doMove(slot, dir, tl) {
 
 function doDash(slot, dir, tl) {
   const a = game.players[slot];
+  // Vampire/Onryō nemajú dash — ich dash slot je pohybové melee (charge)
+  if (SIDE_CHARS[a.char]) return doVampCharge(slot, dir, tl);
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
   if (!delta) { pushInvalid(tl, slot); return; }
   if (a.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
@@ -969,12 +983,41 @@ function doRecharge(slot, tl) {
   }
 }
 
+// Vampire/Onryō: lomená dráha diagonálnej strely — RAZ sa odrazí od ktorejkoľvek steny (biliard,
+// od bočnej letí späť ku kasterovi), roh neodráža (let končí), tvrdý limit VAMP_SHOT_RANGE buniek.
+// Výstrel do priľahlej steny sa odrazí OKAMŽITE (spotrebuje svoj jediný odraz); do rohu = prázdna
+// dráha → wall-rule whiff. Každý krok nesie aj dir (klient podľa neho otáča špic strely po odraze).
+// MUSÍ sedieť s klientským cellsForAttackPreview (vampShotRoute v client.js).
+const DIAG_NAME = { "-1,-1": "up_left", "1,-1": "up_right", "-1,1": "down_left", "1,1": "down_right" };
+function vampShotRoute(x, y, dir) {
+  let [dx, dy] = DIAG_DIRS[dir] || [];
+  if (dx === undefined) return [];
+  const route = [];
+  let bounced = false;
+  while (route.length < VAMP_SHOT_RANGE) {
+    let nx = x + dx, ny = y + dy;
+    if (!inBounds(nx, ny)) {
+      if (bounced) break; // druhý kontakt so stenou — koniec letu
+      const outX = nx < 0 || nx >= game.board.w;
+      const outY = ny < 0 || ny >= game.board.h;
+      if (outX && outY) break; // roh sa neodráža
+      bounced = true;
+      if (outX) dx = -dx; else dy = -dy;
+      nx = x + dx; ny = y + dy;
+      if (!inBounds(nx, ny)) break;
+    }
+    x = nx; y = ny;
+    route.push({ x, y, dir: DIAG_NAME[dx + "," + dy] });
+  }
+  return route;
+}
+
 function doBasic(slot, dir, tl) {
   const me  = game.players[slot];
   const opS = other(slot);
   const op  = game.players[opS];
 
-  // ortogonálne + diagonálne smery (Countess/Onre strieľajú diagonálne — validQueue gate-uje per postava)
+  // ortogonálne + diagonálne smery (Vampire/Onryō strieľajú diagonálne — validQueue gate-uje per postava)
   const delta = WOLF_DIRS[dir];
   if (!delta) { pushInvalid(tl, slot); return; }
   if (me.mana < BASIC_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
@@ -990,20 +1033,26 @@ function doBasic(slot, dir, tl) {
   // klon STOJÍ NA majiteľovej bunke, pohltí len CLONE_DMG a zvyšok prejde na Naruta.
   const cloneDir = CLONE_DIR[dir];
   const cloneDelta = [delta[0], -delta[1]];
-  const shots = [{ x: me.x, y: me.y, dist: 0, clone: false, d: delta, dir, done: false, spent: false }];
-  if (me.clone) shots.push({ x: me.clone.x, y: me.clone.y, dist: 0, clone: true, d: cloneDelta, dir: cloneDir, done: false, spent: false });
+  // Vampire/Onryō: strela letí po vopred vypočítanej lomenej dráhe (route) s odrazom; ostatní priamo
+  const route = SIDE_CHARS[me.char] ? vampShotRoute(me.x, me.y, dir) : null;
+  const shots = [{ x: me.x, y: me.y, dist: 0, clone: false, d: delta, dir, done: false, spent: false, route }];
+  if (me.clone) shots.push({ x: me.clone.x, y: me.clone.y, dist: 0, clone: true, d: cloneDelta, dir: cloneDir, done: false, spent: false, route: null });
 
+  // bunky, ktorými strela preletí (route = lomená dráha; inak priamo po okraj)
+  const shotScanCells = (sh) => {
+    if (sh.route) return sh.route.map(st => [st.x, st.y]);
+    const cs = []; let hx = sh.x, hy = sh.y;
+    while (inBounds(hx + sh.d[0], hy + sh.d[1])) { hx += sh.d[0]; hy += sh.d[1]; cs.push([hx, hy]); }
+    return cs;
+  };
   // deterministický pre-scan: zásah REÁLNEHO hráča ktoroukoľvek strelou odhalí labyrint pred letom
   // (zásah len klona-návnady labyrint neodhaľuje; stacknutý klon strelu k Narutovi pustí → to odhalí)
-  for (const sh of shots) {
-    let hx = sh.x, hy = sh.y, blockedByClone = false;
-    while (inBounds(hx + sh.d[0], hy + sh.d[1])) {
-      hx += sh.d[0]; hy += sh.d[1];
+  outer: for (const sh of shots) {
+    for (const [hx, hy] of shotScanCells(sh)) {
       const cloneDecoy = op?.clone && op.clone.x === hx && op.clone.y === hy && !(op.x === hx && op.y === hy);
-      if (cloneDecoy) { blockedByClone = true; break; } // klon-návnada strelu zožerie
-      if (op && op.x === hx && op.y === hy) break;
+      if (cloneDecoy) break; // klon-návnada strelu zožerie — ďalej nedoletí
+      if (op && op.x === hx && op.y === hy) { revealLabyrinths(tl); break outer; }
     }
-    if (!blockedByClone && op && op.x === hx && op.y === hy) { revealLabyrinths(tl); break; }
   }
 
   // paralelný let: v každom kroku sa všetky živé strely posunú o bunku (jeden frame = všetky charge efekty)
@@ -1013,8 +1062,15 @@ function doBasic(slot, dir, tl) {
     const hits = [];
     for (const s of shots) {
       if (s.done) continue;
-      s.x += s.d[0]; s.y += s.d[1]; s.dist++;
-      if (!inBounds(s.x, s.y)) { s.done = true; continue; }
+      if (s.route) {
+        // lomená dráha (Vampire/Onryō): krok podľa route; dir sa mení po odraze (klient otáča špic)
+        const st = s.route[s.dist];
+        if (!st) { s.done = true; continue; }
+        s.x = st.x; s.y = st.y; s.dir = st.dir; s.dist++;
+      } else {
+        s.x += s.d[0]; s.y += s.d[1]; s.dist++;
+        if (!inBounds(s.x, s.y)) { s.done = true; continue; }
+      }
       fx.push({ kind: "charge", from: slot, dir: s.dir, cell: [s.x, s.y], clone: s.clone });
       if (s.spent) continue; // už minutá na klona-návnadu — letí len vizuálne
       const cloneHere  = op?.clone && op.clone.x === s.x && op.clone.y === s.y;
@@ -1072,13 +1128,13 @@ function doBasic(slot, dir, tl) {
   if (!anyCharge) pushStateFrame(tl, [{ kind: "attack_swing", from: slot, dir, offboard: true }], SMALL_DELAY_MS);
 }
 
-function doMelee(slot, tl, dir = null) {
+function doMelee(slot, tl) {
   const me  = game.players[slot];
   const opS = other(slot);
   const op  = game.players[opS];
 
-  // Countess/Onre majú vlastný melee (smerový charge / úder na vlastnej bunke + bonus)
-  if (SIDE_CHARS[me.char]) return doVampMelee(slot, dir, tl);
+  // Vampire/Onryō majú vlastný melee (úder na vlastnej bunke + bonus)
+  if (SIDE_CHARS[me.char]) return doVampMelee(slot, tl);
 
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
@@ -1139,23 +1195,29 @@ function doMelee(slot, tl, dir = null) {
   }
 }
 
-/* ---- Countess Vampire / Onre: melee + pasca ---- */
+/* ---- Vampire / Onryō: melee + charge + pasca ---- */
 // bonus po REÁLNE dopadnutom dmg (nie pri bloku — mirror sa voči nim správa tiež ako blok):
-// Countess +VAMP_BONUS HP (cap 10); Onre vysaje súperovi manu (limit = koľko súper reálne má)
-// a rovnaký objem si pridá (vlastný cap 10 — presah prepadá, súperovi sa strhne celý drain)
-function vampBonus(slot, tl) {
+// Vampire +amount HP (cap 10); Onryō vysaje súperovi amount many (limit = koľko súper reálne má)
+// a rovnaký objem si pridá (vlastný cap 10 — presah prepadá, súperovi sa strhne celý drain).
+// Vampire NElieči naraz so zásahom — najprv beaty A2 → A3 → A4 (jednotná choreografia pre melee,
+// charge aj trigger pasce), až po nich sa doplnia HP; Onryō drainuje hneď.
+// amount: melee VAMP_MELEE_BONUS, charge VAMP_CHARGE_BONUS, trap VAMP_TRAP_BONUS.
+function vampBonus(slot, tl, amount) {
   const p = game.players[slot];
   const foeS = other(slot);
   const foe = game.players[foeS];
   if (p.char === "countess") {
-    const healed = Math.min(START_HP, p.hp + VAMP_BONUS) - p.hp;
+    for (const a of ["va2", "va3", "va4"]) {
+      pushStateFrame(tl, [{ kind: "vamp_heal_cast", from: slot, anim: a }], VAMP_HEAL_BEAT_MS);
+    }
+    const healed = Math.min(START_HP, p.hp + amount) - p.hp;
     if (healed > 0) {
       p.hp += healed;
       pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed }], SMALL_DELAY_MS);
     }
     return;
   }
-  const drained = Math.min(VAMP_BONUS, Math.max(0, foe.mana));
+  const drained = Math.min(amount, Math.max(0, foe.mana));
   if (drained <= 0) return;
   const gained = Math.min(drained, MAX_MANA - p.mana);
   foe.mana -= drained;
@@ -1163,41 +1225,51 @@ function vampBonus(slot, tl) {
   pushStateFrame(tl, [{ kind: "mana_drain", from: slot, target: foeS, drained, gained }], SMALL_DELAY_MS);
 }
 
-// Melee Countess/Onre: smerový CHARGE (ako vlkolakov special, len 4 ortogonálne smery) ALEBO úder na
-// vlastnej bunke ("center") — OBE verzie 3 dmg + bonus (Countess +3 HP / Onre −3+3 many). Bonus LEN keď
-// dmg reálne dopadne (block/mirror-imunitný blok = nič; zabitý klon-návnada = nič). Charge sa zastaví na
-// prvej figúre súpera (klon-návnada pred hráčom) alebo na okraji (bez cieľa = čisté premiestnenie);
-// na bunke terča OSTÁVA STÁŤ aj pri bloku. Charge do steny z okrajovej bunky = wall rule (mana preč, náraz).
-function doVampMelee(slot, dir, tl) {
+// Melee Vampire/Onryō: úder LEN na vlastnej bunke (bez smeru) — VAMP_MELEE_DMG + VAMP_MELEE_BONUS.
+// Bonus LEN keď dmg reálne dopadne (block/mirror-imunitný blok = nič; zabitý klon-návnada = nič).
+// Vampire = jednotný A1 úder (dmg dopadne až po ňom, potom heal beaty vo vampBonus);
+// Onryō = pôvodná dramaturgia bežného melee (3 beaty), drain hneď po zásahu.
+function doVampMelee(slot, tl) {
   const me  = game.players[slot];
   const opS = other(slot);
   const op  = game.players[opS];
-  const center = dir === "center";
-  const delta = center ? null : { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
-  if (!center && !delta) { pushInvalid(tl, slot); return; }
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
   const raw = VAMP_MELEE_DMG * dealMul(slot) * labyrinthMul(slot);
-
-  if (center) {
-    // úder na vlastnej bunke — rovnaká dramaturgia ako bežný melee (3 beaty), len s 3 dmg + bonusom
-    const cloneHere  = !!(op?.clone && op.clone.x === me.x && op.clone.y === me.y);
-    const playerHere = !cloneHere && !!(op && op.x === me.x && op.y === me.y);
-    if (playerHere) revealLabyrinths(tl);
+  const cloneHere  = !!(op?.clone && op.clone.x === me.x && op.clone.y === me.y);
+  const playerHere = !cloneHere && !!(op && op.x === me.x && op.y === me.y);
+  if (playerHere) revealLabyrinths(tl);
+  if (me.char === "countess") {
+    pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y], anim: "va1" }], VAMP_TRAP_STRIKE_MS);
+  } else {
     for (let r = 0; r < MELEE_REPEAT; r++) {
       pushStateFrame(tl, [{ kind: "melee", from: slot, cells: [[me.x, me.y]] }], SPECIAL_BEAT_MS);
     }
-    if (playerHere) {
-      const landed = !op.shield && !op.mirror; // mirror imunita = blok, bonus nepadá
-      applyHit(opS, raw, tl, "melee");
-      if (landed && !winnerNow()) vampBonus(slot, tl);
-    } else if (cloneHere) {
-      applyHitOnClone(opS, raw, tl, "melee"); // klon-návnada zožerie úder celý (ako bežný melee/vlkolak)
-    }
-    return;
   }
+  if (playerHere) {
+    const landed = !op.shield && !op.mirror; // mirror imunita = blok, bonus nepadá
+    applyHit(opS, raw, tl, "melee");
+    if (landed && !winnerNow()) vampBonus(slot, tl, VAMP_MELEE_BONUS);
+  } else if (cloneHere) {
+    applyHitOnClone(opS, raw, tl, "melee"); // klon-návnada zožerie úder celý (ako bežný melee/vlkolak)
+  }
+}
 
-  // dráha charge: krok za krokom po okraj; stop na prvej figúre (klon-návnada pred súperom)
+// Charge Vampire/Onryō (nahrádza dash, rovnaká cena): pohybové melee — beh zvoleným smerom po PRVÚ
+// figúru súpera (klon-návnada pred hráčom) alebo po okraj (bez cieľa = čisté premiestnenie);
+// VAMP_CHARGE_DMG + VAMP_CHARGE_BONUS pri dopadnutom dmg. Na bunke terča OSTÁVA STÁŤ aj pri bloku.
+// Charge do steny z okrajovej bunky = wall rule (mana preč, náraz, neprečiarkuje sa).
+function doVampCharge(slot, dir, tl) {
+  const me  = game.players[slot];
+  const opS = other(slot);
+  const op  = game.players[opS];
+  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
+  if (!delta) { pushInvalid(tl, slot); return; }
+  if (me.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  me.mana -= DASH_COST;
+  const raw = VAMP_CHARGE_DMG * dealMul(slot) * labyrinthMul(slot);
+
+  // dráha: krok za krokom po okraj; stop na prvej figúre (klon-návnada pred súperom)
   let x = me.x, y = me.y, target = null; // null | "clone" | "player"
   const path = [];
   while (inBounds(x + delta[0], y + delta[1])) {
@@ -1207,7 +1279,6 @@ function doVampMelee(slot, dir, tl) {
     if (op && op.x === x && op.y === y) { target = "player"; break; }
   }
   if (!path.length) {
-    // charge do steny z okrajovej bunky — akcia sa vykoná na mieste (mana preč, náraz, neprečiarkuje sa)
     pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
     return;
   }
@@ -1216,11 +1287,13 @@ function doVampMelee(slot, dir, tl) {
   me.y = path[path.length - 1][1];
   pushStateFrame(tl, [{ kind: "vamp_charge", from: slot, dir }, ...trackSteps(slot, path)], MOVE_DELAY_MS);
   if (!target) return; // dobehla na okraj bez terča — len presun
-  pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y] }], WOLF_STRIKE_MS);
+  // Vampire seká A1 (jednotný úder podľa attack guide), Onryō pôvodný vampstrike (alias Attack_3)
+  pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y],
+    ...(me.char === "countess" ? { anim: "va1" } : {}) }], WOLF_STRIKE_MS);
   if (target === "player") {
     const landed = !op.shield && !op.mirror;
     applyHit(opS, raw, tl, "melee");
-    if (landed && !winnerNow()) vampBonus(slot, tl);
+    if (landed && !winnerNow()) vampBonus(slot, tl, VAMP_CHARGE_BONUS);
   } else {
     applyHitOnClone(opS, raw, tl, "melee");
   }
@@ -1312,25 +1385,18 @@ function triggerTrap(ownerSlot, tl) {
     return true;
   }
   o.mana -= MELEE_COST;
-  // trigger úder = Attack_1 (podľa vampire_attack_guide) — Onreho zjavenie s výkrikom (Scream)
-  // hrá klient už počas trap_tp_in framu; dmg dopadne až po údere
-  pushStateFrame(tl, [{ kind: "vamp_strike", from: ownerSlot, cell: [cell.x, cell.y], anim: "vattack1" }], VAMP_TRAP_STRIKE_MS);
-  const raw = VAMP_MELEE_DMG * dealMul(ownerSlot) * labyrinthMul(ownerSlot);
+  // trigger úder: Countess = A1 (jednotná choreografia s melee), Onre = Attack_1 — jeho zjavenie
+  // s výkrikom (Scream) hrá klient už počas trap_tp_in framu; dmg dopadne až po údere
+  pushStateFrame(tl, [{ kind: "vamp_strike", from: ownerSlot, cell: [cell.x, cell.y],
+    anim: o.char === "countess" ? "va1" : "vattack1" }], VAMP_TRAP_STRIKE_MS);
+  const raw = VAMP_TRAP_DMG * dealMul(ownerSlot) * labyrinthMul(ownerSlot);
   // trap-melee je akcia castera → zasiahnutá figúra spotrebuje prípadnú armovanú obranu (whiff naprázdno nie)
   const foeShieldArmed = foe.shield, foeMirrorArmed = foe.mirror;
   if (playerHere) {
     const landed = !foeShieldArmed && !foeMirrorArmed;
     applyHit(foeS, raw, tl, "melee");
-    if (landed && !winnerNow()) {
-      // Countess: heal sa NEdeje naraz so zásahom — najprv beaty Attack_2 → Attack_3 → Attack_4,
-      // až po nich sa doplnia HP (Onre drainuje hneď — jeho choreografia je len Scream + Attack_1)
-      if (o.char === "countess") {
-        for (const a of ["vattack2", "vattack3", "vattack4"]) {
-          pushStateFrame(tl, [{ kind: "vamp_heal_cast", from: ownerSlot, anim: a }], VAMP_HEAL_BEAT_MS);
-        }
-      }
-      vampBonus(ownerSlot, tl);
-    }
+    // Vampirine heal beaty (A2→A3→A4) + doplnenie HP rieši vampBonus; Onryō drainuje hneď
+    if (landed && !winnerNow()) vampBonus(ownerSlot, tl, VAMP_TRAP_BONUS);
   } else if (cloneHere) {
     applyHitOnClone(foeS, raw, tl, "melee");
   } else {
@@ -1846,9 +1912,15 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   if (SIDE_CHARS[actor.char]) {
     if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !inBounds(cell.x, cell.y)) { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
-    // cast beaty BEZ zvýraznených buniek — blikajúca cieľová bunka by súperovi prezradila polohu pasce
-    for (let r = 0; r < SPECIAL_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, cells: [] }], SPECIAL_BEAT_MS);
+    // cast BEZ zvýraznených buniek — blikajúca cieľová bunka by súperovi prezradila polohu pasce.
+    // Countess: JEDEN dlhý frame — A5 (celá útočná sekvencia) sa hrá RAZ od frame 0; beaty by ju
+    // reštartovali. Onre: pôvodné beaty (Scream loop reštart nevadí).
+    if (actor.char === "countess") {
+      pushStateFrame(tl, [{ kind: "special", from: slot, cells: [] }], VAMP_CAST_MS);
+    } else {
+      for (let r = 0; r < SPECIAL_REPEAT; r++) {
+        pushStateFrame(tl, [{ kind: "special", from: slot, cells: [] }], SPECIAL_BEAT_MS);
+      }
     }
     actor.trap = { x: cell.x, y: cell.y };
     pushStateFrame(tl, [{ kind: "trap_set", from: slot, cell: [cell.x, cell.y] }], SMALL_DELAY_MS);
@@ -1994,7 +2066,7 @@ function doAction(slot, action, tl) {
     case "dash":     return doDash(slot, action.dir, tl);
     case "recharge": return doRecharge(slot, tl);
     case "attack":   return doBasic(slot, action.dir, tl);
-    case "melee":    return doMelee(slot, tl, action.dir || null); // dir: Countess/Onre (charge/center)
+    case "melee":    return doMelee(slot, tl);
     case "special":  return doSpecial(slot, tl, action.dir, action.cell || null); // dir: Medúza/Escanor; cell: Vojak (cieľová bunka)
     case "shield":   return doShield(slot, tl);
     case "mirror":   return doMirror(slot, tl);
@@ -2173,7 +2245,7 @@ function clearTurnTimer() {
 }
 
 // platná základná akcia? (move/attack/dash potrebujú smer); allowDemon = buffnutý hráč smie navoliť aj démon útok;
-// char kvôli Countess/Onre (diagonálny attack, melee so smerom/center)
+// char kvôli Vampire/Onryō (diagonálny attack; dash = charge s rovnakými smermi, melee bez smeru)
 function validBasicAction(a, used, allowDemon = false, char = null) {
   if (!a) return false;
   const known = ACTION_TYPES.has(a.type) || (allowDemon && a.type === "demon");
@@ -2181,7 +2253,6 @@ function validBasicAction(a, used, allowDemon = false, char = null) {
   const side = !!SIDE_CHARS[char];
   if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
   if (a.type === "attack" && !(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
-  if (a.type === "melee" && side && !VAMP_MELEE_DIRS.has(a.dir)) return false;
   return true;
 }
 // hráč, ktorý sa nestihol locknúť: zachová svoju rozpracovanú frontu (draft) a chýbajúce do 3 doplní náhodne
@@ -2198,11 +2269,10 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limi
   const pool = [...ACTION_TYPES].filter(t => !used.has(t));
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const dirs = [...MOVE_DIRS];
-  const side = !!SIDE_CHARS[char]; // Countess/Onre: diagonálny attack, melee so smerom, special s bunkou
+  const side = !!SIDE_CHARS[char]; // Vampire/Onryō: diagonálny attack, special s bunkou (dash/melee generické)
   while (q.length < limit && pool.length) {
     const t = pool.shift();
     if (t === "attack" && side) q.push({ type: t, dir: DIAG_DIR_KEYS[Math.floor(Math.random() * DIAG_DIR_KEYS.length)] });
-    else if (t === "melee" && side) { const md = [...VAMP_MELEE_DIRS]; q.push({ type: t, dir: md[Math.floor(Math.random() * md.length)] }); }
     else if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] });
     else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
     else if (t === "special" && char === "werewolf") q.push({ type: t, dir: WOLF_DIR_KEYS[Math.floor(Math.random() * WOLF_DIR_KEYS.length)] }); // Vlkolakov charge — náhodný z 8 smerov
