@@ -215,8 +215,12 @@ function newPlayer(slot) {
     char: null,        // "fire" | "lightning" | "wanderer" | "medusa" | "minotaur" | "naruto" | "escanor" | "soldier" | "werewolf"
     stone: 0,          // koľko najbližších základných akcií hráč preskočí skamenený (Medúzin special)
     // Escanor: „pride level" 0–3. Rozsah smerového specialu rastie s levelom (0=1 bunka, 3=celá plocha).
-    // Na konci kola: použil shield/mirror (aj golden)? → −1, inak → +1 (clamp 0–3). Reset na 0 pri nasadení.
+    // Na konci kola: použil shield/mirror (aj golden) ALEBO dostal zásah? → −1, inak → +1 (clamp 0–3).
+    // Reset na 0 pri nasadení.
     pride: 0,
+    // Escanor: v tomto kole mu súper zobral HP (akcia/odraz — NIE tile/IK, NIE petrify/banish).
+    // Nastavuje notePrideHit() na miestach dopadu, spotrebuje a vynuluje koniec kola v resolveTurn.
+    prideHit: false,
     // Vlkolak: „fáza mesiaca" 0–3 (nov → spln) = dmg jeho charge specialu (WOLF_MOON_DMG). Odvodená z HP
     // (moonLevelFor) — prepočíta sa na KONCI každého kola a pri nasadení/swape. Verejná (veľkosť postavy je tell).
     moon: 0,
@@ -638,6 +642,7 @@ function applyHitOnClone(ownerSlot, rawDmg, tl, kind = "basic", quietDefense = f
     // samostatný odraz z KLONOVEJ bunky (cell) — nie z pravého Naruta (inak prezradí skutočného)
     pushStateFrame(tl, [{ kind: "mirror", target: ownerSlot, cell: [o.clone.x, o.clone.y], dmg: reflectRaw, atk: kind, gold: !!o.mirrorGold }], MIRROR_BEAM_MS);
     atk.hp = Math.max(0, atk.hp - d);
+    notePrideHit(atkSlot); // odraz z klonovho mirroru je tiež zásah od súpera
     pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: d }], SMALL_DELAY_MS);
     endLabyrinths(tl); // odrazený dmg dopadol na REÁLNEHO hráča — to labyrint ukončuje
     return; // mirror ochránil klona (prežije)
@@ -1386,6 +1391,14 @@ function revealLabyrinths(tl) {
 // už predtým zabezpečil revealLabyrinths (labReveal), takže tieto framy sa hrajú neredigované.
 // fromClone: zásah pochádza od tieňového klona útočníka — mirror odraz vtedy zničí KLONA
 // (nie HP majiteľa); Narutova a klonova strela sú jedna paralelná akcia, obrana neguje obe.
+// Escanor pride: poznač „dostal zásah od súpera" — volá sa VŠADE, kde hráčovi klesá HP kvôli súperovi
+// (priamy dopad, stacknutý pár, zóna/démon aj odraz vlastného útoku od mirroru). Tile/IK dmg a statusy
+// (petrify/banish) sa NEpočítajú. Vyhodnotí sa na konci kola v resolveTurn (−1 pride), flag sa tam nuluje.
+function notePrideHit(slot) {
+  const p = game.players[slot];
+  if (p.char === "escanor") p.prideHit = true;
+}
+
 function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
   const t = game.players[targetSlot];
   if (t.shield) {
@@ -1416,12 +1429,14 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
     }
     const d = recvDmg(atkSlot, rawDmg); // ½ ak má útočník (príjemca odrazu) last stand buff
     atk.hp = Math.max(0, atk.hp - d);
+    notePrideHit(atkSlot); // odraz od mirroru je tiež zásah od súpera
     pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: d }], SMALL_DELAY_MS);
     endLabyrinths(tl); // odrazený zásah ukončuje labyrint — až po dopade odrazu
     return;
   }
   const d = recvDmg(targetSlot, rawDmg); // ½ ak má obranca last stand buff (2× maze buff je už v rawDmg)
   t.hp = Math.max(0, t.hp - d);
+  notePrideHit(targetSlot);
   pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
   endLabyrinths(tl); // labyrint končí až po dopade zásahu a úbytku HP
 }
@@ -1436,6 +1451,7 @@ function applyStackedHit(targetSlot, raws, tl, kind = "basic") {
   const parts = raws.map(r => recvDmg(targetSlot, r)); // ½ pri Last Stand/Hope (2× maze je už v raw)
   const total = parts.reduce((a, b) => a + b, 0);
   t.hp = Math.max(0, t.hp - total);
+  notePrideHit(targetSlot);
   pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: total, parts }], SMALL_DELAY_MS);
   endLabyrinths(tl); // súbežný zásah tiež ukončuje labyrint (odhalenie prebehlo pred letom)
   return true;
@@ -1467,6 +1483,7 @@ function applyHitPairDefended(ownerSlot, rawDmg, tl, kind = "basic", fromClone =
   if (fromClone) {
     const d = recvDmg(atkSlot, rawDmg);
     atk.hp = Math.max(0, atk.hp - d);
+    notePrideHit(atkSlot);
     const fx = [{ kind: "hit", target: atkSlot, dmg: d }];
     if (atk.clone) { fx.push({ kind: "clone_die", target: atkSlot, cell: [atk.clone.x, atk.clone.y] }); atk.clone = null; }
     pushStateFrame(tl, fx, SMALL_DELAY_MS);
@@ -1476,6 +1493,7 @@ function applyHitPairDefended(ownerSlot, rawDmg, tl, kind = "basic", fromClone =
   const parts = [recvDmg(atkSlot, rawDmg), recvDmg(atkSlot, rawDmg)];
   const total = parts[0] + parts[1];
   atk.hp = Math.max(0, atk.hp - total);
+  notePrideHit(atkSlot);
   pushStateFrame(tl, [{ kind: "hit", target: atkSlot, dmg: total, parts }], SMALL_DELAY_MS);
   endLabyrinths(tl);
 }
@@ -1516,6 +1534,7 @@ function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
     const dO = recvDmg(atkSlot, ownerDmg);
     const dC = withClone ? recvDmg(atkSlot, cloneRaw) : 0;
     atk.hp = Math.max(0, atk.hp - dO - dC);
+    notePrideHit(atkSlot);
     // oba odrazy dopadnú na útočníka ako JEDEN úder so súčtom a rozpisom (klient: jeden float „-n -n HP"),
     // nie dva samostatné floaty — HP klesne naraz
     const hits = dC > 0
@@ -1531,6 +1550,7 @@ function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
   const stacked = withClone && o.clone.x === o.x && o.clone.y === o.y;
   const d = recvDmg(ownerSlot, stacked ? Math.max(0, ownerDmg - CLONE_DMG) : ownerDmg);
   o.hp = Math.max(0, o.hp - d);
+  if (d > 0) notePrideHit(ownerSlot);
   const fx = [];
   if (d > 0) fx.push({ kind: "hit", target: ownerSlot, dmg: d });
   if (withClone) { fx.push({ kind: "clone_die", target: ownerSlot, cell: cloneCell }); o.clone = null; }
@@ -1958,6 +1978,7 @@ function doSwap(slot, to, tl) {
   // prepni identitu + nasaď HP/manu nového maga
   me.char = to;
   me.pride = 0; // Escanor: nasadenie swapom začína na pride 0
+  me.prideHit = false; // zásahy predchodcu sa na nového maga neprenášajú
   me.hp = game.mageHp[person][to];
   me.mana = game.mageMana[person][to];
   me.moon = to === "werewolf" ? moonLevelFor(me.hp) : 0; // Vlkolak: fáza HNEĎ podľa preneseného HP
@@ -2318,7 +2339,8 @@ function resolveTurn() {
   const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
   let ended = false;
   // Escanor pride: zachyť PRED spracovaním, či daný Escanor v tomto kole použil shield/mirror/golden shield/mirror
-  // (fronta aj golden flagy sa počas kola menia/miznú). Na konci kola: použil → −1, inak → +1.
+  // (fronta aj golden flagy sa počas kola menia/miznú). Na konci kola: použil obranu ALEBO dostal zásah
+  // (p.prideHit z notePrideHit) → −1, inak → +1.
   const escUsedDefense = {};
   for (const slot of ["p1", "p2"]) {
     const p = game.players[slot];
@@ -2441,12 +2463,16 @@ function resolveTurn() {
     game.players.p1.trap = null; game.players.p2.trap = null;
   }
 
-  // Escanor pride: koniec kola — použil obranu → −1, inak → +1 (clamp 0–3). Prejaví sa v nasledujúcom kole.
+  // Escanor pride: koniec kola — použil obranu ALEBO dostal zásah od súpera → −1, inak → +1 (clamp 0–3;
+  // stále len ±1 za kolo, podmienky sa nesčítavajú). Prejaví sa v nasledujúcom kole.
   for (const slot of ["p1", "p2"]) {
     const p = game.players[slot];
     if (p.char !== "escanor" || !(slot in escUsedDefense)) continue;
-    p.pride = Math.max(0, Math.min(3, (p.pride || 0) + (escUsedDefense[slot] ? -1 : 1)));
+    p.pride = Math.max(0, Math.min(3, (p.pride || 0) + ((escUsedDefense[slot] || p.prideHit) ? -1 : 1)));
   }
+  // flag zásahu žije len jedno kolo (nuluj bez ohľadu na char — mág sa mohol vymeniť swapom)
+  game.players.p1.prideHit = false;
+  game.players.p2.prideHit = false;
 
   // nevyužité obrany zanikajú s koncom kola
   game.players.p1.shield = false;
@@ -2890,6 +2916,7 @@ io.on("connection", (socket) => {
     }
     me.char = key;
     me.pride = 0; // Escanor: každá nová hra začína na pride 0
+    me.prideHit = false;
     me.moon = key === "werewolf" ? moonLevelFor(me.hp) : 0; // Vlkolak: fáza HNEĎ podľa (preneseného) HP
     // obaja vybrali -> začína 1. kolo, naštartuj časovač pred emitom (snapshot nesie timerMs pre refresh-sync)
     if (game.players.p1.char && game.players.p2.char) beginPlanningTimer(0);
