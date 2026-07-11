@@ -196,16 +196,21 @@ actorGhost.style.width = ACTOR_W + "px"; actorGhost.style.height = ACTOR_H + "px
 actorGhost.style.display = "none";
 actorsEl.appendChild(actorGhost);
 
-// obrys súpera na Ariadninej nití (labyrint) — čierna silueta na bunke posledného vstupu na niť
-const actorSilhouette = document.createElement("canvas");
-actorSilhouette.id = "actor-silhouette";
-actorSilhouette.className = "sprite-actor sprite-silhouette";
-actorSilhouette.width = ACTOR_W; actorSilhouette.height = ACTOR_H;
-actorSilhouette.style.width = ACTOR_W + "px"; actorSilhouette.style.height = ACTOR_H + "px";
-// necháme ho VŽDY display:block a riadime len opacity — inak by CSS fade (vynorenie/strata v hmle) z display:none neprešlo
-actorSilhouette.style.display = "block";
-actorSilhouette.style.opacity = "0";
-actorsEl.appendChild(actorSilhouette);
+// obrys súpera na Ariadninej nití (labyrint) — čierna silueta na bunke posledného vstupu na niť.
+// Dva canvasy: [0] = breadcrumb / prvá lovcova figúra, [1] = druhá lovcova figúra — lovec a jeho tieňový
+// klon môžu stáť na dvoch fakľových bunkách (moja + klonova) naraz (hunterHere nesie až 2 bunky)
+const actorSilhouettes = [0, 1].map(i => {
+  const el = document.createElement("canvas");
+  el.id = "actor-silhouette" + (i ? "-2" : "");
+  el.className = "sprite-actor sprite-silhouette";
+  el.width = ACTOR_W; el.height = ACTOR_H;
+  el.style.width = ACTOR_W + "px"; el.style.height = ACTOR_H + "px";
+  // necháme ho VŽDY display:block a riadime len opacity — inak by CSS fade (vynorenie/strata v hmle) z display:none neprešlo
+  el.style.display = "block";
+  el.style.opacity = "0";
+  actorsEl.appendChild(el);
+  return el;
+});
 
 // transient preblik obrysu na prejdenej niťovej bunke — lovec prechádza niťou → na KAŽDEJ bunke, kde je,
 // krátko preblikne jeho čierny obrys (nie len na poslednej). Vlastný canvas, po flash animácii sa odstráni.
@@ -2316,8 +2321,12 @@ function renderGrid(s, effects = []) {
   const fogged = !!(mineLab && mineLab.labyrinth && !mineLab.labReveal);
   boardEl.classList.toggle("labyrinth", fogged);
   const fogVisible = new Set();
+  // fakľové bunky: vlastná + bunka vlastného tieňového klona (klon = druhá fakľa, osvetľuje rovnako ako hráč)
+  const torchCells = new Set();
   if (fogged) {
-    if (mineLab.x != null) fogVisible.add(`${mineLab.x},${mineLab.y}`);
+    if (mineLab.x != null) torchCells.add(`${mineLab.x},${mineLab.y}`);
+    if (mineLab.clone) torchCells.add(`${mineLab.clone.x},${mineLab.clone.y}`);
+    torchCells.forEach(k => fogVisible.add(k));
     (mineLab.thread || []).forEach(([x, y]) => fogVisible.add(`${x},${y}`));
     if (mineLab.threadMark) fogVisible.add(`${mineLab.threadMark[0]},${mineLab.threadMark[1]}`);
     // špeciálne tiles svietia cez tmu — slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
@@ -2390,7 +2399,7 @@ function renderGrid(s, effects = []) {
       const key = `${x},${y}`;
       if (previewSet.has(key)) cell.classList.add("preview-red");
       if (fogged && !fogVisible.has(key)) cell.classList.add("fogged"); // labyrint: tma mimo vlastnej bunky a nite
-      else if (fogged && mineLab && x === mineLab.x && y === mineLab.y) cell.classList.add("torch-lit"); // vlastná bunka ožiarená fakľami
+      else if (fogged && torchCells.has(key)) cell.classList.add("torch-lit"); // vlastná + klonova bunka ožiarené fakľami
       if (threadSet.has(key)) cell.classList.add("thread-cell");
 
       // tile podfarbenie + ikona; IK prekrýva všetko
@@ -2754,14 +2763,19 @@ function escFxMul(slot) {
 // pri nižšom Pride ešte menšia (pride0 ≈ 0.58×). Preto exponent posunutý o -3 oproti escFxMul.
 function escChargeMul(slot) { return escFxMul(slot) * Math.pow(1.2, -3); }
 const PAIR_SHIFT_DEFAULT = 22;
-// pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho
-// vráti 0 a jeho vlastný sprite sa NIKDY neposunie — zdieľaná bunka mu neprezradí, že Minotaur stojí na nej
+// pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho vráti 0.
+// Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere — bunka je aj tak
+// prezradená), vlastný sprite odstúpi presne ako pri normálnej zdieľanej bunke mimo labyrintu.
 const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
-  if (!p1 || !p2 || p1.x !== p2.x || p1.y !== p2.y) return 0;
-  const mag = PAIR_SHIFT[s?.[slot]?.char] ?? PAIR_SHIFT_DEFAULT; // konštantný odsun (nezávisí od pride veľkosti)
-  return slot === "p1" ? -mag : mag;
+  if (!p1 || !p2) return 0;
+  const a = s?.[slot];
+  const mag = PAIR_SHIFT[a?.char] ?? PAIR_SHIFT_DEFAULT; // konštantný odsun (nezávisí od pride veľkosti)
+  if (p1.x != null && p1.x === p2.x && p1.y === p2.y) return slot === "p1" ? -mag : mag;
+  if (a?.labyrinth && a.x != null && (a.hunterHere || []).some(([hx, hy]) => hx === a.x && hy === a.y))
+    return slot === "p1" ? -mag : mag;
+  return 0;
 }
 // pri horizontálnom útoku sa mág otočí v smere streľby, aj keď súper stojí inde
 let facingOverride = { p1: { sx: 0, until: 0 }, p2: { sx: 0, until: 0 } };
@@ -2839,8 +2853,10 @@ function positionActors(s, immediate = false) {
     const STACK_OFFSET = 18; // klon na majiteľovej bunke: jemný posun, aby bolo vidno dve figúry
     // zdieľaná bunka so súperom → rozostup ako postavy (rovnaká char-aware hodnota ako pairShift majiteľa,
     // inak by sa owner a klon rozišli rôzne ďaleko a prezradili, ktorý je pravý); na majiteľovej bunke + STACK_OFFSET
+    // labyrint: lovec (skrytá pozícia) na bunke MÔJHO klona = druhá fakľa (hunterHere) → rovnaký rozostup
     const foeMag = PAIR_SHIFT[data.char] ?? PAIR_SHIFT_DEFAULT;
-    const foeShift = (opp && opp.x === c.x && opp.y === c.y)
+    const hunterOnClone = !!(data.labyrinth && (data.hunterHere || []).some(([hx, hy]) => hx === c.x && hy === c.y));
+    const foeShift = ((opp && opp.x === c.x && opp.y === c.y) || hunterOnClone)
       ? (slot === "p1" ? -foeMag : foeMag) : 0;
     const shift = foeShift + (onOwner ? STACK_OFFSET : 0);
 
@@ -5464,40 +5480,59 @@ function raf() {
     }
   }
 
-  // labyrint: obrys súpera. Keď lovec PRÁVE stojí na mojej (fakľami ožiarenej) bunke (server flag
-  // hunterHere), ukáž ho tam OŽIARENÉHO (nie čierny tieň) — vidím ho ako mimo labyrintu. Inak čierna
-  // silueta na bunke posledného stretnutia s niťou (threadMark), ako doteraz.
+  // labyrint: obrys súpera. Keď lovec (alebo jeho tieňový klon) PRÁVE stojí na niektorej mojej fakľovej
+  // bunke (server pole hunterHere — moja bunka + bunka môjho klona), ukáž tam každú jeho figúru OŽIARENÚ
+  // a správajúcu sa ako mimo labyrintu: normálny pairShift rozostup, tvárou ku mne, živý idle. Inak čierna
+  // statická silueta na bunke posledného stretnutia s niťou (threadMark), ako doteraz.
   {
-    const ctx = actorSilhouette.getContext("2d");
     const mine = me ? state?.[me] : null;
     const oppS = otherSlot();
-    const oppChar = oppS ? state?.[oppS]?.char : null;
+    const oppA = oppS ? state?.[oppS] : null;
+    const oppChar = oppA?.char || null;
     const inLab = !!mine?.labyrinth;
-    const hunterHere = !!(inLab && mine?.hunterHere && mine.x != null); // lovec je práve na mojej bunke
-    const mark = inLab ? (hunterHere ? [mine.x, mine.y] : mine.threadMark) : null;
-    // lit = lovec na mojej bunke → CSS zruší brightness(0); p2 albino paleta cez alt-color (natívne palety to ignorujú)
-    actorSilhouette.classList.toggle("lit", hunterHere);
-    actorSilhouette.classList.toggle("alt-color", hunterHere && !!oppChar && usesAltColor(oppChar, oppS));
-    if (!mark || !oppChar) {
-      // decentne sa STRATÍ v hmle (opacity fade-out cez CSS transition); display necháme block, nech fade dobehne
-      actorSilhouette.style.opacity = "0";
-      ctx.clearRect(0, 0, actorSilhouette.width, actorSilhouette.height);
-    } else {
-      actorSilhouette.style.display = "block";
-      actorSilhouette.style.opacity = "1"; // vynorí sa/ostane (fade-in + lit↔čierny cez CSS transition)
-      const { left, top } = cellToPx(mark[0], mark[1]);
-      // obrys na MOJEJ bunke (prekliaty vošiel na Minotaura / Minotaur na mňa) — uhni nabok ako pairShift
-      const onMe = mine.x === mark[0] && mine.y === mark[1];
-      const dodge = onMe ? (me === "p1" ? 70 : -70) : 0;
-      actorSilhouette.style.left = (left - (ACTOR_W - TILE_W) / 2 + dodge) + "px";
-      actorSilhouette.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
-      const dir = charDirFor(oppChar, oppS);
-      // lovec na mojej bunke (lit) → animuj NORMÁLNE (idle loop, t=now); čierny breadcrumb = statická póza (t=0)
-      const t = hunterHere ? now : 0;
-      ensureSpriteMeta(dir, ANIM_DEF.idle.file)
+    const litCells = (inLab && oppChar && Array.isArray(mine.hunterHere)) ? mine.hunterHere : [];
+    // figúry na vykreslenie: ožiarení lovci (lit) majú prednosť; bez nich breadcrumb (čierny tieň) na threadMark
+    const figs = litCells.length ? litCells.map(c => ({ cell: c, lit: true }))
+      : (inLab && oppChar && mine.threadMark ? [{ cell: mine.threadMark, lit: false }] : []);
+    const oppMag = PAIR_SHIFT[oppChar] ?? PAIR_SHIFT_DEFAULT;
+    const prideMul = escPrideMul(oppA); // Escanorovo pride / vlkolakov mesiac sú verejné aj v labyrinte
+    actorSilhouettes.forEach((el, i) => {
+      const ctx = el.getContext("2d");
+      const fig = figs[i];
+      // lit = lovec na fakľovej bunke → CSS zruší brightness(0); p2 albino paleta cez alt-color (natívne palety to ignorujú)
+      el.classList.toggle("lit", !!(fig && fig.lit));
+      el.classList.toggle("alt-color", !!(fig && fig.lit) && !!oppChar && usesAltColor(oppChar, oppS));
+      if (!fig) {
+        // decentne sa STRATÍ v hmle (opacity fade-out cez CSS transition); display necháme block, nech fade dobehne
+        el.style.opacity = "0";
+        ctx.clearRect(0, 0, el.width, el.height);
+        return;
+      }
+      el.style.opacity = "1"; // vynorí sa/ostane (fade-in + lit↔čierny cez CSS transition)
+      const { left, top } = cellToPx(fig.cell[0], fig.cell[1]);
+      el.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
+      el.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
+      // zdieľa bunku s mojou figúrou → odstúp na súperovu stranu ako pairShift (moja figúra odstúpi cez
+      // pairShift/foeShift sama); druhá lovcova figúra na TEJ ISTEJ bunke = jeho klon stacknutý na
+      // majiteľovi → + STACK_OFFSET posun ako klon v positionActors
+      const onMine = (mine.x === fig.cell[0] && mine.y === fig.cell[1])
+        || (mine.clone && mine.clone.x === fig.cell[0] && mine.clone.y === fig.cell[1]);
+      let shift = onMine ? (oppS === "p1" ? -oppMag : oppMag) : 0;
+      if (i === 1 && figs[0] && figs[0].cell[0] === fig.cell[0] && figs[0].cell[1] === fig.cell[1]) shift += 18;
+      if (fig.lit) {
+        // ožiarený lovec = plnohodnotná figúra: facing ako na zdieľanej bunke (p1 doprava, p2 doľava) + level veľkosť
+        el.style.transformOrigin = prideMul !== 1 ? `50% ${ESC_FEET_FRAC * 100}%` : "";
+        el.style.transform = `translateX(${shift}px) scaleX(${(oppS === "p2" ? -1 : 1) * prideMul}) scaleY(${prideMul})`;
+      } else {
+        el.style.transformOrigin = "";
+        el.style.transform = shift ? `translateX(${shift}px)` : "";
+      }
+      // lit → animuj NORMÁLNE (idle loop, t=now); čierny breadcrumb = statická póza (t=0)
+      const t = fig.lit ? now : 0;
+      ensureSpriteMeta(charDirFor(oppChar, oppS), ANIM_DEF.idle.file)
         .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, t, ACTOR_W, ACTOR_H))
         .catch(() => {});
-    }
+    });
   }
 
   // HUD náhľady vybraných postáv + degradácia portrétu podľa HP (Doom-style)

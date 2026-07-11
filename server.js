@@ -348,24 +348,34 @@ function redactHunterActor(a) {
   return { ...a, mana: null, thread: [], threadMark: null };
 }
 // prekliaty vidí len Damage dlaždice + IK (IK/`iks` sa neredigujú vôbec); heal/mana dlaždice LEN keď na
-// nich priamo stojí (inak by mu prezradili, kde sú pickupy). IK vždy (sú to overlaye v `iks`, mimo `tiles`).
+// nich priamo stojí ALEBO na nich stojí jeho tieňový klon — klon je druhá fakľa a osvetľuje svoju bunku
+// rovnako ako hráč (inak by mu prezradili, kde sú pickupy). IK vždy (sú to overlaye v `iks`, mimo `tiles`).
 function redactTilesFor(mySlot, snap) {
   if (!Array.isArray(snap.tiles)) return snap;
   const me = snap[mySlot];
-  const onMyCell = (t) => me && me.x != null && t.x === me.x && t.y === me.y;
-  return { ...snap, tiles: snap.tiles.filter(t => t.type === "dmg" || onMyCell(t)) };
+  const onTorchCell = (t) => me && ((me.x != null && t.x === me.x && t.y === me.y)
+    || (me.clone && t.x === me.clone.x && t.y === me.clone.y));
+  return { ...snap, tiles: snap.tiles.filter(t => t.type === "dmg" || onTorchCell(t)) };
 }
-// lovec (alebo jeho tieňový klon) PRÁVE stojí na bunke prekliateho — nech už naň vstúpil lovec ALEBO
-// prekliaty vošiel na lovca. Prekliaty ho na svojej (vždy fakľami ožiarenej) bunke uvidí OŽIARENÉHO.
+// lovec (alebo jeho tieňový klon) PRÁVE stojí na niektorej „fakľovej" bunke prekliateho — na jeho vlastnej
+// ALEBO na bunke jeho tieňového klona (klon = druhá fakľa; lovec nevie, ktorá figúra je pravá, takže obe
+// bunky sa správajú identicky). Vracia zoznam buniek lovcových figúr stojacich na fakľových bunkách
+// ([[x,y],…], max 2 — lovec + jeho klon; duplicitná bunka = obe lovcove figúry na tej istej bunke), inak null.
 // Počíta sa čerstvo z každého snapshotu/framu, takže po odchode lovca hneď zhasne (žiadny „stale" obrys).
-function hunterOnCursedCell(me, opp) {
-  return !!(me && opp && me.x != null &&
-    ((opp.x === me.x && opp.y === me.y) || (opp.clone && opp.clone.x === me.x && opp.clone.y === me.y)));
+function hunterLitCells(me, opp) {
+  if (!me || !opp || me.x == null) return null;
+  const torch = [[me.x, me.y]];
+  if (me.clone) torch.push([me.clone.x, me.clone.y]);
+  const onTorch = (x, y) => x != null && torch.some(([tx, ty]) => tx === x && ty === y);
+  const out = [];
+  if (onTorch(opp.x, opp.y)) out.push([opp.x, opp.y]);
+  if (opp.clone && onTorch(opp.clone.x, opp.clone.y)) out.push([opp.clone.x, opp.clone.y]);
+  return out.length ? out : null;
 }
 function redactSnapshotFor(mySlot, snap) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
   const me = snap[mySlot], opp = snap[oppSlot];
-  const hunterHere = hunterOnCursedCell(me, opp);
+  const hunterHere = hunterLitCells(me, opp);
   return redactTilesFor(mySlot, { ...snap, [mySlot]: { ...me, hunterHere }, [oppSlot]: redactActor(opp) });
 }
 // tournament × labyrint: počas kliatby nevidí ANI JEDNA strana manu súperovho tímu — roster nesie
@@ -415,7 +425,7 @@ function redactTimelineFor(mySlot, tl) {
     if (f?.[mySlot]?.labyrinth && !f[mySlot].labReveal) {
       // hunterHere sa musí počítať aj pre každý FRAME timeline (nielen root snapshot) — inak keď prekliaty
       // POČAS kola vstúpi na lovcovu bunku, frame ho nenesie a klient ukáže čierny tieň namiesto ožiareného lovca
-      const hunterHere = hunterOnCursedCell(f[mySlot], f[oppSlot]);
+      const hunterHere = hunterLitCells(f[mySlot], f[oppSlot]);
       return redactRosterMana(oppSlot, redactTilesFor(mySlot, {
         ...f,
         [mySlot]: { ...f[mySlot], hunterHere },
