@@ -1118,6 +1118,18 @@ function spawnManaFloat(slot, amount = 4, gold = false, dark = false) {
   setTimeout(() => el.remove(), 1000);
 }
 
+// Fire Wizard skonzumoval Damage dlaždicu specialom — krátky flare na bunke (dlaždica už zmizla zo state)
+function spawnTileConsumeFx(cell) {
+  if (!Array.isArray(cell)) return;
+  const { left, top } = cellToPx(cell[0], cell[1]);
+  const el = document.createElement("div");
+  el.className = "tile-consume-fx";
+  el.style.left = (left + TILE_W / 2) + "px";
+  el.style.top  = (top + TILE_H / 2) + "px";
+  actorsEl.appendChild(el);
+  setTimeout(() => el.remove(), 600);
+}
+
 // float na konkrétnej bunke (bez väzby na hráča) — napr. stopa na Ariadninej nití
 function spawnCellFloat(cell, text, className) {
   const { left, top } = cellToPx(cell[0], cell[1]);
@@ -3635,6 +3647,10 @@ function schedulePlayTimeline(timeline) {
         // klon sa „nabíja" naprázdno tiež — aura+float na oboch, nech recharge neprezradí pravého
         cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
         spawnChargeAura(e.from, false, false, "clone", dark);
+      }
+      // Fire Wizard skonzumoval Damage dlaždicu (boost zo specialu) — krátky flare na bunke
+      if (e.kind === "tile_consume" && Array.isArray(e.cell)) {
+        spawnTileConsumeFx(e.cell);
       }
       // skamenený ťah — akcia sa nevykonala: prečiarkni práve zaznamenaný badge/beat + STONED float
       if (e.kind === "stoned" && (e.target === "p1" || e.target === "p2")) {

@@ -186,6 +186,23 @@ body {
   transition: transform .15s ease;
 }
 
+/* Fire Wizard skonzumoval Damage dlaždicu specialom — krátky ohnivý flare na bunke */
+@keyframes tile-consume-flare {
+  0%   { transform: translate(-50%,-50%) scale(.3); opacity: 0; }
+  30%  { transform: translate(-50%,-50%) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
+}
+.tile-consume-fx {
+  position: absolute;
+  width: 46px; height: 46px;
+  pointer-events: none;
+  z-index: 7;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,240,180,.95) 0%, rgba(255,150,30,.85) 45%, rgba(204,60,10,.4) 75%, rgba(204,60,10,0) 100%);
+  box-shadow: 0 0 26px rgba(255,160,40,.85);
+  animation: tile-consume-flare 600ms ease-out forwards;
+}
+
 /* ========== Labyrint (Minotaurov special) ==========
    Prekliaty hráč vidí len vlastnú bunku + svoju Ariadninu niť + obrys na nití + špeciálne tiles;
    dáta o súperovi rediguje už server — toto je len vizuálna tma nad tým.

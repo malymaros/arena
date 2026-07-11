@@ -1968,9 +1968,19 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   const cloneStruck = !!(zFoe?.clone && specialZoneHas(actor, zFoe.clone.x, zFoe.clone.y));
   if (dmg > 0 && hit) revealLabyrinths(tl);
 
+  // Fire Wizard: ak special dostal boost zo stojacej Damage dlaždice (rozšírenie zóny o riadky ±1),
+  // po animácii ju SKONZUMUJE (zmizne pre oboch — nezávisle od toho, či special zasiahol/bol blokovaný)
+  const fireConsumes = fireOnDmgTile(actor);
+
   // 3× „nádych“ (caster animuje špeciál; klient bliká rozsah)
   for (let r = 0; r < SPECIAL_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "special", from: slot }], SPECIAL_BEAT_MS);
+  }
+
+  // spotreba Damage dlaždice AŽ PO nádychoch (animácia dokončená) — krátky flare na klientovi
+  if (fireConsumes) {
+    game.tiles = game.tiles.filter(t => !(t.type === "dmg" && t.x === actor.x && t.y === actor.y));
+    pushStateFrame(tl, [{ kind: "tile_consume", from: slot, cell: [actor.x, actor.y] }], SMALL_DELAY_MS);
   }
 
   // Naruto + jeho klon = tá istá postava so zdieľanou obranou → ak zóna zasiahne oboch, block/odraz/hit idú NARAZ
