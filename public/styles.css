@@ -348,6 +348,16 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
 }
 #dash-picker.vamp-charge .arrow{ background: #7a4fd0; } /* šípky charge v rovnakej fialovej */
+.btn.act.special.hidden-question{
+  background: #2c2438;
+  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 14px rgba(177,122,255,.35);
+  animation: hidden-flicker 3.2s linear infinite;
+}
+.btn.act.special.hidden-question:not(:disabled):hover{
+  box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
+}
 
 /* výber smeru pre Move — popup nad tlačidlom v tvare kríža */
 .move-wrap{ position: relative; }
@@ -613,6 +623,15 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .q-badge.shield  { background: #00606b; }
 .q-badge.mirror  { background: #00525b; }
 .q-badge.special { background: #5e1387; }
+.q-badge.hidden-question{
+  background: #2c2438;
+  color: #d8c2ff;
+  font-size: 24px;
+  font-weight: 900;
+  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(154,111,240,.8), 0 0 14px rgba(177,122,255,.45);
+  animation: hidden-flicker 3.2s linear infinite;
+}
 .q-badge.stoned  { background: #4a4d55; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(190,195,205,.4); filter: grayscale(.3); } /* skamenený pass ťah */
 /* súperov DETERMINISTICKY prenesený stun — nie skrytý „?", ale plný kamenný beat (kaster vidí dokedy súper stojí) */
 .q-badge.opp.q-slot.stoned{ background: #4a4d55; border: 2px solid #000; box-shadow: inset 0 0 0 2px rgba(190,195,205,.4); color: #cfd2d6; opacity: 1; filter: grayscale(.3); }
@@ -1629,6 +1648,15 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   .a-badge.shield   { background: #00606b; }
   .a-badge.mirror   { background: #00525b; }
   .a-badge.special  { background: #5e1387; }
+  .a-badge.hidden-question{
+    background: #2c2438;
+    color: #d8c2ff;
+    font-size: 22px;
+    font-weight: 900;
+    text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
+    box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(154,111,240,.75), 0 0 12px rgba(177,122,255,.4);
+    animation: hidden-flicker 3.2s linear infinite;
+  }
   .a-badge.golden_shield { background: #8a6d00; }
   .a-badge.golden_mirror { background: #8a6d00; }
   .a-badge.golden_mana   { background: #8a6d00; }

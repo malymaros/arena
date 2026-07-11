@@ -1370,6 +1370,21 @@ function projCenter(x, y) {
   const { left, top } = cellToPx(x, y);
   return { left: left + TILE_W / 2, top: top + TILE_H / 2 }; // stred bunky v súradniciach #actors (element má translate(-50%,-50%))
 }
+function projectileOrient(charKey, dir) {
+  // Countess/Onre majú úzky diagonálny projektil. Nepoužívaj scaleX+rotate kombináciu:
+  // pri ľavých diagonálach zrkadlenie mení aj znamienko rotácie a špic môže mieriť zle.
+  if (charKey === "countess" || charKey === "onre") {
+    return {
+      right: "rotate(0deg)", down_right: "rotate(45deg)", down: "rotate(90deg)", down_left: "rotate(135deg)",
+      left: "rotate(180deg)", up_left: "rotate(-135deg)", up: "rotate(-90deg)", up_right: "rotate(-45deg)",
+    }[dir] || "";
+  }
+  return {
+    left: "scaleX(-1)", up: "rotate(-90deg)", down: "rotate(90deg)",
+    up_right: "rotate(-45deg)", down_right: "rotate(45deg)",
+    up_left: "scaleX(-1) rotate(45deg)", down_left: "scaleX(-1) rotate(-45deg)",
+  }[dir] || "";
+}
 function spawnOrMoveProjectile(c, s) {
   const charKey = s?.[c.from]?.char;
   const dirKey  = charKey ? (CHAR_META[charKey].chargeDir || charDirFor(charKey, c.from)) : null;
@@ -1410,12 +1425,8 @@ function spawnOrMoveProjectile(c, s) {
   entry.lastCell = c.cell;    // posledná bunka letu = miesto výbuchu (zásah súpera/klona alebo okraj plochy)
   // sprite mieri doprava — ostatné smery flip/rotácia; nastavuje sa KAŽDÝ krok, lebo strela
   // Vampire/Onryō mení smer po odraze od steny (transform sa netranzicuje → okamžitý flip špicu);
-  // diagonály = rotácia o 45° od horizontály
-  const orient = {
-    left: "scaleX(-1)", up: "rotate(-90deg)", down: "rotate(90deg)",
-    up_right: "rotate(-45deg)", down_right: "rotate(45deg)",
-    up_left: "scaleX(-1) rotate(45deg)", down_left: "scaleX(-1) rotate(-45deg)",
-  }[c.dir] || "";
+  // diagonály = rotácia o 45° od horizontály.
+  const orient = projectileOrient(charKey, c.dir);
   entry.el.style.transform = `translate(-50%, -50%) ${orient}`.trim();
   entry.el.style.left = dst.left + "px"; // nová cieľová bunka → CSS ju plynule dokĺže za --charge-ms
   entry.el.style.top  = (dst.top + yOff) + "px";
@@ -2183,9 +2194,11 @@ function displayDir(action, ownerSlot) {
 }
 function actionIcon(action, ownerSlot) {
   const arr = (a) => ARROW_DIR[displayDir(a, ownerSlot)] || "";
+  const ownerChar = state?.[ownerSlot]?.char;
+  const side = ownerChar === "countess" || ownerChar === "onre";
   switch (action?.type) {
     case "move":     return `🚶${arr(action)}`;
-    case "dash":     return `🏃${arr(action)}`;
+    case "dash":     return side ? "❔" : `🏃${arr(action)}`;
     case "recharge": return "🙏";
     case "attack":   return `🏹${arr(action)}`;
     case "melee":    return "🗡️";
@@ -2195,7 +2208,7 @@ function actionIcon(action, ownerSlot) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — len čistý badge
+    case "special":  return side ? "❔" : `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — len čistý badge
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
@@ -2249,7 +2262,10 @@ function appendActionLog(slot, action) {
   }
   const el = log.querySelector(".a-slot.slot-act");
   if (el) {
-    el.className = `a-badge ${action?.type || ""}`;
+    const ownerChar = state?.[slot]?.char;
+    const hiddenSide = ownerChar === "countess" || ownerChar === "onre";
+    const hiddenAction = hiddenSide && (action?.type === "dash" || action?.type === "special");
+    el.className = `a-badge ${action?.type || ""}${hiddenAction ? " hidden-question" : ""}`;
     el.textContent = actionIcon(action, slot);
   }
   return el;
@@ -2907,13 +2923,17 @@ function positionActors(s, immediate = false) {
 function actionBadgeView(a, ownerSlot) {
   const arrow = ARROW_DIR;
   const dd = ARROW_DIR[displayDir(a, ownerSlot)] || ""; // Narutov vertikálny smer (move/dash/attack) súperovi anonymizovaný (↕)
+  const ownerChar = state?.[ownerSlot]?.char;
+  const hiddenSide = ownerChar === "countess" || ownerChar === "onre";
   switch (a?.type) {
     case "move":          return { cls: "move",    text: `🚶${dd || "?"}` };
-    case "dash":          return { cls: "dash",    text: `🏃${dd || "?"}` };
+    case "dash":          return hiddenSide ? { cls: "dash hidden-question", text: "❔" } : { cls: "dash", text: `🏃${dd || "?"}` };
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
-    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
+    case "special":       return hiddenSide
+      ? { cls: "special hidden-question", text: "❔" }
+      : { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
@@ -5216,10 +5236,10 @@ socket.on("state", (s) => {
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(mCost); }
     } else if (mineMelee.char === "countess") {
       meleeBtn.title = "Melee — strike your own cell. A landed hit heals you (blocked = nothing)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")} +${miniPix("❤️")}`; hydratePix(mCost); }
+      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
     } else if (mineMelee.char === "onre") {
       meleeBtn.title = "Melee — strike your own cell. A landed hit drains the foe's mana into yours (blocked = nothing)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")} +${miniPix("💧")}`; hydratePix(mCost); }
+      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
     } else {
       meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
@@ -5228,6 +5248,11 @@ socket.on("state", (s) => {
   // label special podľa mága — v turnaji po naplánovanom swape platí nový mág (ghostCharAt), nie ten na štarte kola
   const specChar = ghostCharAt();
   if (specChar && specialBtn) {
+    const sideSpecial = specChar === "countess" || specChar === "onre";
+    specialBtn.classList.toggle("hidden-question", sideSpecial);
+    const specIco = specialBtn.querySelector(".pix-ico:not(.mini)");
+    const specWant = sideSpecial ? "❔" : "✨";
+    if (specIco && specIco.dataset.emoji !== specWant) { specIco.dataset.emoji = specWant; specIco.innerHTML = ""; pixelizeEmoji(specIco); }
     const cost = specialBtn.querySelector(".cost");
     if (specChar === "medusa") {
       // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
