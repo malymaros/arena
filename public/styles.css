@@ -2423,7 +2423,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 /* ---------- Prihlásenie (meno + heslo) ---------- */
 .login{
   position: fixed; inset: 0; z-index: 10001; overflow: auto;
-  background: rgba(0,0,0,.86);
+  background: #000;
   display: flex; align-items: center; justify-content: center; padding: 24px;
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
 }
@@ -2457,7 +2457,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 /* ---------- Room browser ---------- */
 .rooms{
   position: fixed; inset: 0; z-index: 10000; overflow: auto;
-  background: rgba(0,0,0,.92);
+  background: #000;
   display: flex; align-items: center; justify-content: center; padding: 24px;
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
 }
