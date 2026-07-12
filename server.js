@@ -907,6 +907,8 @@ function forceReset() {
   clearTurnTimer();
   try { if (personSockets.A) personSockets.A.disconnect(true); } catch {}
   try { if (personSockets.B) personSockets.B.disconnect(true); } catch {}
+  for (const s of spectators) { try { s.disconnect(true); } catch {} } // odpoj aj divákov, nech nevisia na zrušenej roomke
+  spectators.clear();
   personSockets.A = null;
   personSockets.B = null;
   personIds.A = null;

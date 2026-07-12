@@ -5980,8 +5980,8 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   const key = qp.get("key") || "";
   const btn = document.createElement("button");
   btn.id = "admin-reset";
-  btn.textContent = "Reset session";
-  btn.title = "Disconnects all players and restarts the game";
+  btn.textContent = "Restart all rooms";
+  btn.title = "Zruší VŠETKY roomky, odpojí všetkých hráčov aj divákov (späť na room-browser)";
   btn.style.position = "fixed";
   btn.style.right = "14px";
   btn.style.bottom = "14px";
@@ -5996,7 +5996,7 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   btn.style.boxShadow = "0 6px 18px rgba(0,0,0,.35)";
 
   btn.addEventListener("click", () => {
-    if (!confirm("Really reset the game and disconnect all players?")) return;
+    if (!confirm("Zrušiť VŠETKY roomky a odpojiť všetkých hráčov aj divákov?")) return;
     socket.emit("admin_reset_all", key);
     fetch(`/admin/reset-all${key ? `?key=${encodeURIComponent(key)}` : ""}`).catch(()=>{});
   });

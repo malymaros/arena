@@ -1870,6 +1870,16 @@ async function main() {
   check(c1.lastTimeline === null && c2.lastTimeline === null,
     "TR: kolo v 2. roomke NEpresiaklo do 1. roomky (izolácia)");
 
+  /* ---------- TR2: admin „Restart all rooms" zruší VŠETKY bežiace roomky ---------- */
+  // teraz bežia 2 roomky (c1/c2 a c3/c4); admin reset (prázdny kľúč = povolený, ADMIN_KEY nenastavený) ich má obe zrušiť
+  c1.sock.emit("admin_reset_all", "");
+  await new Promise(r => setTimeout(r, 400));
+  const c5 = await connect(); // nový príchod → room-browser
+  await waitFor(() => c5.rooms != null, 5000, "c5 dostal room-browser po admin resete");
+  check((c5.rooms.rooms || []).length === 0, "TR2: admin reset zrušil obe roomky (0 v zozname)", `rooms=${JSON.stringify(c5.rooms?.rooms)}`);
+  check(c5.rooms.canCreate === true, "TR2: po admin resete sa dá vytvoriť nová roomka");
+  c5.sock.close();
+
   c3.sock.close(); c4.sock.close();
 
   c1.sock.close(); c2.sock.close();
