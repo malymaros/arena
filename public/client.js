@@ -57,9 +57,13 @@ const socket = io({ auth: { id: arenaId }, autoConnect: false });
   });
 })();
 
-/* ---------- Room browser (po logine) — zatiaľ 1 roomka: create / join / spectate ---------- */
+/* ---------- Room browser (po logine): zoznam roomiek — create / join / spectate ---------- */
 const roomsEl     = document.getElementById("rooms");
 const roomsListEl = document.getElementById("rooms-list");
+// admin režim (?admin=1[&key=…]) → room-browser dostane aj destruktívny „RESET ROOMS" (všetky roomky)
+const ADMIN_QP    = new URLSearchParams(location.search);
+const IS_ADMIN    = ADMIN_QP.has("admin");
+const ADMIN_KEY   = ADMIN_QP.get("key") || "";
 function hideRooms() { roomsEl?.classList.add("hidden"); }
 function renderRooms(info) {
   if (!roomsListEl) return;
@@ -94,6 +98,20 @@ function renderRooms(info) {
     b.textContent = "CREATE ROOM";
     b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
     roomsListEl.appendChild(b);
+  }
+  // admin: zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM) — len s ?admin=1
+  if (IS_ADMIN && list.length > 0) {
+    const rb = document.createElement("button");
+    rb.className = "room-btn reset";
+    rb.textContent = "RESET ROOMS";
+    rb.title = "Zruší VŠETKY roomky a odpojí všetkých hráčov aj divákov";
+    rb.addEventListener("click", () => {
+      if (!confirm("Zrušiť VŠETKY roomky a odpojiť všetkých hráčov aj divákov?")) return;
+      rb.disabled = true;
+      socket.emit("admin_reset_all", ADMIN_KEY);
+      fetch(`/admin/reset-all${ADMIN_KEY ? `?key=${encodeURIComponent(ADMIN_KEY)}` : ""}`).catch(() => {});
+    });
+    roomsListEl.appendChild(rb);
   }
 }
 socket.on("rooms", (info) => {
@@ -5980,8 +5998,8 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   const key = qp.get("key") || "";
   const btn = document.createElement("button");
   btn.id = "admin-reset";
-  btn.textContent = "Restart all rooms";
-  btn.title = "Zruší VŠETKY roomky, odpojí všetkých hráčov aj divákov (späť na room-browser)";
+  btn.textContent = "Reset this room";
+  btn.title = "Zruší LEN túto roomku — odpojí jej hráčov aj divákov (späť na room-browser)";
   btn.style.position = "fixed";
   btn.style.right = "14px";
   btn.style.bottom = "14px";
@@ -5996,9 +6014,8 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   btn.style.boxShadow = "0 6px 18px rgba(0,0,0,.35)";
 
   btn.addEventListener("click", () => {
-    if (!confirm("Zrušiť VŠETKY roomky a odpojiť všetkých hráčov aj divákov?")) return;
-    socket.emit("admin_reset_all", key);
-    fetch(`/admin/reset-all${key ? `?key=${encodeURIComponent(key)}` : ""}`).catch(()=>{});
+    if (!confirm("Zrušiť TÚTO roomku a odpojiť jej hráčov aj divákov?")) return;
+    socket.emit("admin_reset_room", key);
   });
 
   document.body.appendChild(btn);

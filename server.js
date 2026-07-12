@@ -3215,6 +3215,16 @@ io.on("connection", (socket) => {
   // --- admin reset cez socket (napr. z klienta s ?admin=1) — globálny (všetky roomky)
   socket.on("admin_reset_all", (key) => { if (okAdmin(key)) forceResetAll(); });
 
+  // --- admin reset LEN tejto roomky (rohový button v hre): odpojí jej hráčov aj divákov a roomku zruší
+  socket.on("admin_reset_room", (key) => {
+    if (!okAdmin(key)) return;
+    const room = roomForSocket(socket);
+    if (!room) return;
+    room.forceReset();         // odpojí hráčov + divákov, zruší časovače
+    rooms.delete(room.id);     // vyradí roomku z registra
+    broadcastRooms();          // ostatní na room-browseri uvidia aktuálny zoznam
+  });
+
   socket.on("disconnect", () => {
     browsing.delete(socket);
     roomForSocket(socket)?.onDisconnect(socket);

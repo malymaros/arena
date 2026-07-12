@@ -2483,6 +2483,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   background: #ffb300; box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
 }
 .room-btn.create{ width: 100%; padding: 18px; font-size: 14px; }
+.room-btn.reset{ width: 100%; padding: 18px; font-size: 14px; background: #8e0000; color: #fff; }
 .room-btn.spectate{ background: #6a6d75; color: #10141a; }
 .room-btn:hover{ filter: brightness(1.1); }
 .room-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }

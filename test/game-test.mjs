@@ -1870,13 +1870,22 @@ async function main() {
   check(c1.lastTimeline === null && c2.lastTimeline === null,
     "TR: kolo v 2. roomke NEpresiaklo do 1. roomky (izolácia)");
 
-  /* ---------- TR2: admin „Restart all rooms" zruší VŠETKY bežiace roomky ---------- */
-  // teraz bežia 2 roomky (c1/c2 a c3/c4); admin reset (prázdny kľúč = povolený, ADMIN_KEY nenastavený) ich má obe zrušiť
-  c1.sock.emit("admin_reset_all", "");
+  /* ---------- TR3: per-room admin reset zruší LEN svoju roomku (druhá beží ďalej) ---------- */
+  // c1 (v roomke A) spustí per-room reset → roomka A zmizne, roomka B (c3/c4) prežije
+  c1.sock.emit("admin_reset_room", "");
+  await new Promise(r => setTimeout(r, 400));
+  const cX = await connect(); // nový príchod → room-browser
+  await waitFor(() => cX.rooms != null, 5000, "cX dostal room-browser po per-room resete");
+  check((cX.rooms.rooms || []).length === 1, "TR3: per-room reset nechal bežať druhú roomku (1 v zozname)", `rooms=${JSON.stringify(cX.rooms?.rooms)}`);
+  cX.sock.close();
+
+  /* ---------- TR2: admin „RESET ROOMS" (browser) zruší VŠETKY bežiace roomky ---------- */
+  // teraz beží 1 roomka (c3/c4); globálny admin reset (prázdny kľúč = povolený, ADMIN_KEY nenastavený) ju má zrušiť
+  c3.sock.emit("admin_reset_all", "");
   await new Promise(r => setTimeout(r, 400));
   const c5 = await connect(); // nový príchod → room-browser
   await waitFor(() => c5.rooms != null, 5000, "c5 dostal room-browser po admin resete");
-  check((c5.rooms.rooms || []).length === 0, "TR2: admin reset zrušil obe roomky (0 v zozname)", `rooms=${JSON.stringify(c5.rooms?.rooms)}`);
+  check((c5.rooms.rooms || []).length === 0, "TR2: globálny admin reset zrušil všetky roomky (0 v zozname)", `rooms=${JSON.stringify(c5.rooms?.rooms)}`);
   check(c5.rooms.canCreate === true, "TR2: po admin resete sa dá vytvoriť nová roomka");
   c5.sock.close();
 
