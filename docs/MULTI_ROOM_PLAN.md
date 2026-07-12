@@ -141,3 +141,42 @@ Zmeny sú **kontajnerované na room-browser** — herná časť sa nemení.
 | Klient (zoznam roomiek + roomId) | menší |
 | Testy | menší (nový 2-room scenár) |
 | Riziko | stredné — sústredené v scopingu broadcastov a reconnect routingu |
+
+---
+
+## 9. STAV: implementované (factory) + nasadené
+
+Zvolený **factory** (nie ambient pointer). Celý per-room stav+logika v `createRoom(id)` (`server.js`), globálne len `rooms: Map`, `browsing`, `nextRoomId`, `MAX_ROOMS = 2`, routing v `io.on("connection")`. `roomEmit`/`spectators` per-room; `emitStateMasked` iteruje len členov roomky. Klient `renderRooms` cyklí cez pole roomiek, `join_room`/`spectate_room` nesú `roomId`. Test suite **633 PASS** vrátane 2-room izolačného scenára (`TR:` v `test/game-test.mjs`).
+
+### Čo je overené automaticky (vysoká istota)
+Celá herná logika (postavy, obrany, labyrint, klon, pasca, turnaj) — identická, len lexikálne vnorená. Scoping broadcastov (kolo v roomke A nepresiakne do B, obojsmerne). Limit `MAX_ROOMS`. Single-room happy path (create/join/char/kolá).
+
+### ⚠️ Neotestované hrany — WATCH-LIST (odtiaľto sa odpichni pri regresii)
+
+Ak sa niečo pokazí po nasadení, prvé miesta na pozretie (zoradené podľa pravdepodobnosti):
+
+1. **Reconnect / grace naprieč roomkami** — reclaim slučka v `io.on("connection")` (`server.js`, `room.reclaimPersonFor(cid)`).
+   - *Symptóm:* po refreshi/výpadku hráč spadne na room-browser namiesto späť do rozohranej hry, alebo sa posadí do zlej roomky.
+   - *Skontroluj:* `reclaimPersonFor` číta `personIds` per roomku; grace okno `RECLAIM_GRACE_MS`; že sa iteruje `rooms.values()` a nájde sa **správna** roomka.
+
+2. **connectionStateRecovery** (`skipMiddlewares`, `server.js:17`) — na začiatku connection handlera **nulujem** `socket.data.person/roomId`.
+   - *Symptóm:* po krátkom sieťovom výpadku sa hráčovi hra „resetne" na browser, alebo prestane brať jeho `lock_in`.
+   - *Skontroluj:* recovnutý socket obíde `io.use` (nemá `pendingName`); spolieha sa na token-reclaim. `seat()` drží pôvodné meno keď `pendingName` prázdne.
+
+3. **Divácky live-stream** — `spectators` Set + `roomEmit`/`emitStateMasked`.
+   - *Symptóm:* divákovi po pripojení zamrzne obraz (nedostáva priebežné `state`/`game_result`/`new_game`).
+   - *Skontroluj:* `spectate()` pridáva socket do `spectators`; `emitStateMasked` aj `roomEmit` iterujú `spectators`. Starý kód posielal divákom cez `io.sockets.sockets` (všetkým) — teraz musia byť v Sete.
+
+4. **Klientske room-browser UI** — `renderRooms` (`public/client.js`), event `rooms` má nový tvar `{ rooms:[{id,players,max,canJoin,phase}], canCreate }`.
+   - *Symptóm:* zoznam roomiek sa nevykreslí, chýba „CREATE ROOM", Join pošle zlý/žiadny `roomId`.
+   - *Skontroluj:* `socket.emit("join_room", { roomId: r.id })`; `info.canCreate`; `join_denied` sa spolieha na následný `rooms` re-render.
+
+5. **Deštrukcia roomky** — `scheduleRoomDestroyCheck` (grace + 500 ms) → `destroySelf` (`server.js`).
+   - *Symptóm:* prázdna roomka ostane v zozname; alebo divák v zrušenej roomke zamrzne namiesto návratu na browser.
+   - *Skontroluj:* `destroySelf` vráti divákov do `browsing` + `rooms.delete(id)` + `broadcastRooms()`; `roomEmpty()` ráta grace-held miesta ako obsadené.
+
+6. **admin / retry naprieč roomkami** — `forceResetAll` iteruje `rooms` a volá `room.forceReset()`; `retry`/`onRetry` je **per-room** (nezruší cudziu roomku).
+   - *Symptóm:* admin reset nechá roomku bežať, alebo `retry` v jednej roomke zresetne druhú.
+
+### Ako rýchlo zdvihnúť istotu bez prehliadača
+Dopísať do `test/game-test.mjs`: (a) **reconnect** — odpoj hráča, do grace pripoj s rovnakým tokenom → dostane späť slot v správnej roomke; (b) **divák** — pripoj `spectate_room`, over že dostáva priebežné `state` počas kola. Zvyšok (recovery, klientske UI) zavrie len browser smoke-test (2+2 taby).

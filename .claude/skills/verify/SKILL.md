@@ -11,7 +11,7 @@ Zmeny v `server.js` sa overujú cez reálne socket spojenia (rovnaký vzor ako `
 
 1. Driver skript (`.mjs`) musí ležať **v repo roote** — ESM rieši `socket.io-client` podľa umiestnenia súboru, nie cwd (scratchpad nemá node_modules). Pomenuj `*.tmp.mjs` a po behu zmaž.
 2. Server spawn: `spawn(process.execPath, ["server.js"], { env: { PORT: "3997", FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass" } })` + ~1200 ms na boot. `FORCE_FIRST_STARTER=A` → host (prvý pripojený, `create_room`) dostane p1.
-3. Klient: `io(url, { transports: ["websocket"], auth: { name: "<1–8 znakov a–z>", pass: "testpass" } })`; potom `create_room` (c1) / `join_room` (c2), počkaj na `you_are`.
+3. Klient: `io(url, { transports: ["websocket"], auth: { name: "<1–8 znakov a–z>", pass: "testpass" } })`; potom `create_room` (c1); c2 počká na `rooms` event (`{ rooms:[{id,…}], canCreate }`) a pošle `join_room, { roomId: rooms[0].id }`. Počkaj na `you_are`. (Viac roomiek naraz — cap `MAX_ROOMS`; každá roomka je izolovaný closure z `createRoom(id)`.)
 4. Setup: `configure_match` (host; `tileWeights: { dmg:0, heal:100, mana:0, ik:0 }` vypne náhodný tile dmg/IK), `choose_character` obaja, počkaj na `state` s oboma char.
 5. Kolo: obaja `lock_in([akcia×3])`, počkaj na `state` s `timeline` + ~200 ms na root snapshot.
 

@@ -64,33 +64,36 @@ function hideRooms() { roomsEl?.classList.add("hidden"); }
 function renderRooms(info) {
   if (!roomsListEl) return;
   roomsListEl.innerHTML = "";
-  if (!info || info.canCreate) {
-    // žiadna roomka → vytvor (staneš sa hostom a nastavíš parametre)
+  // spätná kompat.: starý formát bol jeden objekt; nový je { rooms: [...], canCreate }
+  const list = Array.isArray(info?.rooms) ? info.rooms : [];
+  // existujúce roomky → Join (voľné miesto) alebo Spectate (plná)
+  list.forEach((r, i) => {
+    const card = document.createElement("div");
+    card.className = "room-card";
+    const label = document.createElement("div");
+    label.className = "room-label";
+    label.innerHTML = `ROOM ${i + 1} <span class="room-count">${r.players}/${r.max}</span>`;
+    const b = document.createElement("button");
+    if (r.canJoin) {
+      b.className = "room-btn join";
+      b.textContent = "JOIN";
+      b.addEventListener("click", () => { b.disabled = true; socket.emit("join_room", { roomId: r.id }); });
+    } else {
+      b.className = "room-btn spectate";
+      b.textContent = "SPECTATE";
+      b.addEventListener("click", () => { b.disabled = true; socket.emit("spectate_room", { roomId: r.id }); });
+    }
+    card.appendChild(label);
+    card.appendChild(b);
+    roomsListEl.appendChild(card);
+  });
+  // vytvor novú roomku (staneš sa hostom a nastavíš parametre) — ak sa ešte dá (limit)
+  if (info?.canCreate) {
     const b = document.createElement("button");
     b.className = "room-btn create";
     b.textContent = "CREATE ROOM";
     b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
     roomsListEl.appendChild(b);
-  } else {
-    // existujúca roomka → Join (voľné miesto) alebo Spectate (plná)
-    const card = document.createElement("div");
-    card.className = "room-card";
-    const label = document.createElement("div");
-    label.className = "room-label";
-    label.innerHTML = `ROOM 1 <span class="room-count">${info.players}/${info.max}</span>`;
-    const b = document.createElement("button");
-    if (info.canJoin) {
-      b.className = "room-btn join";
-      b.textContent = "JOIN";
-      b.addEventListener("click", () => { b.disabled = true; socket.emit("join_room"); });
-    } else {
-      b.className = "room-btn spectate";
-      b.textContent = "SPECTATE";
-      b.addEventListener("click", () => { b.disabled = true; socket.emit("spectate_room"); });
-    }
-    card.appendChild(label);
-    card.appendChild(b);
-    roomsListEl.appendChild(card);
   }
 }
 socket.on("rooms", (info) => {

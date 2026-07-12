@@ -32,8 +32,10 @@ function connect() {
     const sock = io(URL, { transports: ["websocket"], auth: { name, pass: "testpass" } });
     // pomalší boot servera nesmie zhodiť test — socket.io sa retryne samo; reject až po celkovom timeoute
     const killer = setTimeout(() => { sock.close(); reject(new Error("connect timeout")); }, 15000);
-    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0 };
+    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0, rooms: null, spectator: false };
     sock.on("you_are", (s) => { ctx.slot = s?.slot ?? s; ctx.isHost = !!s?.isHost; });
+    sock.on("rooms", (r) => { ctx.rooms = r; });                 // zoznam roomiek (room-browser)
+    sock.on("spectator", () => { ctx.spectator = true; });
     sock.on("color_roll", () => { ctx.colorRolls++; }); // ruleta farieb po configure_match (klient ju animuje)
     sock.on("game_result", (g) => { ctx.gameResult = g; });
     sock.on("turn_timer", (t) => { ctx.lastTimer = t; });
@@ -165,7 +167,10 @@ async function main() {
   // po logine sa už neposadzuje automaticky — c1 vytvorí roomku (host = osoba A), c2 sa pripojí (osoba B)
   c1.sock.emit("create_room");
   await waitFor(() => c1.slot, 5000, "c1 create_room → you_are");
-  c2.sock.emit("join_room");
+  // c2 (na room-browseri) dostane zoznam roomiek → pripojí sa do prvej podľa roomId
+  await waitFor(() => c2.rooms?.rooms?.length > 0, 5000, "c2 vidí roomku v zozname");
+  const roomId = c2.rooms.rooms[0].id;
+  c2.sock.emit("join_room", { roomId });
   await waitFor(() => c2.slot, 5000, "c2 join_room → you_are");
   check(c1.slot === "p1" && c2.slot === "p2", "sloty pridelené p1/p2 (create/join)");
 
@@ -1825,6 +1830,47 @@ async function main() {
   check(tv10Hits.length === 1, "TV10: stojaci lovec trafený za 3", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
   check(fxOf2(tl, "labyrinth_end").filter(e => e.target === "p1").length === 1, "TV10: zásah ukončil labyrint");
   invariantCheck(tl, "TV10");
+
+  /* ---------- TR: viac roomiek naraz — izolácia broadcastov ---------- */
+  // druhá roomka: c3 (host = p1) + c4 (p2). MAX_ROOMS=2 → musí sa dať vytvoriť.
+  const c3 = await connect();
+  const c4 = await connect();
+  await waitFor(() => c3.rooms?.canCreate === true, 5000, "c3 vidí canCreate (miesto na 2. roomku)");
+  c3.sock.emit("create_room");
+  await waitFor(() => c3.slot, 5000, "c3 create_room → you_are (2. roomka)");
+  check(c3.slot === "p1", "TR: c3 je host/p1 druhej roomky");
+  // c4 vidí obe roomky; pripojí sa do tej voľnej (prvá je plná = c1/c2)
+  await waitFor(() => (c4.rooms?.rooms || []).some(r => r.canJoin), 5000, "c4 vidí voľnú roomku");
+  const roomB = c4.rooms.rooms.find(r => r.canJoin);
+  check((c4.rooms.rooms || []).length === 2, "TR: room-browser ukazuje 2 roomky", `rooms=${JSON.stringify(c4.rooms.rooms)}`);
+  c4.sock.emit("join_room", { roomId: roomB.id });
+  await waitFor(() => c4.slot, 5000, "c4 join_room → you_are (2. roomka)");
+  check(c4.slot === "p2", "TR: c4 je p2 druhej roomky");
+  // 3. roomka sa už nedá vytvoriť (limit 2)
+  check(c4.rooms.canCreate === false, "TR: pri 2 roomkách už canCreate=false (limit MAX_ROOMS)");
+
+  // rozohraj druhú roomku (fire vs lightning) samostatne
+  await freshGame(c3, c4);
+  check(!!c3.lastState && c3.lastState.p1.char === "fire", "TR: 2. roomka má vlastný herný stav");
+
+  // IZOLÁCIA: odohraj kolo LEN v 1. roomke → nový timeline dostanú len c1/c2, nie c3/c4
+  c3.lastTimeline = null; c4.lastTimeline = null;
+  await freshGame(c1, c2);
+  const tlIso = await playRound(c1, c2, [A("right"), R, S], [R, S, M("up")]);
+  await new Promise(r => setTimeout(r, 200));
+  check(!!tlIso && !!c1.lastTimeline, "TR: kolo v 1. roomke → c1 dostal timeline");
+  check(c3.lastTimeline === null && c4.lastTimeline === null,
+    "TR: kolo v 1. roomke NEpresiaklo do 2. roomky (izolácia)");
+
+  // a naopak: kolo v 2. roomke → timeline len c3/c4
+  c1.lastTimeline = null; c2.lastTimeline = null;
+  const tlIso2 = await playRound(c3, c4, [A("right"), R, S], [R, S, M("up")]);
+  await new Promise(r => setTimeout(r, 200));
+  check(!!tlIso2 && !!c3.lastTimeline, "TR: kolo v 2. roomke → c3 dostal timeline");
+  check(c1.lastTimeline === null && c2.lastTimeline === null,
+    "TR: kolo v 2. roomke NEpresiaklo do 1. roomky (izolácia)");
+
+  c3.sock.close(); c4.sock.close();
 
   c1.sock.close(); c2.sock.close();
   serverProc?.kill();
