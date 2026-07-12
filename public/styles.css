@@ -746,7 +746,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 
 /* Char select */
 .char-select {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.92); /* takmer nepriehľadné — aréna za výberom neruší */
+  position: fixed; inset: 0; background: #000; /* plne nepriehľadné — aréna za výberom nepresvitá */
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; z-index: 9999;
 }
 .char-select.hidden { display: none; }
