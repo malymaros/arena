@@ -28,6 +28,7 @@ v `public/assets/` — mapovanie na herné súbory a kit postavy sa ešte nerozh
 node detect.cjs      # detekcia buniek -> cells.json + overview.png
 node row.cjs N [M …] # 2x náhľad riadkov -> row.png (rows_*.png = uložené kópie)
 node pack.cjs        # zloženie všetkých pásov -> out/*.png
+node pack_char.cjs   # herné akcie z vybraných pásov -> out/char/*.png
 viewer.html          # animovaný náhľad všetkých pásov (otvoriť priamo v prehliadači)
 ```
 
@@ -36,22 +37,36 @@ Konfigurácia sheetu je `sheet.cjs`; spec animácií (bunky per pás + kotva) je
 `{x0,y0,x1,y1}` — použitý pre `L_FireworkFX` (rozsypané iskry riadku 12 zliate
 do jedného framu).
 
+## Herné akcie (`out/char/`)
+
+`pack_char.cjs` skladá vybrané pásy pod herné názvy — kombinované akcie sa
+lepia priamo z buniek do jednotnej veľkosti framu (kotva per-segment):
+
+| akcia | zdrojové pásy |
+|---|---|
+| `Idle` | L_Stand (4) |
+| `Run` | L_Run (8) |
+| `Attack_1` (cast strely) | L_Jab2 (4) |
+| `Attack_2` (melee) | L_Gatling bez posledného framu (9) |
+| `Special_1` | L_BalloonTwist + L_ScratchFX + L_SpinWrap (9) |
+| `Special_2` | L_FistWheel (3) |
+| `Special_3` | L_MeatFeast (12) |
+| `Special_4` | L_GiantPistol + L_GiantRocket + L_GiantPunch (14, doľava) |
+| `Special_5` | L_GiantRetract (4, doľava) |
+| `Special_6` | L_Rifle (9, doľava) |
+| `Recharge` | L_Balloon (9) |
+| `Recharge2` | L_TwinFists (7) |
+| `Charge` (projektil) | L_FistJet (1) |
+| `Hurt` | L_Hurt (4) |
+| `Dead` | L_Lose (4 — sediaci porazený) |
+| `Win` | L_Win (4) |
+
+Mapovanie Special_1–6 / Recharge2 na konkrétne herné mechaniky (a P1/P2
+paleta) sa rozhodne pri integrácii postavy.
+
 ## Pásy (`out/`, prefix `L_`)
 
-Kompletný „všetko čo sheet dáva" výber na review — finálny kit sa vyberie
-z vieweru. Zaujímavé mapovania na herné akcie:
-
-- **Idle/Run/Hurt/Dead**: `L_Idle` (6), `L_Run` (8), `L_Hurt` (4),
-  `L_Knockback`+`L_Tumble`+`L_Lying` (pád + ležanie ako Dead)
-- **Basic attack + projektil**: `L_Bullet`/`L_Pistol`/`L_Punch` (naťahovací
-  úder) + oddelené letiace päste `L_Fist` (3) / `L_FistJet` (1) ako `Charge.png`
-- **Melee**: `L_Jab`/`L_Jab2` alebo `L_Gatling` (ora-ora salva ako Jotarova)
-- **Special**: `L_Gatling`/`L_FistRain` (plošná salva), Gear Third
-  `L_GiantPistol`→`L_GiantPunch` (obria päsť), `L_RifleUp`/`L_Axe` (vertikály)
-- **Shield/Mirror choreografia**: `L_Balloon` (Fusen — nafúknutie a odrazenie,
-  `L_BalloonBounce` reakcie) — tematicky presne mirror
-- **Recharge**: `L_MeatFeast` (Ultimate Action = jedenie mäsa) alebo `L_Guard`
-- **Win/Lose**: `L_Win`, `L_Lose`, `L_Stand`, `L_Cheer`
+Kompletný „všetko čo sheet dáva" výber na review — z neho vzišiel kit vyššie.
 
 Smerové poznámky: doľava kreslené sú `L_Punch`, `L_Rifle`, `L_Pistol`,
 `L_Pistol2`, `L_Whip`, `L_Unused` a celý Gear Third (kotva bottomright);

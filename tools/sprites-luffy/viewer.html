@@ -11,6 +11,9 @@
 <body>
 <script>
 const GROUPS = {
+  "Herné akcie (out/char — finálny kit)": ["char/Idle","char/Run","char/Attack_1","char/Attack_2",
+    "char/Special_1","char/Special_2","char/Special_3","char/Special_4","char/Special_5","char/Special_6",
+    "char/Recharge","char/Recharge2","char/Charge","char/Hurt","char/Dead","char/Win"],
   "Postoje / pohyb / obrana": ["L_Idle","L_Stand","L_Run","L_Dash","L_DashStop","L_Jump","L_Guard","L_Guard2"],
   "Údery — B combo, pistol, rifle (časť kreslená doľava)": ["L_Jab","L_Jab2","L_Punch","L_PunchBall",
     "L_Bullet","L_BulletEnd","L_Rifle","L_Pistol","L_Pistol2","L_Whip","L_RocketPull"],
@@ -28,8 +31,9 @@ const GROUPS = {
 const FPS = 10;
 for (const [title, files] of Object.entries(GROUPS)) {
   const h = document.createElement("h3"); h.textContent = title; document.body.append(h);
-  for (const name of files) {
-    const src = "out/" + name + ".png";
+  for (const file of files) {
+    const src = "out/" + file + ".png";
+    const name = file.split("/").pop();
     const box = document.createElement("div"); box.className = "box";
     const cvs = document.createElement("canvas");
     const lbl = document.createElement("div"); lbl.className = "lbl";

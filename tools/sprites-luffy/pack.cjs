@@ -119,7 +119,8 @@ const SEGMENTS = {
   L_Unused:      { ids: ids(25, 8, 14), anchor: "bottomright" },// nevyuzite frames zo sheetu (dolava)
 };
 
-for (const [name, seg] of Object.entries(SEGMENTS)) {
+module.exports = { SEGMENTS };
+if (require.main === module) for (const [name, seg] of Object.entries(SEGMENTS)) {
   const cs = seg.ids.map(id => typeof id === "object" ? { ...id, w: id.x1 - id.x0 + 1, h: id.y1 - id.y0 + 1 } : cells.find(c => c.id === id)).filter(Boolean);
   if (cs.length !== seg.ids.length) console.log(`  ! ${name}: nenajdene bunky`, seg.ids.filter(id => typeof id === "string" && !cells.find(c => c.id === id)));
   const maxDim = Math.max(...cs.map(c => Math.max(c.w, c.h)));
