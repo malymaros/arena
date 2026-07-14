@@ -136,6 +136,7 @@ const DEFAULT_CONFIG = {
   tilesPerRound: 1,                              // 1 | 2 | 3 — koľko tiles sa spawne na konci kola
   tileWeights: { dmg: 75, heal: 12, mana: 8, ik: 5 }, // % šanca typu, spolu 100
   timer: "30",                                   // "off" | "30" | "60" | "120" | "quickdraw"
+  tilePreview: true,                             // ukazovať hráčom vopred, kde na konci kola pribudnú tiles / kam sa presunú IK
 };
 
 // celkové spomalenie animácií kola (1 = pôvodné tempo); MUSÍ sedieť s client.js ANIM_SLOW
@@ -315,6 +316,7 @@ function newGame() {
     starter: "p1", // slot, ktorý začína aktuálne kolo; hru 1 otvára p1 (biely), v sérii sa štartér hier strieda, medzi kolami sa preklápa
     tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" } — pribúdajú od konca 1. kola
     iks: [],       // [{ x, y }] — insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
+    pending: null, // { ikMoves: [{x,y}…], spawns: [{x,y,type}…] } — VOPRED vyžrebované zmeny tiles na koniec AKTUÁLNEHO kola (preview pre hráčov)
     // séria zápasov
     seats: { p1: "A", p2: "B" }, // kto sedí na ktorom slote — LOSUJE sa v startMatch (p1 = biely, začína); fixné na celú sériu
     seriesWins: { A: 0, B: 0 },
@@ -402,7 +404,13 @@ function redactTilesFor(mySlot, snap) {
   const me = snap[mySlot];
   const onTorchCell = (t) => me && ((me.x != null && t.x === me.x && t.y === me.y)
     || (me.clone && t.x === me.clone.x && t.y === me.clone.y));
-  return { ...snap, tiles: snap.tiles.filter(t => t.type === "dmg" || onTorchCell(t)) };
+  const out = { ...snap, tiles: snap.tiles.filter(t => t.type === "dmg" || onTorchCell(t)) };
+  // preview (config.tilePreview) sa rediguje ROVNAKO ako existujúce tiles: dmg/IK spawny a ciele presunu IK
+  // prekliaty vidí vždy, heal/mana spawn len keď na tej bunke priamo stojí on alebo jeho tieňový klon
+  if (out.pending) {
+    out.pending = { ...out.pending, spawns: out.pending.spawns.filter(s => s.type === "dmg" || s.type === "ik" || onTorchCell(s)) };
+  }
+  return out;
 }
 // lovec (alebo jeho tieňový klon) PRÁVE stojí na niektorej „fakľovej" bunke prekliateho — na jeho vlastnej
 // ALEBO na bunke jeho tieňového klona (klon = druhá fakľa; lovec nevie, ktorá figúra je pravá, takže obe
@@ -539,6 +547,12 @@ function snapshot() {
     goldLocked: !!(game.players.p1.lastStandBuff || game.players.p2.lastStandBuff),
     tiles: game.tiles.map(t => ({ ...t })),
     iks: game.iks.map(t => ({ ...t })),
+    // preview zmien tiles na konci kola (len ak je zapnutý config.tilePreview) — verejná, symetrická informácia;
+    // heal/mana spawny počas labyrintu rediguje redactTilesFor rovnako ako existujúce tiles
+    pending: (game.config?.tilePreview && game.pending) ? {
+      ikMoves: game.pending.ikMoves.map(c => ({ ...c })),
+      spawns: game.pending.spawns.map(s => ({ ...s })),
+    } : null,
     // tournament: draftnuté tímy per slot — po skončení draftu VEREJNÉ (HUD hlavy oboch strán, poradie
     // = poradie výberu); počas fázy team_select snapshotFor súperov tím maskuje (slepý draft).
     roster: game.roster ? {
@@ -2257,35 +2271,57 @@ function rollTileType(weights) {
   return order[order.length - 1];
 }
 
-// presunie každý existujúci IK na nové políčko; dva IK nesmú skončiť na rovnakom (ostatné tiles a hráči nevadia)
-function relocateIKs() {
-  const placed = [];
-  for (const ik of game.iks) {
-    const c = pickCell((x, y) => !placed.some(p => p.x === x && p.y === y));
-    placed.push(c || ik); // bez voľného políčka ostane na mieste
-  }
-  game.iks = placed;
-}
-
-// koniec kola: presun IK + spawn tilesPerRound nových tiles podľa percentuálnych váh
+// koniec kola: zmaterializuj VOPRED ohlásené zmeny (game.pending — hráči ich celé kolo videli ako preview)
+// a hneď vyžrebuj novú sadu na koniec ďalšieho kola. Náhoda sa tak hádže o kolo skôr než dopadne.
 function endOfRoundTiles() {
   if (!game.config) return;
-  relocateIKs();
+  commitPendingTiles();
+  rollPendingTiles();
+}
 
+// vykonaj ohlásené zmeny: presuň každý IK na jeho ohlásený cieľ + spawni ohlásené nové tiles.
+// Constraints sa NEprehodnocujú — vyhodnotili sa už pri žrebe (rollPendingTiles) proti budúcemu stavu
+// a tiles môžu počas kola už len MIZNÚŤ (pickup, Fireova konzumácia), takže ohlásená bunka ostáva legálna.
+function commitPendingTiles() {
+  const p = game.pending;
+  if (!p) return;
+  game.iks = game.iks.map((ik, i) => p.ikMoves[i] ? { ...p.ikMoves[i] } : ik); // pole je paralelné s game.iks
+  for (const s of p.spawns) {
+    if (s.type === "ik") game.iks.push({ x: s.x, y: s.y });
+    else game.tiles.push({ x: s.x, y: s.y, type: s.type });
+  }
+  game.pending = null;
+}
+
+// vyžrebuj zmeny, ktoré dopadnú na konci NASLEDUJÚCEHO kola: cieľ presunu každého IK (dva IK nesmú skončiť
+// na rovnakom políčku; ostatné tiles a hráči nevadia) + tilesPerRound nových spawnov podľa percentuálnych váh.
+// Všetky constraints sa vyhodnocujú proti BUDÚCEMU stavu dosky (ohlásené IK ciele + ohlásené spawny).
+function rollPendingTiles() {
+  if (!game.config) return;
+  const ikMoves = [];
+  for (const ik of game.iks) {
+    const c = pickCell((x, y) => !ikMoves.some(m => m.x === x && m.y === y));
+    ikMoves.push(c ? { x: c.x, y: c.y } : { x: ik.x, y: ik.y }); // bez voľného políčka ostane na mieste
+  }
+  const spawns = [];
+  const futureIK = (x, y) => ikMoves.some(m => m.x === x && m.y === y)
+    || spawns.some(s => s.type === "ik" && s.x === x && s.y === y);
+  const futureTile = (x, y) => hasTile(x, y) || spawns.some(s => s.type !== "ik" && s.x === x && s.y === y);
   const n = Math.max(1, Math.min(3, game.config.tilesPerRound || 1));
   for (let k = 0; k < n; k++) {
     const type = rollTileType(game.config.tileWeights);
     if (!type) break;
     if (type === "ik") {
-      // IK môže vzniknúť hocikde (aj pod hráčom, aj nad iným tile); len nie na inom IK
-      const c = pickCell((x, y) => !hasIK(x, y));
-      if (c) game.iks.push(c);
+      // IK môže vzniknúť hocikde (aj pod hráčom, aj nad iným tile); len nie na budúcej pozícii iného IK
+      const c = pickCell((x, y) => !futureIK(x, y));
+      if (c) spawns.push({ x: c.x, y: c.y, type: "ik" });
     } else {
-      // môže byť aj pod hráčom; nie na existujúcom tile ani pod IK; bez voľného políčka sa spawn preskočí
-      const c = pickCell((x, y) => !hasTile(x, y) && !hasIK(x, y));
-      if (c) game.tiles.push({ x: c.x, y: c.y, type });
+      // môže byť aj pod hráčom; nie na existujúcom/ohlásenom tile ani pod budúcim IK; bez voľného políčka sa spawn preskočí
+      const c = pickCell((x, y) => !futureTile(x, y) && !futureIK(x, y));
+      if (c) spawns.push({ x: c.x, y: c.y, type });
     }
   }
+  game.pending = { ikMoves, spawns };
 }
 
 /* -------------------- Turn timer (server-side enforcement) -------------------- */
@@ -2623,9 +2659,6 @@ function resolveTurn() {
   game.players.p2.mirrorGold = false;
 
   if (!ended) {
-    // koniec kola — presun IK a spawn nového tile (vidno ich vo finálnom frame)
-    endOfRoundTiles();
-
     // post-round gold fáza: golden mana + last stand. Démon je len JEDEN — ak ho navolia obaja,
     // vyhodnotí sa len tomu, koho akcia príde na rad prvá (starter), druhému červený ✗.
     let demonUsed = false;
@@ -2704,7 +2737,10 @@ function resolveTurn() {
       }
     }
 
-    // bežný prechod do ďalšieho kola (mini-frame posúva HUD dopredu)
+    // prechod do ďalšieho kola: až TU dopadnú zmeny tiles — commit ohláseného preview + žreb nového
+    // na ďalšie kolo. Oboje nesie až finálny mini-frame, takže klient ukáže nové tiles AJ čerstvý preview
+    // spolu s „ROUND N / FINAL ROUND" animáciou na začiatku nasledujúceho kola, nie uprostred dohrávania akcií.
+    endOfRoundTiles();
     const nextTurn    = game.turn + 1;
     const nextStarter = game.starter === "p1" ? "p2" : "p1"; // preklop (hru mohol začínať aj p2)
     tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: [], delayMs: 10 });
@@ -2843,6 +2879,8 @@ function startGame(gameIndex) {
   game.starter = (gameIndex % 2 === 1) ? "p1" : "p2"; // nepárne hry otvára biely, párne čierny; v rámci hry sa štartér kola preklápa
   game.tiles = [];
   game.iks = [];
+  game.pending = null;
+  rollPendingTiles(); // preview spawnov na koniec 1. kola — hráči ho vidia už pri plánovaní prvých akcií
   game.phase = "playing";
 
   emitYouAre();
@@ -2864,7 +2902,7 @@ function sanitizeConfig(raw) {
     weights[k] = v; sum += v;
   }
   if (sum !== 100) return null; // percentá musia dať presne 100
-  return { format, tilesPerRound: perRound, tileWeights: weights, timer };
+  return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview };
 }
 
   /* -------------------- Room lifecycle (per-room, closure) -------------------- */

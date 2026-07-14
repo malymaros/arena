@@ -172,6 +172,20 @@ body {
 }
 .tile-marker svg { display: block; width: 100%; height: 100%; }
 
+/* preview tiles na ďalšie kolo (config.tilePreview) — malý polopriehľadný ghost v rohu bunky.
+   Zámerne VEĽMI jemný a statický (žiadny blik/pulz, žiadne podfarbenie bunky), aby sa nedal
+   pomýliť s plnou centrovanou ikonou tile, ktoré už platí. */
+.tile-pending {
+  position: absolute;
+  right: 4px; bottom: 4px;
+  width: 15px; height: 15px;
+  opacity: .38;
+  filter: grayscale(.4);
+  pointer-events: none;
+  z-index: 1;
+}
+.tile-pending svg { display: block; width: 100%; height: 100%; }
+
 /* vyhodnocovanie tile — výrazný žltý blik celej bunky */
 @keyframes tile-proc-blink {
   0%, 100% { box-shadow: inset 0 0 0 3px rgba(255,220,60,0);   background-color: rgba(255,220,60,0); }

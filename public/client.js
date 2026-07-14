@@ -2343,6 +2343,9 @@ function renderGrid(s, effects = []) {
     // špeciálne tiles svietia cez tmu — slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
     (s?.tiles || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
     (s?.iks || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
+    // preview na ďalšie kolo svieti cez tmu rovnako (server heal/mana spawny mimo fakľových buniek už zredigoval)
+    (s?.pending?.spawns || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
+    (s?.pending?.ikMoves || []).forEach(c => fogVisible.add(`${c.x},${c.y}`));
   }
   // Ariadnina niť — bunky s niťou (vlastná niť prekliateho; lovec vidí súperovu, server mu ju posiela)
   const threadSet = new Set();
@@ -2362,6 +2365,12 @@ function renderGrid(s, effects = []) {
   // špeciálne políčka (dmg/heal/mana + IK overlay)
   const tileMap = new Map();
   (s?.tiles || []).forEach(t => tileMap.set(`${t.x},${t.y}`, t.type));
+
+  // preview na začiatok ďalšieho kola (config.tilePreview): nové spawny + cieľové bunky presunu IK —
+  // kreslí sa ako malý polopriehľadný ghost v rohu bunky (žiadny blik, žiadne podfarbenie — len jemný náznak)
+  const pendingMap = new Map();
+  (s?.pending?.spawns || []).forEach(t => pendingMap.set(`${t.x},${t.y}`, t.type));
+  (s?.pending?.ikMoves || []).forEach(c => pendingMap.set(`${c.x},${c.y}`, "ik"));
 
   const previewSet = new Set();
 
@@ -2432,6 +2441,16 @@ function renderGrid(s, effects = []) {
         m.className = "tile-marker";
         m.innerHTML = tileSvg(isIK ? "ik" : tileType);
         cell.appendChild(m);
+      }
+
+      // preview budúceho tile — malý ghost v rohu (plná centrovaná ikona = tile ktoré UŽ platí);
+      // môže sa krížiť s existujúcim tile len pri cieli presunu IK (IK smie prekryť iné tiles)
+      const pendType = pendingMap.get(key);
+      if (pendType) {
+        const pm = document.createElement("span");
+        pm.className = "tile-pending";
+        pm.innerHTML = tileSvg(pendType);
+        cell.appendChild(pm);
       }
 
       // práve vyhodnocované tile — výrazný blik
@@ -3353,7 +3372,7 @@ function schedulePlayTimeline(timeline) {
   // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) — keď príde "invalid", prečiarkneme ju
   const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
-  state.tiles = first.tiles; state.iks = first.iks;
+  state.tiles = first.tiles; state.iks = first.iks; state.pending = first.pending;
   renderHUD();
   const NEXT_TURN = (first.turn ?? state.turn) + 1;
   const NEXT_STARTER = playStarter === "p1" ? "p2" : "p1"; // preklop (hru môže začínať aj p2)
@@ -3450,7 +3469,7 @@ function schedulePlayTimeline(timeline) {
     const beforeP2 = prev?.p2 || state.p2;
 
     state.p1 = frame.p1; state.p2 = frame.p2;
-    state.tiles = frame.tiles; state.iks = frame.iks;
+    state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending;
     if (frame.starter !== undefined) {
       state.starter = frame.starter;
     }
@@ -5193,6 +5212,7 @@ function showLobby() {
       tilesPerRound: parseInt(pick("lobby-tiles-count") || "1", 10),
       tileWeights: weights,
       timer: pick("lobby-timer") || "off",
+      tilePreview: (pick("lobby-preview") || "on") === "on",
     };
     if (Object.values(weights).reduce((a, b) => a + b, 0) !== 100) return;
     socket.emit("configure_match", config);
