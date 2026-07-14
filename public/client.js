@@ -426,7 +426,9 @@ const FX_OFFSET_X = { lightning: 0.18 };
 // Normalizácia veľkosti postavy v KARTÁCH výberu a HUD PORTRÉTE: mágovia vypĺňajú frame len z ~51 %
 // výšky (veľa vzduchu), Medúza 59 % a Minotaur 72 % — pri rovnakom fill preto pôsobia príliš veľkí.
 // Násobič ich zmenšuje na porovnateľnú výšku postavy; na BOARDE ostávajú zámerne väčší (bez násobiča).
-const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7, countess: 0.93, onre: 0.93 };
+// luffy/jotaro (Hidden preview): ich pásy majú figúru takmer cez celý frame (88 % / 78 % výšky),
+// kým mágovia ~52 % — normalizácia na výšku mágov v karte (66/112 ≈ .59, resp. ·(112/144) ≈ .66)
+const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7, countess: 0.93, onre: 0.93, luffy: 0.59, jotaro: 0.66 };
 const portraitFill = (char, base) => base * (PORTRAIT_SCALE[char] ?? 1);
 
 const CHAR_META = {
@@ -4057,7 +4059,8 @@ function drawEscanorCard(ctx, cvs, now) {
 
 // Hidden preview postavy (Luffy/Jotaro): bez hoveru Idle, po nadídení cast animácia RAZ a potom
 // slučka chvosta (loopFrom; frames-1 = statický posledný frame). fill dorovnáva väčší frame castu
-// na mierku Idle (drawSprite škáluje podľa výšky framu — inak by postava pri hoveri skočila).
+// na mierku Idle (drawSprite škáluje podľa výšky framu — inak by postava pri hoveri skočila);
+// obe kreslenia idú cez portraitFill (PORTRAIT_SCALE normalizuje figúru na výšku mágov).
 const PREVIEW_CAST = {
   luffy:  { file: "Special_1.png",   frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
   jotaro: { file: "Special_3_P.png", frames: 4, fps: 6, loopFrom: 3, fill: 1.31 * 160 / 144 }, // Star Platinum menacing — drží posledný frame
@@ -4071,12 +4074,12 @@ function drawPreviewCard(ctx, cvs, key, now) {
     const fi = Math.floor((now - previewHoverT0[key]) / 1000 * cast.fps);
     const idx = fi < cast.frames ? fi : cast.loopFrom + ((fi - cast.frames) % (cast.frames - cast.loopFrom));
     ensureSpriteMeta(dir, cast.file)
-      .then(meta => drawSprite(ctx, meta, { file: cast.file, frames: cast.frames, frameIndex: idx }, now, cvs.width, cvs.height, cast.fill, 0.98, true, 0, -52))
+      .then(meta => drawSprite(ctx, meta, { file: cast.file, frames: cast.frames, frameIndex: idx }, now, cvs.width, cvs.height, portraitFill(key, cast.fill), 0.98, true, 0, -52))
       .catch(() => {});
   } else {
     previewHoverT0[key] = 0;
     ensureSpriteMeta(dir, ANIM_DEF.idle.file)
-      .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52))
+      .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, cvs.width, cvs.height, portraitFill(key, 1.31), 0.98, true, 0, -52))
       .catch(() => {});
   }
 }
