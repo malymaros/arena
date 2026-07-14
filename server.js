@@ -112,6 +112,13 @@ const GOLDEN_MIRROR_COST = 5; // ten istý predťah, ale mirror (odraz) namiesto
 const DASH_COST   = 4; // presun až o 2 políčka jedným smerom
 const GOLDEN_MANA_GAIN = 6; // golden mana refill: +6 many za HP; cena v HP rastie s každým použitím (1, 2, 3…)
 
+// Nové special tiles: POWER (spotrebný) — caster stojaci na ňom v momente vyhodnotenia dmg akcie dostane
+// flat +POWER_TILE_BONUS k útoku a tile sa použitím SPOTREBUJE (aj whiff/block — použitie, nie zásah);
+// bonus sa NEnásobí Last Stand/maze multiplikátormi (klient ho ukazuje ako samostatný „-2" float).
+// BLOCK (permanentný) — figúra na ňom nemôže castnúť shield/mirror: akcia sa prečiarkne BEZ ceny
+// (vedomá výnimka z wall pravidla — hráč si na block tile vie „pass-núť" slot zadarmo, platí pozíciou).
+const POWER_TILE_BONUS = 2;
+
 // Démon útok — dostupný LEN buffnutému hráčovi v poslednom (Last Stand) kole; zaberá jeden z 3 akčných slotov
 const DEMON_COST = 10; // celá mana
 const DEMON_DMG  = 10; // zasiahne každé políčko OKREM toho, na ktorom kaster stojí (vyhodnotí sa cez shield/mirror)
@@ -134,7 +141,7 @@ const TIMER_OPTIONS = new Set(["off", "30", "60", "120", "quickdraw"]);
 const DEFAULT_CONFIG = {
   format: "single",                              // "single" | "bo3" | "tournament"
   tilesPerRound: 1,                              // 1 | 2 | 3 — koľko tiles sa spawne na konci kola
-  tileWeights: { dmg: 75, heal: 12, mana: 8, ik: 5 }, // % šanca typu, spolu 100
+  tileWeights: { dmg: 50, heal: 10, mana: 10, ik: 10, power: 10, block: 10 }, // % šanca typu, spolu 100
   timer: "30",                                   // "off" | "30" | "60" | "120" | "quickdraw"
   tilePreview: true,                             // ukazovať hráčom vopred, kde na konci kola pribudnú tiles / kam sa presunú IK
 };
@@ -314,7 +321,7 @@ function newGame() {
     arena: "bridge",
     turn: 1,
     starter: "p1", // slot, ktorý začína aktuálne kolo; hru 1 otvára p1 (biely), v sérii sa štartér hier strieda, medzi kolami sa preklápa
-    tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" } — pribúdajú od konca 1. kola
+    tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" | "power" | "block" } — pribúdajú od konca 1. kola
     iks: [],       // [{ x, y }] — insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
     pending: null, // { ikMoves: [{x,y}…], spawns: [{x,y,type}…] } — VOPRED vyžrebované zmeny tiles na koniec AKTUÁLNEHO kola (preview pre hráčov)
     // séria zápasov
@@ -396,19 +403,21 @@ function redactHunterActor(a) {
   if (!a) return a;
   return { ...a, mana: null, thread: [], threadMark: null };
 }
-// prekliaty vidí len Damage dlaždice + IK (IK/`iks` sa neredigujú vôbec); heal/mana dlaždice LEN keď na
-// nich priamo stojí ALEBO na nich stojí jeho tieňový klon — klon je druhá fakľa a osvetľuje svoju bunku
-// rovnako ako hráč (inak by mu prezradili, kde sú pickupy). IK vždy (sú to overlaye v `iks`, mimo `tiles`).
+// prekliaty vidí len Damage a Block dlaždice + IK (IK/`iks` sa neredigujú vôbec) — hazardy, ktoré sa ho
+// priamo týkajú; heal/mana/POWER dlaždice (výhody-pickupy) LEN keď na nich priamo stojí ALEBO na nich stojí
+// jeho tieňový klon — klon je druhá fakľa a osvetľuje svoju bunku rovnako ako hráč (inak by mu prezradili,
+// kde sú pickupy). IK vždy (sú to overlaye v `iks`, mimo `tiles`).
 function redactTilesFor(mySlot, snap) {
   if (!Array.isArray(snap.tiles)) return snap;
   const me = snap[mySlot];
   const onTorchCell = (t) => me && ((me.x != null && t.x === me.x && t.y === me.y)
     || (me.clone && t.x === me.clone.x && t.y === me.clone.y));
-  const out = { ...snap, tiles: snap.tiles.filter(t => t.type === "dmg" || onTorchCell(t)) };
-  // preview (config.tilePreview) sa rediguje ROVNAKO ako existujúce tiles: dmg/IK spawny a ciele presunu IK
-  // prekliaty vidí vždy, heal/mana spawn len keď na tej bunke priamo stojí on alebo jeho tieňový klon
+  const alwaysVisible = (type) => type === "dmg" || type === "block";
+  const out = { ...snap, tiles: snap.tiles.filter(t => alwaysVisible(t.type) || onTorchCell(t)) };
+  // preview (config.tilePreview) sa rediguje ROVNAKO ako existujúce tiles: dmg/block/IK spawny a ciele presunu IK
+  // prekliaty vidí vždy, heal/mana/power spawn len keď na tej bunke priamo stojí on alebo jeho tieňový klon
   if (out.pending) {
-    out.pending = { ...out.pending, spawns: out.pending.spawns.filter(s => s.type === "dmg" || s.type === "ik" || onTorchCell(s)) };
+    out.pending = { ...out.pending, spawns: out.pending.spawns.filter(s => alwaysVisible(s.type) || s.type === "ik" || onTorchCell(s)) };
   }
   return out;
 }
@@ -1074,6 +1083,8 @@ function doBasic(slot, dir, tl) {
   // NOVÉ PRAVIDLO: útok do steny sa už neprečiarkne — máš naň manu, tak sa minie a strela sa „vypustí"
   // (hneď zhasne na okraji). Klonova strela (vertikálne zrkadlená) môže pritom letieť ďalej.
   me.mana -= BASIC_COST;
+  // POWER tile: +2 k MAJITEĽOVÝM strelám (klonova strela boost nemá); spotreba hneď pri použití útoku
+  const pBonus = powerBoost(slot, tl);
   let anyCharge = false; // aspoň jedna strela vôbec vzlietla (dostala in-board bunku) → netreba whiff
 
   // strely: majiteľ + prípadný klon. Klon zrkadlí smer VERTIKÁLNE (up<->down), horizontálne rovnako
@@ -1140,13 +1151,15 @@ function doBasic(slot, dir, tl) {
     }
     // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
     // (h.shot.dist sa počíta z klonovej bunky) × rovnaké násobiče (Last Stand ×2 / Last Hope ×4, maze ×2).
-    const rawOf = (h) => Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot);
+    // POWER bonus je flat a LEN na majiteľovej strele (klon z power tile neprofituje).
+    const rawOf = (h) => Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot) + (h.shot.clone ? 0 : pBonus);
     // súperove „player" zásahy z TOHTO kroku: stacknutý Naruto+klon strieľajúci rovnakým smerom trafí
     // z jednej bunky dvakrát → na NEKRYTÉ HP to spojíme do JEDNÉHO úderu so súčtom dmg (nie dva animačne
     // oddelené); pri obrane (štít/mirror) applyStackedHit vráti false a rieši sa každá strela zvlášť.
     const playerHits = hits.filter(h => h.target === "player");
-    if (playerHits.length && !applyStackedHit(opS, playerHits.map(rawOf), tl, "basic")) {
-      for (const h of playerHits) { applyHit(opS, rawOf(h), tl, "basic", h.shot.clone); if (winnerNow()) break; }
+    const ownerBonus = playerHits.some(h => !h.shot.clone) ? pBonus : 0; // bonus nesie len majiteľova strela
+    if (playerHits.length && !applyStackedHit(opS, playerHits.map(rawOf), tl, "basic", ownerBonus)) {
+      for (const h of playerHits) { applyHit(opS, rawOf(h), tl, "basic", h.shot.clone, h.shot.clone ? 0 : pBonus); if (winnerNow()) break; }
     }
     for (const h of hits) {
       if (h.target === "player" || winnerNow()) continue;
@@ -1162,7 +1175,7 @@ function doBasic(slot, dir, tl) {
           applyHitOnClone(opS, CLONE_DMG, tl, "basic");
           if (!winnerNow()) {
             const through = Math.max(0, raw - CLONE_DMG);
-            if (through > 0) applyHit(opS, through, tl, "basic", h.shot.clone);
+            if (through > 0) applyHit(opS, through, tl, "basic", h.shot.clone, h.shot.clone ? 0 : pBonus);
           }
         }
       } else { // clone (návnada mimo majiteľovej bunky)
@@ -1188,6 +1201,8 @@ function doMelee(slot, tl) {
 
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
+  // POWER tile: +2 k MAJITEĽOVMU úderu (klonov sek boost nemá); spotreba pri použití — aj pri minutí
+  const pBonus = powerBoost(slot, tl);
 
   // úder sa švihne vždy (mana je preč aj pri minutí); bežne zasiahne len súpera na rovnakom políčku,
   // Medúza šľahá chvostom širšie — vlastné políčko + 1 diagonálne na všetky strany, za nižší dmg.
@@ -1221,12 +1236,12 @@ function doMelee(slot, tl) {
   for (let r = 0; r < MELEE_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "melee", from: slot, cells: cells.concat(cloneCells) }], SPECIAL_BEAT_MS);
   }
-  const meleeRaw = (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) * labyrinthMul(slot); // maze buff: 2× počas labyrintu
-  const cloneMeleeRaw = MELEE_DMG * dealMul(slot) * labyrinthMul(slot); // klon (vždy Narutov) seká za plný MELEE_DMG
+  const meleeRaw = (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) * labyrinthMul(slot) + pBonus; // maze buff: 2× počas labyrintu; POWER flat +2
+  const cloneMeleeRaw = MELEE_DMG * dealMul(slot) * labyrinthMul(slot); // klon (vždy Narutov) seká za plný MELEE_DMG, bez POWER bonusu
   // stacknutý pár Naruto+klon na súperovej bunke seká dvakrát → na nekryté HP JEDEN úder so súčtom
   // (klient vypíše „8+8" a zanimuje ako jeden zásah); pri obrane sa rieši každý sek zvlášť
-  if (!(hitFoeByMe && hitFoeByClone && applyStackedHit(opS, [meleeRaw, cloneMeleeRaw], tl, "melee"))) {
-    if (hitFoeByMe) applyHit(opS, meleeRaw, tl, "melee");
+  if (!(hitFoeByMe && hitFoeByClone && applyStackedHit(opS, [meleeRaw, cloneMeleeRaw], tl, "melee", pBonus))) {
+    if (hitFoeByMe) applyHit(opS, meleeRaw, tl, "melee", false, pBonus);
     if (hitFoeByClone && !winnerNow()) applyHit(opS, cloneMeleeRaw, tl, "melee", true);
   }
   // stacknutý pár Naruto+klon: obrana kryje pár ako JEDNA postava v jednom beate (applyHitPairDefended),
@@ -1234,13 +1249,14 @@ function doMelee(slot, tl) {
   const stackedMelee = (raw, fromClone) => {
     if (op.shield || op.mirror) { applyHitPairDefended(opS, raw, tl, "melee", fromClone); return; }
     if (op.clone) { applyHitOnClone(opS, CLONE_DMG, tl, "melee"); raw = Math.max(0, raw - CLONE_DMG); }
-    if (raw > 0 && !winnerNow()) applyHit(opS, raw, tl, "melee", fromClone);
+    if (raw > 0 && !winnerNow()) applyHit(opS, raw, tl, "melee", fromClone, fromClone ? 0 : pBonus);
   };
   if (hitStackedByMe) stackedMelee(meleeRaw, false);
   if (hitStackedByClone && !winnerNow()) stackedMelee(cloneMeleeRaw, true);
   if ((hitFoeCloneByMe || hitFoeCloneByClone) && !winnerNow()) {
     // obrana sa už prípadne „ukázala" na zásahu hráča tou istou akciou → bez duplicitných frame-ov
-    applyHitOnClone(opS, hitFoeCloneByMe ? (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) : CLONE_DMG * dealMul(slot),
+    // (majiteľov sek na klona nesie aj POWER bonus — mirror z klona ho odrazí ako súčasť plného dmg)
+    applyHitOnClone(opS, hitFoeCloneByMe ? (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) + pBonus : CLONE_DMG * dealMul(slot),
       tl, "melee", hitFoeByMe || hitFoeByClone);
   }
 }
@@ -1285,7 +1301,8 @@ function vampBonus(slot, tl, amount, hpSource = amount) {
 // na vlastnej bunke). bonusAmount 0 = melee bez heal/drain bonusu. consumeDefense: len trap beží mimo
 // resolveTurn slučky (ktorá inak spotrebuje súperovu obranu za akciu castera), tak si ju spotrebuje sám.
 // Vracia true, ak úder na niečo dopadol (na rozlíšenie whiffu naprázdno).
-function vampMeleeLand(ownerSlot, raw, bonusAmount, tl, consumeDefense = false) {
+// powerBonus = POWER tile prídavok už obsiahnutý v raw — len na rozpis hit framu (samostatný „-2" float)
+function vampMeleeLand(ownerSlot, raw, bonusAmount, tl, consumeDefense = false, powerBonus = 0) {
   const me   = game.players[ownerSlot];
   const foeS = other(ownerSlot);
   const foe  = game.players[foeS];
@@ -1303,12 +1320,12 @@ function vampMeleeLand(ownerSlot, raw, bonusAmount, tl, consumeDefense = false) 
       const hpBefore = foe.hp;
       applyHitOnClone(foeS, CLONE_DMG, tl, "melee");        // klon pohltí CLONE_DMG a zomrie
       const through = Math.max(0, raw - CLONE_DMG);
-      if (through > 0 && !winnerNow()) applyHit(foeS, through, tl, "melee"); // zvyšok na majiteľa
+      if (through > 0 && !winnerNow()) applyHit(foeS, through, tl, "melee", false, powerBonus); // zvyšok na majiteľa
       if (bonusAmount > 0) vampBonus(ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
     }
   } else if (playerHere) {
     const hpBefore = foe.hp;
-    applyHit(foeS, raw, tl, "melee");
+    applyHit(foeS, raw, tl, "melee", false, powerBonus);
     if (bonusAmount > 0 && !defended) vampBonus(ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
   } else if (decoyHere) {
     applyHitOnClone(foeS, raw, tl, "melee");                // klon-návnada zožerie úder celý
@@ -1328,7 +1345,9 @@ function doVampMelee(slot, tl) {
   const op  = game.players[opS];
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
-  const raw = VAMP_MELEE_DMG * dealMul(slot) * labyrinthMul(slot);
+  // POWER tile: +2 k úderu; spotreba pri použití — aj pri whiffe na prázdnej bunke
+  const pBonus = powerBoost(slot, tl);
+  const raw = VAMP_MELEE_DMG * dealMul(slot) * labyrinthMul(slot) + pBonus;
   // reálny zásah hráča (aj stacknutého páru s klonom) odhalí labyrint PRED údermi
   if (op && op.x === me.x && op.y === me.y) revealLabyrinths(tl);
   if (me.char === "countess") {
@@ -1340,7 +1359,7 @@ function doVampMelee(slot, tl) {
       pushStateFrame(tl, [{ kind: "melee", from: slot, cells: [[me.x, me.y]] }], SPECIAL_BEAT_MS);
     }
   }
-  vampMeleeLand(slot, raw, 0, tl); // own-cell melee bez heal/drain bonusu; klon-návnada/stacknutý pár rieši helper
+  vampMeleeLand(slot, raw, 0, tl, false, pBonus); // own-cell melee bez heal/drain bonusu; klon-návnada/stacknutý pár rieši helper
 }
 
 // Charge Vampire/Onryō (nahrádza dash, rovnaká cena): pohybové melee — beh zvoleným smerom po PRVÚ
@@ -1355,7 +1374,10 @@ function doVampCharge(slot, dir, tl) {
   if (!delta) { pushInvalid(tl, slot); return; }
   if (me.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= DASH_COST;
-  const raw = VAMP_CHARGE_DMG * dealMul(slot) * labyrinthMul(slot);
+  // POWER tile: ráta sa ŠTARTOVÁ bunka (caster na nej stojí v momente vyhodnotenia akcie, beh je až potom);
+  // spotreba pri použití — aj keď charge skončí čistým premiestnením bez terča či nárazom do steny
+  const pBonus = powerBoost(slot, tl);
+  const raw = VAMP_CHARGE_DMG * dealMul(slot) * labyrinthMul(slot) + pBonus;
 
   // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár)
   let x = me.x, y = me.y, hit = false;
@@ -1380,7 +1402,7 @@ function doVampCharge(slot, dir, tl) {
   // Vampire seká A1 (jednotný úder podľa attack guide), Onryō pôvodný vampstrike (alias Attack_3)
   pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y],
     ...(me.char === "countess" ? { anim: "va1" } : {}) }], WOLF_STRIKE_MS);
-  vampMeleeLand(slot, raw, VAMP_CHARGE_BONUS, tl); // hráč / klon-návnada / stacknutý pár rieši helper
+  vampMeleeLand(slot, raw, VAMP_CHARGE_BONUS, tl, false, pBonus); // hráč / klon-návnada / stacknutý pár rieši helper
 }
 
 // Countess/Onre sú IMÚNNE voči mirroru: súperov mirror sa voči ich dmg správa ako obyčajný štít
@@ -1528,7 +1550,10 @@ function notePrideHit(slot) {
   if (p.char === "escanor") p.prideHit = true;
 }
 
-function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
+// bonus = POWER tile prídavok obsiahnutý v rawDmg — na NEKRYTOM zásahu sa pripne na hit frame (klient
+// ho vypíše ako samostatný zlatý „-2" float vedľa základu); pri bloku/odraze sa rozpis nepripína
+// (mirror odráža plný dmg vrátane bonusu ako jedno číslo).
+function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false, bonus = 0) {
   const t = game.players[targetSlot];
   if (t.shield) {
     pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
@@ -1566,7 +1591,10 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
   const d = recvDmg(targetSlot, rawDmg); // ½ ak má obranca last stand buff (2× maze buff je už v rawDmg)
   t.hp = Math.max(0, t.hp - d);
   notePrideHit(targetSlot);
-  pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: d }], SMALL_DELAY_MS);
+  const hitFx = { kind: "hit", target: targetSlot, dmg: d };
+  // POWER bonus rozpis len keď polovičné prijímanie (Last Stand ½) čísla neskreslí — inak jeden súčet
+  if (bonus > 0 && d === rawDmg && d >= bonus) hitFx.bonus = bonus;
+  pushStateFrame(tl, [hitFx], SMALL_DELAY_MS);
   endLabyrinths(tl); // labyrint končí až po dopade zásahu a úbytku HP
 }
 
@@ -1574,14 +1602,17 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false) {
 // bunky) na NEKRYTÉ HP súpera = JEDEN úder so súčtom dmg — klient ho podľa `parts` vypíše ako „2+2"
 // a zanimuje ako jeden zásah (nie dva za sebou). Pri obrane (štít/mirror) vráti false → volajúci
 // nechá každú strelu prejsť applyHit-om zvlášť (obrana rieši každú osobitne). Vráti true ak spracoval.
-function applyStackedHit(targetSlot, raws, tl, kind = "basic") {
+function applyStackedHit(targetSlot, raws, tl, kind = "basic", bonus = 0) {
   const t = game.players[targetSlot];
   if (raws.length < 2 || t.shield || t.mirror) return false; // jediný zásah / obrana → rieši applyHit
   const parts = raws.map(r => recvDmg(targetSlot, r)); // ½ pri Last Stand/Hope (2× maze je už v raw)
   const total = parts.reduce((a, b) => a + b, 0);
   t.hp = Math.max(0, t.hp - total);
   notePrideHit(targetSlot);
-  pushStateFrame(tl, [{ kind: "hit", target: targetSlot, dmg: total, parts }], SMALL_DELAY_MS);
+  const hitFx = { kind: "hit", target: targetSlot, dmg: total, parts };
+  // POWER bonus je vnútri PRVEJ časti (majiteľova strela/sek — klon boost nemá); rozpis len bez ½ skreslenia
+  if (bonus > 0 && total === raws.reduce((a, b) => a + b, 0) && parts[0] >= bonus) hitFx.bonus = bonus;
+  pushStateFrame(tl, [hitFx], SMALL_DELAY_MS);
   endLabyrinths(tl); // súbežný zásah tiež ukončuje labyrint (odhalenie prebehlo pred letom)
   return true;
 }
@@ -1631,7 +1662,7 @@ function applyHitPairDefended(ownerSlot, rawDmg, tl, kind = "basic", fromClone =
 // a klon sú „tá istá postava" so zdieľanou obranou, ich reakcie idú do SPOLOČNÝCH beatov (blok / mirror-lúč /
 // hit sa prehrajú NARAZ, nie sekvenčne). ownerDmg = dmg na Naruta; klon STACKNUTÝ na jeho bunke z neho
 // pohltí CLONE_DMG (bez obrany), klon-návnada na vlastnej bunke netlmí nič.
-function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
+function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone, bonus = 0) {
   const o = game.players[ownerSlot];
   const withClone = !!(includeClone && o.clone);
   const cloneCell = withClone ? [o.clone.x, o.clone.y] : null;
@@ -1677,11 +1708,17 @@ function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone) {
   // zvyšok (rovnaké pravidlo ako prestrelený stacknutý pár pri streľbe/melee); klon-návnada zasiahnutý
   // zónou na VLASTNEJ bunke nič netlmí (majiteľ berie plný dmg) — klon zaniká, VŠETKO v jednom beate
   const stacked = withClone && o.clone.x === o.x && o.clone.y === o.y;
-  const d = recvDmg(ownerSlot, stacked ? Math.max(0, ownerDmg - CLONE_DMG) : ownerDmg);
+  const raw = stacked ? Math.max(0, ownerDmg - CLONE_DMG) : ownerDmg;
+  const d = recvDmg(ownerSlot, raw);
   o.hp = Math.max(0, o.hp - d);
   if (d > 0) notePrideHit(ownerSlot);
   const fx = [];
-  if (d > 0) fx.push({ kind: "hit", target: ownerSlot, dmg: d });
+  if (d > 0) {
+    const hitFx = { kind: "hit", target: ownerSlot, dmg: d };
+    // POWER bonus rozpis (samostatný „-2" float) len keď ho ½ prijímanie/klonov soak neskreslí
+    if (bonus > 0 && d === raw && d >= bonus) hitFx.bonus = bonus;
+    fx.push(hitFx);
+  }
   if (withClone) { fx.push({ kind: "clone_die", target: ownerSlot, cell: cloneCell }); o.clone = null; }
   if (!fx.length) fx.push({ kind: "hit", target: ownerSlot, dmg: 0 }); // poistka: beat nesmie byť prázdny
   pushStateFrame(tl, fx, SMALL_DELAY_MS);
@@ -1783,6 +1820,8 @@ function trackSteps(slot, cells) {
 
 function doShield(slot, tl) {
   const a = game.players[slot];
+  // BLOCK tile: obrana sa na ňom nedá castnúť — prečiarknutie BEZ ceny (mana ostáva)
+  if (defenseBlockedBy(a)) { pushInvalid(tl, slot, SMALL_DELAY_MS, "blocked_shield"); return; }
   if (a.mana < SHIELD_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   a.mana -= SHIELD_COST;
   a.shield = true;
@@ -1792,6 +1831,8 @@ function doShield(slot, tl) {
 
 function doMirror(slot, tl) {
   const a = game.players[slot];
+  // BLOCK tile: obrana sa na ňom nedá castnúť — prečiarknutie BEZ ceny (mana ostáva)
+  if (defenseBlockedBy(a)) { pushInvalid(tl, slot, SMALL_DELAY_MS, "blocked_mirror"); return; }
   if (a.mana < MIRROR_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   a.mana -= MIRROR_COST;
   a.mirror = true;
@@ -1901,6 +1942,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   if (actor.char === "soldier") {
     if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !inBounds(cell.x, cell.y)) { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
+    const pBonus = powerBoost(slot, tl); // POWER tile: +2 k lúču; spotreba pri použití — aj keď lúč mine
     const cells = [[cell.x, cell.y]];
     const foeS = other(slot);
     const foe  = game.players[foeS];
@@ -1913,8 +1955,8 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     pushStateFrame(tl, [{ kind: "special", from: slot, cells }], SOLDIER_AIM_MS);
     // lúč zo zbrane + výbuch na cieľovej bunke — zásah (hit/block/odraz) padne až po dolete
     pushStateFrame(tl, [{ kind: "soldier_beam", from: slot, cell: [cell.x, cell.y] }], SOLDIER_BEAM_MS);
-    const dmg = SPECIAL_ZONE_DMG.soldier * dealMul(slot);
-    if (inZone) applyHitBoth(foeS, dmg, tl, "special", cloneStruck);
+    const dmg = SPECIAL_ZONE_DMG.soldier * dealMul(slot) + pBonus;
+    if (inZone) applyHitBoth(foeS, dmg, tl, "special", cloneStruck, pBonus);
     else if (cloneStruck) applyHitOnClone(foeS, dmg, tl, "special", false); // klon-návnada na cieli — zomiera (obrana kryje/odráža)
     else pushStateFrame(tl, [], SMALL_DELAY_MS);
     return;
@@ -1931,6 +1973,9 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     const delta = WOLF_DIRS[dir];
     if (!delta) { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
+    // POWER tile: ráta sa ŠTARTOVÁ bunka (na nej vlkolak stojí v momente vyhodnotenia; beh je až potom);
+    // spotreba pri použití — aj pri behu bez terča či náraze do steny
+    const pBonus = powerBoost(slot, tl);
     const foeS = other(slot);
     const foe  = game.players[foeS];
     // dráha: krok za krokom po okraj; stop na prvej figúre (klon pred súperom — bait pravidlo ako melee)
@@ -1950,7 +1995,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
       pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
       return;
     }
-    const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * dealMul(slot) * labyrinthMul(slot);
+    const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * dealMul(slot) * labyrinthMul(slot) + pBonus;
     // istý zásah REÁLNEHO hráča (aj do štítu/zrkadla) odhalí prípadný labyrint pred animáciou;
     // zásah klona-návnady labyrint neodhaľuje (kill klona ho nekončí — súper sa nesmie dozvedieť, že trafil klona)
     if (target === "player") revealLabyrinths(tl);
@@ -1963,7 +2008,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     if (!target) return; // dobehol na okraj bez terča — len presun
     // seknutie (Attack_2) na bunke terča; dmg/block/odraz dopadne až po ňom
     pushStateFrame(tl, [{ kind: "wolf_strike", from: slot, cell: [actor.x, actor.y] }], WOLF_STRIKE_MS);
-    if (target === "player") applyHit(foeS, raw, tl, "special");
+    if (target === "player") applyHit(foeS, raw, tl, "special", false, pBonus);
     else applyHitOnClone(foeS, raw, tl, "special");
     return;
   }
@@ -1999,6 +2044,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   if (actor.char === "escanor") {
     if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
+    const pBonus = powerBoost(slot, tl); // POWER tile: +2 k slnku; spotreba pri použití — aj pri hode do autu
     const cells = escanorCells(actor, dir);
     // hod slnka MIMO plochy (kotva F von z dosky → prázdna zóna, aj pri pride 3): akcia sa VYKONÁ ako útok
     // do steny — mana je preč, choreografia prebehne (slnko odletí do autu), klient ukáže OUT OF BOUNDS,
@@ -2015,13 +2061,15 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     // 1 special frame drží celú choreografiu (klient ju spustí); zásah dopadne až po nej (ESC_SPECIAL_MS)
     pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], ESC_SPECIAL_MS);
     const dmg = SPECIAL_ZONE_DMG.escanor; // 8
-    if (inZone) applyHitBoth(foeS, dmg * dealMul(slot), tl, "special", cloneStruck);
-    else if (cloneStruck) applyHitOnClone(foeS, dmg * dealMul(slot), tl, "special", false);
+    if (inZone) applyHitBoth(foeS, dmg * dealMul(slot) + pBonus, tl, "special", cloneStruck, pBonus);
+    else if (cloneStruck) applyHitOnClone(foeS, dmg * dealMul(slot) + pBonus, tl, "special", false);
     else pushStateFrame(tl, [], SMALL_DELAY_MS);
     return;
   }
 
   actor.mana -= SPECIAL_COST;
+  // POWER tile (fire/lightning/wanderer zónové speciály): +2 k zóne; spotreba pri použití — aj keď zóna minie
+  const pBonus = powerBoost(slot, tl);
 
   // vyhodnotenie zásahu je deterministické už pred nádychmi (pozície sa počas nich nemenia) —
   // istý zásah odhalí prípadný labyrint ešte PRED animáciou špeciálu
@@ -2050,10 +2098,10 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   // Naruto + jeho klon = tá istá postava so zdieľanou obranou → ak zóna zasiahne oboch, block/odraz/hit idú NARAZ
   const ownerHit = !!(dmg > 0 && hit); // hit === zFoeS (súper bol v zóne)
   if (ownerHit) {
-    applyHitBoth(zFoeS, dmg * dealMul(slot), tl, "special", cloneStruck);
+    applyHitBoth(zFoeS, dmg * dealMul(slot) + pBonus, tl, "special", cloneStruck, pBonus);
   } else if (cloneStruck) {
-    // zóna minula súpera, ale trafila jeho klona → klon reaguje sám
-    applyHitOnClone(zFoeS, (SPECIAL_ZONE_DMG[actor.char] || 0) * dealMul(slot), tl, "special", false);
+    // zóna minula súpera, ale trafila jeho klona → klon reaguje sám (POWER bonus nesie aj tento zásah)
+    applyHitOnClone(zFoeS, (SPECIAL_ZONE_DMG[actor.char] || 0) * dealMul(slot) + pBonus, tl, "special", false);
   } else {
     pushStateFrame(tl, [], SMALL_DELAY_MS);
   }
@@ -2068,6 +2116,8 @@ function doDemon(slot, tl) {
 
   if (me.mana < DEMON_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= DEMON_COST;
+  // POWER tile: aj démon je akcia s okamžitým dmg → +2 (10 → 12); spotreba pri použití
+  const pBonus = powerBoost(slot, tl);
 
   // dosah = všetky políčka okrem toho, na ktorom kaster stojí (jediná „bezpečná" bunka pre súpera)
   const cells = [];
@@ -2092,9 +2142,9 @@ function doDemon(slot, tl) {
   // súperov tieňový klon v zóne (všade okrem kasterovej bunky) — zomiera/bráni SPOLU so súperom v jednom beate
   const cloneInRange = !!(op?.clone && !(op.clone.x === me.x && op.clone.y === me.y));
   if (inRange) {
-    applyHitBoth(opS, DEMON_DMG, tl, "demon", cloneInRange);
+    applyHitBoth(opS, DEMON_DMG + pBonus, tl, "demon", cloneInRange, pBonus);
   } else if (cloneInRange) {
-    applyHitOnClone(opS, DEMON_DMG, tl, "demon", false);
+    applyHitOnClone(opS, DEMON_DMG + pBonus, tl, "demon", false);
   } else {
     pushStateFrame(tl, [], SMALL_DELAY_MS);
   }
@@ -2160,6 +2210,27 @@ function hasTile(x, y) {
 }
 function hasIK(x, y) {
   return game.iks.some(t => t.x === x && t.y === y);
+}
+// BLOCK tile: figúra na ňom nemôže armovať shield/mirror. Kontroluje majiteľa AJ jeho tieňového klona —
+// zdieľaná obrana sa armuje na oboch figúrach naraz, takže klon stojaci na block tile cast tiež zmarí.
+// Kontrola je až pri VYKONANÍ (nie vo validQueue) — vlastná pozícia v momente vyhodnotenia nie je pri
+// plánovaní istá (charge sa zastavuje o súperovu figúru, trap teleportuje).
+function defenseBlockedBy(a) {
+  const onBlock = (x, y) => game.tiles.some(t => t.type === "block" && t.x === x && t.y === y);
+  return !!a && (onBlock(a.x, a.y) || (!!a.clone && onBlock(a.clone.x, a.clone.y)));
+}
+// POWER tile: caster stojí na ňom v momente vyhodnotenia dmg akcie → vráti +POWER_TILE_BONUS k útoku
+// a tile SPOTREBUJE (tile_consume flare). Volá sa hneď po odpočte many — spotreba platí za POUŽITIE útoku,
+// aj keď skončí whiffom do steny / blokom / odrazom (rovnaká filozofia ako Fireova konzumácia dmg tile).
+// Bonus je flat (NEnásobí sa dealMul/labyrinthMul — klient ho vypisuje ako samostatný „-2" float) a mirror
+// ho odráža ako súčasť plného dmg. Narutov klon boost nemá ani tile nespotrebúva (ráta sa LEN majiteľova bunka).
+function powerBoost(slot, tl) {
+  const me = game.players[slot];
+  const idx = game.tiles.findIndex(t => t.type === "power" && t.x === me.x && t.y === me.y);
+  if (idx < 0) return 0;
+  game.tiles.splice(idx, 1);
+  pushStateFrame(tl, [{ kind: "tile_consume", from: slot, cell: [me.x, me.y], tile: "power" }], SMALL_DELAY_MS);
+  return POWER_TILE_BONUS;
 }
 function pickCell(filterFn) {
   const cells = [];
@@ -2258,9 +2329,9 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
   }
 }
 
-// vyber typ tile podľa percentuálnych váh (dmg/heal/mana/ik, spolu ~100); null ak sú všetky 0
+// vyber typ tile podľa percentuálnych váh (dmg/heal/mana/ik/power/block, spolu ~100); null ak sú všetky 0
 function rollTileType(weights) {
-  const order = ["dmg", "heal", "mana", "ik"];
+  const order = ["dmg", "heal", "mana", "ik", "power", "block"];
   const total = order.reduce((a, k) => a + Math.max(0, weights?.[k] || 0), 0);
   if (total <= 0) return null;
   let r = Math.random() * total;
@@ -2512,7 +2583,8 @@ function resolveTurn() {
   let ended = false;
   // Escanor pride: zachyť PRED spracovaním, či daný Escanor v tomto kole použil shield/mirror/golden shield/mirror
   // (fronta aj golden flagy sa počas kola menia/miznú). Na konci kola: použil obranu ALEBO dostal zásah
-  // (p.prideHit z notePrideHit) → −1, inak → +1.
+  // (p.prideHit z notePrideHit) → −1, inak → +1. Číta sa FRONTA, nie výsledok — obrana zmarená BLOCK tile
+  // (blocked_shield/mirror) teda pride uberá tiež (skúsil sa brániť) — zámer.
   const escUsedDefense = {};
   for (const slot of ["p1", "p2"]) {
     const p = game.players[slot];
@@ -2522,6 +2594,7 @@ function resolveTurn() {
   }
   // Pútnik (wanderer): ak v tomto kole použil mirror (obyčajný ALEBO golden), pasívna +many na konci kola NEpríde.
   // Zachyť PRED spracovaním kola — golden flag aj fronta (golden predťah) sa počas kola menia/miznú (ako pri Escanorovi).
+  // Číta sa FRONTA, nie výsledok — mirror zmarený BLOCK tile regen tiež ruší (zámer, hoci mana ostala).
   const wandererUsedMirror = {};
   for (const slot of ["p1", "p2"]) {
     const p = game.players[slot];
@@ -2560,6 +2633,9 @@ function resolveTurn() {
     if (gp.stone > 0) {
       // skamenený hráč: zlatý predťah sa nevykoná (mana ostáva) a kameň NEuberá
       pushStateFrame(tl, [{ kind: "stoned", target: second }], SMALL_DELAY_MS);
+    } else if (defenseBlockedBy(gp)) {
+      // BLOCK tile: ani zlatý predťah sa na ňom nedá castnúť — prečiarknutie BEZ ceny
+      pushInvalid(tl, second, SMALL_DELAY_MS, isMirror ? "blocked_mirror" : "blocked_shield");
     } else if (gp.mana >= cost) {
       gp.mana -= cost;
       if (isMirror) {
@@ -2903,7 +2979,7 @@ function sanitizeConfig(raw) {
   const w = raw.tileWeights || {};
   const weights = {};
   let sum = 0;
-  for (const k of ["dmg", "heal", "mana", "ik"]) {
+  for (const k of ["dmg", "heal", "mana", "ik", "power", "block"]) {
     const v = Math.max(0, Math.round(Number(w[k]) || 0));
     weights[k] = v; sum += v;
   }

@@ -391,6 +391,8 @@ const INVALID_MSG = {
   already_stone: ["🗿 ALREADY STONE", "lowmana-float"], // Medúzin special na už skamenenú postavu — bez efektu
   already_lost: ["🌀 ALREADY LOST", "lowmana-float"],   // Minotaurov special na už blúdiaceho — bez efektu
   not_alone: ["🚫 NOT ALONE", "lowmana-float"],         // Narutov summon vyžaduje bunku bez súpera
+  blocked_shield: ["🛡️ SHIELD BLOCKED", "lowmana-float"], // BLOCK tile: obrana sa na ňom nedá castnúť (bez ceny)
+  blocked_mirror: ["🪞 MIRROR BLOCKED", "lowmana-float"], // BLOCK tile: obrana sa na ňom nedá castnúť (bez ceny)
 };
 const INVALID_MSG_DEFAULT = ["🚫 NO EFFECT", "lowmana-float"];
 const NEW_ROUND_MS = 1900; // „ROUND N" animácia medzi kolami (musí sedieť s CSS .round-banner.show)
@@ -1147,11 +1149,12 @@ function spawnManaFloat(slot, amount = 4, gold = false, dark = false) {
 }
 
 // Fire Wizard skonzumoval Damage dlaždicu specialom — krátky flare na bunke (dlaždica už zmizla zo state)
-function spawnTileConsumeFx(cell) {
+function spawnTileConsumeFx(cell, tile) {
   if (!Array.isArray(cell)) return;
   const { left, top } = cellToPx(cell[0], cell[1]);
   const el = document.createElement("div");
-  el.className = "tile-consume-fx";
+  el.className = "tile-consume-fx" + (tile === "power" ? " power" : ""); // power = zlatý odtieň flare
+
   el.style.left = (left + TILE_W / 2) + "px";
   el.style.top  = (top + TILE_H / 2) + "px";
   actorsEl.appendChild(el);
@@ -1894,6 +1897,28 @@ const PIX = {
     "..aaaa..",
     "..a..a..",
   ]},
+  // POWER tile — zlatý meč (útok z tejto bunky dostane +2 dmg, tile sa spotrebuje)
+  sword: { pal: { a: "#ffd54f", b: "#b26a00" }, rows: [
+    "...aa...",
+    "...aa...",
+    "...aa...",
+    "...aa...",
+    ".bbaabb.",
+    "...bb...",
+    "...bb...",
+    "........",
+  ]},
+  // BLOCK tile — sivý štít s červeným ✕ (na tejto bunke sa nedá castnúť shield/mirror)
+  shieldx: { pal: { a: "#9aa0a8", b: "#e53935" }, rows: [
+    ".aaaaaa.",
+    ".abaaba.",
+    ".aabbaa.",
+    ".aabbaa.",
+    ".abaaba.",
+    "..aaaa..",
+    "...aa...",
+    "........",
+  ]},
   boot: { pal: { a: "#e0e0e0", b: "#8d6e63" }, rows: [
     "..aaa...",
     "..aaa...",
@@ -2023,7 +2048,7 @@ function pixSvg(name) {
 // malá inline ikonka do cost riadkov — pixelizované emoji, hydratuje hydratePix()
 const miniPix = (emoji) => `<span class="pix-ico mini" data-emoji="${emoji}"></span>`;
 // špeciálne políčka mapujú na ikony knižnice
-const TILE_TO_PIX = { dmg: "flame", heal: "heart", mana: "drop", ik: "skull" };
+const TILE_TO_PIX = { dmg: "flame", heal: "heart", mana: "drop", ik: "skull", power: "sword", block: "shieldx" };
 function tileSvg(type) { return pixSvg(TILE_TO_PIX[type] || type); }
 
 // jemná pixelizácia emoji: nakreslí sa do malého canvasu a CSS ho roztiahne s pixelated
@@ -3228,6 +3253,14 @@ function updateActionButtons() {
   const specialUsed = myQueue.some(a => a.type === "special");
   specialBtn.disabled = specialUsed;
   if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); wolfPicker?.classList.add("hidden"); }
+  // BLOCK tile varovanie: shield/mirror castnutý z block bunky server prečiarkne (bez ceny) — podfarbi
+  // buttony, keď by nová obrana išla z block tile (ghost po fronte; klon na block tile cast marí tiež).
+  // Len vizuálne varovanie, klik nezakazuje — pozícia v momente vyhodnotenia nemusí byť istá (charge/trap).
+  const onBlockTile = (p) => !!p && (state?.tiles || []).some(t => t.type === "block" && t.x === p.x && t.y === p.y);
+  const defBlocked = state?.phase === "playing" && (onBlockTile(ghostPos()) || onBlockTile(simulatedClonePos()));
+  document.querySelectorAll('.controls button[data-act="shield"], .controls button[data-act="mirror"]').forEach(btn => {
+    btn.classList.toggle("block-warn", defBlocked);
+  });
 }
 function updateLockButton() {
   const locked = !!state?.[me]?.locked;
@@ -3630,12 +3663,18 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", frameHold);
+        // POWER tile bonus: extra dmg z tile ide ako SAMOSTATNÝ zlatý „⚡-2" float (hlavný float ukazuje
+        // základ bez bonusu, HP samozrejme klesli o súčet) — bonus je v e.dmg/e.parts[0] už zarátaný
+        const bonus = (typeof e.bonus === "number" && e.bonus > 0) ? e.bonus : 0;
         // stacknutý Naruto+klon = súbežné zásahy spojené do jedného úderu → vypíš rozpis „-3 -3 HP"
         if (Array.isArray(e.parts) && e.parts.length > 1 && e.parts.reduce((a, b) => a + b, 0) > 0) {
-          spawnFloat(e.target, `-${e.parts.join(" -")} HP`, "dmg-float");
-        } else if (typeof e.dmg === "number" && e.dmg > 0) {
-          spawnDamageFloat(e.target, e.dmg);
+          const parts = bonus ? [Math.max(0, e.parts[0] - bonus), ...e.parts.slice(1)] : e.parts;
+          spawnFloat(e.target, `-${parts.join(" -")} HP`, "dmg-float");
+        } else if (typeof e.dmg === "number" && e.dmg - bonus > 0) {
+          spawnDamageFloat(e.target, e.dmg - bonus);
         }
+        // zlatý float mierne oneskorený, nech sa neprekryje s hlavným
+        if (bonus) { const tgt = e.target; setTimeout(() => spawnFloat(tgt, `⚡ -${bonus}`, "power-float"), 280); }
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
         // flinch (nie hurt) — klon ho zrkadlí, takže pri neplatnej akcii trhnú obaja Naruti rovnako
@@ -3695,9 +3734,9 @@ function schedulePlayTimeline(timeline) {
         cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
         spawnChargeAura(e.from, false, false, "clone", dark);
       }
-      // Fire Wizard skonzumoval Damage dlaždicu (boost zo specialu) — krátky flare na bunke
+      // Fire Wizard skonzumoval Damage dlaždicu (boost zo specialu) / caster POWER tile — krátky flare na bunke
       if (e.kind === "tile_consume" && Array.isArray(e.cell)) {
-        spawnTileConsumeFx(e.cell);
+        spawnTileConsumeFx(e.cell, e.tile);
       }
       // Pútnik použil mirror → nedostal pasívnu manu; float, nech hráč vie prečo
       if (e.kind === "wanderer_no_regen" && (e.target === "p1" || e.target === "p2")) {

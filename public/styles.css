@@ -156,6 +156,16 @@ body {
   background: rgba(40,130,255,.13);
   box-shadow: inset 0 0 0 2px #2b6fc2;
 }
+/* POWER — útok castnutý z tejto bunky dostane +2 dmg a tile sa spotrebuje */
+.cell.tile-power {
+  background: rgba(255,200,0,.15);
+  box-shadow: inset 0 0 0 2px #d4a017;
+}
+/* BLOCK (anti-magic) — na tejto bunke sa nedá castnúť shield/mirror; permanentný */
+.cell.tile-block {
+  background: rgba(150,155,165,.14);
+  box-shadow: inset 0 0 0 2px #8a8f98;
+}
 @keyframes ik-pulse { 0%,100%{ filter: brightness(1); } 50%{ filter: brightness(1.4); } }
 .cell.tile-ik {
   background: rgba(140,0,190,.30);
@@ -216,6 +226,14 @@ body {
   box-shadow: 0 0 26px rgba(255,160,40,.85);
   animation: tile-consume-flare 600ms ease-out forwards;
 }
+/* POWER tile spotreba — rovnaký flare v zlatom */
+.tile-consume-fx.power {
+  background: radial-gradient(circle, rgba(255,250,210,.95) 0%, rgba(255,213,79,.85) 45%, rgba(178,106,0,.4) 75%, rgba(178,106,0,0) 100%);
+  box-shadow: 0 0 26px rgba(255,213,79,.85);
+}
+/* obrana castnutá z BLOCK tile by sa prečiarkla — varovanie na shield/mirror buttonoch (len vizuál, klik ide) */
+.btn.act.block-warn { position: relative; box-shadow: inset 0 0 0 2px #8a8f98; filter: saturate(.35); }
+.btn.act.block-warn::after { content: "⚠"; position: absolute; top: 1px; right: 3px; font-size: 11px; color: #ffd54f; }
 
 /* ========== Labyrint (Minotaurov special) ==========
    Prekliaty hráč vidí len vlastnú bunku + svoju Ariadninu niť + obrys na nití + špeciálne tiles;
@@ -1898,7 +1916,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     30%  { opacity: 1; }
     to   { transform: translate(-50%, -48px); opacity: 0; }
   }
-  .dmg-float, .mana-float{
+  .dmg-float, .mana-float, .power-float{
     position: absolute;
     z-index: 5;
     font-weight: 900;
@@ -1910,6 +1928,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   }
   .dmg-float {  color: #ff5a5a; }
   .mana-float { color: #57a9ff; }
+  .power-float { color: #ffd54f; } /* extra dmg z POWER tile — samostatný zlatý „⚡ -2" */
   .mana-float.gold { color: #ffd54f; } /* golden mana — rovnaký float, len zlatý */
   /* Pútnikova pasívna mana — čierny float (svetlý halo kvôli čitateľnosti na tmavej aréne) */
   .mana-float.dark { color: #17171d; text-shadow: 0 0 5px rgba(215,215,225,.9), 0 0 2px rgba(255,255,255,.65); }
