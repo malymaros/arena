@@ -161,7 +161,7 @@ body {
   background: rgba(255,200,0,.15);
   box-shadow: inset 0 0 0 2px #d4a017;
 }
-/* BLOCK (anti-magic) — na tejto bunke sa nedá castnúť shield/mirror; permanentný */
+/* BLOCK (defence blocker) — na tejto bunke sa nedá castnúť shield/mirror; permanentný */
 .cell.tile-block {
   background: rgba(150,155,165,.14);
   box-shadow: inset 0 0 0 2px #8a8f98;
