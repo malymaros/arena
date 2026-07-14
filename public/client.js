@@ -454,7 +454,11 @@ const CHAR_META = {
   // (karty per strana skrýva CSS cez data-side; hrateľné len v single/bo3, turnaj Hidden stránku nepustí).
   // Onre hrá vždy vpravo vo svojej natívnej palete → dirP2 = ten istý priečinok (žiadny albino filter).
   countess:  { name: "Vampire", dir: "Countess_Vampire" },
-  onre:      { name: "Onryō",   dir: "Onre", dirP2: "Onre" }
+  onre:      { name: "Onryō",   dir: "Onre", dirP2: "Onre" },
+  // Hidden preview postavy (zatiaľ NEHRATEĽNÉ — karta bez data-char, klik/draft ju ignorujú):
+  // Luffy len P1, Jotaro len P2; Jotaro vpravo v natívnej palete (dirP2 = ten istý priečinok).
+  luffy:     { name: "Luffy",   dir: "luffy" },
+  jotaro:    { name: "Jotaro",  dir: "jotaro", dirP2: "jotaro" }
 };
 // side-postavy viazané na slot (zrkadlo serverového SIDE_CHARS); v turnaji sa dajú draftnúť, ale
 // swap DO/Z nich je zakázaný — v HUD hlavách to reprezentuje glitch (viď renderMageHeads)
@@ -4051,12 +4055,39 @@ function drawEscanorCard(ctx, cvs, now) {
   }
 }
 
+// Hidden preview postavy (Luffy/Jotaro): bez hoveru Idle, po nadídení cast animácia RAZ a potom
+// slučka chvosta (loopFrom; frames-1 = statický posledný frame). fill dorovnáva väčší frame castu
+// na mierku Idle (drawSprite škáluje podľa výšky framu — inak by postava pri hoveri skočila).
+const PREVIEW_CAST = {
+  luffy:  { file: "Special_1.png",   frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
+  jotaro: { file: "Special_3_P.png", frames: 4, fps: 6, loopFrom: 3, fill: 1.31 * 160 / 144 }, // Star Platinum menacing — drží posledný frame
+};
+const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
+function drawPreviewCard(ctx, cvs, key, now) {
+  const dir = charDirFor(key, me);
+  const cast = PREVIEW_CAST[key];
+  if (abilityHoverChar === key) {
+    if (!previewHoverT0[key]) previewHoverT0[key] = now;
+    const fi = Math.floor((now - previewHoverT0[key]) / 1000 * cast.fps);
+    const idx = fi < cast.frames ? fi : cast.loopFrom + ((fi - cast.frames) % (cast.frames - cast.loopFrom));
+    ensureSpriteMeta(dir, cast.file)
+      .then(meta => drawSprite(ctx, meta, { file: cast.file, frames: cast.frames, frameIndex: idx }, now, cvs.width, cvs.height, cast.fill, 0.98, true, 0, -52))
+      .catch(() => {});
+  } else {
+    previewHoverT0[key] = 0;
+    ensureSpriteMeta(dir, ANIM_DEF.idle.file)
+      .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52))
+      .catch(() => {});
+  }
+}
+
 function drawCharSelectFrame(now) {
   const canvases = selEl.querySelectorAll("canvas.char-canvas");
   canvases.forEach((cvs) => {
     const key = cvs.dataset.char;
     const ctx = cvs.getContext("2d");
     if (key === "escanor") { drawEscanorCard(ctx, cvs, now); return; } // vlastné WeakIdle/IntroStand
+    if (PREVIEW_CAST[key]) { drawPreviewCard(ctx, cvs, key, now); return; } // Hidden preview (Luffy/Jotaro)
     const dir = charDirFor(key, me); // hráč vpravo vidí Medúzu v natívnej tmavej palete (Medusa2)
     if (!dir) return;
     // mŕtvy mág (tournament): dead póza mága + death démon prekrytý cez okno karty
@@ -4195,6 +4226,10 @@ const ABILITY_PREVIEW = {
   // bonus ikona (heal/drain) sa ukazuje v stats riadku pri dmg (3☠️❤️ / 3☠️💧), nie v texte popisu
   countess:  { caster: { x: 0, y: 1 }, dmg: 3, bonus: "❤️", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
   onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
+  // Hidden preview postavy (zatiaľ nehrateľné): špeciál je utajený — secret:true vypína caster
+  // aj zónu (prázdna mini-doska), stats riadok len ❓, text TOP SECRET (fialový neón flicker)
+  luffy:     { caster: null, dmg: null, secret: true, effect: { num: "", emoji: "❓" }, desc: '<span class="ca-secret">TOP SECRET</span>' },
+  jotaro:    { caster: null, dmg: null, secret: true, effect: { num: "", emoji: "❓" }, desc: '<span class="ca-secret">TOP SECRET</span>' },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -4203,12 +4238,16 @@ function renderAbilityPreview(char) {
   const w = board.w || 4, h = board.h || 3;
   // hráč vpravo (p2): náhľad zrkadlovo — caster pri pravom okraji, smerový special (Medúza) mieri doľava
   const mirror = me === "p2";
-  const caster = mirror ? { x: w - 1 - def.caster.x, y: def.caster.y } : def.caster;
+  // secret (Hidden preview): žiadny caster ani zóna — mini-doska ostáva celá prázdna
+  const caster = (def.secret || !def.caster) ? { x: -1, y: -1 }
+    : mirror ? { x: w - 1 - def.caster.x, y: def.caster.y } : def.caster;
   const dir = (mirror && def.dir) ? (def.dir === "right" ? "left" : "right") : def.dir;
   // Vojak: zóna = príkladová cieľová bunka z definície (zrkadlená pre p2), nie odvodená z pozície castera
-  const hit = def.target
-    ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
-    : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
+  const hit = def.secret
+    ? new Set()
+    : def.target
+      ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
+      : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
   grid.innerHTML = "";
@@ -4308,10 +4347,13 @@ function clearAbilityPreview() {
   moonPreview = null;
   charAbilityEl?.classList.add("hidden");
 }
-selEl.querySelectorAll(".char-card[data-char]").forEach(card => {
+selEl.querySelectorAll(".char-card").forEach(card => {
+  // preview karty Hidden stránky (Luffy/Jotaro) nemajú data-char na karte (neklikateľné) — kľúč nesie canvas
+  const key = card.dataset.char || card.querySelector("canvas.char-canvas")?.dataset.char;
+  if (!key) return; // placeholder "Coming soon"
   card.addEventListener("mouseenter", () => {
-    if (isMageDead(card.dataset.char)) return; // mŕtvy mág nemá náhľad špeciálu
-    renderAbilityPreview(card.dataset.char);
+    if (isMageDead(key)) return; // mŕtvy mág nemá náhľad špeciálu
+    renderAbilityPreview(key);
   });
 });
 selEl.querySelectorAll(".char-cards").forEach(el => el.addEventListener("mouseleave", clearAbilityPreview));
@@ -4448,7 +4490,7 @@ function rosterGlitchCards() {
   // viditeľná (druhú stranu skrýva data-side:none, nedraftnutú off-roster:none), tá neviditeľná sa mutuje
   // neškodne mimo obraz. Žiadna závislosť na off-roster/charSelectHp/layout → glitchne vždy tú viditeľnú.
   if (!selEl.classList.contains("roster-mode") || hiddenMode || selEl.classList.contains("hidden")) return [];
-  return [...selEl.querySelectorAll(".char-card.hidden-char")];
+  return [...selEl.querySelectorAll(".char-card.hidden-char:not(.preview-char)")]; // preview karty (Luffy/Jotaro) sa nedraftujú → neglitchujú
 }
 function syncRosterGlitch() {
   const cards = rosterGlitchCards();

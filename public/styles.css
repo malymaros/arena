@@ -819,7 +819,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
    byť boxami) a vidno LEN karty draftnutého tímu; vyššia špecificita prebije .char-cards.hidden */
 .char-select.roster-mode .char-cards { display: contents; }
 .char-select.roster-mode .char-card.off-roster,
-.char-select.roster-mode .char-card.soon { display: none; }
+.char-select.roster-mode .char-card.soon,
+.char-select.roster-mode .char-card.preview-char { display: none; }
 /* karty tímu dostávajú flex `order` 1..N podľa poradia draftu (JS v updateCharSelectHp);
    pravá (skrytá) šípka musí ostať za nimi, ľavá drží order 0 pred nimi */
 .char-select.roster-mode #char-page-next { order: 100; }
@@ -1151,6 +1152,14 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
 .char-card.hidden-char.glitch-flash { box-shadow: 0 0 0 3px #7afff2, 0 0 0 5px #000, 0 0 22px rgba(122,255,242,.7) !important; }
 .char-card.hidden-char.glitch-flash .char-canvas { filter: hue-rotate(90deg) saturate(2.2) contrast(1.35) invert(.1); }
 .char-card.hidden-char.glitch-flash .char-name { color: #7afff2; text-shadow: -2px 1px 0 #000, 2px 0 0 rgba(255,91,214,.75), 0 0 12px rgba(122,255,242,.75); }
+/* preview karty Hidden stránky (Luffy/Jotaro) — fialový skin hidden-char, ale zatiaľ nehrateľné (bez pointeru) */
+.char-card.preview-char { cursor: default; }
+/* „TOP SECRET" popis špeciálu preview postáv — fialový neón s flickerom ako Hidden nadpis */
+.ca-secret {
+  color: #b17aff; font-weight: bold; letter-spacing: 3px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,.6), 0 0 10px rgba(177,122,255,.8);
+  animation: hidden-flicker 3.2s linear infinite;
+}
 /* nové postavy na Hidden stránke sú viazané na stranu hráča: P1 vidí len Countess Vampire, P2 len Onre */
 #char-select:not(.p2-side) .char-card[data-side="p2"] { display: none; }
 #char-select.p2-side .char-card[data-side="p1"] { display: none; }
@@ -1607,6 +1616,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
   #char-select.p2-side canvas.char-canvas[data-char="werewolf"]{ filter: none; }
   /* Onre je natívna P2 postava (Hidden stránka) — žiadny albino filter */
   #char-select.p2-side canvas.char-canvas[data-char="onre"]{ filter: none; }
+  /* Jotaro (Hidden preview, len P2) — natívna paleta, žiadny albino filter */
+  #char-select.p2-side canvas.char-canvas[data-char="jotaro"]{ filter: none; }
   /* hráč vpravo (p2): celý výber orientovaný na opačnú stranu — postavy v kartách aj mini-caster
      v náhľade špeciálu hľadia doľava (zrkadlovo k ľavému hráčovi); zónu zrkadlí renderAbilityPreview */
   #char-select.p2-side canvas.char-canvas{ transform: scaleX(-1); }
