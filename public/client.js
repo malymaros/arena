@@ -3253,14 +3253,6 @@ function updateActionButtons() {
   const specialUsed = myQueue.some(a => a.type === "special");
   specialBtn.disabled = specialUsed;
   if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); wolfPicker?.classList.add("hidden"); }
-  // BLOCK tile varovanie: shield/mirror castnutý z block bunky server prečiarkne (bez ceny) — podfarbi
-  // buttony, keď by nová obrana išla z block tile (ghost po fronte; klon na block tile cast marí tiež).
-  // Len vizuálne varovanie, klik nezakazuje — pozícia v momente vyhodnotenia nemusí byť istá (charge/trap).
-  const onBlockTile = (p) => !!p && (state?.tiles || []).some(t => t.type === "block" && t.x === p.x && t.y === p.y);
-  const defBlocked = state?.phase === "playing" && (onBlockTile(ghostPos()) || onBlockTile(simulatedClonePos()));
-  document.querySelectorAll('.controls button[data-act="shield"], .controls button[data-act="mirror"]').forEach(btn => {
-    btn.classList.toggle("block-warn", defBlocked);
-  });
 }
 function updateLockButton() {
   const locked = !!state?.[me]?.locked;

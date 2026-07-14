@@ -231,9 +231,6 @@ body {
   background: radial-gradient(circle, rgba(255,250,210,.95) 0%, rgba(255,213,79,.85) 45%, rgba(178,106,0,.4) 75%, rgba(178,106,0,0) 100%);
   box-shadow: 0 0 26px rgba(255,213,79,.85);
 }
-/* obrana castnutá z BLOCK tile by sa prečiarkla — varovanie na shield/mirror buttonoch (len vizuál, klik ide) */
-.btn.act.block-warn { position: relative; box-shadow: inset 0 0 0 2px #8a8f98; filter: saturate(.35); }
-.btn.act.block-warn::after { content: "⚠"; position: absolute; top: 1px; right: 3px; font-size: 11px; color: #ffd54f; }
 
 /* ========== Labyrint (Minotaurov special) ==========
    Prekliaty hráč vidí len vlastnú bunku + svoju Ariadninu niť + obrys na nití + špeciálne tiles;
