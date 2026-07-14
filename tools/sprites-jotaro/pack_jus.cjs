@@ -32,7 +32,9 @@ const SEGMENTS = {
   J_Taunt:     { ids: ids(7, 0, 7), anchor: "bottom" },     // provokacne pozy
   J_Punch:     { ids: ids(8, 0, 3), anchor: "bottom" },     // priamy uder s ruzovym svistom
   J_Kick:      { ids: ids(9, 0, 4), anchor: "bottom" },     // nizky kop so svistom
-  J_CoatIdle:  { ids: ids(10, 0, 5), anchor: "bottom" },    // postoj s vlajucim plastom (win/intro)
+  // alignFeet: horizontalne zarovnanie podla taziska noh (spodne 4 riadky bunky) namiesto stredu
+  // bboxu — vlajuci plast rozsiruje bbox do strany a centrovanie by posuvalo telo (jitter v karte)
+  J_CoatIdle:  { ids: ids(10, 0, 5), anchor: "bottom", alignFeet: true }, // postoj s vlajucim plastom (win/intro)
   // 12.2 ma detekciou zliate dve figury -> rozdelene explicitnymi boxami
   J_Point:     { ids: ["12.0", "12.1", { x0: 91, y0: 839, x1: 138, y1: 889 }, { x0: 139, y0: 839, x1: 185, y1: 889 }], anchor: "bottom" }, // ukazanie prstom
   J_CapTip:    { ids: ids(14, 7, 10), anchor: "bottom" },   // ruka na siltovku (yare yare)
@@ -52,7 +54,13 @@ for (const [name, seg] of Object.entries(SEGMENTS)) {
   cs.forEach((c, k) => {
     const ox = k * F;
     const dw = c.w * S, dh = c.h * S;
-    const dx0 = ox + ((F - dw) >> 1);
+    let dx0 = ox + ((F - dw) >> 1);
+    if (seg.alignFeet) { // nohy (tazisko spodnych 4 riadkov bunky) do stredu framu
+      let sx = 0, n = 0;
+      for (let y = Math.max(c.y0, c.y1 - 3); y <= c.y1; y++) for (let x = c.x0; x <= c.x1; x++)
+        if (!isBg((y * png.width + x) * 4)) { sx += x - c.x0; n++; }
+      if (n) dx0 = ox + Math.round(F / 2 - (sx / n + 0.5) * S);
+    }
     const dy0 = seg.anchor === "bottom" ? F - PAD - dh : (F - dh) >> 1;
     for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
       const sx = c.x0 + (x / S | 0), sy = c.y0 + (y / S | 0);
