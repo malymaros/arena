@@ -4066,6 +4066,9 @@ const PREVIEW_CAST = {
   jotaro: { file: "Special_3_P.png", frames: 4, fps: 6, loopFrom: 3, fill: 1.31 * 160 / 144 }, // Star Platinum menacing — drží posledný frame
 };
 const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
+// offsetY −39 (mágovia −52): ich pásy sú bottom-anchored s malým PAD, mágovia majú vo frame
+// väčší spodný okraj — s −52 stáli o ~13 px vyššie; −39 dorovnáva nohy na úroveň mágov (~189 px)
+const PREVIEW_OFF_Y = -39;
 function drawPreviewCard(ctx, cvs, key, now) {
   const dir = charDirFor(key, me);
   const cast = PREVIEW_CAST[key];
@@ -4074,12 +4077,12 @@ function drawPreviewCard(ctx, cvs, key, now) {
     const fi = Math.floor((now - previewHoverT0[key]) / 1000 * cast.fps);
     const idx = fi < cast.frames ? fi : cast.loopFrom + ((fi - cast.frames) % (cast.frames - cast.loopFrom));
     ensureSpriteMeta(dir, cast.file)
-      .then(meta => drawSprite(ctx, meta, { file: cast.file, frames: cast.frames, frameIndex: idx }, now, cvs.width, cvs.height, portraitFill(key, cast.fill), 0.98, true, 0, -52))
+      .then(meta => drawSprite(ctx, meta, { file: cast.file, frames: cast.frames, frameIndex: idx }, now, cvs.width, cvs.height, portraitFill(key, cast.fill), 0.98, true, 0, PREVIEW_OFF_Y))
       .catch(() => {});
   } else {
     previewHoverT0[key] = 0;
     ensureSpriteMeta(dir, ANIM_DEF.idle.file)
-      .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, cvs.width, cvs.height, portraitFill(key, 1.31), 0.98, true, 0, -52))
+      .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, cvs.width, cvs.height, portraitFill(key, 1.31), 0.98, true, 0, PREVIEW_OFF_Y))
       .catch(() => {});
   }
 }
