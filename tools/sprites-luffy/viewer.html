@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Luffy strips viewer</title>
+<style>
+  body { background:#14141c; color:#eee; font:14px monospace; display:flex; flex-wrap:wrap; gap:14px; padding:14px; align-content:flex-start; }
+  .box { text-align:center; background:#1e1e28; border:1px solid #333; border-radius:6px; padding:8px; }
+  canvas { image-rendering:pixelated; background:#2a2a36; }
+  .lbl { margin-top:4px; color:#ffd75e; }
+  h3 { width:100%; margin:6px 0 0; color:#8fd; }
+</style>
+<body>
+<script>
+const GROUPS = {
+  "Postoje / pohyb / obrana": ["L_Idle","L_Stand","L_Run","L_Dash","L_DashStop","L_Jump","L_Guard","L_Guard2"],
+  "Údery — B combo, pistol, rifle (časť kreslená doľava)": ["L_Jab","L_Jab2","L_Punch","L_PunchBall",
+    "L_Bullet","L_BulletEnd","L_Rifle","L_Pistol","L_Pistol2","L_Whip","L_RocketPull"],
+  "Projektilové kandidáty (oddelené päste)": ["L_Fist","L_FistJet"],
+  "Salvy a špeciály": ["L_Gatling","L_Gatling2","L_FistRain","L_RifleUp","L_UpSwipe","L_WhipUp","L_WhipUp2",
+    "L_Axe","L_DashAttack","L_FistWheel","L_FireworkFX","L_SpinWrap","L_FlashFX","L_ScratchFX"],
+  "Gear Third — obrie päste (doľava)": ["L_TwinFists","L_GiantPistol","L_GiantRocket","L_GiantPunch",
+    "L_GiantRetract","L_SmokeFists","L_Recover20"],
+  "Balón (mirror/shield choreografia?)": ["L_Balloon","L_BalloonBounce","L_BalloonTwist"],
+  "Vzdušné (v hre asi nevyužiteľné)": ["L_AirStomp","L_AirKick","L_AirSpin"],
+  "Zásahy / knockdown / visenie": ["L_Hurt","L_Knockback","L_Tumble","L_Roll","L_Lying","L_GetUp",
+    "L_Hang","L_Fall","L_Grapple"],
+  "Ultimate / emócie / win-lose": ["L_MeatFeast","L_Cheer","L_Win","L_Lose","L_Unused"],
+};
+const FPS = 10;
+for (const [title, files] of Object.entries(GROUPS)) {
+  const h = document.createElement("h3"); h.textContent = title; document.body.append(h);
+  for (const name of files) {
+    const src = "out/" + name + ".png";
+    const box = document.createElement("div"); box.className = "box";
+    const cvs = document.createElement("canvas");
+    const lbl = document.createElement("div"); lbl.className = "lbl";
+    box.append(cvs, lbl); document.body.append(box);
+    const img = new Image();
+    img.onload = () => {
+      const F = img.height, n = img.width / F;
+      cvs.width = F; cvs.height = F;
+      const disp = Math.min(288, Math.max(160, F * 1.5));
+      cvs.style.width = cvs.style.height = disp + "px";
+      lbl.textContent = `${name} (${n} × ${F}px)`;
+      const ctx = cvs.getContext("2d");
+      setInterval(() => {
+        const f = Math.floor(Date.now() / (1000 / FPS)) % n;
+        ctx.clearRect(0, 0, F, F);
+        ctx.drawImage(img, f * F, 0, F, F, 0, 0, F, F);
+      }, 1000 / FPS / 2);
+    };
+    img.onerror = () => { lbl.textContent = name + " CHYBA"; };
+    img.src = src;
+  }
+}
+</script>
