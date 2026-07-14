@@ -2,7 +2,8 @@
 // Na rozdiel od jotarovho pack_char.cjs (kopia hotovych pasov) sa tu kombinovane
 // akcie skladaju priamo z buniek sheetu do jednotnej velkosti framu — Special_1
 // a Special_4 lepia viacero segmentov s roznymi F. Kotva sa preberá per-segment.
-// Vystup: out/char/*.png (herne nazvy; zatial nie su v public/assets/).
+// Vystup: out/char/*.png + kopia do public/assets/luffy/ (herne nazvy;
+// P1/P2 paleta sa zatial nerozlisuje).
 const fs = require("fs");
 const path = require("path");
 const { PNG } = require("pngjs");
@@ -12,7 +13,9 @@ const { SEGMENTS } = require("./pack.cjs");
 const cfg = SHEETS.luffy;
 const cells = require("./" + cfg.cells);
 const OUT = path.join(__dirname, "out", "char");
+const ASSETS = path.join(__dirname, "..", "..", "public", "assets", "luffy");
 fs.mkdirSync(OUT, { recursive: true });
+fs.mkdirSync(ASSETS, { recursive: true });
 
 const S = 2, PAD = 8;
 const png = PNG.sync.read(fs.readFileSync(cfg.src));
@@ -34,6 +37,7 @@ const ACTIONS = {
   Special_4: ["L_GiantPistol", "L_GiantRocket", "L_GiantPunch"], // Gear Third (dolava)
   Special_5: ["L_GiantRetract"],                              // stiahnutie obrej paste (dolava)
   Special_6: ["L_Rifle"],                                     // tocena ruka (dolava)
+  Special_7: ["L_BalloonBounce"],                             // odrazenie utoku balonom
   Recharge:  ["L_Balloon"],                                   // nafuknutie balona
   Recharge2: ["L_TwinFists"],                                 // obrie paste pri hrudi
   Charge:    ["L_FistJet"],                                   // letiaca blur-pesta — projektil
@@ -70,6 +74,8 @@ for (const [name, parts] of Object.entries(ACTIONS)) {
       strip.data[di+2] = png.data[si+2]; strip.data[di+3] = 255;
     }
   });
-  fs.writeFileSync(path.join(OUT, `${name}.png`), PNG.sync.write(strip));
+  const buf = PNG.sync.write(strip);
+  fs.writeFileSync(path.join(OUT, `${name}.png`), buf);
+  fs.writeFileSync(path.join(ASSETS, `${name}.png`), buf);
   console.log(`${name}.png — ${cs.length} framov, frame ${F}px`);
 }

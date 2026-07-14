@@ -21,8 +21,9 @@ nasadení sa pásy zrkadlia ako obvykle).
 
 Sprity ~30×60 px → jednotný 2× nearest-neighbor upscale ako u Jotara. Formát
 výstupu: štvorcové frames v horizontálnom páse (engine odvodí počet =
-šírka/výška), veľkosť framu per-segment, PAD 8. Výstupy zatiaľ NIE sú
-v `public/assets/` — mapovanie na herné súbory a kit postavy sa ešte nerozhodli.
+šírka/výška), veľkosť framu per-segment, PAD 8. Herné akcie idú cez
+`pack_char.cjs` aj do `public/assets/luffy/` (viď tabuľka nižšie); kit
+postavy (mechaniky, P1/P2 paleta) sa rozhodne pri integrácii.
 
 ```
 node detect.cjs      # detekcia buniek -> cells.json + overview.png
@@ -37,10 +38,11 @@ Konfigurácia sheetu je `sheet.cjs`; spec animácií (bunky per pás + kotva) je
 `{x0,y0,x1,y1}` — použitý pre `L_FireworkFX` (rozsypané iskry riadku 12 zliate
 do jedného framu).
 
-## Herné akcie (`out/char/`)
+## Herné akcie (`out/char/` + `public/assets/luffy/`)
 
-`pack_char.cjs` skladá vybrané pásy pod herné názvy — kombinované akcie sa
-lepia priamo z buniek do jednotnej veľkosti framu (kotva per-segment):
+`pack_char.cjs` skladá vybrané pásy pod herné názvy a zapisuje ich aj priamo
+do `public/assets/luffy/` (P1/P2 paleta sa zatiaľ nerozlišuje). Kombinované
+akcie sa lepia priamo z buniek do jednotnej veľkosti framu (kotva per-segment):
 
 | akcia | zdrojové pásy |
 |---|---|
@@ -54,6 +56,7 @@ lepia priamo z buniek do jednotnej veľkosti framu (kotva per-segment):
 | `Special_4` | L_GiantPistol + L_GiantRocket + L_GiantPunch (14, doľava) |
 | `Special_5` | L_GiantRetract (4, doľava) |
 | `Special_6` | L_Rifle (9, doľava) |
+| `Special_7` | L_BalloonBounce (12 — odrazenie útoku balónom) |
 | `Recharge` | L_Balloon (9) |
 | `Recharge2` | L_TwinFists (7) |
 | `Charge` (projektil) | L_FistJet (1) |
