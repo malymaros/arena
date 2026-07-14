@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Jotaro + Star Platinum strips viewer</title>
+<style>
+  body { background:#14141c; color:#eee; font:14px monospace; display:flex; flex-wrap:wrap; gap:14px; padding:14px; align-content:flex-start; }
+  .box { text-align:center; background:#1e1e28; border:1px solid #333; border-radius:6px; padding:8px; }
+  canvas { image-rendering:pixelated; background:#2a2a36; }
+  .lbl { margin-top:4px; color:#ffd75e; }
+  h3 { width:100%; margin:6px 0 0; color:#8fd; }
+</style>
+<body>
+<script>
+const GROUPS = {
+  "Assety postavy (public/assets/jotaro)": ["Idle","Idle_P","Run","Run_P","Attack_1","Attack_1_P",
+    "Attack_2","Attack_2_P","Special_1","Special_1_P","Special_2","Special_2_P","Special_3_P",
+    "Dead","Dead_P","Hurt","Charge"].map(n => "../../public/assets/jotaro/" + n + ".png"),
+  "Jotaro (JUS 2x)": ["J_Idle","J_Run","J_Dash","J_Guard","J_Jump","J_Hurt","J_Dead","J_Getup",
+    "J_Taunt","J_Punch","J_Kick","J_CoatIdle","J_Point","J_CapTip","J_Jabs","J_Hook",
+    "J_Barrage","J_Uppercut","J_FistRaise"].map(n => "out/jus/" + n + ".png"),
+  "Star Platinum (JUS 2x)": ["SP_Idle","SP_Punch","SP_Barrage","SP_BarrageUp","SP_BarrageAir",
+    "SP_Summon","SP_Unsummon","SP_Jabs","SP_Uppercut","SP_SnesMenace"].map(n => "out/sp/" + n + ".png"),
+};
+const FPS = 10;
+for (const [title, files] of Object.entries(GROUPS)) {
+  const h = document.createElement("h3"); h.textContent = title; document.body.append(h);
+  for (const src of files) {
+    const name = src.split("/").pop().replace(".png", "");
+    const box = document.createElement("div"); box.className = "box";
+    const cvs = document.createElement("canvas");
+    const lbl = document.createElement("div"); lbl.className = "lbl";
+    box.append(cvs, lbl); document.body.append(box);
+    const img = new Image();
+    img.onload = () => {
+      const F = img.height, n = img.width / F;
+      cvs.width = F; cvs.height = F;
+      const disp = Math.min(288, Math.max(160, F * 1.5));
+      cvs.style.width = cvs.style.height = disp + "px";
+      lbl.textContent = `${name} (${n} × ${F}px)`;
+      const ctx = cvs.getContext("2d");
+      setInterval(() => {
+        const f = Math.floor(Date.now() / (1000 / FPS)) % n;
+        ctx.clearRect(0, 0, F, F);
+        ctx.drawImage(img, f * F, 0, F, F, 0, 0, F, F);
+      }, 1000 / FPS / 2);
+    };
+    img.onerror = () => { lbl.textContent = name + " CHYBA"; };
+    img.src = src;
+  }
+}
+</script>
