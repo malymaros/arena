@@ -2316,9 +2316,15 @@ function rollPendingTiles() {
       const c = pickCell((x, y) => !futureIK(x, y));
       if (c) spawns.push({ x: c.x, y: c.y, type: "ik" });
     } else {
-      // môže byť aj pod hráčom; nie na existujúcom/ohlásenom tile ani pod budúcim IK; bez voľného políčka sa spawn preskočí
+      // môže byť aj pod hráčom; nie na existujúcom/ohlásenom tile ani pod budúcim IK
       const c = pickCell((x, y) => !futureTile(x, y) && !futureIK(x, y));
       if (c) spawns.push({ x: c.x, y: c.y, type });
+      else {
+        // doska je plná special tiles (žiadna bunka pre dmg/heal/mana) → namiesto preskočenia spawnu
+        // padne IK BEZ OHĽADU na váhy (IK smie prekryť tiles) — late-game poistka, nech sa hra nezasekne
+        const ik = pickCell((x, y) => !futureIK(x, y));
+        if (ik) spawns.push({ x: ik.x, y: ik.y, type: "ik" });
+      }
     }
   }
   game.pending = { ikMoves, spawns };

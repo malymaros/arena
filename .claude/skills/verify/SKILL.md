@@ -19,5 +19,5 @@ Zmeny v `server.js` sa overujú cez reálne socket spojenia (rovnaký vzor ako `
 
 - **Absolútne HP nie je dôkaz zásahu** — heal dlaždice môžu HP priebežne dvíhať. Dôkaz ber z timeline efektov (`kind: "hit"/"mirror"/"block"` + `target`).
 - Poradie akcií: starter kola sa strieda (R1 = p1), akcie sa interleavujú starter-first — na armovanie obrany PRED útokom súpera treba obranu zaradiť tak, aby vyšla skôr v interleave.
-- Štart: p1 (0,1), p2 (4,1); START_MANA 6, RECHARGE +4, basic 1, melee/dash/mirror 4, shield 2. Bezpečný whiff = attack up z riadku 1 (zasiahne prázdne (x,0)) alebo melee mimo zdieľanej bunky.
+- Doska je **4×3** (`BOARD` v server.js). Štart: p1 (0,1), p2 (3,1); START_MANA 6, RECHARGE +4, basic 1, melee/dash/mirror 4, shield 2. Bezpečný whiff = attack up z riadku 1 (zasiahne prázdne (x,0)) alebo melee mimo zdieľanej bunky.
 - Fronta = práve 3 akcie, každý typ max raz.
