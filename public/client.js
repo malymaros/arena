@@ -4233,9 +4233,9 @@ const ABILITY_PREVIEW = {
   countess:  { caster: { x: 0, y: 1 }, dmg: 3, bonus: "❤️", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
   onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
   // Hidden preview postavy (zatiaľ nehrateľné): špeciál je utajený — secret:true vypína caster
-  // aj zónu (prázdna mini-doska), stats riadok len ❓, text TOP SECRET (fialový neón flicker)
-  luffy:     { caster: null, dmg: null, secret: true, effect: { num: "", emoji: "❓" }, desc: '<span class="ca-secret">TOP SECRET</span>' },
-  jotaro:    { caster: null, dmg: null, secret: true, effect: { num: "", emoji: "❓" }, desc: '<span class="ca-secret">TOP SECRET</span>' },
+  // aj zónu (prázdna mini-doska), žiadny stats riadok, text TOP SECRET (fialový neón flicker)
+  luffy:     { caster: null, dmg: null, secret: true, desc: '<span class="ca-secret">TOP SECRET</span>' },
+  jotaro:    { caster: null, dmg: null, secret: true, desc: '<span class="ca-secret">TOP SECRET</span>' },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
