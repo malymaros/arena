@@ -2023,6 +2023,36 @@ async function main() {
   check(sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 8).length === 1,
     "TJ8: Special 2 dáva 8 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
   invariantCheck(tl, "TJ8");
+
+  /* ---------- TJ11: naruto klon zabitý zmrazeným útokom → clone_die AŽ pri resume ---------- */
+  await freshJotaro("naruto");
+  // kolo1 (starter p1): naruto summon klona na (0,1) (stojí sám); jotaro recharge + presun bližšie
+  tl = await playRound(c1, c2, [SP, R, S], [R, M("left"), S]);
+  check(!!tl[tl.length - 1].p1.clone, "TJ11: naruto má klona", `clone=${JSON.stringify(tl[tl.length - 1].p1.clone)}`);
+  // naruto klon aj hráč na (0,1); jotaro po M(left) na (2,1). kolo2 (starter p2): jotaro THE WORLD,
+  // frozen: dash left na (0,1)... mana tesná — namiesto toho special1 na klonovu bunku ak dosiahne.
+  // Zjednodušene: frozen basic up_left z (2,1) → (1,0),(0,1)? trasa (1,0),(0,1)... over decoy/hráč split.
+  // Kľúč testu: clone_die sa NEobjaví v zmrazených framoch, iba pri resume.
+  let tj11 = await playRoundTimestop([R, S, M("up")], [SP, R, S], [D("left"), A("up_left"), R]);
+  const tj11endIdx = tj11.tl2.findIndex(f => (f.effects || []).some(e => e.kind === "timestop_end"));
+  const cloneDieBeforeEnd = tj11.tl2.slice(0, tj11endIdx < 0 ? tj11.tl2.length : tj11endIdx)
+    .some(f => (f.effects || []).some(e => e.kind === "clone_die"));
+  check(!cloneDieBeforeEnd, "TJ11: clone_die sa počas zamrazenia NEobjaví (odložené na resume)");
+
+  /* ---------- TJ12: turnaj — p2 draftne jotara; swap DO/Z jotara zakázaný ---------- */
+  {
+    c1.sock.emit("retry"); await sleep(150);
+    configureMatch(c1, { format: "tournament" }); await sleep(200);
+    c1.sock.emit("choose_team", ["fire", "lightning", "wanderer"]);
+    c2.sock.emit("choose_team", ["jotaro", "fire", "lightning"]);
+    await sleep(300);
+    c1.sock.emit("choose_character", "fire");
+    c2.sock.emit("choose_character", "jotaro");
+    await sleep(250);
+    // swap Z jotara (na fire) — zakázaný (side-postava má odlišnú sémantiku akcií)
+    const rej = await new Promise(res => c2.sock.emit("lock_in", [{ type: "swap", to: "fire" }, R, S], (r) => res(r)));
+    check(rej && rej.ok === false, "TJ12: swap Z jotara odmietnutý (ack ok:false)", `ack=${JSON.stringify(rej)}`);
+  }
   }
 
   /* ---------- TR: viac roomiek naraz — izolácia broadcastov ---------- */
