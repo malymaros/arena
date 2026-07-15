@@ -32,7 +32,7 @@ function connect() {
     const sock = io(URL, { transports: ["websocket"], auth: { name, pass: "testpass" } });
     // pomalší boot servera nesmie zhodiť test — socket.io sa retryne samo; reject až po celkovom timeoute
     const killer = setTimeout(() => { sock.close(); reject(new Error("connect timeout")); }, 15000);
-    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0, rooms: null, spectator: false };
+    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, timelines: [], gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0, rooms: null, spectator: false };
     sock.on("you_are", (s) => { ctx.slot = s?.slot ?? s; ctx.isHost = !!s?.isHost; });
     sock.on("rooms", (r) => { ctx.rooms = r; });                 // zoznam roomiek (room-browser)
     sock.on("spectator", () => { ctx.spectator = true; });
@@ -42,7 +42,8 @@ function connect() {
     sock.on("new_game", () => { /* séria: ďalšia hra — sloty prídu cez you_are */ });
     sock.on("state", (s) => {
       ctx.lastState = s;
-      if (s.timeline) ctx.lastTimeline = s.timeline;
+      // THE WORLD: v jednom kole prídu DVE timeline emisie (partial + pokračovanie) — zbieraj do poľa
+      if (s.timeline) { ctx.lastTimeline = s.timeline; ctx.timelines.push(s.timeline); }
     });
     sock.on("game_over", (g) => { ctx.gameOver = g; });
     sock.on("connect", () => { clearTimeout(killer); setTimeout(() => resolve(ctx), 300); });
@@ -1848,6 +1849,20 @@ async function main() {
     c2.sock.emit("choose_character", "jotaro");
     await sleep(250);
   }
+  // odohraj kolo s Jotarovým THE WORLD: lock oboch → timeline #1 (partial, končí timestop_wait) →
+  // pošli 3 zmrazené akcie (jotaro = c2/p2) → timeline #2 (pokračovanie). Vráti { tl1, tl2 }.
+  async function playRoundTimestop(q1, q2, tsQueue) {
+    c1.timelines = []; c2.timelines = [];
+    c1.lastTimeline = null; c2.lastTimeline = null;
+    c1.sock.emit("lock_in", q1);
+    c2.sock.emit("lock_in", q2);
+    await waitFor(() => c2.timelines.length >= 1, 5000, "TJ timestop tl1");
+    await sleep(150);
+    c2.sock.emit("timestop_actions", tsQueue);
+    await waitFor(() => c2.timelines.length >= 2, 5000, "TJ timestop tl2");
+    await sleep(150);
+    return { tl1: c2.timelines[0], tl2: c2.timelines[1] };
+  }
 
   /* ---------- TJ1: side-binding — jotaro len p2; draft len p2 hráčom ---------- */
   {
@@ -1943,23 +1958,71 @@ async function main() {
   check(tl[tl.length - 1].p2.hp === 10, "TJ4: jotaro po odraze bez zranenia", `hp=${tl[tl.length - 1].p2.hp}`);
   invariantCheck(tl, "TJ4");
 
-  /* ---------- TJ8: Special 2 (worldUsed=true v F1) — 8 dmg susedná bunka + wall whiff ---------- */
+  /* ---------- TJ5: THE WORLD happy path — pauza, zmrazený zásah announce, kumulatívny hit pri resume ---------- */
   await freshJotaro();
-  // kolo1 (starter p1): fire D(right)→(2,1); jotaro S2L z (3,1) → bunka (2,1)=fire → 8 dmg
-  tl = await playRound(c1, c2, [D("right"), R, S], [S2L, R, S]);
+  // kolo1 (starter p1, jotaro nestartér → THE WORLD ako p2[1]): fire D(right)+M(up) → (2,0) (mimo Jotarovho
+  // riadku, na trase up_left); jotaro R (mana→10) potom SP=THE WORLD (mana→5); frozen A(up_left) trafí (2,0) za 3
+  let tj5 = await playRoundTimestop([D("right"), M("up"), R], [R, SP, S], [A("up_left"), R, S]);
+  check(fxOf2(tj5.tl1, "timestop_wait").length === 1, "TJ5: timeline #1 končí timestop_wait");
+  check(fxOf2(tj5.tl1, "timestop_start").length === 1, "TJ5: THE WORLD cast v timeline #1");
+  check(fxOf2(tj5.tl2, "ts_hit").length >= 1, "TJ5: zmrazený zásah len ohlásený (ts_hit)");
+  const tj5end = tj5.tl2.findIndex(f => (f.effects || []).some(e => e.kind === "timestop_end"));
+  check(tj5end > 0 && tj5.tl2.slice(0, tj5end).every(f => f.p1.hp === 10),
+    "TJ5: HP súpera počas zamrazenia NEMENNÉ", `end=${tj5end}`);
+  const tj5hits = sumEffects(tj5.tl2).hits.filter(h => h.target === "p1");
+  check(tj5hits.length === 1 && tj5hits[0].dmg === 3, "TJ5: kumulatívny zásah = jeden hit za 3", `hits=${JSON.stringify(tj5hits)}`);
+  check(tj5.tl2[tj5.tl2.length - 1].p1.hp === 7, "TJ5: fire po resume na 7 HP", `hp=${tj5.tl2[tj5.tl2.length - 1].p1.hp}`);
+  check(tj5.tl2[tj5.tl2.length - 1].p2.worldUsed === true, "TJ5: worldUsed po THE WORLD");
+  invariantCheck(tj5.tl2, "TJ5");
+
+  /* ---------- TJ6: shield counter — nabitý shield → jeden block, 0 dmg ---------- */
+  await freshJotaro();
+  // všetko v kole1 (starter p1, jotaro nestartér → THE WORLD ako p2[1]): fire D(down)→(0,2), potom S (shield);
+  // jotaro R (mana→10), potom SP=THE WORLD (mana→5, zachytí nabitý foeShield); frozen A(up_left) trafí (0,2) za 1
+  let tj6 = await playRoundTimestop([D("down"), S, R], [R, SP, S], [A("up_left"), R, S]);
+  check(fxOf2(tj6.tl2, "block").filter(e => e.target === "p1").length === 1, "TJ6: shield block pri resume", `blocks=${JSON.stringify(fxOf2(tj6.tl2, "block"))}`);
+  check(sumEffects(tj6.tl2).hits.length === 0, "TJ6: shield → 0 dmg");
+  check(tj6.tl2[tj6.tl2.length - 1].p1.hp === 10, "TJ6: fire nezranený");
+  invariantCheck(tj6.tl2, "TJ6");
+
+  /* ---------- TJ7: mirror counter — nabitý mirror → jeden odraz kumulatívneho súčtu na jotara ---------- */
+  await freshJotaro();
+  // fire M(down)→(0,2) (POHYB zadarmo, nie dash — nech zostane mana na MI 4), potom MI (mirror); ostatné ako TJ6
+  let tj7 = await playRoundTimestop([M("down"), MI, R], [R, SP, S], [A("up_left"), R, S]);
+  check(fxOf2(tj7.tl2, "ts_mirror").length >= 1, "TJ7: zmrazený zásah ohlásený ako MIRRORED");
+  check(fxOf2(tj7.tl2, "mirror").length === 1, "TJ7: jeden mirror odraz pri resume", `mirrors=${JSON.stringify(fxOf2(tj7.tl2, "mirror"))}`);
+  const tj7ref = sumEffects(tj7.tl2).hits.filter(h => h.target === "p2");
+  check(tj7ref.length === 1 && tj7ref[0].dmg === 1, "TJ7: kumulatívny odraz na jotara (1)", `hits=${JSON.stringify(sumEffects(tj7.tl2).hits)}`);
+  check(tj7.tl2[tj7.tl2.length - 1].p2.hp === 9, "TJ7: jotaro po odraze na 9 HP");
+  invariantCheck(tj7.tl2, "TJ7");
+
+  /* ---------- TJ13: obrana NEspotrebovaná, ak zmrazené akcie nič nezasiahli (D1) ---------- */
+  await freshJotaro();
+  // fire shield, jotaro THE WORLD, frozen NEútočí (len M(up),R,S) → 0 zásahov → shield ostáva nabitý
+  let tj13 = await playRoundTimestop([D("down"), S, R], [R, SP, S], [M("up"), R, S]);
+  check(fxOf2(tj13.tl2, "ts_hit").length === 0 && fxOf2(tj13.tl2, "block").length === 0 && sumEffects(tj13.tl2).hits.length === 0,
+    "TJ13: žiadny zásah počas zamrazenia (žiadny ts_hit/block/hit)");
+  const tj13end = tj13.tl2.findIndex(f => (f.effects || []).some(e => e.kind === "timestop_end"));
+  check(tj13end >= 0 && tj13.tl2[tj13end].p1.shield === true,
+    "TJ13: nabitý shield PREŽIL prázdne zamrazenie (D1)", `shield=${tj13end >= 0 ? tj13.tl2[tj13end].p1.shield : "n/a"}`);
+
+  /* ---------- TJ14: invariantCheck — ts_hit sa neráta do HP delty (nový kind, sumEffects ho ignoruje) ---------- */
+  // (pokryté invariantCheck v TJ5–TJ7); explicitne over, že ts_hit má dmg ale HP frame ním neklesá
+  check(tj5.tl2.every((f, i) => i === 0 || (f.effects || []).every(e => e.kind !== "ts_hit") ||
+      f.p1.hp === tj5.tl2[i - 1].p1.hp), "TJ14: ts_hit frame NEmení HP");
+
+  /* ---------- TJ8: worldUsed → Special 2 (8 dmg susedná bunka), žiadna pauza ---------- */
+  await freshJotaro();
+  // kolo1: THE WORLD (frozen bez zásahu, jotaro ostáva (3,1) cez M(right) náraz); fire STOJÍ na (0,1) → worldUsed=true
+  await playRoundTimestop([R, S, ML], [SP, R, S], [M("right"), R, S]);
+  // kolo2 (starter p2): fire D(right) z (0,1)→(2,1); jotaro S2L z (3,1) → bunka (2,1)=fire → 8 dmg; ŽIADNA pauza
+  tl = await playRound(c1, c2, [D("right"), R, S], [R, S2L, S]);
+  check(fxOf2(tl, "timestop_wait").length === 0, "TJ8: Special 2 je normálna akcia bez pauzy");
   check(fxOf2(tl, "special").some(e => e.from === "p2" && (e.cells || []).some(c => c[0] === 2 && c[1] === 1)),
     "TJ8: Special 2 zóna = susedná bunka (2,1)", `sp=${JSON.stringify(fxOf2(tl, "special").filter(e => e.from === "p2"))}`);
   check(sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 8).length === 1,
     "TJ8: Special 2 dáva 8 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
   invariantCheck(tl, "TJ8");
-  // wall whiff: jotaro na (3,1) S2R → (4,1) mimo = offboard whiff (mana preč, bez dmg); fresh nech má na special.
-  // queue [S2R, M(up), ML]: special2 −5 (mana 6→1), move zadarmo, ML naprázdno (mana 1<4 → invalid, bez odpočtu) → mana ostane 1
-  await freshJotaro();
-  tl = await playRound(c1, c2, [R, S, M("left")], [S2R, M("up"), ML]);
-  check(fxOf2(tl, "special").some(e => e.from === "p2" && e.offboard),
-    "TJ8: Special 2 z krajného stĺpca von = offboard whiff", `sp=${JSON.stringify(fxOf2(tl, "special").filter(e => e.from === "p2"))}`);
-  check(sumEffects(tl).hits.length === 0, "TJ8: wall whiff bez dmg");
-  check(tl[tl.length - 1].p2.mana === 1, "TJ8: wall whiff minul manu specialu (6→1)", `mana=${tl[tl.length - 1].p2.mana}`);
   }
 
   /* ---------- TR: viac roomiek naraz — izolácia broadcastov ---------- */

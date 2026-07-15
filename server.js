@@ -202,6 +202,10 @@ const VAMP_HEAL_BEAT_MS   = Math.round(450 * ANIM_SLOW);
 const VAMP_CAST_MS = Math.round(17 * 1000 / 6);
 // Naruto: summon klona — po pečatiach (special beaty) hrá Naruto + 2 kópie po bokoch Special_2 animáciu
 const CLONE_SUMMON_MS  = Math.round(1300 * ANIM_SLOW);
+// Jotaro THE WORLD: cast (Star Platinum „menace" + invert flash) pred pauzou; koniec (obnovenie času)
+// pred kumulatívnou aplikáciou. MUSIA sedieť s klientskými TIMESTOP_*_MS v client.js.
+const TIMESTOP_CAST_MS = Math.round(1400 * ANIM_SLOW);
+const TIMESTOP_END_MS  = Math.round(900 * ANIM_SLOW);
 
 // Last Stand (duálne tlačidlo s golden mana) — démon zabije hráča a oživí ho na plno; ďalšie kolo je posledné
 // Last Stand sa prehráva FRAME-DRIVEN: každá fáza je samostatný frame (timeline prehrávač = jediný zdroj času),
@@ -294,8 +298,7 @@ function newPlayer(slot) {
     trap: null,
     // Jotaro: použil už THE WORLD v TEJTO hre? Po ňom sa special button natrvalo mení na Special 2.
     // Prežíva swap (per-hra jednorazovosť), nová hra = čerstvý newPlayer = false.
-    // POZOR (F1): dočasne default true — Special 2 správanie bez time-stopu; v F3b sa vráti na false.
-    worldUsed: true,
+    worldUsed: false,
     labyrinth: false,  // blúdi v labyrinte (Minotaurov special) — nevidí board, kým nepadne vzájomný zásah
     mazeBuff: false,   // hráč ÚSPEŠNE zaklial súpera do labyrintu (len priamym castom, nie cez odraz) → 2× výstupný
                        // dmg, kým labyrint trvá. Cielené na toho, kto hrá Minotaura. (tile dmg/IK dostáva normálne)
@@ -562,6 +565,8 @@ function snapshot() {
     names: { p1: personNames[game.seats.p1] || null, p2: personNames[game.seats.p2] || null },
     // host stlačil START, no 2. hráč ešte nie je → klient hosta ukáže „čakám na druhého hráča"
     awaitingOpponent: pendingMatchConfig != null,
+    // Jotaro THE WORLD: kým čaká na 3 zmrazené akcie, klient (obaja) vie prepnúť UI mód (neutrálne — len slot)
+    timestop: (game.timestop && game.timestop.mode === "waiting") ? { slot: game.timestop.slot } : null,
     board: { ...game.board },
     p1: cloneActor(game.players.p1),
     p2: cloneActor(game.players.p2),
@@ -728,6 +733,8 @@ function killClone(slot, tl, ms = SMALL_DELAY_MS) {
 function applyHitOnClone(ownerSlot, rawDmg, tl, kind = "basic", quietDefense = false) {
   const o = game.players[ownerSlot];
   if (!o?.clone) return;
+  // THE WORLD: zmrazený zásah na klona (decoy) — odlož clone_die na obnovenie času (žiadny okamžitý dmg/poof)
+  if (frozenActive()) { noteFrozenClone(ownerSlot); return; }
   if (o.shield) {
     // block aj na klonovej bunke — zdieľaný štít sa rozbije na oboch figúrach
     pushStateFrame(tl, [{ kind: "block", target: ownerSlot, cell: [o.clone.x, o.clone.y], gold: !!o.shieldGold }], SMALL_DELAY_MS);
@@ -949,6 +956,24 @@ function validQueue(queue, slot) {
         if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
       }
     }
+  }
+  return true;
+}
+
+// Jotaro THE WORLD: 3 nové zmrazené akcie (kvázi nové kolo, všetky typy nanovo). Povolené:
+// move|dash|recharge|attack|melee|shield|special1. Zakázané: special (THE WORLD beží / Special 2 ešte
+// nie je), golden akcie, swap, stoned. Mana sa NEvaliduje tvrdo (nedostatok = invalid pri vykonaní).
+function validTimestopQueue(queue, slot) {
+  if (!Array.isArray(queue) || queue.length !== 3) return false;
+  const allowed = new Set(["move", "dash", "recharge", "attack", "melee", "shield", "special1"]);
+  const types = queue.map(a => a && a.type);
+  if (types.some(t => !allowed.has(t))) return false;
+  if (new Set(types).size !== types.length) return false; // každý typ max 1×
+  const side = !!SIDE_CHARS[game.players[slot]?.char]; // Jotaro strieľa diagonálne
+  for (const a of queue) {
+    if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
+    if (a.type === "attack" && !(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
+    if (a.type === "special1" && a.dir !== "left" && a.dir !== "right") return false;
   }
   return true;
 }
@@ -1454,6 +1479,25 @@ function mirrorImmune(atkSlot) {
 // null mimo vyhodnocovania akcie — pasca sa triggeruje až PO úplnom dokončení súperovej akcie
 let actionSteps = null;
 
+/* ---- Jotaro THE WORLD (time-stop) ---- */
+// sentinel z doAction hore do runRoundLoop: kolo sa pozastaví a čaká na klientove timestop_actions
+const PAUSE = Symbol("timestop_pause");
+// beží zamrazená trojica Jotarových akcií? (súper zmrznutý, jeho zásahy sa len OHLASujú a kumulujú)
+function frozenActive() { return game.timestop?.mode === "frozen"; }
+// zmrazený zásah na súpera — NEmeň HP, len ohlás label (ts_hit / ts_mirror ak je nabitý mirror) a zaeviduj raw;
+// dmg dopadne kumulatívne (jeden hit s parts) pri obnovení času (applyTimestopResume). raw už obsahuje dealMul (D11).
+function noteFrozenHit(tl, targetSlot, raw, kind) {
+  const ts = game.timestop;
+  if (!ts) return;
+  ts.hits.push({ raw, kind });
+  pushStateFrame(tl, [{ kind: ts.foeMirror ? "ts_mirror" : "ts_hit", target: targetSlot, dmg: raw, atk: kind }], SMALL_DELAY_MS);
+}
+// zmrazený zásah na súperovho tieňového klona — odlož clone_die na obnovenie času (žiadny okamžitý poof)
+function noteFrozenClone(ownerSlot) {
+  const ts = game.timestop; const o = game.players[ownerSlot];
+  if (ts && o?.clone) ts.cloneEvents.push({ ownerSlot, cell: [o.clone.x, o.clone.y] });
+}
+
 function randomTrapCell() {
   const c = pickCell(() => true);
   return c ? { x: c.x, y: c.y } : null;
@@ -1564,6 +1608,7 @@ function endLabyrinths(tl) {
 // takže aréna ostáva stmavená až po labyrinth_end. Niť a obrys zanikajú už pri odhalení,
 // aby ich lovec nevidel ani na okamih. Zásah je deterministický — pozície sa počas animácie nemenia.
 function revealLabyrinths(tl) {
+  if (frozenActive()) return; // THE WORLD (bod 8): počas zamrazenia sa labyrint neodhaľuje — odklad na obnovenie času
   for (const slot of ["p1", "p2"]) {
     const p = game.players[slot];
     if (!p.labyrinth || p.labReveal) continue;
@@ -1591,6 +1636,8 @@ function notePrideHit(slot) {
 // ho vypíše ako samostatný zlatý „-2" float vedľa základu); pri bloku/odraze sa rozpis nepripína
 // (mirror odráža plný dmg vrátane bonusu ako jedno číslo).
 function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false, bonus = 0) {
+  // THE WORLD: zmrazený zásah na súpera sa len ohlási a kumuluje (dopadne pri obnovení času)
+  if (frozenActive() && targetSlot === game.timestop.foeSlot && !fromClone) { noteFrozenHit(tl, targetSlot, rawDmg, kind); return; }
   const t = game.players[targetSlot];
   if (t.shield) {
     pushStateFrame(tl, [{ kind: "block", target: targetSlot, gold: !!t.shieldGold }], SMALL_DELAY_MS);
@@ -1640,6 +1687,8 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false, bon
 // a zanimuje ako jeden zásah (nie dva za sebou). Pri obrane (štít/mirror) vráti false → volajúci
 // nechá každú strelu prejsť applyHit-om zvlášť (obrana rieši každú osobitne). Vráti true ak spracoval.
 function applyStackedHit(targetSlot, raws, tl, kind = "basic", bonus = 0) {
+  // THE WORLD: každý zmrazený zásah ohlás samostatne (kumulát pri obnovení); vracia true = spracované
+  if (frozenActive() && targetSlot === game.timestop.foeSlot) { for (const r of raws) noteFrozenHit(tl, targetSlot, r, kind); return true; }
   const t = game.players[targetSlot];
   if (raws.length < 2 || t.shield || t.mirror) return false; // jediný zásah / obrana → rieši applyHit
   const parts = raws.map(r => recvDmg(targetSlot, r)); // ½ pri Last Stand/Hope (2× maze je už v raw)
@@ -1663,6 +1712,9 @@ function applyStackedHit(targetSlot, raws, tl, kind = "basic", bonus = 0) {
 // Volať LEN keď je obrana armed (o.shield || o.mirror) a klon stojí na majiteľovej bunke.
 function applyHitPairDefended(ownerSlot, rawDmg, tl, kind = "basic", fromClone = false) {
   const o = game.players[ownerSlot];
+  // THE WORLD: zmrazený zásah na stacknutý pár — ohlás hráčov zásah + odlož clone_die (obrana/mirror sa
+  // vyhodnotí kumulatívne pri obnovení cez ts.foeShield/foeMirror)
+  if (frozenActive() && ownerSlot === game.timestop.foeSlot) { noteFrozenHit(tl, ownerSlot, rawDmg, kind); noteFrozenClone(ownerSlot); return; }
   const atkSlot = other(ownerSlot);
   const atk = game.players[atkSlot];
   if (o.shield) {
@@ -1701,6 +1753,15 @@ function applyHitPairDefended(ownerSlot, rawDmg, tl, kind = "basic", fromClone =
 // pohltí CLONE_DMG (bez obrany), klon-návnada na vlastnej bunke netlmí nič.
 function applyHitBoth(ownerSlot, ownerDmg, tl, kind, includeClone, bonus = 0) {
   const o = game.players[ownerSlot];
+  // THE WORLD: zmrazený zónový zásah — ohlás hráčov zásah (pri stacknutom klonovi zníž o CLONE_DMG soak)
+  // + odlož clone_die; dopadne kumulatívne pri obnovení času
+  if (frozenActive() && ownerSlot === game.timestop.foeSlot) {
+    const withCl = !!(includeClone && o.clone);
+    const stacked = withCl && o.clone.x === o.x && o.clone.y === o.y;
+    noteFrozenHit(tl, ownerSlot, stacked ? Math.max(0, ownerDmg - CLONE_DMG) : ownerDmg, kind);
+    if (withCl) noteFrozenClone(ownerSlot);
+    return;
+  }
   const withClone = !!(includeClone && o.clone);
   const cloneCell = withClone ? [o.clone.x, o.clone.y] : null;
   const atkSlot = other(ownerSlot);
@@ -1857,8 +1918,9 @@ function trackSteps(slot, cells) {
 
 function doShield(slot, tl) {
   const a = game.players[slot];
-  // BLOCK tile: obrana sa na ňom nedá castnúť — prečiarknutie BEZ ceny (mana ostáva)
-  if (defenseBlockedBy(a)) { pushInvalid(tl, slot, SMALL_DELAY_MS, "blocked_shield"); return; }
+  // BLOCK tile: obrana sa na ňom nedá castnúť — prečiarknutie BEZ ceny (mana ostáva).
+  // THE WORLD (D3): počas zamrazenia sú dlaždice inertné → shield sa armne aj z block tile.
+  if (defenseBlockedBy(a) && !frozenActive()) { pushInvalid(tl, slot, SMALL_DELAY_MS, "blocked_shield"); return; }
   if (a.mana < SHIELD_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   a.mana -= SHIELD_COST;
   a.shield = true;
@@ -1904,10 +1966,93 @@ function doJotaroS1(slot, dir, tl) {
   else pushStateFrame(tl, [], SMALL_DELAY_MS);
 }
 
-// THE WORLD (Jotarov special pred prvým použitím) — pauza/resume protokol, plne implementované v F3b.
+// THE WORLD (Jotarov special pred prvým použitím) — jednorazový time-stop. Cast + zachytenie súperovej
+// nabitej obrany, potom PAUZA (runRoundLoop pošle čiastočnú timeline a čaká na klientove timestop_actions).
+// Mana gate (5) overil doSpecial. Vracia PAUSE sentinel.
 function doJotaroWorld(slot, tl) {
-  // F1 stub: v F1 je worldUsed default true, takže táto vetva je nedosiahnuteľná (special = Special 2).
-  pushInvalid(tl, slot, SMALL_DELAY_MS);
+  const actor = game.players[slot];
+  const foeS = other(slot);
+  const foe = game.players[foeS];
+  actor.mana -= WORLD_COST;
+  actor.worldUsed = true; // po THE WORLD sa special button natrvalo mení na Special 2 (prežíva swap)
+  // cast: Star Platinum „menace" + invert flash (globálny efekt — vidia obaja); nedá sa blokovať/odraziť
+  pushStateFrame(tl, [{ kind: "timestop_start", from: slot }], TIMESTOP_CAST_MS);
+  // zachyť súperovu NABITÚ obranu (armed PRED castom) — NEspotrebuje sa castom (runRoundLoop preskočí
+  // consumption), platí cez celé zamrazenie a vyhodnotí sa kumulatívne pri obnovení času (applyTimestopResume)
+  game.timestop = {
+    slot, foeSlot: foeS,
+    foeShield: !!foe?.shield, foeShieldGold: !!foe?.shieldGold,
+    foeMirror: !!foe?.mirror, foeMirrorGold: !!foe?.mirrorGold,
+    hits: [], cloneEvents: [], mode: "waiting",
+  };
+  return PAUSE;
+}
+
+// zmrazené vykonanie 3 nových Jotarových akcií (frozen mode), potom obnovenie času a kumulatívna aplikácia
+function runTimestopActions(queue) {
+  const ts = game.timestop, ctx = game.roundCtx, tl = ctx.tl;
+  ts.mode = "frozen";
+  const slot = ts.slot;
+  // actionSteps zámerne null (D4): pasce sa počas zamrazenia netriggerujú a prejdené bunky sa nezbierajú;
+  // trackSteps ale niť labyrintu pletie ďalej (D5 — je to Jotarov reálny pohyb)
+  actionSteps = null;
+  for (const act of queue) {
+    pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null } }], 250);
+    doAction(slot, act, tl); // frozen: zásah na súpera sa cez guardy v apply* len ohlási (ts_hit/ts_mirror)
+    pushStateFrame(tl, [], ACTION_GAP_MS);
+  }
+  applyTimestopResume();
+  // resume mohol niekoho zabiť (kumulatívny zásah / mirror odraz na Jotara) — prvá smrť končí hru
+  if (winnerNow()) { ctx.ended = true; return finishRound(); }
+  runRoundLoop(); // pokračuj zvyškom kola od uloženej pozície (ctx.i / ctx.slotIdx)
+}
+
+// obnovenie času: reveal (ak zásah + labyrint), timestop_end, potom JEDEN kumulatívny beat
+// (block / mirror odraz / hit s parts / nič) podľa súperovej nabitej obrany a súčtu zmrazených zásahov.
+function applyTimestopResume() {
+  const ts = game.timestop, ctx = game.roundCtx, tl = ctx.tl;
+  ts.mode = "applying"; // vypni frozen (frozenActive() false) — reveal/endLabyrinths a kumulatívny zásah bežia naživo
+  const jslot = ts.slot, foeS = ts.foeSlot;
+  const jo = game.players[jslot], foe = game.players[foeS];
+  const anyEvent = ts.hits.length > 0 || ts.cloneEvents.length > 0;
+  // istý zásah počas zamrazenia + beží labyrint → reveal PRED aplikačnými frame-ami (hra nesmie skončiť v hmle)
+  if (anyEvent) revealLabyrinths(tl);
+  pushStateFrame(tl, [{ kind: "timestop_end", from: jslot }], TIMESTOP_END_MS);
+
+  // odložené klonové úmrtia (decoy/absorb) — poof pri obnovení
+  for (const ev of ts.cloneEvents) {
+    const o = game.players[ev.ownerSlot];
+    if (o?.clone) { pushStateFrame(tl, [{ kind: "clone_die", target: ev.ownerSlot, cell: [o.clone.x, o.clone.y] }], SMALL_DELAY_MS); o.clone = null; }
+  }
+
+  if (ts.hits.length === 0) {
+    // žiadny zásah na hráča (nanajvýš zomrel decoy klon) → nabitá obrana OSTÁVA (D1), labyrint (ak decoy) NEkončí
+    game.timestop = null;
+    return;
+  }
+  const parts = ts.hits.map(h => recvDmg(ts.foeShield ? foeS : (ts.foeMirror ? jslot : foeS), h.raw));
+  const total = parts.reduce((a, b) => a + b, 0);
+  const rawTotal = ts.hits.reduce((a, h) => a + h.raw, 0);
+
+  if (ts.foeShield) {
+    // shield platil cez celé zamrazenie: jeden block, 0 dmg, spotrebuj
+    pushStateFrame(tl, [{ kind: "block", target: foeS, gold: ts.foeShieldGold }], SMALL_DELAY_MS);
+    foe.shield = false; foe.shieldGold = false;
+  } else if (ts.foeMirror) {
+    // mirror: nezraniteľný + JEDEN kumulatívny odraz celého súčtu na Jotara (raw — neblokuje sa, neodráža späť)
+    pushStateFrame(tl, [{ kind: "mirror", target: foeS, dmg: rawTotal, atk: "special", gold: ts.foeMirrorGold }], MIRROR_BEAM_MS);
+    jo.hp = Math.max(0, jo.hp - total);
+    notePrideHit(jslot);
+    pushStateFrame(tl, [{ kind: "hit", target: jslot, dmg: total, ...(parts.length > 1 ? { parts } : {}) }], SMALL_DELAY_MS);
+    foe.mirror = false; foe.mirrorGold = false;
+  } else {
+    // bez obrany: jeden kombinovaný hit s parts (súčet naraz, jeden hurt)
+    foe.hp = Math.max(0, foe.hp - total);
+    notePrideHit(foeS);
+    pushStateFrame(tl, [{ kind: "hit", target: foeS, dmg: total, ...(parts.length > 1 ? { parts } : {}) }], SMALL_DELAY_MS);
+  }
+  endLabyrinths(tl); // aspoň jeden zásah/blok/odraz dopadol → labyrint končí (aj blokovaný/odrazený)
+  game.timestop = null;
 }
 
 function doSpecial(slot, tl, dir = null, cell = null) {
@@ -2323,6 +2468,7 @@ function defenseBlockedBy(a) {
 // Bonus je flat (NEnásobí sa dealMul/labyrinthMul — klient ho vypisuje ako samostatný „-2" float) a mirror
 // ho odráža ako súčasť plného dmg. Narutov klon boost nemá ani tile nespotrebúva (ráta sa LEN majiteľova bunka).
 function powerBoost(slot, tl) {
+  if (frozenActive()) return 0; // THE WORLD (D2): dlaždice sa počas zamrazenia nevyhodnocujú — power inertný, nespotrebuje sa
   const me = game.players[slot];
   const idx = game.tiles.findIndex(t => t.type === "power" && t.x === me.x && t.y === me.y);
   if (idx < 0) return 0;
@@ -2816,7 +2962,17 @@ function runRoundLoop() {
       if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null, to: act.to || null } }], 250);
       // pasca (Countess/Onre): zbieraj bunky prejdené počas akcie; trigger sa vyhodnotí AŽ PO jej dokončení
       actionSteps = { p1: [], p2: [], p1c: [], p2c: [] };
-      doAction(slot, act, tl);
+      const res = doAction(slot, act, tl);
+      // Jotaro THE WORLD: kolo sa POZASTAVÍ — pošli čiastočnú timeline (končí timestop_wait) a čakaj na
+      // timestop_actions. Súperovu obranu NEspotrebuj (ostáva armed cez zamrazenie), pasce nevyhodnocuj (čas stojí).
+      if (res === PAUSE) {
+        actionSteps = null;
+        ctx.slotIdx++; // resume pokračuje NASLEDUJÚCOU akciou pôvodnej queue
+        pushStateFrame(tl, [{ kind: "timestop_wait", from: slot }], SMALL_DELAY_MS);
+        ctx.emittedUpTo = tl.length;
+        emitStateMasked(tl); // partial emit; časovač kola sa NEspúšťa
+        return;
+      }
       if (foeShieldArmed) { game.players[foe].shield = false; game.players[foe].shieldGold = false; }
       if (foeMirrorArmed) { game.players[foe].mirror = false; game.players[foe].mirrorGold = false; }
       resolveTrapsAfterAction(tl);
@@ -2972,7 +3128,14 @@ function finishRound() {
     game.starter = nextStarter;
   }
 
-  emitStateMasked(tl); // per-osoba: labyrintová redakcia snapshotu AJ timeline (roster HP/mana je verejné)
+  // emit: normálne celá timeline; po THE WORLD pauze (emittedUpTo>0) len POKRAČOVANIE (už odohrané frame-y
+  // sa neposielajú dvakrát) so seed frame-om súčasného stavu — klient aplikuje timeline[0] a animuje od [1]
+  let emitTl = tl;
+  if (ctx.emittedUpTo > 0) {
+    const seed = { ...tl[ctx.emittedUpTo - 1], effects: [], delayMs: 10 };
+    emitTl = [seed, ...tl.slice(ctx.emittedUpTo)];
+  }
+  emitStateMasked(emitTl); // per-osoba: labyrintová redakcia snapshotu AJ timeline (roster HP/mana je verejné)
 
   // príprava na ďalšie plánovanie (lokálny stav; vizuálne odomkne až klient po dohraní timeline)
   game.players.p1.locked = false;
@@ -2990,7 +3153,7 @@ function finishRound() {
   game.players.p1.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false, lastHope: false };
   game.players.p2.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false, lastHope: false };
 
-  const dur = tl.reduce((a, f) => a + (f.delayMs || 0), 0);
+  const dur = emitTl.reduce((a, f) => a + (f.delayMs || 0), 0);
   game.roundCtx = null; // kolo dohrané — kontext už netreba (ďalšie kolo si vytvorí nový)
   if (ended) {
     handleGameEnd(dur);
@@ -3100,6 +3263,8 @@ function startGame(gameIndex) {
 
   game.players.p1 = newPlayer("p1");
   game.players.p2 = newPlayer("p2");
+  game.roundCtx = null;  // rozpracované/pozastavené kolo z predošlej hry nesmie prežiť
+  game.timestop = null;  // ani Jotarova time-stop pauza
   game.turn = 1;
   game.starter = (gameIndex % 2 === 1) ? "p1" : "p2"; // nepárne hry otvára biely, párne čierny; v rámci hry sa štartér kola preklápa
   game.tiles = [];
@@ -3307,6 +3472,8 @@ function sanitizeConfig(raw) {
     if (game.phase !== "playing") return;
     const slot = slotForPerson(person);
     if (!game.players.p1.char || !game.players.p2.char) return; // ešte sa vyberajú postavy
+    // počas Jotarovho THE WORLD čakania je bežný lock_in neplatný (rieši sa cez timestop_actions)
+    if (game.timestop?.mode === "waiting") { if (typeof ack === "function") ack({ ok: false, reason: "timestop" }); return; }
     const me = game.players[slot];
     // zopakovaný lock_in (stratený ack) pre už vyriešené kolo → zahoď, nech sa stará voľba nevloží do nového kola
     if (clientTurn !== undefined && clientTurn !== game.turn) { if (typeof ack === "function") ack({ ok: true }); return; }
@@ -3334,6 +3501,21 @@ function sanitizeConfig(raw) {
       if (game.config?.timer === "quickdraw") armTurnTimer(QUICKDRAW_MS);
       emitStateMasked(); // labyrint: prekliaty nesmie dostať súperovu pozíciu ani tu
     }
+  }
+
+  // Jotaro THE WORLD: 3 zmrazené akcie od hráča Jotara počas pauzy kola. Po nich runTimestopActions
+  // dohrá zvyšok kola a pošle POKRAČOVACIU timeline (finishRound cez ctx.emittedUpTo).
+  function onTimestopActions(socket, queue, ack) {
+    const person = socket.data.person;
+    if (!person) return;
+    if (game.phase !== "playing") { if (typeof ack === "function") ack({ ok: false }); return; }
+    const ts = game.timestop;
+    if (!ts || ts.mode !== "waiting" || !game.roundCtx) { if (typeof ack === "function") ack({ ok: false, reason: "no_timestop" }); return; }
+    const slot = slotForPerson(person);
+    if (slot !== ts.slot) { if (typeof ack === "function") ack({ ok: false, reason: "not_yours" }); return; }
+    if (!validTimestopQueue(queue, slot)) { if (typeof ack === "function") ack({ ok: false }); return; }
+    if (typeof ack === "function") ack({ ok: true });
+    runTimestopActions(queue.map(a => ({ type: a.type, dir: a.dir || null })));
   }
 
   // priebežne posielaná rozpracovaná voľba — backstop ju pri timeoute zahrá (a doplní len chýbajúce do 3)
@@ -3378,7 +3560,7 @@ function sanitizeConfig(raw) {
   newGame(); // čerstvé lobby pri vzniku roomky
   return {
     id, roomsRow, reclaimPersonFor, seat, join, spectate, leave, forceReset,
-    isEmpty: roomEmpty, onConfigure, onChooseTeam, onChooseCharacter, onLockIn, onDraftQueue, onRetry, onDisconnect,
+    isEmpty: roomEmpty, onConfigure, onChooseTeam, onChooseCharacter, onLockIn, onTimestopActions, onDraftQueue, onRetry, onDisconnect,
   };
 }
 /* ==================== koniec Room factory ==================== */
@@ -3471,6 +3653,7 @@ io.on("connection", (socket) => {
   socket.on("choose_team", (keys) => roomForSocket(socket)?.onChooseTeam(socket, keys));
   socket.on("choose_character", (key) => roomForSocket(socket)?.onChooseCharacter(socket, key));
   socket.on("lock_in", (queue, clientTurn, ack) => roomForSocket(socket)?.onLockIn(socket, queue, clientTurn, ack));
+  socket.on("timestop_actions", (queue, ack) => roomForSocket(socket)?.onTimestopActions(socket, queue, ack));
   socket.on("draft_queue", (d) => roomForSocket(socket)?.onDraftQueue(socket, d));
   socket.on("retry", () => roomForSocket(socket)?.onRetry(socket));
 
