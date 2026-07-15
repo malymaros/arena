@@ -294,6 +294,7 @@ for (const _slot of ["p1", "p2"]) {
 }
 let standSummoned = { p1: false, p2: false }; // stand už odohral summon intro (Summon_P) pri tomto nasadení
 let standSummonStart = { p1: 0, p2: 0 };      // čas štartu summonu (Summon_P sa kreslí relatívnym časom, RAZ)
+let tsCastUntil = { p1: 0, p2: 0 };           // dokedy stand hrá Special_3_P „menace" (THE WORLD cast — ako v náhľade)
 let standPrevChar = { p1: null, p2: null };   // detekcia (re)nasadenia Jotara → reset summonu
 const STAND_OFFSET = 64;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane) — vznáša sa ďalej
 const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
@@ -301,6 +302,7 @@ const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
 function standFileFor(slot) {
   const st = state?.[slot];
   if ((st?.hp ?? 1) <= 0 || st?.down) return "Dead_P.png"; // smrť → unsummon póza
+  if (performance.now() < (tsCastUntil[slot] || 0)) return "Special_3_P.png"; // THE WORLD cast → Star Platinum „menace" (ako v náhľade)
   switch (animState[slot]?.key) {
     case "run":     return "Run_P.png";       // move/dash
     case "attack":  return "Attack_1_P.png";  // basic strela
@@ -3174,7 +3176,41 @@ function ensureStonePrefix() {
   myQueue = [...Array.from({ length: need }, () => ({ type: "stoned" })), ...rest].slice(0, 3);
 }
 
+// Jotaro THE WORLD: samostatný placeholder pre 3 zmrazené akcie — pôvodná lišta kola (queueEl) ostáva
+// viditeľná ako „vykonáva sa THE WORLD", tu sa zadávajú nové akcie.
+const tsQueueEl = document.createElement("div");
+tsQueueEl.id = "ts-queue";
+tsQueueEl.className = "ts-queue hidden";
+queueEl.parentElement?.appendChild(tsQueueEl);
+function renderTsQueue() {
+  tsQueueEl.classList.remove("hidden");
+  queueEl.classList.add("ts-executing"); // pôvodná lišta: „stojí na vykonávaní THE WORLD"
+  tsQueueEl.innerHTML = "";
+  const label = document.createElement("div");
+  label.className = "ts-queue-label";
+  label.textContent = "⏱ THE WORLD — 3 frozen actions";
+  tsQueueEl.appendChild(label);
+  const slots = document.createElement("div");
+  slots.className = "ts-queue-slots";
+  for (let i = 0; i < 3; i++) {
+    const el = document.createElement("span");
+    el.className = "a-badge ts-slot";
+    const a = myQueue[i];
+    if (a) {
+      const v = actionBadgeView(a, me);
+      el.classList.add(v.cls);
+      if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
+    } else { el.classList.add("empty"); el.textContent = String(i + 1); }
+    slots.appendChild(el);
+  }
+  tsQueueEl.appendChild(slots);
+}
+function hideTsQueue() { tsQueueEl.classList.add("hidden"); queueEl.classList.remove("ts-executing"); }
+
 function renderQueue() {
+  // THE WORLD plánovanie: NEprestavuj pôvodnú lištu (ostáva „executing"), zadávaj do samostatného placeholdera
+  if (tsPlanning) { renderTsQueue(); updateActionButtons(); syncGoldenHalves(); updateGoldenButton(); updateLockButton(); return; }
+  hideTsQueue();
   ensureStonePrefix();
   queueEl.innerHTML = "";
   qBeatEls = [];
@@ -3320,10 +3356,13 @@ function sendDraft() {
 function updateActionButtons() {
   document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     const type = btn.dataset.act.split(":")[0];
-    const used = myQueue.some(a => a.type === type);
+    // Jotaro: mirror slot = Special 1 (NIE mirror) → „used" podľa special1 a golden mirror ho NEZAMYKÁ
+    const isJotaroMirror = type === "mirror" && ghostCharAt() === "jotaro";
+    const effType = isJotaroMirror ? "special1" : type;
+    const used = myQueue.some(a => a.type === effType);
     btn.disabled = used; // skutočne navolené v kole = sivé „použité"
     // golden predťah blokuje bežnú akciu rovnakého druhu ZÁMKOM (nie ako „použité") — klik shake-ne cez poistku v handleri
-    const goldenLock = (type === "shield" && goldenArmed) || (type === "mirror" && goldenMirrorArmed);
+    const goldenLock = ((type === "shield" && goldenArmed) || (type === "mirror" && goldenMirrorArmed)) && !isJotaroMirror;
     btn.classList.toggle("locked-golden", goldenLock && !used);
   });
   const moveUsed = myQueue.some(a => a.type === "move");
@@ -3476,9 +3515,9 @@ function schedulePlayTimeline(timeline) {
 
   const gen = ++playGen;
   playing = true;
-  // Jotaro THE WORLD: nová timeline (vrátane pokračovacej po zmrazení) = pauza sa skončila; overlay skry
-  // (filter body.timestop-mode nechaj — pokračovacia timeline ho zhasne až efektom timestop_end)
-  tsPlanning = false; tsFrozen = false; tsOverlaySet(false);
+  // Jotaro THE WORLD: nová timeline (vrátane pokračovacej po zmrazení) = pauza sa skončila; overlay + ts-queue
+  // skry (filter body.timestop-mode nechaj — pokračovacia timeline ho zhasne až efektom timestop_end)
+  tsPlanning = false; tsFrozen = false; tsOverlaySet(false); hideTsQueue();
   hideConnError();  // kolo sa vyhodnotilo → prípadná hláška o chybe spojenia je už neaktuálna
   stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) — zhasni prípadný stale časovač
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
@@ -3634,7 +3673,10 @@ function schedulePlayTimeline(timeline) {
       }
       // Jotaro THE WORLD: cast → zapni „ZA WARUDO" filter (obaja); wait → koniec čiastočnej timeline (pauza);
       // ts_hit/ts_mirror → announce float nad zmrazeným súperom (bez zmeny HP); end → vypni filter
-      if (e.kind === "timestop_start") document.body.classList.add("timestop-mode");
+      if (e.kind === "timestop_start") {
+        document.body.classList.add("timestop-mode");
+        if (e.from === "p1" || e.from === "p2") tsCastUntil[e.from] = performance.now() + frameHold; // stand hrá Special_3_P „menace" počas castu
+      }
       if (e.kind === "timestop_wait") tsWait = true;
       if (e.kind === "ts_hit" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, `-${e.dmg} HP`, "ts-float");
       if (e.kind === "ts_mirror" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, "MIRRORED", "ts-float");
@@ -5142,7 +5184,9 @@ function enterTimestopMode() {
     lockedIn = false;
     myQueue = [];
     goldenArmed = goldenMirrorArmed = goldenManaArmed = lastStandArmed = lastHopeArmed = false;
-    document.body.classList.remove("timestop-mode"); // Jotaro nie je zmrazený → bez filtra na jeho strane
+    // filter time-stopu vidia OBAJA rovnako (aréna sa odfarbí obom); overlay „TIME HAS STOPPED" je len pre
+    // súpera — Jotaro plánuje, nesmie mu prekážať. Jotaro NEmá overlay, ale filter áno.
+    document.body.classList.add("timestop-mode");
     tsOverlaySet(false);
     lockBtn.classList.remove("locked", "ready"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
     closePickers(); renderQueue(); syncGoldenHalves(); syncGoldDualHalves(); updateUiLocks();

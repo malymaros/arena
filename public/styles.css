@@ -256,6 +256,23 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   animation: ts-pulse 1.6s ease-in-out infinite;
 }
 @keyframes ts-pulse { 0%,100% { opacity: .78; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
+
+/* Jotaro THE WORLD: samostatný placeholder pre 3 zmrazené akcie (pôvodná lišta ostáva ako „executing") */
+.ts-queue { margin-top: 8px; padding: 6px 10px; border-radius: 10px; text-align: center;
+  background: rgba(60,40,110,.28); border: 2px solid #7a4fd0; box-shadow: 0 0 14px rgba(150,110,255,.4);
+  animation: ts-pulse 1.8s ease-in-out infinite; }
+.ts-queue.hidden { display: none; }
+.ts-queue-label { font-weight: 900; font-size: 12px; letter-spacing: .05em; color: #d8c2ff;
+  text-shadow: 0 0 8px rgba(150,110,255,.8); margin-bottom: 5px; }
+.ts-queue-slots { display: flex; gap: 8px; justify-content: center; }
+.ts-slot { min-width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; font-weight: 800; background: rgba(0,0,0,.35); border: 1px solid #7a4fd0; }
+.ts-slot.empty { color: #8a7ab8; border-style: dashed; opacity: .6; }
+/* pôvodná lišta kola počas THE WORLD — stlmená, „stojí na vykonávaní" */
+.queue.ts-executing { opacity: .5; filter: grayscale(.5); position: relative; }
+.queue.ts-executing::after { content: "⏱ EXECUTING THE WORLD"; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px;
+  letter-spacing: .08em; color: #e7dcff; text-shadow: 0 0 10px rgba(150,110,255,.9), 0 2px 0 #000; pointer-events: none; }
 #arena { transition: filter .6s ease; } /* plynulé stmievanie/rozsvietenie pri vstupe/úniku z labyrintu */
 /* bunka s Ariadninou niťou — jemný zlatý nádych (čiaru kreslí .thread-svg cez stredy buniek) */
 .cell.thread-cell { box-shadow: inset 0 0 0 2px rgba(232,178,60,.45); }
