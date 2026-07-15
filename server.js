@@ -1997,7 +1997,8 @@ function runTimestopActions(queue) {
   // trackSteps ale niť labyrintu pletie ďalej (D5 — je to Jotarov reálny pohyb)
   actionSteps = null;
   for (const act of queue) {
-    pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null } }], 250);
+    // frozen:true — klient túto akciu NEzaráta do round-scriptu (kurzor ostáva na THE WORLD), len ju animuje
+    pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null }, frozen: true }], 250);
     doAction(slot, act, tl); // frozen: zásah na súpera sa cez guardy v apply* len ohlási (ts_hit/ts_mirror)
     pushStateFrame(tl, [], ACTION_GAP_MS);
   }

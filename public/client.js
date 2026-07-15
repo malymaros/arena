@@ -3509,6 +3509,11 @@ let playing = false;  // počas prehrávania neaktualizuj UI zo snapshotov a dr�
 // tsFrozen = som súper a čakám zmrazený (UI zamknuté, full-screen filter). Práve jeden je aktívny počas pauzy.
 let tsPlanning = false;
 let tsFrozen = false;
+// tsActive = beží time-stop (od timestop_start po timestop_end) — počas neho zmrazíme animácie VŠETKÝCH
+// okrem Jotara (tsJotaroSlot); tsFreezeAt = čas zmrazenia (statický drawT pre zmrazené figúry)
+let tsActive = false;
+let tsJotaroSlot = null;
+let tsFreezeAt = 0;
 
 function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
@@ -3675,12 +3680,19 @@ function schedulePlayTimeline(timeline) {
       // ts_hit/ts_mirror → announce float nad zmrazeným súperom (bez zmeny HP); end → vypni filter
       if (e.kind === "timestop_start") {
         document.body.classList.add("timestop-mode");
-        if (e.from === "p1" || e.from === "p2") tsCastUntil[e.from] = performance.now() + frameHold; // stand hrá Special_3_P „menace" počas castu
+        if (e.from === "p1" || e.from === "p2") {
+          tsCastUntil[e.from] = performance.now() + frameHold; // stand hrá Special_3_P počas castu
+          tsActive = true; tsJotaroSlot = e.from; tsFreezeAt = performance.now(); // zmraz animácie VŠETKÝCH okrem Jotara
+          spawnWorldCenter(e.from); // veľký stredový „menace" sprite (zamrzne ako v náhľade)
+        }
       }
       if (e.kind === "timestop_wait") tsWait = true;
       if (e.kind === "ts_hit" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, `-${e.dmg} HP`, "ts-float");
       if (e.kind === "ts_mirror" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, "MIRRORED", "ts-float");
-      if (e.kind === "timestop_end") document.body.classList.remove("timestop-mode");
+      if (e.kind === "timestop_end") {
+        document.body.classList.remove("timestop-mode");
+        tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // čas sa rozbehol — animácie zas bežia
+      }
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení; diagonály podľa
       // horizontálnej zložky — Countess/Onre strieľajú šikmo)
       if (e.kind === "charge" && typeof e.dir === "string" && (e.from === "p1" || e.from === "p2")) {
@@ -4067,9 +4079,13 @@ function schedulePlayTimeline(timeline) {
         lsCenterDisappear(); // smrť/ležanie rieši st.down v raf
       }
       if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) {
-        const logEl  = appendActionLog(e.from, e.action);
-        const beatEl = highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
-        lastActed[e.from] = { logEl, beatEl }; // ak hneď príde "invalid", prečiarkneme práve tieto
+        // THE WORLD zmrazená akcia (frozen) — len ju animuj na boarde; round-script kurzor ostáva na THE WORLD
+        // (nezaráta sa do beatCounts/logu), tracker tak počas celého time-stopu stojí na akcii THE WORLD
+        if (!e.frozen) {
+          const logEl  = appendActionLog(e.from, e.action);
+          const beatEl = highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
+          lastActed[e.from] = { logEl, beatEl }; // ak hneď príde "invalid", prečiarkneme práve tieto
+        }
       }
       // prázdny gold beat (golden shield/mirror = pos 0, golden mana = 7/8) — len posuň zelenú šípku naň
       if (e.kind === "beat_empty" && (e.from === "p1" || e.from === "p2")) {
@@ -4134,6 +4150,7 @@ function clearActors() {
   cloneSummonPose = { p1: null, p2: null };
   cloneDead = { p1: false, p2: false };
   standSummoned = { p1: false, p2: false }; standSummonStart = { p1: 0, p2: 0 }; standPrevChar = { p1: null, p2: null };
+  tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // THE WORLD vizuál nesmie prežiť reset/novú hru
   youMarker.style.display = "none";
   actorsInitialized = false;
 }
@@ -5173,6 +5190,41 @@ tsOverlay.innerHTML = `<div class="ts-overlay-text">⏱ ZA WARUDO — TIME HAS S
 document.body.appendChild(tsOverlay);
 function tsOverlaySet(on) { tsOverlay.classList.toggle("hidden", !on); }
 
+// veľký stredový sprite THE WORLD castu — Star Platinum „menace" (Special_3_P); hrá RAZ a ZAMRZNE na
+// poslednom frame (rovnako ako náhľad karty pri výbere). Drží sa počas celého time-stopu, mizne pri konci.
+let worldCenterRaf = 0;
+const worldCenter = document.createElement("canvas");
+worldCenter.id = "world-center";
+{
+  const px = Math.round(TILE_H * 2.4);
+  worldCenter.width = px; worldCenter.height = px;
+  worldCenter.style.width = px + "px"; worldCenter.style.height = px + "px";
+  worldCenter.style.display = "none";
+}
+document.body.appendChild(worldCenter);
+function spawnWorldCenter(slot) {
+  const dir = charDirFor("jotaro", slot);
+  worldCenter.style.display = "block";
+  const start = performance.now();
+  cancelAnimationFrame(worldCenterRaf);
+  const draw = () => {
+    const ctx = worldCenter.getContext("2d");
+    ensureSpriteMeta(dir, "Special_3_P.png").then(m => {
+      const fps = 6, total = m.frames;
+      const fi = Math.floor((performance.now() - start) / 1000 * fps);
+      const idx = Math.min(total - 1, fi); // RAZ 0..N-1, potom drží posledný frame (zamrzne ako v náhľade)
+      drawSprite(ctx, m, { file: "Special_3_P.png", frames: total, frameIndex: idx }, 0, worldCenter.width, worldCenter.height, 1, 0.5, true);
+    }).catch(() => {});
+    worldCenterRaf = requestAnimationFrame(draw);
+  };
+  draw();
+}
+function hideWorldCenter() {
+  cancelAnimationFrame(worldCenterRaf); worldCenterRaf = 0;
+  worldCenter.style.display = "none";
+  const c = worldCenter.getContext("2d"); c.clearRect(0, 0, worldCenter.width, worldCenter.height);
+}
+
 // vstup do ts-módu (po timestop_wait alebo po reload/reclaim): Jotaro plánuje 3 zmrazené akcie,
 // súper čaká zamrznutý s full-screen filtrom a zamknutým UI.
 function enterTimestopMode() {
@@ -5971,7 +6023,10 @@ function raf() {
     // Transform (loop:false) a WinSunBoard s loopFrom (zdvih raz, potom chvost — aj pri victory) musia ísť
     // od frame 0 → relatívny čas; inak (loop) globálny now je ok
     const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
-    const drawT = (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
+    // THE WORLD: čas stojí → všetci OKREM Jotara majú zmrazený drawT (statický frame, žiadne cyklenie idle)
+    const tsFrozenActor = tsActive && slot !== tsJotaroSlot;
+    const drawT = tsFrozenActor ? tsFreezeAt
+                : (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
                 : escWinsun ? (now - (animState[slot].start || 0))
                 : (VAMP_ONESHOT_KEYS.has(aSt.key) || vampCast) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast) hrá RAZ od frame 0, potom drží pózu
                 : (stoned ? 0 : now);
@@ -6003,7 +6058,8 @@ function raf() {
     const stoned = (st.stone || 0) > 0;
     const flAt = cloneFlinch[slot] || 0;
     const flinching = !stoned && flAt && (now - flAt) < 700; // tile zásah na klonovi → strhnutie (Hurt.png) ako pravý
-    let anim, animT = stoned ? 0 : now;
+    // THE WORLD: zmraz aj súperovho klona (všetko okrem Jotara stojí)
+    let anim, animT = (tsActive && slot !== tsJotaroSlot) ? tsFreezeAt : (stoned ? 0 : now);
     if (stoned) anim = ANIM_DEF.idle;
     // Hurt hrá od ZAČIATKU zásahu (animT = now - flAt), nie zamrznutý na poslednom frame — inak by strhnutie
     // nebolo vidno (neloopová animácia kreslená globálnym `now` uviazne na poslednom frame)
