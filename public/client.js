@@ -2924,7 +2924,7 @@ const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho vráti 0.
 // Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere — bunka je aj tak
 // prezradená), vlastný sprite odstúpi presne ako pri normálnej zdieľanej bunke mimo labyrintu.
-const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60, jotaro: 90 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu; Jotaro je zavalitý + má za sebou stand
+const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60, jotaro: 78 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu; Jotaro je zavalitý + má za sebou stand
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2) return 0;
