@@ -23,6 +23,7 @@ const MAP = {
   "Special_2.png":   "jus/J_Idle.png",
   "Special_2_P.png": "sp/SP_Punch.png",
   "Special_3_P.png": "sp/SP_SnesMenace.png",   // samotny stand (SNES trup)
+  "Summon_P.png":    "sp/SP_Summon.png",        // uvodne intro standu (one-shot)
   "Dead.png":        "jus/J_Dead.png",
   "Dead_P.png":      "sp/SP_Unsummon.png",
   "Hurt.png":        "jus/J_Hurt.png",
