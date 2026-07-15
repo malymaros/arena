@@ -275,6 +275,37 @@ cloneGhost.style.width = ACTOR_W + "px"; cloneGhost.style.height = ACTOR_H + "px
 cloneGhost.style.display = "none";
 actorsEl.appendChild(cloneGhost);
 
+// Jotarov stand Star Platinum — druhý canvas vedľa Jotara (vzor cloneEls); kreslí `_P` pás zodpovedajúci
+// aktuálnej animácii Jotara. Stály (viditeľný pri Jotarovi), summon intro pri nasadení, Dead_P pri smrti.
+const standEls = { p1: null, p2: null };
+for (const _slot of ["p1", "p2"]) {
+  const c = document.createElement("canvas");
+  c.id = "actor-stand-" + _slot;
+  c.className = "sprite-actor sprite-stand";
+  c.width = ACTOR_W; c.height = ACTOR_H;
+  c.style.width = ACTOR_W + "px"; c.style.height = ACTOR_H + "px";
+  c.style.display = "none";
+  actorsEl.appendChild(c);
+  standEls[_slot] = c;
+}
+let standSummoned = { p1: false, p2: false }; // stand už odohral summon intro (Summon_P) pri tomto nasadení
+let standSummonStart = { p1: 0, p2: 0 };      // čas štartu summonu (Summon_P sa kreslí relatívnym časom, RAZ)
+let standPrevChar = { p1: null, p2: null };   // detekcia (re)nasadenia Jotara → reset summonu
+const STAND_OFFSET = 22;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane)
+const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
+// herná animácia Jotara (animState.key) → zodpovedajúci `_P` pás standu
+function standFileFor(slot) {
+  const st = state?.[slot];
+  if ((st?.hp ?? 1) <= 0 || st?.down) return "Dead_P.png"; // smrť → unsummon póza
+  switch (animState[slot]?.key) {
+    case "run":     return "Run_P.png";       // move/dash
+    case "attack":  return "Attack_1_P.png";  // basic strela
+    case "attack2": return "Attack_2_P.png";  // melee
+    case "casting": return "Special_2_P.png"; // special1/Special 2/THE WORLD cast (F5 doladí per-typ)
+    default:        return "Idle_P.png";      // idle/hurt (Hurt_P neexistuje)/stoned
+  }
+}
+
 // DEATH summon — screen-space overlay (fixed, mimo stacking contextu .stage, aby bolo vidno v každej fáze).
 // Veľkosť medzi fázami riešime CSS transformom scale(); canvas má základnú „stredovú" veľkosť.
 const deathCenter = document.createElement("canvas");
@@ -2999,6 +3030,24 @@ function positionActors(s, immediate = false) {
     el._logCell = { x: c.x, y: c.y };
   });
 
+  // Jotarov stand — vždy vedľa Jotara (na jeho chrbtovej strane, o STAND_OFFSET), zrkadlený podľa facingu;
+  // pozíciu drží so slideom ako actor. Kreslenie (aktuálny `_P` pás / summon / dead) rieši raf.
+  [["p1", standEls.p1, p1], ["p2", standEls.p2, p2]].forEach(([slot, el, data]) => {
+    if (!data || data.char !== "jotaro" || data.x == null) { el.style.display = "none"; return; }
+    const { left, top } = cellToPx(data.x, data.y);
+    const px = left - (ACTOR_W - TILE_W) / 2;
+    const py = top  - (ACTOR_H - TILE_H);
+    const wasHidden = el.style.display === "none";
+    el.style.display = "block";
+    if (immediate || !actorsInitialized || wasHidden) {
+      el.style.transition = "none"; el.style.left = px + "px"; el.style.top = py + "px";
+      void el.offsetHeight; el.style.transition = "";
+    } else { el.style.left = px + "px"; el.style.top = py + "px"; }
+    const fc = facing[slot] || 1;
+    const shift = pairShift(slot, s) - fc * STAND_OFFSET; // za Jotarom (opačne než smeruje)
+    el.style.transform = `translateX(${shift}px) scaleX(${fc})`;
+  });
+
   // „YOU" značka nad vlastnou postavou — sleduje aktéra (rovnaké transition ako pohyb)
   const meData = me ? s[me] : null;
   if (meData && meData.char) {
@@ -4014,7 +4063,7 @@ function schedulePlayTimeline(timeline) {
 
 /* ---------- Actors clear ---------- */
 function clearActors() {
-  [actorP1, actorP2, cloneEls.p1, cloneEls.p2, cloneGhost].forEach(el => {
+  [actorP1, actorP2, cloneEls.p1, cloneEls.p2, cloneGhost, standEls.p1, standEls.p2].forEach(el => {
     const ctx = el.getContext("2d");
     ctx.clearRect(0, 0, el.width, el.height);
     el.style.display = "none";
@@ -4028,6 +4077,7 @@ function clearActors() {
   cloneSummonFx = [];
   cloneSummonPose = { p1: null, p2: null };
   cloneDead = { p1: false, p2: false };
+  standSummoned = { p1: false, p2: false }; standSummonStart = { p1: 0, p2: 0 }; standPrevChar = { p1: null, p2: null };
   youMarker.style.display = "none";
   actorsInitialized = false;
 }
@@ -5616,6 +5666,9 @@ socket.on("state", (s) => {
       escTransformed[slot] = fromReload && (s.turn || 1) > 1;
     }
     escPrevChar[slot] = c;
+    // Jotaro: keď sa na slote (re)objaví (nasadenie/swap-in — nie mid-hra), prehraj summon intro standu znova
+    if (c === "jotaro" && standPrevChar[slot] !== "jotaro") { standSummoned[slot] = false; standSummonStart[slot] = 0; }
+    standPrevChar[slot] = c;
   }
   // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
   if (!s.timeline) _finalRoundActive = !!s.goldLocked;
@@ -5892,6 +5945,29 @@ function raf() {
     }
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, animT, ACTOR_W, ACTOR_H))
+      .catch(() => {});
+  });
+
+  // Jotarov stand Star Platinum — kreslí `_P` pás podľa aktuálnej animácie Jotara; summon intro RAZ pri
+  // nasadení (Summon_P, relatívny čas), Dead_P pri smrti. Vždy viditeľný pri žijúcom Jotarovi.
+  ["p1", "p2"].forEach(slot => {
+    const el = standEls[slot];
+    const st = state?.[slot];
+    if (el.style.display === "none" || st?.char !== "jotaro" || st.x == null) return;
+    const ctx = el.getContext("2d");
+    el.classList.toggle("alt-color", usesAltColor("jotaro", slot)); // jotaro má dirP2=jotaro → natívne, bez filtra
+    const dir = charDirFor("jotaro", slot);
+    const dead = (st.hp ?? 1) <= 0 || st.down;
+    let file = null, drawT = now;
+    if (!dead && !standSummoned[slot]) { // summon intro (Summon_P) RAZ od nasadenia
+      if (!standSummonStart[slot]) standSummonStart[slot] = now;
+      const t = now - standSummonStart[slot];
+      if (t >= SP_SUMMON_MS) standSummoned[slot] = true;
+      else { file = "Summon_P.png"; drawT = t; }
+    }
+    if (!file) file = standFileFor(slot);
+    ensureSpriteMeta(dir, file)
+      .then(meta => drawSprite(ctx, meta, { file, fps: 8, loop: true }, drawT, ACTOR_W, ACTOR_H))
       .catch(() => {});
   });
 
