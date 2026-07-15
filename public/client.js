@@ -203,6 +203,10 @@ const DEATH_SEQ = {
 const ACTOR_SCALE = 1.875;
 const ACTOR_W = Math.round(TILE_W * ACTOR_SCALE);
 const ACTOR_H = Math.round(TILE_H * ACTOR_SCALE);
+// Jotaro (a jeho stand) majú figúru cez väčšinu framu → na boarde ich kreslíme menšie, aby výškou sedeli
+// s mágmi (namerané: jotaro figúra 0.78 framu vs mágovia ~0.52). Stand sa navyše VZNÁŠA za chrbtom (float Y).
+const JOTARO_BOARD_FILL = 0.66;
+const STAND_FLOAT_Y = -34; // stand posunutý hore (vznáša sa nad/za Jotarom)
 [actorP1, actorP2].forEach(c => {
   c.width = ACTOR_W; c.height = ACTOR_H;
   c.style.width = ACTOR_W + "px"; c.style.height = ACTOR_H + "px";
@@ -396,7 +400,7 @@ const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, min
 // vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
 // ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
 // Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128); Vlkolak je zhrbený nízko (vrch figúry ~0.55 framu)
-const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48, werewolf: 0.55, countess: 0.45, onre: 0.45, jotaro: 0.42 };
+const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48, werewolf: 0.55, countess: 0.45, onre: 0.45, jotaro: 0.45 };
 
 // zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -5926,8 +5930,15 @@ function raf() {
                 : escWinsun ? (now - (animState[slot].start || 0))
                 : (VAMP_ONESHOT_KEYS.has(aSt.key) || vampCast) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast) hrá RAZ od frame 0, potom drží pózu
                 : (stoned ? 0 : now);
+    // Jotarov pás má figúru cez ~78 % framu (mágovia ~52 %) a nohy 5,6 % nad spodkom framu → pri fill 0.95/
+    // anchorY 0.5 je „obrovský" a nohy vysoko. Kreslíme ho menší (JOTARO_BOARD_FILL) a ukotvený na nohy
+    // (anchorY 1) na rovnaký spodný okraj ako mágovia.
+    const jotaro = st.char === "jotaro";
+    const bFill = jotaro ? JOTARO_BOARD_FILL : 0.95;
+    const bAnchorY = jotaro ? 1 : 0.5;
+    const bOffY = jotaro ? 4 : 0; // dorovnaj nohy na spodný okraj (jotaro má 5,6 % framu pod nohami)
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, 0.95, 0.5, true, 0, 0, poseCrop))
+      .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, bFill, bAnchorY, true, 0, bOffY, poseCrop))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
@@ -5980,8 +5991,10 @@ function raf() {
       else { file = "Summon_P.png"; drawT = t; }
     }
     if (!file) file = standFileFor(slot);
+    // stand kreslený rovnako veľký ako Jotaro (JOTARO_BOARD_FILL), ukotvený na nohy, ale VZNÁŠA sa hore
+    // (STAND_FLOAT_Y) a je za Jotarom (nižší z-index cez .sprite-stand v CSS)
     ensureSpriteMeta(dir, file)
-      .then(meta => drawSprite(ctx, meta, { file, fps: 8, loop: true }, drawT, ACTOR_W, ACTOR_H))
+      .then(meta => drawSprite(ctx, meta, { file, fps: 8, loop: true }, drawT, ACTOR_W, ACTOR_H, JOTARO_BOARD_FILL, 1, true, 0, STAND_FLOAT_Y))
       .catch(() => {});
   });
 
@@ -6043,8 +6056,10 @@ function raf() {
       else { actorGhost.style.transformOrigin = ""; actorGhost.style.transform = `scaleX(${gFace})`; }
       actorGhost.classList.toggle("alt-color", usesAltColor(ghostChar, me));
       const dir = charDirFor(ghostChar, me);
+      // Jotarov ghost menší + ukotvený na nohy ako na boarde (stand sa v ghoste NEkreslí — D8)
+      const gJot = ghostChar === "jotaro";
       ensureSpriteMeta(dir, ANIM_DEF.idle.file)
-        .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
+        .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H, gJot ? JOTARO_BOARD_FILL : 0.95, gJot ? 1 : 0.5, true, 0, gJot ? 4 : 0))
         .catch(() => {});
     }
   }

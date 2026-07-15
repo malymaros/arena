@@ -298,9 +298,12 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .sprite-actor {
   position: absolute; width: var(--tile-w); height: var(--tile-h);
   image-rendering: pixelated;
+  z-index: 3;
   /* --move-ms nastavuje client.js z MOVE_MS (sync s ANIM_SLOW) */
   transition: left var(--move-ms, 700ms) linear, top var(--move-ms, 700ms) linear, transform 150ms ease;
 }
+/* Jotarov stand Star Platinum sa vznáša ZA Jotarom (nižší z-index než postava) */
+.sprite-stand { z-index: 2; }
 /* ghost — náhľad vlastnej pozície po naplánovaných movoch */
 .sprite-ghost {
   opacity: .45;
