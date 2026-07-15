@@ -3340,6 +3340,16 @@ function updateActionButtons() {
   if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); wolfPicker?.classList.add("hidden"); }
 }
 function updateLockButton() {
+  // Jotaro THE WORLD: počas plánovania zmrazenej trojice je button „EXECUTE" (ignoruj stale state[me].locked
+  // z pôvodného locku kola — inak by ho renderQueue po prvej akcii zamkol a hráč by nemohol odoslať)
+  if (tsPlanning) {
+    lockBtn.classList.remove("locked");
+    lockBtn.textContent = "EXECUTE";
+    lockBtn.disabled = false;
+    lockBtn.classList.toggle("ready", myQueue.length === 3);
+    updateUiLocks();
+    return;
+  }
   const locked = !!state?.[me]?.locked;
   if (locked) {
     lockBtn.classList.add("locked"); lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
@@ -4166,7 +4176,9 @@ function drawEscanorCard(ctx, cvs, now) {
 // obe kreslenia idú cez portraitFill (PORTRAIT_SCALE normalizuje figúru na výšku mágov).
 const PREVIEW_CAST = {
   luffy:  { file: "Special_1.png",   frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
-  // Jotaro je už hrateľný → renderuje sa ako bežná karta (Idle + SPECIAL_ANIMS hover, dead/roster stav)
+  // Jotaro je hrateľný, ale kartu kreslíme preview štýlom (Idle + hover = Star Platinum „menace" Special_3_P,
+  // správne zarovnané nohy cez PREVIEW_OFF_Y); dead-mag stav rieši drawCharSelectFrame PRED touto vetvou
+  jotaro: { file: "Special_3_P.png", frames: 4, fps: 6, loopFrom: 3, fill: 1.31 * 160 / 144 },
 };
 const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
 // offsetY −39 (mágovia −52): ich pásy sú bottom-anchored s malým PAD, mágovia majú vo frame
@@ -4196,12 +4208,14 @@ function drawCharSelectFrame(now) {
     const key = cvs.dataset.char;
     const ctx = cvs.getContext("2d");
     if (key === "escanor") { drawEscanorCard(ctx, cvs, now); return; } // vlastné WeakIdle/IntroStand
-    if (PREVIEW_CAST[key]) { drawPreviewCard(ctx, cvs, key, now); return; } // Hidden preview (Luffy/Jotaro)
+    const deadRoster = isMageDead(key) && cvs.closest(".char-card")?.dataset.char; // (turnaj) mŕtvy draftnutý mág
+    // Preview štýl (Luffy/Jotaro) — ALE ak je draftnutý mág mŕtvy (turnaj), prednosť má dead póza (nižšie)
+    if (PREVIEW_CAST[key] && !deadRoster) { drawPreviewCard(ctx, cvs, key, now); return; }
     const dir = charDirFor(key, me); // hráč vpravo vidí Medúzu v natívnej tmavej palete (Medusa2)
     if (!dir) return;
     // mŕtvy mág (tournament): dead póza mága + death démon prekrytý cez okno karty
     // (len skutočné hrateľné karty — preview karty Hidden stránky nemajú data-char na karte a roster stav)
-    if (isMageDead(key) && cvs.closest(".char-card")?.dataset.char) {
+    if (deadRoster) {
       ensureSpriteMeta(dir, ANIM_DEF.dead.file)
         .then(meta => {
           drawSprite(ctx, meta, ANIM_DEF.dead, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52);
