@@ -295,7 +295,7 @@ for (const _slot of ["p1", "p2"]) {
 let standSummoned = { p1: false, p2: false }; // stand už odohral summon intro (Summon_P) pri tomto nasadení
 let standSummonStart = { p1: 0, p2: 0 };      // čas štartu summonu (Summon_P sa kreslí relatívnym časom, RAZ)
 let standPrevChar = { p1: null, p2: null };   // detekcia (re)nasadenia Jotara → reset summonu
-const STAND_OFFSET = 22;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane)
+const STAND_OFFSET = 64;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane) — vznáša sa ďalej
 const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
 // herná animácia Jotara (animState.key) → zodpovedajúci `_P` pás standu
 function standFileFor(slot) {
@@ -2924,7 +2924,7 @@ const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho vráti 0.
 // Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere — bunka je aj tak
 // prezradená), vlastný sprite odstúpi presne ako pri normálnej zdieľanej bunke mimo labyrintu.
-const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu
+const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60, jotaro: 90 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu; Jotaro je zavalitý + má za sebou stand
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2) return 0;
