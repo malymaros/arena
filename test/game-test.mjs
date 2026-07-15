@@ -1831,6 +1831,137 @@ async function main() {
   check(fxOf2(tl, "labyrinth_end").filter(e => e.target === "p1").length === 1, "TV10: zásah ukončil labyrint");
   invariantCheck(tl, "TV10");
 
+  /* ==================== JOTARO (side-bound P2, stand Star Platinum) ==================== */
+  {
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const S1L = { type: "special1", dir: "left" };
+  const S1R = { type: "special1", dir: "right" };
+  const S2L = { type: "special", dir: "left" };
+  const S2R = { type: "special", dir: "right" };
+  // c1 = p1 (fire), c2 = p2 (jotaro). mana:100 tiles = žiadny dmg šum pri 8-dmg zásahoch
+  async function freshJotaro(p1char = "fire", tileWeights = { dmg: 0, heal: 0, mana: 100, ik: 0 }) {
+    c1.sock.emit("retry");
+    await sleep(150);
+    configureMatch(c1, { tileWeights });
+    await sleep(150);
+    c1.sock.emit("choose_character", p1char);
+    c2.sock.emit("choose_character", "jotaro");
+    await sleep(250);
+  }
+
+  /* ---------- TJ1: side-binding — jotaro len p2; draft len p2 hráčom ---------- */
+  {
+    c1.sock.emit("retry"); await sleep(150);
+    configureMatch(c1); await sleep(150);
+    c1.sock.emit("choose_character", "jotaro"); // zlá strana (p1) — odmietnuť
+    c2.sock.emit("choose_character", "jotaro"); // správna strana (p2)
+    await sleep(250);
+    check(!c1.lastState?.p1?.char, "TJ1: jotaro na p1 odmietnutý", `p1=${c1.lastState?.p1?.char}`);
+    // c1 nemá char (jeho pick bol odmietnutý) → snapshotFor mu maskuje súperov char; over cez c2 (vidí seba)
+    check(c2.lastState?.p2?.char === "jotaro", "TJ1: jotaro na p2 prijatý", `p2=${c2.lastState?.p2?.char}`);
+  }
+  {
+    c1.sock.emit("retry"); await sleep(150);
+    configureMatch(c1, { format: "tournament" }); await sleep(200);
+    c1.sock.emit("choose_team", ["jotaro", "fire", "lightning"]); // p1 nesmie draftnúť jotara
+    await sleep(150);
+    check(!c1.lastState?.rosterReady?.p1, "TJ1: p1 draft s jotarom odmietnutý");
+    c1.sock.emit("choose_team", ["fire", "lightning", "wanderer"]);
+    c2.sock.emit("choose_team", ["jotaro", "fire", "lightning"]); // p2 draftol jotara — OK
+    await sleep(300);
+    c1.sock.emit("choose_character", "fire");
+    c2.sock.emit("choose_character", "jotaro");
+    await sleep(250);
+    check(c1.lastState?.p2?.char === "jotaro", "TJ1: p2 draftol a nasadil jotara v turnaji", `p2=${c1.lastState?.p2?.char}`);
+  }
+
+  /* ---------- TJ2: diagonálny basic (vamp trasa) — odraz od steny + falloff 3/2/1 + roh whiff ---------- */
+  await freshJotaro();
+  // kolo1 (starter p1): fire M(right)→(1,1); jotaro A(up_left) z (3,1): trasa (2,0)→odraz→(1,1)=fire dist2 → 2 dmg
+  tl = await playRound(c1, c2, [M("right"), R, S], [A("up_left"), R, S]);
+  const tj2Cells = fxOf2(tl, "charge").map(e => `${e.cell[0]},${e.cell[1]}`);
+  check(tj2Cells.includes("2,0") && tj2Cells.includes("1,1"),
+    "TJ2: lomená dráha up_left (2,0)→(1,1) (odraz od hornej steny)", `cells=${JSON.stringify(tj2Cells)}`);
+  const tj2Hit = sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 2);
+  check(tj2Hit.length === 1, "TJ2: odrazená strela dist=2 dáva 2 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "TJ2");
+  // kolo2 (starter p2): jotaro M(up)→(3,0), potom A(up_right) do ROHU = whiff (roh sa neodráža)
+  tl = await playRound(c1, c2, [R, S, M("left")], [M("up"), A("up_right"), R]);
+  check(fxOf2(tl, "attack_swing").filter(e => e.from === "p2" && e.offboard).length === 1,
+    "TJ2: výstrel do rohu = whiff", `swings=${JSON.stringify(fxOf2(tl, "attack_swing"))}`);
+  check(fxOf2(tl, "charge").length === 0, "TJ2: whiff bez letiacej strely");
+
+  /* ---------- TJ3: Special 1 (mirror slot) — obe diagonály strany, 4 dmg, kraj, whiff, shield, mirror ---------- */
+  await freshJotaro();
+  // kolo1 (starter p1): fire M(right)→(1,1) D(down)→(1,2); jotaro M(left)→(2,1) S1L → zóna (1,0),(1,2); fire na (1,2) → 4 dmg
+  tl = await playRound(c1, c2, [M("right"), D("down"), R], [M("left"), S1L, R]);
+  const tj3Cells = fxOf2(tl, "special1").flatMap(e => (e.cells || []).map(c => `${c[0]},${c[1]}`));
+  check(tj3Cells.includes("1,0") && tj3Cells.includes("1,2"),
+    "TJ3: special1 zóna = obe diagonály zvolenej strany", `cells=${JSON.stringify(tj3Cells)}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 4).length === 1,
+    "TJ3: special1 dáva 4 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "TJ3");
+  // kraj dosky: jotaro M(up)→(3,0), S1L → (2,-1 oob),(2,1) = len 1 bunka
+  await freshJotaro();
+  tl = await playRound(c1, c2, [R, S, M("left")], [M("up"), S1L, R]);
+  check(fxOf2(tl, "special1").some(e => (e.cells || []).length === 1),
+    "TJ3: special1 z kraja má len 1 bunku v zóne", `s1=${JSON.stringify(fxOf2(tl, "special1"))}`);
+  // z krajného stĺpca von = offboard whiff (mana preč, žiadny dmg) — prep: dostaň jotara na (1,1) s plnou manou
+  await freshJotaro();
+  await playRound(c1, c2, [R, S, M("up")], [D("left"), R, S]); // jotaro (3,1)→(1,1), R doplní manu
+  // R2 (starter p2): jotaro M(left)→(0,1), S1L → (-1,0),(-1,2) oob = prázdna zóna
+  tl = await playRound(c1, c2, [R, S, M("up")], [M("left"), S1L, R]);
+  check(fxOf2(tl, "special1").some(e => e.offboard && (e.cells || []).length === 0),
+    "TJ3: special1 z ľavého okraja = offboard whiff", `s1=${JSON.stringify(fxOf2(tl, "special1"))}`);
+  // shield blokne special1 — prep: jotaro na (1,1) s plnou manou, fire STOJÍ na (0,1) (ML = melee naprázdno)
+  await freshJotaro();
+  await playRound(c1, c2, [R, S, ML], [D("left"), R, S]);
+  // R2 (starter p2): jotaro M(up)→(1,0), S1L → zóna (0,-1 oob),(0,1)=fire; fire shield PRED special1
+  tl = await playRound(c1, c2, [S, R, ML], [M("up"), S1L, R]);
+  check(fxOf2(tl, "block").filter(e => e.target === "p1").length === 1 && sumEffects(tl).hits.length === 0,
+    "TJ3: shield zablokoval special1", `blocks=${fxOf2(tl, "block").length}, hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  // mirror odrazí special1 (4) späť na jotara — rovnaká pozícia, fire mirror
+  await freshJotaro();
+  await playRound(c1, c2, [R, S, ML], [D("left"), R, S]);
+  tl = await playRound(c1, c2, [MI, R, ML], [M("up"), S1L, R]);
+  check(fxOf2(tl, "mirror").length === 1 && sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 4).length === 1,
+    "TJ3: mirror odrazil special1 (4) na jotara", `mirrors=${fxOf2(tl, "mirror").length}, hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "TJ3mirror");
+
+  /* ---------- TJ4: mirror akcia odmietnutá; golden_mirror prijatý a funkčný ---------- */
+  await freshJotaro();
+  {
+    const rej = await new Promise(res => c2.sock.emit("lock_in", [ML, MI, R], (r) => res(r)));
+    check(rej && rej.ok === false, "TJ4: mirror akcia v jotaro queue odmietnutá (ack ok:false)", `ack=${JSON.stringify(rej)}`);
+  }
+  await freshJotaro();
+  // jotaro (nestartér) golden_mirror; fire special (celý riadok, 5) → odraz 5 na fire
+  tl = await playRound(c1, c2, [SP, R, S], [GMI, R, S, ML]);
+  check(fxOf2(tl, "golden_mirror").length >= 1, "TJ4: golden_mirror sa nabil");
+  check(sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 5).length === 1,
+    "TJ4: golden_mirror odrazil fire special (5) späť", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tl[tl.length - 1].p2.hp === 10, "TJ4: jotaro po odraze bez zranenia", `hp=${tl[tl.length - 1].p2.hp}`);
+  invariantCheck(tl, "TJ4");
+
+  /* ---------- TJ8: Special 2 (worldUsed=true v F1) — 8 dmg susedná bunka + wall whiff ---------- */
+  await freshJotaro();
+  // kolo1 (starter p1): fire D(right)→(2,1); jotaro S2L z (3,1) → bunka (2,1)=fire → 8 dmg
+  tl = await playRound(c1, c2, [D("right"), R, S], [S2L, R, S]);
+  check(fxOf2(tl, "special").some(e => e.from === "p2" && (e.cells || []).some(c => c[0] === 2 && c[1] === 1)),
+    "TJ8: Special 2 zóna = susedná bunka (2,1)", `sp=${JSON.stringify(fxOf2(tl, "special").filter(e => e.from === "p2"))}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 8).length === 1,
+    "TJ8: Special 2 dáva 8 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "TJ8");
+  // wall whiff: jotaro na (3,1) S2R → (4,1) mimo = offboard whiff (mana preč, bez dmg); fresh nech má na special.
+  // queue [S2R, M(up), ML]: special2 −5 (mana 6→1), move zadarmo, ML naprázdno (mana 1<4 → invalid, bez odpočtu) → mana ostane 1
+  await freshJotaro();
+  tl = await playRound(c1, c2, [R, S, M("left")], [S2R, M("up"), ML]);
+  check(fxOf2(tl, "special").some(e => e.from === "p2" && e.offboard),
+    "TJ8: Special 2 z krajného stĺpca von = offboard whiff", `sp=${JSON.stringify(fxOf2(tl, "special").filter(e => e.from === "p2"))}`);
+  check(sumEffects(tl).hits.length === 0, "TJ8: wall whiff bez dmg");
+  check(tl[tl.length - 1].p2.mana === 1, "TJ8: wall whiff minul manu specialu (6→1)", `mana=${tl[tl.length - 1].p2.mana}`);
+  }
+
   /* ---------- TR: viac roomiek naraz — izolácia broadcastov ---------- */
   // druhá roomka: c3 (host = p1) + c4 (p2). MAX_ROOMS=2 → musí sa dať vytvoriť.
   const c3 = await connect();

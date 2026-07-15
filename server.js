@@ -79,12 +79,13 @@ function moonLevelFor(hp) {
 // nie sú v CHARS (turnajový pool). Mimo turnaja ich choose_character pustí správnej strane;
 // V TURNAJI si ich hráč môže draftnúť ako jedného z 3 magov (len svoju stranu) — swap DO/Z nich je
 // však zakázaný (odlišná sémantika akcií: diagonálny basic, charge, pasca), viď validQueue/doSwap.
-const SIDE_CHARS = { countess: "p1", onre: "p2" };
-// side-postava priradená slotu (inverzia SIDE_CHARS) — p1 → countess, p2 → onre; inak null
-function sideCharForSlot(slot) {
-  for (const k in SIDE_CHARS) if (SIDE_CHARS[k] === slot) return k;
-  return null;
-}
+// side-BOUND postavy (väzba na stranu + swap ban + diagonálny basic + draft len na svojej strane).
+// Jotaro (JJBA, stand Star Platinum, special THE WORLD) je viazaný na p2 ako Onryō.
+const SIDE_CHARS = { countess: "p1", onre: "p2", jotaro: "p2" };
+// VAMP kit (charge namiesto dashu, vlastné melee, pasca-special, mirror imunita) — PODMNOŽINA side-bound.
+// Jotaro je side-bound, ale NEMÁ vamp kit: dashuje/melee normálne, special nie je pasca, nie je mirror-imúnny.
+const VAMP_CHARS = { countess: 1, onre: 1 };
+// (Väzba side-postavy na slot sa overuje priamo `SIDE_CHARS[key] === slot` — viď onChooseCharacter/onChooseTeam.)
 // ich basic attack strieľa DIAGONÁLNE (4 diagonálne smery namiesto ortogonálnych; falloff nezmenený —
 // na 3-riadkovej ploche má diagonála max 2 kroky, takže dmg je vždy 3 alebo 2)
 const DIAG_DIRS = { up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
@@ -101,6 +102,14 @@ const VAMP_TRAP_BONUS   = 3;
 // diagonálny basic: strela sa RAZ odrazí od ktorejkoľvek steny (biliard — od bočnej letí späť),
 // roh neodráža (strela končí), tvrdý limit letu = 3 bunky → dmg presne 3/2/1 podľa vzdialenosti
 const VAMP_SHOT_RANGE = 3;
+// Jotaro (Star Platinum): diagonálny basic používa vamp trasu (VAMP_SHOT_RANGE, dmg 3/2/1). Special 1
+// (v mirror slote) = smerový útok na OBE diagonálne bunky zvolenej strany; Special 2 (po THE WORLD) =
+// smerový útok na jedinú susednú bunku. THE WORLD = jednorazový per-hra time-stop (WORLD_COST).
+const WORLD_COST     = 5;
+const JOTARO_S1_COST = 4;
+const JOTARO_S1_DMG  = 4;
+const JOTARO_S2_COST = 5;
+const JOTARO_S2_DMG  = 8;
 const STONE_ACTIONS = 2; // Medúzin special: zasiahnutý súper preskočí najbližšie 2 základné akcie (kameň)
 // Minotaurov special (labyrint) nemá číselnú konštantu — trvá, kým jeden hráč nezasiahne druhého (viď endLabyrinths)
 const CLONE_DMG = 1; // Narutov klon: koľko pohltí na zdieľanej bunke (jednorazový bait), kým zvyšok strely prejde na Naruta. Útok aj odraz mirrorom dávajú PLNÝ dmg ako Naruto (viď doBasic/doMelee/applyHitOnClone)
@@ -123,7 +132,8 @@ const POWER_TILE_BONUS = 2;
 const DEMON_COST = 10; // celá mana
 const DEMON_DMG  = 10; // zasiahne každé políčko OKREM toho, na ktorom kaster stojí (vyhodnotí sa cez shield/mirror)
 
-const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash"]);
+// special1 = Jotarov útok v mirror slote (len Jotaro; ostatné postavy ho vo validQueue/fillFromDraft odmietnu)
+const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash", "special1"]);
 const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 
 /* -------------------- Match / lobby config -------------------- */
@@ -282,6 +292,10 @@ function newPlayer(slot) {
     // Countess/Onre: pasca { x, y } | null. Značku vidí LEN caster (súperovi sa trap aj trap_set
     // redigujú); trigger = súperov vstup/prechod PO dokončení jeho akcie (teleport castera + melee).
     trap: null,
+    // Jotaro: použil už THE WORLD v TEJTO hre? Po ňom sa special button natrvalo mení na Special 2.
+    // Prežíva swap (per-hra jednorazovosť), nová hra = čerstvý newPlayer = false.
+    // POZOR (F1): dočasne default true — Special 2 správanie bez time-stopu; v F3b sa vráti na false.
+    worldUsed: true,
     labyrinth: false,  // blúdi v labyrinte (Minotaurov special) — nevidí board, kým nepadne vzájomný zásah
     mazeBuff: false,   // hráč ÚSPEŠNE zaklial súpera do labyrintu (len priamym castom, nie cez odraz) → 2× výstupný
                        // dmg, kým labyrint trvá. Cielené na toho, kto hrá Minotaura. (tile dmg/IK dostáva normálne)
@@ -528,13 +542,13 @@ function emitStateMasked(timeline = null) {
 /* -------------------- Helpers -------------------- */
 function cloneActor(a) {
   if (!a) return null;
-  const { slot, x, y, hp, mana, char, stone, pride, moon, labyrinth, labReveal, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
+  const { slot, x, y, hp, mana, char, stone, pride, moon, worldUsed, labyrinth, labReveal, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked } = a;
   // niť treba hlboko kopírovať — server do nej pushuje, plytká referencia by menila už uložené timeline framy
   const thread = (a.thread || []).map(c => [...c]);
   const threadMark = a.threadMark ? [...a.threadMark] : null;
   const clone = a.clone ? { ...a.clone } : null; // Narutov tieňový klon (pozícia)
   const trap = a.trap ? { ...a.trap } : null;    // pasca Countess/Onre (súperovi ju maskuje snapshotFor/redactTimelineFor)
-  return { slot, x, y, hp, mana, char, stone, pride, moon, labyrinth, labReveal, thread, threadMark, clone, trap, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
+  return { slot, x, y, hp, mana, char, stone, pride, moon, worldUsed, labyrinth, labReveal, thread, threadMark, clone, trap, shield, shieldGold, mirror, mirrorGold, manaRefills, lastStandBuff, lastHopeBuff, down, locked };
 }
 function snapshot() {
   return {
@@ -675,6 +689,20 @@ function escanorCells(me, dir) {
   if (pride === 1) { add(fx - 1, fy - 1); add(fx + 1, fy - 1); add(fx - 1, fy + 1); add(fx + 1, fy + 1); }
   if (pride === 2) for (let yy = fy - 1; yy <= fy + 1; yy++) for (let xx = fx - 1; xx <= fx + 1; xx++) add(xx, yy);
   return out;
+}
+
+// Jotaro Special 1 (v mirror slote): smerový (left/right) — OBE diagonálne bunky zvolenej strany
+// (x±1, y−1) a (x±1, y+1). Rovná bunka (x±1, y) NIE. Na kraji dosky len bunky v ploche (môže byť prázdna).
+// Jotaro Special 2 (po THE WORLD): jediná susedná bunka (x±1, y). Obe MUSIA sedieť s cellsForSpecialPreview.
+function jotaroS1Cells(me, dir) {
+  const dx = dir === "left" ? -1 : 1;
+  const out = [];
+  for (const dy of [-1, 1]) if (inBounds(me.x + dx, me.y + dy)) out.push([me.x + dx, me.y + dy]);
+  return out;
+}
+function jotaroS2Cells(me, dir) {
+  const dx = dir === "left" ? -1 : 1;
+  return inBounds(me.x + dx, me.y) ? [[me.x + dx, me.y]] : [];
 }
 
 /* ---- Narutov tieňový klon ---- */
@@ -849,10 +877,17 @@ function validQueue(queue, slot) {
   if (goldenPre === "golden_shield" && types.includes("shield")) return false;
   if (goldenPre === "golden_mirror" && types.includes("mirror")) return false;
   {
-    // Vampire/Onryō: basic strieľa DIAGONÁLNE (4 diagonálne smery); melee je bez smeru (vlastná bunka)
-    // a dash = charge (rovnaké 4 smery ako dash). Side postavy nie sú v turnaji → char je fixný.
-    const side = !!SIDE_CHARS[game.players[slot]?.char];
+    // Vampire/Onryō/Jotaro: basic strieľa DIAGONÁLNE (4 diagonálne smery); Vampire/Onryō majú melee bez
+    // smeru a dash = charge. Jotaro dashuje/melee normálne, ale nemá mirror (v tom slote má special1).
+    const meChar = game.players[slot]?.char;
+    const side = !!SIDE_CHARS[meChar];
+    const isJotaro = meChar === "jotaro";
     for (const a of q) {
+      if (a.type === "mirror" && isJotaro) return false;        // Jotaro nemá mirror akciu
+      if (a.type === "special1" && !isJotaro) return false;     // special1 je len Jotarov
+      if (a.type === "special1" && a.dir !== "left" && a.dir !== "right") return false;
+      // Jotarov special: po THE WORLD (worldUsed) je to Special 2 — smerový (left/right); inak THE WORLD (bez smeru)
+      if (a.type === "special" && isJotaro && game.players[slot]?.worldUsed && a.dir !== "left" && a.dir !== "right") return false;
       if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
       if (a.type === "attack" && !(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
     }
@@ -874,7 +909,7 @@ function validQueue(queue, slot) {
       // Vampire/Onryō: dash = charge — beh po prvú VIDITEĽNÚ figúru súpera alebo okraj (zrkadlí
       // klientský ghost; v labyrinte je súper skrytý → beh na okraj); ostatní dashujú max 2 bunky
       if (a.type === "dash" && d) {
-        if (SIDE_CHARS[simChar]) {
+        if (VAMP_CHARS[simChar]) {
           while (inBounds(sx + d[0], sy + d[1])) {
             sx += d[0]; sy += d[1];
             if (!meP?.labyrinth && foe && ((foe.x === sx && foe.y === sy) || (foe.clone && foe.clone.x === sx && foe.clone.y === sy))) break;
@@ -905,8 +940,8 @@ function validQueue(queue, slot) {
         }
       }
       // Countess/Onre: special (pasca) nesie cieľovú bunku — BEZ obmedzení (aj súperova aktuálna,
-      // aj vlastná), stačí platná bunka v ploche
-      if (a.type === "special" && SIDE_CHARS[simChar]) {
+      // aj vlastná), stačí platná bunka v ploche. (Jotaro NIE — jeho special je smerový bez bunky.)
+      if (a.type === "special" && VAMP_CHARS[simChar]) {
         const c = a.cell;
         if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
       }
@@ -986,8 +1021,8 @@ function doMove(slot, dir, tl) {
 
 function doDash(slot, dir, tl) {
   const a = game.players[slot];
-  // Vampire/Onryō nemajú dash — ich dash slot je pohybové melee (charge)
-  if (SIDE_CHARS[a.char]) return doVampCharge(slot, dir, tl);
+  // Vampire/Onryō nemajú dash — ich dash slot je pohybové melee (charge). Jotaro dashuje normálne.
+  if (VAMP_CHARS[a.char]) return doVampCharge(slot, dir, tl);
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
   if (!delta) { pushInvalid(tl, slot); return; }
   if (a.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
@@ -1196,8 +1231,8 @@ function doMelee(slot, tl) {
   const opS = other(slot);
   const op  = game.players[opS];
 
-  // Vampire/Onryō majú vlastný melee (úder na vlastnej bunke + bonus)
-  if (SIDE_CHARS[me.char]) return doVampMelee(slot, tl);
+  // Vampire/Onryō majú vlastný melee (úder na vlastnej bunke + bonus). Jotaro melee normálne.
+  if (VAMP_CHARS[me.char]) return doVampMelee(slot, tl);
 
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
@@ -1408,8 +1443,7 @@ function doVampCharge(slot, dir, tl) {
 // Countess/Onre sú IMÚNNE voči mirroru: súperov mirror sa voči ich dmg správa ako obyčajný štít
 // (bloklne celý dmg, nič neodráža; spotrebuje sa bežne ako obrana krytej akcie)
 function mirrorImmune(atkSlot) {
-  const c = game.players[atkSlot]?.char;
-  return c === "countess" || c === "onre";
+  return !!VAMP_CHARS[game.players[atkSlot]?.char];
 }
 
 /* ---- Pasca (Countess/Onre special) ---- */
@@ -1840,6 +1874,39 @@ function doMirror(slot, tl) {
   pushStateFrame(tl, [{ kind: "mirror_on", from: slot }], SMALL_DELAY_MS);
 }
 
+// Jotaro Special 1 (v mirror slote): 4 many, smerový (left/right), 4 dmg na OBE diagonálne bunky strany.
+// Cez obrany ako každý dmg special (shield blokuje, mirror odrazí 4). Zóna zasiahne súpera aj jeho klona
+// (applyHitBoth). Prázdna zóna (útok z krajného stĺpca von) = wall-rule whiff (mana preč, choreografia, bez dmg).
+function doJotaroS1(slot, dir, tl) {
+  const actor = game.players[slot];
+  if (!actor) return;
+  if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
+  if (actor.mana < JOTARO_S1_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  actor.mana -= JOTARO_S1_COST;
+  const pBonus = powerBoost(slot, tl); // POWER tile: +2; spotreba pri použití (aj whiff/block/odraz)
+  const cells = jotaroS1Cells(actor, dir);
+  if (!cells.length) { // celá zóna mimo plochy → útok do steny (vykoná sa, mana preč, neprečiarkuje sa)
+    pushStateFrame(tl, [{ kind: "special1", from: slot, dir, cells: [], offboard: true }], SPECIAL_BEAT_MS);
+    return;
+  }
+  const foeS = other(slot);
+  const foe  = game.players[foeS];
+  const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
+  const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
+  if (inZone) revealLabyrinths(tl); // istý zásah odhalí prípadný labyrint pred animáciou
+  pushStateFrame(tl, [{ kind: "special1", from: slot, dir, cells }], SPECIAL_BEAT_MS);
+  const dmg = JOTARO_S1_DMG * dealMul(slot) + pBonus;
+  if (inZone) applyHitBoth(foeS, dmg, tl, "special", cloneStruck, pBonus);
+  else if (cloneStruck) applyHitOnClone(foeS, dmg, tl, "special", false);
+  else pushStateFrame(tl, [], SMALL_DELAY_MS);
+}
+
+// THE WORLD (Jotarov special pred prvým použitím) — pauza/resume protokol, plne implementované v F3b.
+function doJotaroWorld(slot, tl) {
+  // F1 stub: v F1 je worldUsed default true, takže táto vetva je nedosiahnuteľná (special = Special 2).
+  pushInvalid(tl, slot, SMALL_DELAY_MS);
+}
+
 function doSpecial(slot, tl, dir = null, cell = null) {
   const actor = game.players[slot];
   if (!actor) return;
@@ -2017,7 +2084,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   // aj súperova aktuálna bunka; trigger až pri opätovnom vstupe/prechode, státie netriggeruje). Značku
   // vidí len caster (player.trap aj trap_set sa súperovi redigujú). Max 1 pasca — recast starú nahradí
   // (pokojne aj tou istou bunkou). Trigger rieši resolveTrapsAfterAction/triggerTrap po súperovej akcii.
-  if (SIDE_CHARS[actor.char]) {
+  if (VAMP_CHARS[actor.char]) {
     if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !inBounds(cell.x, cell.y)) { pushInvalid(tl, slot); return; }
     actor.mana -= SPECIAL_COST;
     // cast bliká CELOU plochou (ako Minotaurov special) — pasca môže byť hocikde, plný blik jej polohu
@@ -2036,6 +2103,33 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     }
     actor.trap = { x: cell.x, y: cell.y };
     pushStateFrame(tl, [{ kind: "trap_set", from: slot, cell: [cell.x, cell.y] }], SMALL_DELAY_MS);
+    return;
+  }
+
+  // Jotaro: special = THE WORLD (jednorazový time-stop). Po ňom (worldUsed) sa button natrvalo zmení na
+  // Special 2 = smerový (left/right) 8 dmg útok na JEDINÚ susednú bunku (x±1, y); cez obrany ako každý dmg
+  // special (shield blokuje, mirror odrazí 8). Cast z krajného stĺpca von z plochy = wall-rule whiff.
+  if (actor.char === "jotaro") {
+    if (!actor.worldUsed) return doJotaroWorld(slot, tl); // THE WORLD (mana gate 5 už overený vyššie)
+    // Special 2
+    if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
+    actor.mana -= JOTARO_S2_COST;
+    const pBonus = powerBoost(slot, tl);
+    const cells = jotaroS2Cells(actor, dir);
+    if (!cells.length) { // susedná bunka mimo plochy → útok do steny (vykoná sa, mana preč, neprečiarkuje sa)
+      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: [], offboard: true }], SPECIAL_BEAT_MS);
+      return;
+    }
+    const foeS = other(slot);
+    const foe  = game.players[foeS];
+    const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
+    const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
+    if (inZone) revealLabyrinths(tl);
+    pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
+    const dmg = JOTARO_S2_DMG * dealMul(slot) + pBonus;
+    if (inZone) applyHitBoth(foeS, dmg, tl, "special", cloneStruck, pBonus);
+    else if (cloneStruck) applyHitOnClone(foeS, dmg, tl, "special", false);
+    else pushStateFrame(tl, [], SMALL_DELAY_MS);
     return;
   }
 
@@ -2196,7 +2290,8 @@ function doAction(slot, action, tl) {
     case "recharge": return doRecharge(slot, tl);
     case "attack":   return doBasic(slot, action.dir, tl);
     case "melee":    return doMelee(slot, tl);
-    case "special":  return doSpecial(slot, tl, action.dir, action.cell || null); // dir: Medúza/Escanor; cell: Vojak (cieľová bunka)
+    case "special":  return doSpecial(slot, tl, action.dir, action.cell || null); // dir: Medúza/Escanor/Jotaro(S2); cell: Vojak (cieľová bunka)
+    case "special1": return doJotaroS1(slot, action.dir, tl); // Jotarov útok v mirror slote (smer left/right)
     case "shield":   return doShield(slot, tl);
     case "mirror":   return doMirror(slot, tl);
     case "demon":    return doDemon(slot, tl);
@@ -2423,7 +2518,11 @@ function validBasicAction(a, used, allowDemon = false, char = null) {
   if (!a) return false;
   const known = ACTION_TYPES.has(a.type) || (allowDemon && a.type === "demon");
   if (!known || used.has(a.type)) return false;
-  const side = !!SIDE_CHARS[char];
+  const side = !!SIDE_CHARS[char];      // diagonálny basic (Countess/Onre/Jotaro)
+  const isJotaro = char === "jotaro";
+  if (a.type === "mirror" && isJotaro) return false;    // Jotaro nemá mirror (v tom slote má special1)
+  if (a.type === "special1" && !isJotaro) return false; // special1 je len Jotarov
+  if (a.type === "special1" && a.dir !== "left" && a.dir !== "right") return false;
   if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
   if (a.type === "attack" && !(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
   return true;
@@ -2439,18 +2538,25 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limi
     q.push({ type: a.type, dir: a.dir || null, cell: a.cell || null }); // cell = cieľ Vojakovho/Countess/Onre specialu
     used.add(a.type);
   }
-  const pool = [...ACTION_TYPES].filter(t => !used.has(t));
+  const isJotaro = char === "jotaro";
+  // special1 je len Jotarov; Jotaro naopak nemá mirror (v tom slote má special1) — vyhoď z náhodného poolu
+  const pool = [...ACTION_TYPES].filter(t => !used.has(t)
+    && !(t === "special1" && !isJotaro) && !(t === "mirror" && isJotaro));
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const dirs = [...MOVE_DIRS];
-  const side = !!SIDE_CHARS[char]; // Vampire/Onryō: diagonálny attack, special s bunkou (dash/melee generické)
+  const side = !!SIDE_CHARS[char]; // diagonálny attack (Countess/Onre/Jotaro)
+  const vamp = !!VAMP_CHARS[char]; // special s bunkou = pasca (len Countess/Onre)
+  const lr = () => (Math.random() < 0.5 ? "left" : "right");
   while (q.length < limit && pool.length) {
     const t = pool.shift();
     if (t === "attack" && side) q.push({ type: t, dir: DIAG_DIR_KEYS[Math.floor(Math.random() * DIAG_DIR_KEYS.length)] });
     else if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] });
-    else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
+    else if (t === "special1") q.push({ type: t, dir: lr() }); // Jotarov special1 — smer left/right
+    else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: lr() }); // Medúzin/Escanorov special potrebuje smer
     else if (t === "special" && char === "werewolf") q.push({ type: t, dir: WOLF_DIR_KEYS[Math.floor(Math.random() * WOLF_DIR_KEYS.length)] }); // Vlkolakov charge — náhodný z 8 smerov
     else if (t === "special" && char === "soldier") q.push({ type: t, cell: randomSoldierTarget(slot) }); // Vojakov special potrebuje cieľovú bunku
-    else if (t === "special" && side) q.push({ type: t, cell: randomTrapCell() }); // pasca — ľubovoľná bunka
+    else if (t === "special" && vamp) q.push({ type: t, cell: randomTrapCell() }); // pasca — ľubovoľná bunka
+    else if (t === "special" && isJotaro) q.push(game.players[slot]?.worldUsed ? { type: t, dir: lr() } : { type: t }); // Special 2 (smer) / THE WORLD (bez args)
     else q.push({ type: t });
   }
   return q;
@@ -3121,10 +3227,9 @@ function sanitizeConfig(raw) {
     if (!Array.isArray(keys) || keys.length !== TEAM_SIZE) return;
     const team = keys.map(String);
     if (new Set(team).size !== TEAM_SIZE) return;    // bez duplicít v tíme
-    // len známe postavy z poolu + PRÍPADNE vlastná side-postava (p1 → countess, p2 → onre)
+    // len známe postavy z poolu + PRÍPADNE vlastná side-postava (p1 → countess; p2 → onre|jotaro)
     const slot = slotForPerson(person);
-    const mySide = sideCharForSlot(slot);
-    if (!team.every(k => CHARS.includes(k) || k === mySide)) return;
+    if (!team.every(k => CHARS.includes(k) || SIDE_CHARS[k] === slot)) return;
     game.roster[person] = team;
     if (game.roster.A && game.roster.B) finishTeamSelect();
     else emitStateMasked(); // súper uvidí rosterReady („opponent is ready"), nie samotný tím
