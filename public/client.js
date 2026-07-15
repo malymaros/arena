@@ -2450,6 +2450,7 @@ function renderGrid(s, effects = []) {
     if (e?.kind === "charge")    charges.push(e);
     if (e?.kind === "special")   specials.push(e);
     if (e?.kind === "special1")  specials.push(e); // Jotarov útok v mirror slote — rovnaké zvýraznenie zóny + center cast
+    if (e?.kind === "timestop_start" && Array.isArray(e.cells)) e.cells.forEach(([x, y]) => previewSet.add(`${x},${y}`)); // THE WORLD cast — celoplošný blik
     if (e?.kind === "hit")       hitTarget = e.target;
     if (e?.kind === "tile_proc") procs.push(e);
     if (e?.kind === "clone_hit" && Array.isArray(e.cell)) cloneHitCells.push(e.cell);
@@ -3514,6 +3515,10 @@ let tsFrozen = false;
 let tsActive = false;
 let tsJotaroSlot = null;
 let tsFreezeAt = 0;
+// round-script beat counts — MODULOVÉ, aby prežili pauzu THE WORLD: pokračovacia timeline pokračuje
+// v číslovaní beatov (kurzor tak po obnovení času skočí na správnu ĎALŠIU akciu, nie na začiatok lišty)
+let roundBeatCounts = { p1: 0, p2: 0 };
+let tsResumePending = false; // ďalšia timeline je pokračovanie po THE WORLD → NEresetuj beat counts
 
 function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
@@ -3543,7 +3548,11 @@ function schedulePlayTimeline(timeline) {
   for (const slot of ["p1", "p2"]) if (preLvl[slot] != null) escPrideDisplay[slot] = preLvl[slot];
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
   const playStarter = first.starter ?? state?.starter ?? "p1";
-  const beatCounts = { p1: 0, p2: 0 };
+  // beat counts prežijú pauzu THE WORLD: pokračovacia timeline (tsResumePending) NEresetuje číslovanie,
+  // takže kurzor po obnovení času skočí na akciu VPRAVO od THE WORLD (nie na začiatok lišty)
+  if (!tsResumePending) roundBeatCounts = { p1: 0, p2: 0 };
+  tsResumePending = false;
+  const beatCounts = roundBeatCounts;
   // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) — keď príde "invalid", prečiarkneme ju
   const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
@@ -4125,7 +4134,7 @@ function schedulePlayTimeline(timeline) {
     prev = frame;
     // Jotaro THE WORLD: čiastočná timeline skončila na timestop_wait — NEplánuj ďalší krok a NEspusti koncovú
     // vetvu playbacku (UI sa nesmie odomknúť). Prejdi do ts-módu; pokračovacia timeline príde druhým `state`.
-    if (tsWait) { playing = false; enterTimestopMode(); return; }
+    if (tsWait) { playing = false; tsResumePending = true; enterTimestopMode(); return; } // pokračovanie zachová beat counts
     setTimeout(step, frame.delayMs ?? 600);
   };
 
@@ -5243,9 +5252,11 @@ function enterTimestopMode() {
     lockBtn.classList.remove("locked", "ready"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
     closePickers(); renderQueue(); syncGoldenHalves(); syncGoldDualHalves(); updateUiLocks();
   } else {
-    // súper — zmrazený, UI zamknuté, full-screen filter + overlay
+    // súper — zmrazený, UI zamknuté, full-screen filter + overlay. Po caste už NEVIDÍ stredového Star
+    // Platinum (iba oznámenie o zastavenom čase) — center sprite je len Jotarova „menace" póza.
     tsFrozen = true; tsPlanning = false;
     document.body.classList.add("timestop-mode");
+    hideWorldCenter();
     tsOverlaySet(true);
     updateUiLocks();
   }
@@ -6251,7 +6262,9 @@ function raf() {
 
     // mŕtvy: prehraj Dead raz od momentu úmrtia a zamrzni na poslednom frame
     const dir = charDirFor(st.char, slot);
-    let anim = ANIM_DEF.idle, t = stonedHud ? 0 : now;
+    // THE WORLD: zmraz aj súperov HUD portrét (čas stojí — všetko okrem Jotara zamrzne)
+    const tsFrozenHud = tsActive && slot !== tsJotaroSlot;
+    let anim = ANIM_DEF.idle, t = tsFrozenHud ? tsFreezeAt : (stonedHud ? 0 : now);
     if (hp <= 0) {
       if (!hudDeadSince[slot]) hudDeadSince[slot] = now;
       anim = ANIM_DEF.dead;

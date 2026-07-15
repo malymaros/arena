@@ -1975,8 +1975,11 @@ function doJotaroWorld(slot, tl) {
   const foe = game.players[foeS];
   actor.mana -= WORLD_COST;
   actor.worldUsed = true; // po THE WORLD sa special button natrvalo mení na Special 2 (prežíva swap)
-  // cast: Star Platinum „menace" + invert flash (globálny efekt — vidia obaja); nedá sa blokovať/odraziť
-  pushStateFrame(tl, [{ kind: "timestop_start", from: slot }], TIMESTOP_CAST_MS);
+  // cast: Star Platinum „menace" + celoplošný blik (ako Minotaur) + invert flash (globálny — vidia obaja);
+  // nedá sa blokovať/odraziť. Po tomto frame plocha prestane blikať a čas sa zastaví (timestop_wait).
+  const castCells = [];
+  for (let y = 0; y < game.board.h; y++) for (let x = 0; x < game.board.w; x++) castCells.push([x, y]);
+  pushStateFrame(tl, [{ kind: "timestop_start", from: slot, cells: castCells }], TIMESTOP_CAST_MS);
   // zachyť súperovu NABITÚ obranu (armed PRED castom) — NEspotrebuje sa castom (runRoundLoop preskočí
   // consumption), platí cez celé zamrazenie a vyhodnotí sa kumulatívne pri obnovení času (applyTimestopResume)
   game.timestop = {
