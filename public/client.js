@@ -3403,12 +3403,19 @@ function playNewRoundTransition(nextTurn, done) {
 /* ---------- Timeline prehrávanie ---------- */
 let playGen = 0;      // generácia prehrávania — novšia timeline zruší staršiu slučku
 let playing = false;  // počas prehrávania neaktualizuj UI zo snapshotov a drž LOCK zamknutý
+// Jotaro THE WORLD: tsPlanning = som Jotaro a plánujem 3 zmrazené akcie (UI odomknuté, lock → timestop_actions);
+// tsFrozen = som súper a čakám zmrazený (UI zamknuté, full-screen filter). Práve jeden je aktívny počas pauzy.
+let tsPlanning = false;
+let tsFrozen = false;
 
 function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
 
   const gen = ++playGen;
   playing = true;
+  // Jotaro THE WORLD: nová timeline (vrátane pokračovacej po zmrazení) = pauza sa skončila; overlay skry
+  // (filter body.timestop-mode nechaj — pokračovacia timeline ho zhasne až efektom timestop_end)
+  tsPlanning = false; tsFrozen = false; tsOverlaySet(false);
   hideConnError();  // kolo sa vyhodnotilo → prípadná hláška o chybe spojenia je už neaktuálna
   stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) — zhasni prípadný stale časovač
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
@@ -3543,6 +3550,7 @@ function schedulePlayTimeline(timeline) {
 
     const shooters = new Set(); // basic strela — jednorazová póza
     const casters  = new Set(); // special — looping, malá postava sa animuje súbežne s veľkým sprite-om
+    let tsWait = false;         // Jotaro THE WORLD: tento frame je koniec čiastočnej timeline → pauza
     for (const e of frame.effects || []) {
       // poistka: výnimka v JEDNOM efekte nesmie zaseknúť prehrávanie celého kola (step() beží cez setTimeout —
       // neodchytený throw by reťaz natrvalo prerušil a UI by ostalo zamknuté uprostred kola)
@@ -3561,6 +3569,13 @@ function schedulePlayTimeline(timeline) {
         casters.add(e.from);
         if (e.dir === "left" || e.dir === "right") facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
+      // Jotaro THE WORLD: cast → zapni „ZA WARUDO" filter (obaja); wait → koniec čiastočnej timeline (pauza);
+      // ts_hit/ts_mirror → announce float nad zmrazeným súperom (bez zmeny HP); end → vypni filter
+      if (e.kind === "timestop_start") document.body.classList.add("timestop-mode");
+      if (e.kind === "timestop_wait") tsWait = true;
+      if (e.kind === "ts_hit" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, `-${e.dmg} HP`, "ts-float");
+      if (e.kind === "ts_mirror" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, "MIRRORED", "ts-float");
+      if (e.kind === "timestop_end") document.body.classList.remove("timestop-mode");
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení; diagonály podľa
       // horizontálnej zložky — Countess/Onre strieľajú šikmo)
       if (e.kind === "charge" && typeof e.dir === "string" && (e.from === "p1" || e.from === "p2")) {
@@ -3987,6 +4002,9 @@ function schedulePlayTimeline(timeline) {
     positionActors(state);
 
     prev = frame;
+    // Jotaro THE WORLD: čiastočná timeline skončila na timestop_wait — NEplánuj ďalší krok a NEspusti koncovú
+    // vetvu playbacku (UI sa nesmie odomknúť). Prejdi do ts-módu; pokračovacia timeline príde druhým `state`.
+    if (tsWait) { playing = false; enterTimestopMode(); return; }
     setTimeout(step, frame.delayMs ?? 600);
   };
 
@@ -4676,7 +4694,8 @@ function syncMirrorBtn(char) {
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
 function uiLocked() {
-  return lockedIn || playing || !!state?.[me]?.locked;
+  if (tsPlanning) return false; // Jotaro počas THE WORLD plánuje zmrazené akcie — ovládanie odomknuté
+  return lockedIn || playing || tsFrozen || !!state?.[me]?.locked;
 }
 
 // vizuálne zámky: otvorený picker zamyká ostatné akčné tlačidlá, LOCK IN zamyká všetky
@@ -4696,9 +4715,13 @@ function updateUiLocks() {
   const openBtn = openPicker ? PICKER_BTNS[openPicker] : null;
   const locked = uiLocked();
   actionButtonsAll().forEach(b => {
-    b.classList.toggle("locked-ui", locked || (!!openPicker && b !== openBtn));
+    let bl = locked || (!!openPicker && b !== openBtn);
+    // počas THE WORLD plánovania (tsPlanning): special (THE WORLD práve beží) + golden/gold-dual/démon/last-hope
+    // sú v zmrazenej trojici zakázané → zamkni ich (special1 v mirror slote a základné akcie ostávajú)
+    if (tsPlanning && (b === specialBtn || b.id === "golden-btn" || b.id === "gold-dual-btn" || b.id === "demon-btn" || b.id === "last-hope-btn")) bl = true;
+    b.classList.toggle("locked-ui", bl);
   });
-  undoBtn.classList.toggle("locked-ui", locked);
+  undoBtn.classList.toggle("locked-ui", locked && !tsPlanning);
 }
 
 function closePickers() {
@@ -5030,7 +5053,59 @@ function emitLockIn(payload) {
   };
   send();
 }
+/* ---------- Jotaro THE WORLD — klientská pauza / ts-mód ---------- */
+// full-screen overlay pre zmrazeného súpera (text „⏱ TIME HAS STOPPED…"); filter rieši body.timestop-mode
+const tsOverlay = document.createElement("div");
+tsOverlay.id = "timestop-overlay";
+tsOverlay.className = "hidden";
+tsOverlay.innerHTML = `<div class="ts-overlay-text">⏱ ZA WARUDO — TIME HAS STOPPED…</div>`;
+document.body.appendChild(tsOverlay);
+function tsOverlaySet(on) { tsOverlay.classList.toggle("hidden", !on); }
+
+// vstup do ts-módu (po timestop_wait alebo po reload/reclaim): Jotaro plánuje 3 zmrazené akcie,
+// súper čaká zamrznutý s full-screen filtrom a zamknutým UI.
+function enterTimestopMode() {
+  const tsSlot = state?.timestop?.slot;
+  if (!tsSlot || isSpectator) { tsPlanning = false; tsFrozen = false; tsOverlaySet(false); return; }
+  if (me === tsSlot) {
+    // Jotarov hráč — plánovanie 3 zmrazených akcií (kvázi nové kolo, všetky typy nanovo)
+    tsPlanning = true; tsFrozen = false;
+    lockedIn = false;
+    myQueue = [];
+    goldenArmed = goldenMirrorArmed = goldenManaArmed = lastStandArmed = lastHopeArmed = false;
+    document.body.classList.remove("timestop-mode"); // Jotaro nie je zmrazený → bez filtra na jeho strane
+    tsOverlaySet(false);
+    lockBtn.classList.remove("locked", "ready"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
+    closePickers(); renderQueue(); syncGoldenHalves(); syncGoldDualHalves(); updateUiLocks();
+  } else {
+    // súper — zmrazený, UI zamknuté, full-screen filter + overlay
+    tsFrozen = true; tsPlanning = false;
+    document.body.classList.add("timestop-mode");
+    tsOverlaySet(true);
+    updateUiLocks();
+  }
+}
+
+// Jotaro potvrdil 3 zmrazené akcie → pošli timestop_actions (server dohrá zvyšok kola a pošle pokračovaciu timeline)
+function submitTimestopActions() {
+  if (myQueue.length !== 3) { lockBtn.classList.add("shake"); setTimeout(() => lockBtn.classList.remove("shake"), 400); return; }
+  const payload = [...myQueue];
+  tsPlanning = false;
+  lockedIn = true; // drž zamknuté, kým nepríde pokračovacia timeline (playing ju prevezme)
+  closePickers();
+  lockBtn.classList.add("locked"); lockBtn.classList.remove("ready"); lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
+  updateUiLocks();
+  socket.emit("timestop_actions", payload, (res) => {
+    if (res && res.ok === false) { // server odmietol (nemalo by nastať — validácia zrkadlí klienta) → vráť plánovanie
+      tsPlanning = true; lockedIn = false;
+      lockBtn.classList.remove("locked"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
+      updateUiLocks();
+    }
+  });
+}
+
 lockBtn.addEventListener("click", () => {
+  if (tsPlanning) { submitTimestopActions(); return; } // THE WORLD: lock button = EXECUTE zmrazenej trojice
   if (playing) return; // počas prehrávania kola nelockuj
   if (uiLocked()) return;
   if (myQueue.length !== 3) {
@@ -5569,6 +5644,13 @@ socket.on("state", (s) => {
     renderQueue(); // prekresli round-script lištu (zlatý skeleton mojich slotov hneď, bez interakcie)
   }
   // počas prehrávania snapshot bez timeline nevykresľuj — framy bežiacej timeline majú prednosť
+
+  // Jotaro THE WORLD: reload/reclaim počas čakania → snapshot nesie timestop (bez timeline) → obnov ts-mód;
+  // ak timestop zmizol (kolo pokračuje inou cestou) → vypni prípadný zaseknutý filter/overlay
+  if (s.timestop && !s.timeline) enterTimestopMode();
+  else if (!s.timestop && !s.timeline && (tsPlanning || tsFrozen)) {
+    tsPlanning = false; tsFrozen = false; tsOverlaySet(false); document.body.classList.remove("timestop-mode"); updateUiLocks();
+  }
 
   // dash/attack tlačidlá podľa mága — Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
   syncDashBtn(s[me]?.char);

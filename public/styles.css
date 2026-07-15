@@ -241,6 +241,21 @@ body {
   box-shadow: inset 0 0 0 2px rgba(255,255,255,.03);
 }
 body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: filter .6s ease; }
+
+/* Jotaro THE WORLD (ZA WARUDO): počas zastaveného času sa celá plocha odfarbí + invertuje (súper zamrznutý).
+   Aplikuje sa obom pri caste; Jotarovmu hráčovi ho enterTimestopMode zhasne (nie je zmrazený). */
+body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); transition: filter .5s ease; }
+#timestop-overlay {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center;
+  pointer-events: none; background: radial-gradient(ellipse at center, rgba(60,40,110,.12), rgba(0,0,0,.42));
+}
+#timestop-overlay.hidden { display: none; }
+#timestop-overlay .ts-overlay-text {
+  margin-top: 14vh; font-weight: 900; font-size: clamp(20px, 4vw, 44px); letter-spacing: .06em;
+  color: #e7dcff; text-shadow: 0 0 14px rgba(150,110,255,.85), 0 3px 0 #000;
+  animation: ts-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ts-pulse { 0%,100% { opacity: .78; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
 #arena { transition: filter .6s ease; } /* plynulé stmievanie/rozsvietenie pri vstupe/úniku z labyrintu */
 /* bunka s Ariadninou niťou — jemný zlatý nádych (čiaru kreslí .thread-svg cez stredy buniek) */
 .cell.thread-cell { box-shadow: inset 0 0 0 2px rgba(232,178,60,.45); }
@@ -1946,7 +1961,7 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     30%  { opacity: 1; }
     to   { transform: translate(-50%, -48px); opacity: 0; }
   }
-  .dmg-float, .mana-float, .power-float{
+  .dmg-float, .mana-float, .power-float, .ts-float{
     position: absolute;
     z-index: 5;
     font-weight: 900;
@@ -1956,6 +1971,8 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     white-space: nowrap;
     animation: floatUp .9s ease-out forwards;
   }
+  /* Jotaro THE WORLD: announce zmrazeného zásahu (dmg ešte nedopadol) — bledofialový, kurzívny */
+  .ts-float{ color: #c9b3ff; font-style: italic; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 8px rgba(150,110,255,.6); }
   .dmg-float {  color: #ff5a5a; }
   .mana-float { color: #57a9ff; }
   .power-float { color: #ffd54f; } /* extra dmg z POWER tile — samostatný zlatý „⚡ -2" */
