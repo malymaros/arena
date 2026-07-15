@@ -3525,8 +3525,9 @@ function schedulePlayTimeline(timeline) {
   const gen = ++playGen;
   playing = true;
   // Jotaro THE WORLD: nová timeline (vrátane pokračovacej po zmrazení) = pauza sa skončila; overlay + ts-queue
-  // skry (filter body.timestop-mode nechaj — pokračovacia timeline ho zhasne až efektom timestop_end)
-  tsPlanning = false; tsFrozen = false; tsOverlaySet(false); hideTsQueue();
+  // + stredový Special_3_P skry (u súpera to je moment „Jotaro klikol EXECUTE"); filter body.timestop-mode
+  // nechaj — pokračovacia timeline ho zhasne až efektom timestop_end
+  tsPlanning = false; tsFrozen = false; tsOverlaySet(false); hideTsQueue(); hideWorldCenter();
   hideConnError();  // kolo sa vyhodnotilo → prípadná hláška o chybe spojenia je už neaktuálna
   stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) — zhasni prípadný stale časovač
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
@@ -5265,6 +5266,7 @@ function submitTimestopActions() {
   const payload = [...myQueue];
   tsPlanning = false;
   lockedIn = true; // drž zamknuté, kým nepríde pokračovacia timeline (playing ju prevezme)
+  hideWorldCenter(); // klik na EXECUTE → stredový Special_3_P zmizne (u Jotara hneď; u súpera pri pokračovaní)
   closePickers();
   lockBtn.classList.add("locked"); lockBtn.classList.remove("ready"); lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
   updateUiLocks();
