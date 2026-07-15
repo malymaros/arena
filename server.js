@@ -348,6 +348,9 @@ function newGame() {
     // tournament: HP a mana každého z 3 magov per osoba sa prenášajú medzi hrami (null mimo tournamentu)
     mageHp: null,
     mageMana: null,
+    // rezumovateľné kolo (Jotarov THE WORLD): kontext prebiehajúceho resolveTurn / stav time-stop pauzy
+    roundCtx: null,
+    timestop: null,
   };
 }
 newGame();
@@ -2679,6 +2682,9 @@ function resolveLastStandBanish(slot, tl) {
 }
 
 /* -------------------- Turn resolution -------------------- */
+// resolveTurn je REZUMOVATEĽNÝ (kvôli Jotarovmu THE WORLD, ktorý kolo uprostred pozastaví a čaká na
+// klienta): init kontextu + Last Hope/golden pre-fáza tu, hlavný interleave loop v runRoundLoop() (číta/
+// zapisuje game.roundCtx a vie skončiť buď finishRound(), alebo PAUZOU), koncová fáza vo finishRound().
 function resolveTurn() {
   clearTurnTimer();
   const tl = [];
@@ -2686,7 +2692,6 @@ function resolveTurn() {
   pushStateFrame(tl, [], 10);
 
   const order = game.starter === "p1" ? ["p1","p2"] : ["p2","p1"];
-  let ended = false;
   // Escanor pride: zachyť PRED spracovaním, či daný Escanor v tomto kole použil shield/mirror/golden shield/mirror
   // (fronta aj golden flagy sa počas kola menia/miznú). Na konci kola: použil obranu ALEBO dostal zásah
   // (p.prideHit z notePrideHit) → −1, inak → +1. Číta sa FRONTA, nie výsledok — obrana zmarená BLOCK tile
@@ -2764,30 +2769,49 @@ function resolveTurn() {
     pushStateFrame(tl, [{ kind: "beat_empty", from: second, beat: "gpre" }], ACTION_GAP_MS);
   }
 
-  outer:
-  for (let i = 0; i < 3; i++) {
+  // ulož kontext rezumovateľného kola a spusti hlavný interleave loop
+  game.roundCtx = {
+    tl, order, i: 0, slotIdx: 0, ended: false,
+    stonedStep: null, tookStoned: null,
+    escUsedDefense, wandererUsedMirror, doomSlot,
+    second, emittedUpTo: 0,
+  };
+  runRoundLoop();
+}
+
+// hlavný interleave loop kola — číta/zapisuje game.roundCtx, takže sa dá po THE WORLD pauze rezumovať
+// od uloženej pozície (ctx.i = číslo akcie 0–2, ctx.slotIdx = ktorý slot v order je na rade).
+function runRoundLoop() {
+  const ctx = game.roundCtx;
+  const { tl, order } = ctx;
+  while (ctx.i < 3) {
     // skamenenie chráni pred tile efektmi počas CELÉHO kroku, v ktorom padol aj posledný skamenený ťah
-    // (odkamenenie je „na konci ťahu" — tiles sa začnú vyhodnocovať až od nasledujúceho kroku)
-    const stonedStep = { p1: game.players.p1.stone > 0, p2: game.players.p2.stone > 0 };
-    const tookStoned = { p1: false, p2: false }; // kto v tomto kroku odohral skamenený pass
-    for (const slot of order) {
+    // (odkamenenie je „na konci ťahu" — tiles sa začnú vyhodnocovať až od nasledujúceho kroku).
+    // Zachyť ho pri VSTUPE do kroku (slotIdx 0), aby pauza uprostred kroku nestratila hodnotu.
+    if (ctx.slotIdx === 0) {
+      ctx.stonedStep = { p1: game.players.p1.stone > 0, p2: game.players.p2.stone > 0 };
+      ctx.tookStoned = { p1: false, p2: false }; // kto v tomto kroku odohral skamenený pass
+    }
+    while (ctx.slotIdx < order.length) {
+      const slot = order[ctx.slotIdx];
       const meP = game.players[slot];
       if (meP.stone > 0) {
         // skamenený ťah: akcia sa preskočí (bez many) a NEspotrebuje súperovu obranu.
         // Kameň sa NEuberá teraz — až na KONCI kroku (nižšie), aby socha vizuálne vydržala celý tento krok
         // vrátane vyhodnotenia jeho dlaždíc; odkamenenie sa tak prejaví až na začiatku NASLEDUJÚCEJ akcie
         // (predtým socha zmizla už pri „STONED" float 2. akcie, hoci dlaždica pod hráčom sa ešte netriggerovala).
-        tookStoned[slot] = true;
+        ctx.tookStoned[slot] = true;
         pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "stoned", dir: null, to: null } }], 250);
         pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS);
         pushStateFrame(tl, [], ACTION_GAP_MS);
+        ctx.slotIdx++;
         continue;
       }
       const foe = other(slot);
       // obrany kryjú práve túto (najbližšiu) súperovu akciu — spotrebujú sa ňou aj bez zásahu
       const foeShieldArmed = game.players[foe].shield;
       const foeMirrorArmed = game.players[foe].mirror;
-      const act = meP.queue[i];
+      const act = meP.queue[ctx.i];
       // ohlás akciu klientovi (záznam kola pod HUD widgetom)
       if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null, to: act.to || null } }], 250);
       // pasca (Countess/Onre): zbieraj bunky prejdené počas akcie; trigger sa vyhodnotí AŽ PO jej dokončení
@@ -2800,23 +2824,35 @@ function resolveTurn() {
 
       // po každej akcii skontroluj lethal
       const w = winnerNow();
-      if (w) { ended = true; break outer; }
+      if (w) { ctx.ended = true; return finishRound(); }
       // krátka pokojová pauza medzi akciami, nech oko stihne zaregistrovať každý ťah
       pushStateFrame(tl, [], ACTION_GAP_MS);
+      ctx.slotIdx++;
     }
 
     // koniec ťahu — efekty špeciálnych políčok (pickupy, dmg, IK)
-    endOfStepTileEffects(tl, stonedStep);
+    endOfStepTileEffects(tl, ctx.stonedStep);
     // až TERAZ ubudni kameň za skamenené passy tohto kroku — socha (kreslená zo state.stone) tak zmizne
     // až v ďalšom kroku, čiže vizuálne na začiatku nasledujúcej akcie, keď sa dlaždice pod hráčom spustia
     for (const slot of order) {
-      if (!tookStoned[slot] || game.players[slot].stone <= 0) continue;
+      if (!ctx.tookStoned[slot] || game.players[slot].stone <= 0) continue;
       game.players[slot].stone--;
       // posledný kameň odišiel → socha sa roztrieští (klient vykreslí kamenné úlomky, nie len preblik)
       if (game.players[slot].stone === 0) pushStateFrame(tl, [{ kind: "unpetrify", target: slot }], SMALL_DELAY_MS);
     }
-    if (winnerNow()) { ended = true; break outer; }
+    if (winnerNow()) { ctx.ended = true; return finishRound(); }
+    ctx.i++;
+    ctx.slotIdx = 0;
   }
+  finishRound();
+}
+
+// koncová fáza kola (po dohraní všetkých akcií alebo po lethal) — pride/moon, obrany, gold fáza, doom,
+// tiles, emit timeline, reset a naplánovanie ďalšieho kola. Číta game.roundCtx a na konci ho vynuluje.
+function finishRound() {
+  const ctx = game.roundCtx;
+  const { tl, order, escUsedDefense, wandererUsedMirror, doomSlot } = ctx;
+  let ended = ctx.ended;
 
   // koniec hry: tieňové klony miznú (aj pri výhre majiteľa) — poof po dohraní smrteľného zásahu;
   // pasce zanikajú ticho (smrť castera / koniec hry — nová hra aj tak resetuje hráčov)
@@ -2955,6 +2991,7 @@ function resolveTurn() {
   game.players.p2.draft = { queue: [], golden: false, goldenMirror: false, goldenMana: false, lastStand: false, lastHope: false };
 
   const dur = tl.reduce((a, f) => a + (f.delayMs || 0), 0);
+  game.roundCtx = null; // kolo dohrané — kontext už netreba (ďalšie kolo si vytvorí nový)
   if (ended) {
     handleGameEnd(dur);
   } else {
