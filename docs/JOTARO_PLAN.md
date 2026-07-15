@@ -411,22 +411,22 @@ Registrácia a kit:
 
 Každá fáza = samostatne commitnuteľný, testami krytý celok. Zaškrtávaj.
 
-- [ ] **F0 — assety:** `pack_char.cjs` + `Summon_P.png`; over štvorcové framy (šírka/výška
-      deliteľná — engine odvodzuje počet framov).
-- [ ] **F1 — registrácia + basic kit (bez THE WORLD):** SIDE_CHARS/VAMP_CHARS split (server+klient),
-      karta klikateľná, diagonálny basic, normálny dash/melee, special1 v mirror slote (+ skin,
-      picker, preview, ikony), Special 2 ako DOČASNÉ správanie special buttonu (worldUsed
-      inicializuj na `true`, nech je F1 hrateľná a testovateľná bez time-stopu). Testy TJ1-TJ4, TJ8.
-- [ ] **F2 — stand:** standEls render, summon intro, death unsummon, HEAD_CX/TOP. Vizuálne overenie.
-- [ ] **F3a — refaktor `resolveTurn` na rezumovateľný** (bez zmeny správania!). Celé `npm test`
-      zelené. Samostatný commit.
-- [ ] **F3b — THE WORLD:** server pauza/resume + `timestop_actions` + announce/kumulát; klient
-      pauza + ts UI + filter; `worldUsed` default späť `false`. Testy TJ5-TJ7, TJ13, TJ14.
-- [ ] **F4 — matica okrajov:** labyrint (TJ10), naruto (TJ11), turnaj (TJ12), tiles (TJ9),
-      pasca (TJ15), Last Stand ručný check.
-- [ ] **F5 — dokumentácia + polish:** CLAUDE.md, ability preview text, choreografia THE WORLD
-      castu (Special_3_P menace + invert flash + „THE WORLD!" float), vizuálne overenie v
-      prehliadači (obe strany, reload počas timestopu).
+- [x] **F0 — assety:** `pack_char.cjs` + `Summon_P.png`; framy overené štvorcové. ✅ (commit)
+- [x] **F1 — registrácia + basic kit (bez THE WORLD):** SIDE_CHARS/VAMP_CHARS split (server+klient),
+      karta klikateľná, diagonálny basic, normálny dash/melee, special1 v mirror slote (skin/picker/
+      preview/ikony), Special 2. Testy TJ1-TJ4, TJ8 zelené. ✅
+- [x] **F2 — stand:** standEls render, summon intro (Summon_P), death unsummon (Dead_P), HEAD_CX/TOP.
+      Kód hotový. ⚠️ VIZUÁLNE OVERENIE V PREHLIADAČI CHÝBA (offset/veľkosť standu môže chcieť doladiť).
+- [x] **F3a — refaktor `resolveTurn` na rezumovateľný** (bez zmeny správania). Celé `npm test` zelené. ✅
+- [x] **F3b — THE WORLD:** server pauza/resume + `timestop_actions` + announce/kumulát (TJ5-7,13,14
+      zelené); klient pauza + ts UI + filter (kód hotový); `worldUsed` default `false`. ✅ server;
+      ⚠️ klientská pauza/ts-mód/reload VIZUÁLNE NEOVERENÉ.
+- [~] **F4 — matica okrajov:** turnaj (TJ12) ✅, naruto klon odložený clone_die (TJ11) ✅.
+      CHÝBA: labyrint (TJ10), tiles (TJ9), pasca (TJ15), Last Stand ručný check — server logika
+      (frozenActive guardy) je hotová, len bez cielených testov.
+- [~] **F5 — dokumentácia + polish:** CLAUDE.md ✅; ability preview text ✅. CHÝBA: choreografia
+      THE WORLD castu (Special_3_P menace/invert flash/„THE WORLD!" float — teraz len generický
+      filter), vizuálne overenie v prehliadači (obe strany, reload počas timestopu).
 
 ---
 
