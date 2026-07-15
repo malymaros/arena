@@ -4741,7 +4741,7 @@ function syncMirrorBtn(char) {
     delete ico.dataset.emoji;
     delete ico.dataset.done;
     ico.classList.add("charge-mark");
-    ico.textContent = "❔";
+    ico.textContent = "???"; // rovnaký „hidden" vzhľad ako Vampírov charge button
     if (cost) { cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(cost); }
     mirrorBtn.title = "Star Platinum — a directional (left/right) strike hitting BOTH diagonal cells on that side for 4 dmg";
   } else if (ico) {
@@ -5039,20 +5039,21 @@ function updateGoldenButton() {
 
 document.querySelectorAll(".controls button[data-act]").forEach(btn => {
   btn.addEventListener("click", () => {
+    const [type, arg] = btn.dataset.act.split(":");
+
+    // Jotaro: mirror slot je Special 1 → klik TOGGLUJE L/R picker (togglePicker rieši open→close aj
+    // „iný picker otvorený"); musí byť PRED guardom otvoreného pickera, inak by re-klik len shakoval
+    if (type === "mirror" && ghostCharAt() === "jotaro") {
+      togglePicker("special1", mirrorBtn, "special1");
+      return;
+    }
+
     if (uiLocked()) return;
     if (myQueue.length >= 3) return;
 
     // pri otvorenom pickeri sú klikateľné len jeho šípky — ostatné tlačidlá sú blokované
     const isPickerArrow = !!btn.closest(".dir-picker");
     if (openPicker && !isPickerArrow) { shakeBtn(btn); return; }
-
-    const [type, arg] = btn.dataset.act.split(":");
-
-    // Jotaro: mirror slot je Special 1 → klik otvorí L/R picker (nie push mirror)
-    if (type === "mirror" && ghostCharAt() === "jotaro") {
-      togglePicker("special1", mirrorBtn, "special1");
-      return;
-    }
 
     // každá akcia max 1× za kolo
     if (myQueue.some(a => a.type === type)) {
