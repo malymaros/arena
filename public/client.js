@@ -361,11 +361,11 @@ youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
 // horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
-const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50, soldier: 0.47, werewolf: 0.50, countess: 0.49, onre: 0.50 };
+const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50, soldier: 0.47, werewolf: 0.50, countess: 0.49, onre: 0.50, jotaro: 0.47 };
 // vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
 // ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
 // Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128); Vlkolak je zhrbený nízko (vrch figúry ~0.55 framu)
-const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48, werewolf: 0.55, countess: 0.45, onre: 0.45 };
+const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48, werewolf: 0.55, countess: 0.45, onre: 0.45, jotaro: 0.42 };
 
 // zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -419,6 +419,7 @@ const SPECIAL_ANIMS = {
   werewolf:  { file: "Run+Attack.png",   fps: SPECIAL_FPS, loop: true }, // rozbeh charge — veľký stredový sprite hrá LEN Run+Attack (Attack_2 seknutie je na malej figúre pri dopade)
   countess:  { file: "A5.png",           fps: SPECIAL_FPS, loop: true }, // kladenie pasce — celá útočná sekvencia A1–A4 (17f); pri caste sa hrá RAZ od frame 0 (server drží jeden dlhý VAMP_CAST_MS frame), loop len pre victory/preview. Cieľová bunka sa NEzvýrazňuje, pasca je tajná
   onre:      { file: "Scream.png",       fps: SPECIAL_FPS, loop: true }, // kladenie pasce — prízračný výkrik
+  jotaro:    { file: "Special_2_P.png",  fps: SPECIAL_FPS, loop: true }, // Star Platinum úder (stred castu; F5 doladí per special1/2 + THE WORLD)
 };
 // niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
@@ -463,12 +464,14 @@ const CHAR_META = {
   jotaro:    { name: "Jotaro",  dir: "jotaro", dirP2: "jotaro" }
 };
 // side-postavy viazané na slot (zrkadlo serverového SIDE_CHARS); v turnaji sa dajú draftnúť, ale
-// swap DO/Z nich je zakázaný — v HUD hlavách to reprezentuje glitch (viď renderMageHeads)
-const SIDE_CHARS = { countess: "p1", onre: "p2" };
-function sideCharForSlot(slot) {
-  for (const k in SIDE_CHARS) if (SIDE_CHARS[k] === slot) return k;
-  return null;
-}
+// swap DO/Z nich je zakázaný — v HUD hlavách to reprezentuje glitch (viď renderMageHeads).
+// Jotaro (stand Star Platinum) je side-bound na p2 ako Onryō.
+const SIDE_CHARS = { countess: "p1", onre: "p2", jotaro: "p2" };
+// vamp kit (charge/trap/vamp melee/mirror-imunita) — PODMNOŽINA side-bound; Jotaro NIE
+// (dashuje/melee normálne, special nie je pasca, nie je mirror-imúnny, dash bez ❔ skinu)
+const VAMP_CHARS = { countess: 1, onre: 1 };
+// je `key` side-postava viazaná na `slot`? (p2 má viac: onre, jotaro)
+function sideCharBoundTo(key, slot) { return SIDE_CHARS[key] === slot; }
 // sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
   const m = CHAR_META[char];
@@ -2280,7 +2283,8 @@ function actionIcon(action, ownerSlot) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — len čistý badge
+    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje — len čistý badge
+    case "special1": return `👊${ARROW_DIR[action.dir] || ""}`; // Jotarov útok v mirror slote (Star Platinum)
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
@@ -2408,6 +2412,7 @@ function renderGrid(s, effects = []) {
   for (const e of effects) {
     if (e?.kind === "charge")    charges.push(e);
     if (e?.kind === "special")   specials.push(e);
+    if (e?.kind === "special1")  specials.push(e); // Jotarov útok v mirror slote — rovnaké zvýraznenie zóny + center cast
     if (e?.kind === "hit")       hitTarget = e.target;
     if (e?.kind === "tile_proc") procs.push(e);
     if (e?.kind === "clone_hit" && Array.isArray(e.cell)) cloneHitCells.push(e.cell);
@@ -2633,6 +2638,15 @@ function cellsForSpecialPreview(meState, dir){
       if (foe && foe.x != null && ((foe.x === cx && foe.y === cy) || (foe.clone && foe.clone.x === cx && foe.clone.y === cy))) break;
       cx += delta[0]; cy += delta[1];
     }
+  } else if (char === "jotaro"){
+    // special = Special 2 (po THE WORLD, worldUsed): jediná susedná bunka (x±dir, y). THE WORLD (pred ním):
+    // cast je globálny → celá doska blikne (nič konkrétne neleakuje). worldUsed nesie meState.
+    if (meState.worldUsed) {
+      const fx = x + (dir === "left" ? -1 : 1);
+      if (fx >= 0 && fx < board.w) cells.push([fx, y]);
+    } else {
+      for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
+    }
   } else if (char === "escanor"){
     // smerový (left/right) — rozsah podľa pride levelu; zrkadlí escanorCells na serveri
     const pride = Math.max(0, Math.min(3, meState.pride ?? 0));
@@ -2648,6 +2662,17 @@ function cellsForSpecialPreview(meState, dir){
     }
   }
   return cells;
+}
+// Jotarov Special 1 (mirror slot): obe diagonálne bunky zvolenej strany (x±dir, y±1) — zrkadlí jotaroS1Cells
+function cellsForJotaroS1(p, dir){
+  if (!p) return [];
+  const dx = dir === "left" ? -1 : 1;
+  const out = [];
+  for (const dy of [-1, 1]) {
+    const cx = p.x + dx, cy = p.y + dy;
+    if (cx >= 0 && cy >= 0 && cx < board.w && cy < board.h) out.push([cx, cy]);
+  }
+  return out;
 }
 // dosah melee — vlastné políčko; Medúza navyše 1 diagonálne na všetky strany (zrkadlí doMelee na serveri)
 function cellsForMeleePreview(p, char){
@@ -2803,7 +2828,7 @@ function vampShotRoute(x, y, dir){
 // idú po lomenej bounce dráhe (char sa dodáva kvôli nej)
 function cellsForAimPreview(meState, dir, char){
   if (!meState) return [];
-  if (char === "countess" || char === "onre") return vampShotRoute(meState.x, meState.y, dir);
+  if (SIDE_CHARS[char]) return vampShotRoute(meState.x, meState.y, dir); // diagonálny basic s odrazom (Countess/Onre/Jotaro)
   const delta = WOLF_DIRS_CLIENT[dir];
   if (!delta) return [];
   const cells = [];
@@ -3022,7 +3047,8 @@ function actionBadgeView(a, ownerSlot) {
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
-    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor; Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
+    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
+    case "special1":      return { cls: "special", text: `👊${arrow[a.dir] || ""}` }; // Jotarov útok v mirror slote
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
@@ -3060,6 +3086,10 @@ function attachQueueHover(el, a, idx) {
       const char = ghostCharAt(idx); const p = ghostPos(idx);
       if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, foe: state?.[otherSlot()] }, a.dir));
     });
+    el.addEventListener("mouseleave", clearPreviewCells);
+  } else if (a.type === "special1") {
+    // Jotarov Special 1 — obe diagonálne bunky zvolenej strany z ghost pozície
+    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForJotaroS1(p, a.dir)); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
     el.addEventListener("mouseenter", () => {
@@ -3526,6 +3556,11 @@ function schedulePlayTimeline(timeline) {
         cloneFloat(e.from, msg, cls);
       }
       if (e.kind === "special" && e.from && state?.[e.from]?.char !== "escanor") casters.add(e.from); // Escanor rieši vlastná choreografia
+      // Jotarov Special 1 (mirror slot): rovnaká center-cast choreografia ako special; otočenie podľa smeru
+      if (e.kind === "special1" && (e.from === "p1" || e.from === "p2")) {
+        casters.add(e.from);
+        if (e.dir === "left" || e.dir === "right") facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
+      }
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení; diagonály podľa
       // horizontálnej zložky — Countess/Onre strieľajú šikmo)
       if (e.kind === "charge" && typeof e.dir === "string" && (e.from === "p1" || e.from === "p2")) {
@@ -4063,7 +4098,7 @@ function drawEscanorCard(ctx, cvs, now) {
 // obe kreslenia idú cez portraitFill (PORTRAIT_SCALE normalizuje figúru na výšku mágov).
 const PREVIEW_CAST = {
   luffy:  { file: "Special_1.png",   frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
-  jotaro: { file: "Special_3_P.png", frames: 4, fps: 6, loopFrom: 3, fill: 1.31 * 160 / 144 }, // Star Platinum menacing — drží posledný frame
+  // Jotaro je už hrateľný → renderuje sa ako bežná karta (Idle + SPECIAL_ANIMS hover, dead/roster stav)
 };
 const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
 // offsetY −39 (mágovia −52): ich pásy sú bottom-anchored s malým PAD, mágovia majú vo frame
@@ -4176,8 +4211,8 @@ selEl.addEventListener("click", (e) => {
 const teamConfirmBtn = document.getElementById("team-confirm");
 const teamWaitEl = document.getElementById("team-wait");
 function toggleTeamPick(key) {
-  // side-postavu smie draftnúť len jej vlastná strana (p1 → countess, p2 → onre); druhej strany je zakázaná
-  if (SIDE_CHARS[key] && key !== sideCharForSlot(me)) return;
+  // side-postavu smie draftnúť len jej vlastná strana (p1 → countess; p2 → onre|jotaro); druhej strany je zakázaná
+  if (SIDE_CHARS[key] && !sideCharBoundTo(key, me)) return;
   const i = teamPick.indexOf(key);
   if (i >= 0) teamPick.splice(i, 1);
   else if (teamPick.length < TEAM_SIZE) teamPick.push(key);
@@ -4235,7 +4270,9 @@ const ABILITY_PREVIEW = {
   // Hidden preview postavy (zatiaľ nehrateľné): špeciál je utajený — secret:true vypína caster
   // aj zónu (prázdna mini-doska), žiadny stats riadok, text TOP SECRET (fialový neón flicker)
   luffy:     { caster: null, dmg: null, secret: true, desc: '<span class="ca-secret">TOP SECRET</span>' },
-  jotaro:    { caster: null, dmg: null, secret: true, desc: '<span class="ca-secret">TOP SECRET</span>' },
+  // Jotaro: THE WORLD (jednorazový time-stop) — bez konkrétnych čísel v texte (cost badge nesie 5).
+  // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
+  jotaro:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once per game): time stops — take 3 extra actions while the foe is frozen; all their effects land at once when time resumes. Diagonal bouncing basic; his stand Star Platinum strikes both diagonals with Special 1" },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -4546,7 +4583,9 @@ const specialBtn    = document.getElementById("special-btn");
 const specialPicker = document.getElementById("special-picker"); // smer pohľadu — používa len Medúza
 const cellPicker    = document.getElementById("cell-picker");    // Vojak/Countess/Onre — mini mapa plochy na výber cieľovej bunky
 const wolfPicker    = document.getElementById("wolf-picker");    // Vlkolak — 8 smerov charge (aj diagonály)
-const aimPickerDiag = document.getElementById("aim-picker-diag"); // Countess/Onre — diagonálny basic (4 smery)
+const aimPickerDiag = document.getElementById("aim-picker-diag"); // Countess/Onre/Jotaro — diagonálny basic (4 smery)
+const mirrorBtn = document.getElementById("mirror-btn"); // pre Jotara sa mení na Special 1
+const s1Picker  = document.getElementById("s1-picker");  // Jotarov Special 1 — smer left/right
 
 function shakeBtn(btn) {
   btn.classList.add("shake");
@@ -4555,10 +4594,10 @@ function shakeBtn(btn) {
 
 // otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
 // odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
-let openPicker = null; // null | "move" | "attack" | "attack_diag" | "dash" | "special" | "special_cell" | "special_wolf"
+let openPicker = null; // null | "move" | "attack" | "attack_diag" | "dash" | "special" | "special_cell" | "special_wolf" | "special1"
 const meleeBtn = document.getElementById("melee-btn"); // melee má picker (Countess/Onre) → vlastné id a handler
-const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker };
-const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn };
+const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker, special1: s1Picker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn, special1: mirrorBtn };
 
 // Vampire/Onryō: dash slot = CHARGE — tlačidlo dostane fialový „Hidden" skin s preblikávaním a ???
 // namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
@@ -4600,6 +4639,38 @@ function syncDashBtn(char) {
   attackBtn.title = side
     ? "Range Attack — a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance"
     : ATTACK_TITLE_DEFAULT;
+}
+
+// Jotaro nemá mirror — tento slot je Special 1 (Star Platinum): fialový ❔ skin, cost 4, L/R picker.
+// Pre ostatné postavy vráti bežný mirror. Volané zo state handlera pri každom snapshote.
+const MIRROR_TITLE_DEFAULT = "Mirror (−4 mana, reflects all damage of the opponent's next action back at them)";
+function syncMirrorBtn(char) {
+  if (!mirrorBtn) return;
+  const jo = char === "jotaro";
+  mirrorBtn.classList.toggle("jotaro-s1", jo);
+  s1Picker?.classList.toggle("jotaro-s1", jo);
+  const ico = mirrorBtn.querySelector(".pix-ico");
+  const cost = mirrorBtn.querySelector(".cost");
+  if (ico && jo) {
+    delete ico.dataset.emoji;
+    delete ico.dataset.done;
+    ico.classList.add("charge-mark");
+    ico.textContent = "❔";
+    if (cost) { cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(cost); }
+    mirrorBtn.title = "Star Platinum — a directional (left/right) strike hitting BOTH diagonal cells on that side for 4 dmg";
+  } else if (ico) {
+    ico.classList.remove("charge-mark");
+    if (cost) { cost.innerHTML = `−4${miniPix("💧")}`; hydratePix(cost); }
+    mirrorBtn.title = MIRROR_TITLE_DEFAULT;
+    if (ico.dataset.emoji !== "🪞") {
+      ico.dataset.emoji = "🪞";
+      ico.innerHTML = "";
+      delete ico.dataset.done;
+      pixelizeEmoji(ico);
+    } else if (!ico.dataset.done) {
+      pixelizeEmoji(ico);
+    }
+  }
 }
 
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
@@ -4654,7 +4725,7 @@ moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"))
 // Countess/Onre strieľajú diagonálne — attack otvára diagonálny picker namiesto ortogonálneho
 attackBtn.addEventListener("click", () => {
   const c = ghostCharAt();
-  togglePicker((c === "countess" || c === "onre") ? "attack_diag" : "attack", attackBtn, "attack");
+  togglePicker(SIDE_CHARS[c] ? "attack_diag" : "attack", attackBtn, "attack"); // Countess/Onre/Jotaro strieľajú diagonálne
 });
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
 // Melee: priama akcia bez pickera (Vampire/Onryō sekajú tiež len na vlastnej bunke)
@@ -4701,6 +4772,16 @@ function buildCellPicker(freeAll = false) {
 // Special: Medúza/Escanor si najprv vyberú smer pohľadu (←/→), Vlkolak jeden z 8 smerov charge,
 // Vojak cieľovú bunku; ostatní pridajú akciu priamo
 specialBtn.addEventListener("click", () => {
+  if (ghostCharAt() === "jotaro") {
+    // po THE WORLD (worldUsed): Special 2 = smerový (left/right) → picker; pred ním: THE WORLD bez smeru → priamo
+    if (state?.[me]?.worldUsed) { togglePicker("special", specialBtn, "special"); return; }
+    if (uiLocked()) return;
+    if (openPicker) { shakeBtn(specialBtn); return; }
+    if (myQueue.length >= 3 || myQueue.some(a => a.type === "special")) { shakeBtn(specialBtn); return; }
+    myQueue.push({ type: "special" });
+    renderQueue();
+    return;
+  }
   if (ghostCharAt() === "medusa" || ghostCharAt() === "escanor") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
   if (ghostCharAt() === "werewolf") { togglePicker("special_wolf", specialBtn, "special"); return; } // charge — 8 smerov
   if (ghostCharAt() === "soldier") {
@@ -4876,6 +4957,12 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
 
     const [type, arg] = btn.dataset.act.split(":");
 
+    // Jotaro: mirror slot je Special 1 → klik otvorí L/R picker (nie push mirror)
+    if (type === "mirror" && ghostCharAt() === "jotaro") {
+      togglePicker("special1", mirrorBtn, "special1");
+      return;
+    }
+
     // každá akcia max 1× za kolo
     if (myQueue.some(a => a.type === type)) {
       shakeBtn(btn);
@@ -4892,7 +4979,8 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     if (type === "recharge")  myQueue.push({ type: "recharge" });
     if (type === "attack")    myQueue.push({ type: "attack", dir: arg });
     if (type === "melee")     myQueue.push({ type: "melee" });
-    if (type === "special")   myQueue.push(arg ? { type: "special", dir: arg } : { type: "special" }); // smer (←/→) volí len Medúza
+    if (type === "special")   myQueue.push(arg ? { type: "special", dir: arg } : { type: "special" }); // smer (←/→): Medúza/Escanor/Jotaro(S2)
+    if (type === "special1")  myQueue.push({ type: "special1", dir: arg }); // Jotarov útok v mirror slote
     if (type === "shield")    myQueue.push({ type: "shield" });
     if (type === "mirror")    myQueue.push({ type: "mirror" });
 
@@ -5212,13 +5300,19 @@ function autoLockTimeout() {
   // golden predťah už pokrýva štít/mirror — nedopĺňaj ich (inak by sa akcia zahrala 2× a server lock odmietol)
   if (goldenArmed) used.add("shield");
   if (goldenMirrorArmed) used.add("mirror");
-  const pool = ["recharge", "shield", "mirror", "melee", "special", "move", "dash", "attack"].filter(t => !used.has(t));
-  const sideChar = ghostCharAt() === "countess" || ghostCharAt() === "onre"; // diagonálny attack, pasca s bunkou (dash/melee generické)
+  const gc = ghostCharAt();
+  const diagChar = !!SIDE_CHARS[gc];               // diagonálny attack (Countess/Onre/Jotaro)
+  const vampChar = gc === "countess" || gc === "onre"; // special = pasca s bunkou
+  const isJotaro = gc === "jotaro";
+  // Jotaro nemá mirror akciu → vyhoď z poolu (inak by server lock odmietol); special1 nedopĺňame (voliteľný)
+  const pool = ["recharge", "shield", "mirror", "melee", "special", "move", "dash", "attack"]
+    .filter(t => !used.has(t) && !(t === "mirror" && isJotaro));
   const DIAG_KEYS = ["up_left", "up_right", "down_left", "down_right"];
   while (myQueue.length < 3 && pool.length) {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-    if (t === "attack" && sideChar) myQueue.push({ type: t, dir: DIAG_KEYS[Math.floor(Math.random() * 4)] });
-    else if (t === "special" && sideChar) myQueue.push({ type: t, cell: { x: (Math.random() * board.w) | 0, y: (Math.random() * board.h) | 0 } }); // pasca — ľubovoľná bunka
+    if (t === "attack" && diagChar) myQueue.push({ type: t, dir: DIAG_KEYS[Math.floor(Math.random() * 4)] });
+    else if (t === "special" && vampChar) myQueue.push({ type: t, cell: { x: (Math.random() * board.w) | 0, y: (Math.random() * board.h) | 0 } }); // pasca — ľubovoľná bunka
+    else if (t === "special" && isJotaro) myQueue.push(state?.[me]?.worldUsed ? { type: t, dir: Math.random() < 0.5 ? "left" : "right" } : { type: t }); // Special 2 (smer) / THE WORLD (bez args)
     else if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
     else if (t === "special" && (ghostCharAt() === "medusa" || ghostCharAt() === "escanor")) myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
     else if (t === "special" && ghostCharAt() === "werewolf") myQueue.push({ type: t, dir: WOLF_DIR_KEYS_CLIENT[Math.floor(Math.random() * WOLF_DIR_KEYS_CLIENT.length)] }); // Vlkolakov charge — náhodný z 8 smerov
@@ -5478,6 +5572,8 @@ socket.on("state", (s) => {
 
   // dash/attack tlačidlá podľa mága — Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
   syncDashBtn(s[me]?.char);
+  // mirror slot podľa mága — Jotaro tu má Special 1 (fialový ❔ skin + L/R picker)
+  syncMirrorBtn(s[me]?.char);
   // label melee podľa mága — Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō majú center strike bez bonusu
   const mineMelee = s[me];
   if (mineMelee?.char && meleeBtn) {
@@ -5545,6 +5641,17 @@ socket.on("state", (s) => {
       specialBtn.title = `Special (−5 mana, 3 dmg) — set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit ${bonus}. Only one trap — recasting replaces it`;
       const bonusIcon = specChar === "countess" ? miniPix("❤️") : miniPix("💧");
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 3${miniPix("☠️")}${bonusIcon}`; hydratePix(cost); }
+    } else if (specChar === "jotaro") {
+      // pred THE WORLD: ⏱ (time-stop). Po ňom (worldUsed): Special 2 = smerový 8 dmg (👊) na susednú bunku.
+      if (state?.[me]?.worldUsed) {
+        if (specIco) { delete specIco.dataset.emoji; delete specIco.dataset.done; specIco.classList.add("charge-mark"); specIco.textContent = "👊"; }
+        specialBtn.title = "Special 2 (−5 mana, 8 dmg) — a directional (left/right) strike on the adjacent cell";
+        if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
+      } else {
+        if (specIco) { delete specIco.dataset.emoji; delete specIco.dataset.done; specIco.classList.add("charge-mark"); specIco.textContent = "⏱"; }
+        specialBtn.title = "THE WORLD (−5 mana, once per game) — time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes";
+        if (cost) { cost.innerHTML = `−5${miniPix("💧")} ⏱`; hydratePix(cost); }
+      }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
       if (dmg != null) {
@@ -6020,7 +6127,8 @@ if (specialBtn){
     const p = ghostPos();
     if (!char || !p) return;
     if (char === "medusa" || char === "escanor" || char === "werewolf") return; // smerový special — preview ukazujú až šípky pickeru
-    showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char }));
+    if (char === "jotaro" && state?.[me]?.worldUsed) return; // Special 2 je smerový — preview ukáže L/R picker
+    showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, worldUsed: state?.[me]?.worldUsed }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
 }
@@ -6030,9 +6138,15 @@ specialPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   btn.addEventListener("mouseenter", () => {
     const char = ghostCharAt();
     const p = ghostPos();
-    if ((char === "medusa" || char === "escanor") && p)
-      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride }, dir));
+    if ((char === "medusa" || char === "escanor" || char === "jotaro") && p)
+      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, worldUsed: state?.[me]?.worldUsed }, dir));
   });
+  btn.addEventListener("mouseleave", clearPreviewCells);
+});
+// hover preview Jotarovho Special 1 na šípkach s1-pickera (←/→) — obe diagonály strany z ghost pozície
+s1Picker?.querySelectorAll("button[data-act]").forEach(btn => {
+  const dir = btn.dataset.act.split(":")[1];
+  btn.addEventListener("mouseenter", () => { const p = ghostPos(); if (p) showPreviewCells(cellsForJotaroS1(p, dir)); });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
 // hover preview dráhy vlkolakovho charge na šípkach 8-smerového pickera — z ghost pozície,

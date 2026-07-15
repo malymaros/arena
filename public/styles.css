@@ -408,6 +408,28 @@ body.labyrinth-mode #arena { filter: brightness(.22) saturate(.35); transition: 
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
 }
 #dash-picker.vamp-charge .arrow{ background: #7a4fd0; } /* šípky charge v rovnakej fialovej */
+
+/* Jotaro: mirror slot = Special 1 (Star Platinum) — rovnaký fialový „Hidden" skin ako vamp charge,
+   ikona ❔; triedu prepína syncMirrorBtn podľa zvoleného mága */
+.btn.act.mirror.jotaro-s1{
+  background: #2c2438;
+  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 14px rgba(177,122,255,.35);
+  animation: hidden-flicker 3.2s linear infinite;
+}
+.btn.act.mirror.jotaro-s1 .pix-ico.charge-mark{
+  width: 44px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 18px; line-height: 1; font-weight: 900; color: #d8c2ff; letter-spacing: 0;
+  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
+  animation: hidden-question-glitch 1.35s steps(2, end) infinite;
+}
+.btn.act.mirror.jotaro-s1:not(:disabled):not(.locked-ui):not(.locked-perm):not(.locked-golden):hover{
+  box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
+}
+#s1-picker.jotaro-s1 .arrow{ background: #7a4fd0; } /* šípky Special 1 v rovnakej fialovej */
+.btn.act.mirror.jotaro-s1.locked-ui .pix-ico.charge-mark,
+.btn.act.mirror.jotaro-s1:disabled .pix-ico.charge-mark{ animation: none; }
 /* výber smeru pre Move — popup nad tlačidlom v tvare kríža */
 .move-wrap{ position: relative; }
 .dir-picker{

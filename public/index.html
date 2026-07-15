@@ -211,7 +211,15 @@
 
       <div class="act-group" data-label="DEFEND">
         <button class="btn act shield" data-act="shield" title="Shield (−2 mana, blocks all damage of the opponent's next action)"><span class="pix-ico" data-emoji="🛡️"></span><span class="cost">−2<span class="pix-ico mini" data-emoji="💧"></span></span></button>
-        <button class="btn act mirror" data-act="mirror" title="Mirror (−4 mana, reflects all damage of the opponent's next action back at them)"><span class="pix-ico" data-emoji="🪞"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+        <!-- Mirror — Jotaro tento slot nemá: syncMirrorBtn ho premení na Special 1 (fialový ❔ skin + L/R picker) -->
+        <div class="move-wrap">
+          <button id="mirror-btn" class="btn act mirror" data-act="mirror" title="Mirror (−4 mana, reflects all damage of the opponent's next action back at them)"><span class="pix-ico" data-emoji="🪞"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+          <!-- Jotaro Special 1: smer left/right (Star Platinum udrie na obe diagonály strany) -->
+          <div id="s1-picker" class="dir-picker special-picker hidden">
+            <button class="btn arrow left"  data-act="special1:left"  title="Star Platinum — Left">←</button>
+            <button class="btn arrow right" data-act="special1:right" title="Star Platinum — Right">→</button>
+          </div>
+        </div>
       </div>
 
       <div class="act-group" data-label="MANA">
@@ -313,15 +321,17 @@
           <div class="char-stats hidden" data-char="onre"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Onryō</div>
         </div>
-        <!-- preview karty (zatiaľ NEHRATEĽNÉ): data-char je len na canvase (kreslenie/hover),
-             karta bez data-char = klik aj draft ju ignorujú; Luffy len P1, Jotaro len P2 -->
+        <!-- Jotaro (JJBA, stand Star Platinum) — HRATEĽNÝ, viazaný na P2 ako Onryō -->
+        <div class="char-card hidden-char" data-char="jotaro" data-side="p2">
+          <canvas class="char-canvas" width="220" height="240" data-char="jotaro"></canvas>
+          <div class="char-stats hidden" data-char="jotaro"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Jotaro</div>
+        </div>
+        <!-- preview karta (zatiaľ NEHRATEĽNÁ): data-char je len na canvase (kreslenie/hover),
+             karta bez data-char = klik aj draft ju ignorujú; Luffy len P1 -->
         <div class="char-card hidden-char preview-char" data-side="p1">
           <canvas class="char-canvas" width="220" height="240" data-char="luffy"></canvas>
           <div class="char-name">Luffy</div>
-        </div>
-        <div class="char-card hidden-char preview-char" data-side="p2">
-          <canvas class="char-canvas" width="220" height="240" data-char="jotaro"></canvas>
-          <div class="char-name">Jotaro</div>
         </div>
         <div class="char-card soon"><div class="soon-mark">???</div><div class="char-name">Coming soon</div></div>
       </div>
