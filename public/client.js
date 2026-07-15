@@ -294,7 +294,6 @@ for (const _slot of ["p1", "p2"]) {
 }
 let standSummoned = { p1: false, p2: false }; // stand už odohral summon intro (Summon_P) pri tomto nasadení
 let standSummonStart = { p1: 0, p2: 0 };      // čas štartu summonu (Summon_P sa kreslí relatívnym časom, RAZ)
-let tsCastUntil = { p1: 0, p2: 0 };           // dokedy stand hrá Special_3_P „menace" (THE WORLD cast — ako v náhľade)
 let standPrevChar = { p1: null, p2: null };   // detekcia (re)nasadenia Jotara → reset summonu
 const STAND_OFFSET = 64;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane) — vznáša sa ďalej
 const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
@@ -302,7 +301,7 @@ const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
 function standFileFor(slot) {
   const st = state?.[slot];
   if ((st?.hp ?? 1) <= 0 || st?.down) return "Dead_P.png"; // smrť → unsummon póza
-  if (performance.now() < (tsCastUntil[slot] || 0)) return "Special_3_P.png"; // THE WORLD cast → Star Platinum „menace" (ako v náhľade)
+  // POZN.: stand pri Jotarovi sa počas THE WORLD NEmení (menace Special_3_P je len v strede plochy)
   switch (animState[slot]?.key) {
     case "run":     return "Run_P.png";       // move/dash
     case "attack":  return "Attack_1_P.png";  // basic strela
@@ -3690,9 +3689,8 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "timestop_start") {
         document.body.classList.add("timestop-mode");
         if (e.from === "p1" || e.from === "p2") {
-          tsCastUntil[e.from] = performance.now() + frameHold; // stand hrá Special_3_P počas castu
           tsActive = true; tsJotaroSlot = e.from; tsFreezeAt = performance.now(); // zmraz animácie VŠETKÝCH okrem Jotara
-          spawnWorldCenter(e.from); // veľký stredový „menace" sprite (zamrzne ako v náhľade)
+          spawnWorldCenter(e.from); // veľký stredový „menace" sprite (Special_3_P, zamrzne ako v náhľade)
         }
       }
       if (e.kind === "timestop_wait") tsWait = true;
@@ -5252,11 +5250,10 @@ function enterTimestopMode() {
     lockBtn.classList.remove("locked", "ready"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
     closePickers(); renderQueue(); syncGoldenHalves(); syncGoldDualHalves(); updateUiLocks();
   } else {
-    // súper — zmrazený, UI zamknuté, full-screen filter + overlay. Po caste už NEVIDÍ stredového Star
-    // Platinum (iba oznámenie o zastavenom čase) — center sprite je len Jotarova „menace" póza.
+    // súper — zmrazený, UI zamknuté, full-screen filter + overlay. Stredový Special_3_P vidí PO CELÚ dobu
+    // (kým Jotaro nezadá všetky zmrazené akcie) — center ostáva, mizne až pri obnovení času (timestop_end).
     tsFrozen = true; tsPlanning = false;
     document.body.classList.add("timestop-mode");
-    hideWorldCenter();
     tsOverlaySet(true);
     updateUiLocks();
   }
@@ -5903,13 +5900,12 @@ socket.on("state", (s) => {
       const bonusIcon = specChar === "countess" ? miniPix("❤️") : miniPix("💧");
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 3${miniPix("☠️")}${bonusIcon}`; hydratePix(cost); }
     } else if (specChar === "jotaro") {
-      // pred THE WORLD: ⏱ (time-stop). Po ňom (worldUsed): Special 2 = smerový 8 dmg (👊) na susednú bunku.
+      // klasická ✨ ikona (ako mágovia — reset blok vyššie ju už nastavil); mení sa len cost badge:
+      // pred THE WORLD hodiny (⏱), po ňom (worldUsed) Special 2 = 8 dmg
       if (state?.[me]?.worldUsed) {
-        if (specIco) { delete specIco.dataset.emoji; delete specIco.dataset.done; specIco.classList.add("charge-mark"); specIco.textContent = "👊"; }
         specialBtn.title = "Special 2 (−5 mana, 8 dmg) — a directional (left/right) strike on the adjacent cell";
         if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
       } else {
-        if (specIco) { delete specIco.dataset.emoji; delete specIco.dataset.done; specIco.classList.add("charge-mark"); specIco.textContent = "⏱"; }
         specialBtn.title = "THE WORLD (−5 mana, once per game) — time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes";
         if (cost) { cost.innerHTML = `−5${miniPix("💧")} ⏱`; hydratePix(cost); }
       }
