@@ -206,7 +206,55 @@ const ACTOR_H = Math.round(TILE_H * ACTOR_SCALE);
 // Jotaro (a jeho stand) majú figúru cez väčšinu framu → na boarde ich kreslíme menšie, aby výškou sedeli
 // s mágmi (namerané: jotaro figúra 0.78 framu vs mágovia ~0.52). Stand sa navyše VZNÁŠA za chrbtom (float Y).
 const JOTARO_BOARD_FILL = 0.66;
-const STAND_FLOAT_Y = -34; // stand posunutý hore (vznáša sa nad/za Jotarom)
+// Jotarove pásy majú RÔZNU výšku framu (Idle/Attack/Special 144 px, ale Run/Hurt len 128 px) pri takmer
+// rovnako veľkej figúre (~110–112 px). drawSprite škáluje podľa výšky framu (fill × dstH/fh), takže tá istá
+// figúra v nižšom frame vyjde väčšia → Jotaro „narastie", keď sa hýbe. Normalizujeme fill × (fh/REF), čím sa
+// škála stane nezávislou od paddingu framu (na obraze závisí len od skutočnej výšky figúry). REF = 144.
+const JOTARO_FRAME_REF_H = 144;
+// Konštantná škála na obraze (px na obraze / px zdroja) po normalizácii fill × fh/REF — nezávislá od framu.
+const JOTARO_SCALE = Math.min(ACTOR_W, ACTOR_H) / JOTARO_FRAME_REF_H * JOTARO_BOARD_FILL;
+// Star Platinum `_P` pásy (a Jotarove telo) majú v ÚTOČNÝCH pózach figúru zámerne posunutú tak, aby BBOX
+// ostal centrovaný (napr. pri údere päsť vyletí bokom a telo/nohy sú odtlačené na druhú stranu). Keby sme
+// kreslili centrované na frame, NOHY by pri animácii uskakovali zľava doprava a hore-dole. Preto ukotvujeme
+// figúru za NOHY: pre každý frame držíme x-offset ťažiska nôh (od stredu framu) a botGap (medzera pod nohami).
+// Namerané cez pngjs (bottom ~12 riadkov figúry). x/g sú polia per frame.
+const STAND_FEET = {
+  "Idle_P.png": { x:[-1,1,1,1], g:[8,8,8,8] },
+  "Run_P.png": { x:[-46,-45,-45,-45], g:[13,13,12,13] },
+  "Attack_1_P.png": { x:[-1,1,1,1], g:[8,8,8,8] },
+  "Attack_2_P.png": { x:[9,-68,-62,-70,-71,-68], g:[57,40,40,40,40,40] },
+  "Special_1_P.png": { x:[22,-62,-61,-66,-71,-75], g:[32,40,40,40,34,25] },
+  "Special_2_P.png": { x:[-26,-72,-72,-3,-61,-19,-20,-65,-48,-17], g:[35,43,43,40,46,37,33,46,44,37] },
+  "Special_3_P.png": { x:[32,44,20,6], g:[8,8,8,8] },
+  "Dead_P.png": { x:[-1,-1,-1,1,2,1], g:[8,8,8,8,8,8] },
+  "Summon_P.png": { x:[1,4,-1,-1,-1], g:[8,8,8,8,8] },
+  // Jotarove telo v stredovom páre
+  "Attack_1.png": { x:[5,4,-10,-9,-5], g:[8,8,8,8,8] },
+  "Attack_2.png": { x:[1,4,7,7,7,7], g:[8,8,8,8,8,8] },
+};
+// nohy daného framu (fallback pre neznámy pás = stred, botGap 8)
+function standFeet(file, idx) {
+  const t = STAND_FEET[file];
+  if (!t) return { x: 0, g: 8 };
+  const i = Math.max(0, Math.min(t.g.length - 1, idx | 0));
+  return { x: t.x[i] ?? 0, g: t.g[i] ?? 8 };
+}
+// index práve zobrazeného framu — zrkadlí logiku drawSprite (loop/loopFrom/clamp), aby feet lookup sedel
+function spriteFrameIndex(anim, t, total) {
+  if (anim.frameIndex != null) return Math.max(0, Math.min(total - 1, anim.frameIndex));
+  const elapsedF = Math.floor(t / (1000 / anim.fps));
+  if (anim.loopFrom != null) return elapsedF < total ? elapsedF : anim.loopFrom + ((elapsedF - anim.loopFrom) % (total - anim.loopFrom));
+  if (anim.loop) return ((elapsedF % total) + total) % total;
+  return Math.min(total - 1, Math.max(0, elapsedF));
+}
+const STAND_FLOAT_Y = -34; // stand posunutý hore (vznáša sa nad/za Jotarom) — aplikované v transforme (kvôli plynulému swapu)
+const JOTARO_CENTER_GAP = 0.13; // horizontálny rozostup Jotara a SP v stredovom páre (zlomok veľkosti overlayu) — dolaď podľa vzhľadu
+const JOTARO_CENTER_FILL = 0.62; // veľkosť figúr v stredovom páre (menšie než sólo overlay, lebo sú dve) — tunable
+// stredový pár: nohy OBOCH figúr zladené na spoločnú líniu = stred canvasu + INSET·výška, per-frame
+// stabilizované (kompenzácia botGap), aby SP „nelietal" nad Jotarom a nešklbal sa. INSET posúva líniu nôh NADOL.
+// 0.475 = presne úroveň nôh Fire Wizarda v jeho stredovom overlayi (Attack_2/idle majú botGap 0 → nohy na spodku
+// framu; fire feet = 0.95·(0.5−0)·výška). Tak Jotarove nohy sedia rovnako ako fireove. Tunable.
+const JOTARO_CENTER_INSET = 0.475;
 [actorP1, actorP2].forEach(c => {
   c.width = ACTOR_W; c.height = ACTOR_H;
   c.style.width = ACTOR_W + "px"; c.style.height = ACTOR_H + "px";
@@ -293,20 +341,31 @@ for (const _slot of ["p1", "p2"]) {
   standEls[_slot] = c;
 }
 let standSummoned = { p1: false, p2: false }; // stand už odohral summon intro (Summon_P) pri tomto nasadení
+let standHiddenByWorld = { p1: false, p2: false }; // board-standa skryla veľká THE WORLD menace → raf ho po jej zmiznutí vráti
 let standSummonStart = { p1: 0, p2: 0 };      // čas štartu summonu (Summon_P sa kreslí relatívnym časom, RAZ)
 let standPrevChar = { p1: null, p2: null };   // detekcia (re)nasadenia Jotara → reset summonu
 const STAND_OFFSET = 64;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane) — vznáša sa ďalej
 const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
-// herná animácia Jotara (animState.key) → zodpovedajúci `_P` pás standu
+// Star Platinum — útočná choreografia: pri melee / Special 1 / Special 2 stand hrá svoj útočný `_P` pás
+// a s Jotarom si VYMENIA pozície — stand zíde dole na Jotarovu úroveň (zo vznášania) a dopredu, Jotaro cúvne
+// dozadu na miesto, kde stál stand (obaja na zemi). Aktívne, kým `now < until`.
+let standAttack = { p1: null, p2: null };      // { file, until } — útočný pás standu + výmena pozícií
+// lokomócia standu: dash = beh za Jotarom (Run_P), move = zmizne (Dead_P) a zjaví sa (Summon_P) na novej bunke
+let standBlip = { p1: null, p2: null };        // { start, ox, oy } — prebiehajúci „zmizni→zjav sa" pri MOVE
+const SP_BLIP_DEAD_MS = 500;                   // fáza 1 (Dead_P) na starej bunke
+const SP_BLIP_SUMMON_MS = 650;                 // fáza 2 (Summon_P) na novej bunke (spolu < MOVE_DELAY_MS ≈ 1440)
+// aktuálne ohlásená akcia daného hráča (z `action` efektu) — rozlíši move/dash pri lokomócii standu
+let curAction = { p1: null, p2: null };
+function standSwapActive(slot) { return !!(standAttack[slot] && performance.now() < standAttack[slot].until); }
+// herná animácia Jotara (animState.key) → zodpovedajúci `_P` pás standu (mimo útoku/blipu — tie rieši raf)
 function standFileFor(slot) {
   const st = state?.[slot];
   if ((st?.hp ?? 1) <= 0 || st?.down) return "Dead_P.png"; // smrť → unsummon póza
   // POZN.: stand pri Jotarovi sa počas THE WORLD NEmení (menace Special_3_P je len v strede plochy)
   switch (animState[slot]?.key) {
-    case "run":     return "Run_P.png";       // move/dash
+    case "run":     return "Run_P.png";       // dash = beh za Jotarom (move rieši blip mimo tejto funkcie)
     case "attack":  return "Attack_1_P.png";  // basic strela
-    case "attack2": return "Attack_2_P.png";  // melee
-    case "casting": return "Special_2_P.png"; // special1/Special 2/THE WORLD cast (F5 doladí per-typ)
+    case "victory": return "Special_2_P.png"; // výhra: Jotaro idle, stand hrá Special 2 (odomknutý po THE WORLD)
     default:        return "Idle_P.png";      // idle/hurt (Hurt_P neexistuje)/stoned
   }
 }
@@ -880,6 +939,32 @@ function updateSpecialCenter(casts) {
   for (const sp of casts) {
     const caster = state?.[sp.from];
     if (!caster || !caster.char) continue;
+
+    // Jotarov PÁR: telo (Attack_2) + stand Star Platinum (spFile) v strede, rozmiestnené ako na doske
+    // (SP dopredu k súperovi, Jotaro dozadu), nohy zarovnané. Totálne analogicky k jednosprite overlayu iných postáv.
+    if (sp.jotaroPair) {
+      const dirKey = charDirFor("jotaro", sp.from);
+      const flip = currentFacing(sp.from, facing);
+      const px = Math.round(TILE_H * SPECIAL_SCALE);
+      const gap = Math.round(px * JOTARO_CENTER_GAP);
+      const fc = facing[sp.from] || 1; // p2 = -1 (tvárou k súperovi vľavo)
+      const mk = (file, jfig, dx, z) => {
+        const cvs = document.createElement("canvas");
+        // canvas ŠIROKÝ (2×), aby sa pri ukotvení na nohy vešla vyletená päsť bez orezania (výška určuje škálu = min)
+        cvs.width = px * 2; cvs.height = px;
+        cvs.className = "special-center";
+        cvs.dataset.dir = dirKey; cvs.dataset.file = file; cvs.dataset.fps = "8"; cvs.dataset.jfig = jfig;
+        cvs.style.left = `calc(50% + ${dx}px)`;
+        cvs.style.top  = "50%";
+        cvs.style.zIndex = String(z);
+        cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`; // centrované ROVNAKO ako overlaye iných postáv
+        actorsEl.appendChild(cvs);
+      };
+      mk("Attack_2.png", "body", -fc * gap, 6);       // Jotaro dozadu (opačne než smeruje)
+      mk(sp.spFile, "stand", fc * gap, 7);            // Star Platinum dopredu (k súperovi), nad telom
+      continue;
+    }
+
     const dirKey = charDirFor(caster.char, sp.from);
     const file   = sp.file || SPECIAL_ANIMS[caster.char].file;
 
@@ -1462,9 +1547,10 @@ function projCenter(x, y) {
   return { left: left + TILE_W / 2, top: top + TILE_H / 2 }; // stred bunky v súradniciach #actors (element má translate(-50%,-50%))
 }
 function projectileOrient(charKey, dir) {
-  // Countess/Onre majú úzky diagonálny projektil. Nepoužívaj scaleX+rotate kombináciu:
-  // pri ľavých diagonálach zrkadlenie mení aj znamienko rotácie a špic môže mieriť zle.
-  if (charKey === "countess" || charKey === "onre") {
+  // Countess/Onre/Jotaro majú úzky diagonálny projektil (Jotaro = letiaca päsť Star Platinum).
+  // Nepoužívaj scaleX+rotate kombináciu: pri ľavých diagonálach zrkadlenie mení aj znamienko
+  // rotácie a špic (päsť) môže mieriť zle — preto čistá rotácia (base = doprava).
+  if (charKey === "countess" || charKey === "onre" || charKey === "jotaro") {
     return {
       right: "rotate(0deg)", down_right: "rotate(45deg)", down: "rotate(90deg)", down_left: "rotate(135deg)",
       left: "rotate(180deg)", up_left: "rotate(-135deg)", up: "rotate(-90deg)", up_right: "rotate(-45deg)",
@@ -2320,7 +2406,9 @@ function actionIcon(action, ownerSlot) {
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
     case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje — len čistý badge
-    case "special1": return `👊${ARROW_DIR[action.dir] || ""}`; // Jotarov útok v mirror slote (Star Platinum)
+    // Jotarov útok v mirror slote sa v zápise kola tvári ako obyčajný mirror (🪞, bez smeru) —
+    // analógia k Vampire/Onryō, ktorých charge v dash slote sa ukazuje ako obyčajný dash (nemaskuje smer útoku)
+    case "special1": return "🪞";
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
@@ -2428,6 +2516,7 @@ function renderGrid(s, effects = []) {
   const charges  = [];
   const specials = [];
   const meleeCasts = [];
+  const jotaroCenter = []; // Jotarov stredový overlay = PÁR (jeho telo Attack_2 + stand Star Platinum), ako na doske
   const procs    = [];
   const cloneHitCells = []; // klon zasiahnutý tile-om → blik jeho bunky (ako hit-blink u hráča)
   const trapFlashCells = []; // trigger pasce (Countess/Onre) — rozžiarenie bunky pre oboch
@@ -2459,8 +2548,13 @@ function renderGrid(s, effects = []) {
       const caster = s?.[e.from];
       const cells = Array.isArray(e.cells) ? e.cells : (caster ? [[caster.x, caster.y]] : []);
       cells.forEach(([x, y]) => previewSet.add(`${x},${y}`));
-      const atk = caster?.char === "medusa" ? ANIM_DEF.attack1_loop : ANIM_DEF.attack2_loop; // Medúza seká Attack_1
-      meleeCasts.push({ from: e.from, file: atk.file, fps: atk.fps });
+      // stredový overlay: Jotaro = PÁR (telo Attack_2 + SP Attack_2_P), Medúza = Attack_1, ostatní Attack_2
+      if (caster?.char === "jotaro") {
+        jotaroCenter.push({ from: e.from, jotaroPair: true, spFile: "Attack_2_P.png" });
+      } else {
+        const atk = caster?.char === "medusa" ? ANIM_DEF.attack1_loop : ANIM_DEF.attack2_loop;
+        meleeCasts.push({ from: e.from, file: atk.file, fps: atk.fps });
+      }
     }
     // démon útok — blikajú zasahované bunky (všetky okrem kasterovej)
     if (e?.kind === "demon_attack" && Array.isArray(e.cells)) {
@@ -2555,7 +2649,16 @@ function renderGrid(s, effects = []) {
   renderThreadLines(s);
   // Escanor: veľký centrálny sprite pri caste = WinSun (Escanor drží rastúce slnko); malá postava ostáva Win
   // Escanor má vlastnú necyklenú choreografiu (runEscanorSpecial) — z generického looping centra ho vynechaj
-  updateSpecialCenter(specials.filter(sp => s?.[sp.from]?.char !== "escanor").concat(meleeCasts));
+  // Jotarov Special 2 (po THE WORLD) → stredový PÁR (telo Attack_2 + SP Special_2_P). Special 1 (mirror útok)
+  // ZÁMERNE bez stredového spritu. THE WORLD má vlastný menace (spawnWorldCenter).
+  for (const sp of specials) {
+    if (s?.[sp.from]?.char === "jotaro" && sp.kind === "special") jotaroCenter.push({ from: sp.from, jotaroPair: true, spFile: "Special_2_P.png" });
+  }
+  // Escanor rieši vlastná runEscanorSpecial; Jotaro ide cez jotaroCenter (pár)
+  updateSpecialCenter(
+    specials.filter(sp => s?.[sp.from]?.char !== "escanor" && s?.[sp.from]?.char !== "jotaro")
+      .concat(meleeCasts).concat(jotaroCenter)
+  );
 }
 
 /* ---------- Pasca (Countess/Onre) — statická hlava castera v strede bunky ---------- */
@@ -2987,7 +3090,9 @@ function positionActors(s, immediate = false) {
       el.style.transform = `translateX(${shift}px) scaleX(${scale * prideMul}) scaleY(${prideMul})`;
     } else {
       el.style.transformOrigin = "";
-      el.style.transform = `translateX(${shift}px) scaleX(${scale})`;
+      // Jotaro pri útoku (melee/S1/S2): cúvne DOZADU na miesto, kde stál stand (o STAND_OFFSET opačne než smeruje)
+      const backShift = (data.char === "jotaro" && standSwapActive(slot)) ? -(facing[slot] || 1) * STAND_OFFSET : 0;
+      el.style.transform = `translateX(${shift + backShift}px) scaleX(${scale})`;
     }
 
     el.dataset.slot = slot;
@@ -3040,18 +3145,26 @@ function positionActors(s, immediate = false) {
   // pozíciu drží so slideom ako actor. Kreslenie (aktuálny `_P` pás / summon / dead) rieši raf.
   [["p1", standEls.p1, p1], ["p2", standEls.p2, p2]].forEach(([slot, el, data]) => {
     if (!data || data.char !== "jotaro" || data.x == null) { el.style.display = "none"; return; }
+    const wasHidden = el.style.display === "none";
+    el.style.display = "block";
+    // MOVE-blip: pozíciu aj pás standu (snap starú→novú bunku + Dead_P→Summon_P) plne riadi raf — sem nezasahuj
+    if (standBlip[slot]) return;
     const { left, top } = cellToPx(data.x, data.y);
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
-    const wasHidden = el.style.display === "none";
-    el.style.display = "block";
     if (immediate || !actorsInitialized || wasHidden) {
       el.style.transition = "none"; el.style.left = px + "px"; el.style.top = py + "px";
       void el.offsetHeight; el.style.transition = "";
     } else { el.style.left = px + "px"; el.style.top = py + "px"; }
     const fc = facing[slot] || 1;
-    const shift = pairShift(slot, s) - fc * STAND_OFFSET; // za Jotarom (opačne než smeruje)
-    el.style.transform = `translateX(${shift}px) scaleX(${fc})`;
+    // Útok (melee/S1/S2): stand príde DOPREDU k Jotarovi a DOLE na zem (floatY 0), nad Jotara (z-index).
+    // Inak: za Jotarom (o STAND_OFFSET) a vznáša sa hore (STAND_FLOAT_Y). Float aj swap sú v transforme,
+    // aby prechod plynulo animovala CSS transition (transform 150ms).
+    const swap = standSwapActive(slot);
+    const shift  = pairShift(slot, s) - (swap ? 0 : fc * STAND_OFFSET);
+    const floatY = swap ? 0 : STAND_FLOAT_Y;
+    el.style.zIndex = swap ? "4" : "";
+    el.style.transform = `translateX(${shift}px) translateY(${floatY}px) scaleX(${fc})`;
   });
 
   // „YOU" značka nad vlastnou postavou — sleduje aktéra (rovnaké transition ako pohyb)
@@ -3103,7 +3216,7 @@ function actionBadgeView(a, ownerSlot) {
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
     case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
-    case "special1":      return { cls: "special", text: `👊${arrow[a.dir] || ""}` }; // Jotarov útok v mirror slote
+    case "special1":      return { cls: "mirror",  text: "🪞" }; // Jotarov útok v mirror slote sa tvári ako mirror (analógia k charge=dash u Vampire/Onryō)
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
@@ -3188,7 +3301,7 @@ function renderTsQueue() {
   tsQueueEl.innerHTML = "";
   const label = document.createElement("div");
   label.className = "ts-queue-label";
-  label.textContent = "⏱ THE WORLD — 3 frozen actions";
+  label.textContent = "⏱ THE WORLD - 3 frozen actions";
   tsQueueEl.appendChild(label);
   const slots = document.createElement("div");
   slots.className = "ts-queue-slots";
@@ -3661,8 +3774,15 @@ function schedulePlayTimeline(timeline) {
 
     // run aj pri pohybe KLONA (animState je zdieľaný — klon zrkadlí majiteľovu animáciu)
     const cloneMoved = (b, f) => !!(b?.clone && f?.clone && (b.clone.x !== f.clone.x || b.clone.y !== f.clone.y));
-    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) setAnim("p1", "run", MOVE_MS);
-    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) setAnim("p2", "run", MOVE_MS);
+    // Jotarov stand pri pohybe: dash = beh za Jotarom (Run_P), MOVE = zmizne (Dead_P) na starej bunke a
+    // zjaví sa (Summon_P) na novej. Blip spustíme len pri skutočnom posune (nie klon) a len pre Jotara.
+    const noteStandLoco = (slot, before, frm) => {
+      if (frm?.char !== "jotaro" || before?.x == null) return;
+      if (curAction[slot] === "dash") { standBlip[slot] = null; return; } // dash → Run_P (rieši standFileFor)
+      if (before.x !== frm.x || before.y !== frm.y) standBlip[slot] = { start: performance.now(), ox: before.x, oy: before.y };
+    };
+    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
+    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
 
     const shooters = new Set(); // basic strela — jednorazová póza
     const casters  = new Set(); // special — looping, malá postava sa animuje súbežne s veľkým sprite-om
@@ -3679,20 +3799,27 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.from, msg, cls);
         cloneFloat(e.from, msg, cls);
       }
-      if (e.kind === "special" && e.from && state?.[e.from]?.char !== "escanor") casters.add(e.from); // Escanor rieši vlastná choreografia
-      // Jotarov Special 1 (mirror slot): rovnaká center-cast choreografia ako special; otočenie podľa smeru
+      // Escanor rieši vlastná choreografia; Jotaro NIE je center-cast — jeho figúra hrá Attack_2 a útok
+      // vizuálne vedie stand (nižšie), preto sem nepridávaj ani jeho `special` (Special 2 po THE WORLD)
+      if (e.kind === "special" && e.from && state?.[e.from]?.char !== "escanor" && state?.[e.from]?.char !== "jotaro") casters.add(e.from);
+      // Jotarov Special 2 (po THE WORLD): figúra hrá Attack_2, stand Special_2_P, VYMENIA si pozície (swap)
+      if (e.kind === "special" && (e.from === "p1" || e.from === "p2") && state?.[e.from]?.char === "jotaro") {
+        setAnim(e.from, "attack2_loop", frameHold);
+        standAttack[e.from] = { file: "Special_2_P.png", until: performance.now() + frameHold + POSE_TAIL_MS };
+        lastAttackEndAt[e.from] = performance.now() + frameHold;
+      }
+      // Jotarov Special 1 (mirror slot): figúra hrá Attack_2, stand Special_1_P, VYMENIA si pozície; otočenie podľa smeru
       if (e.kind === "special1" && (e.from === "p1" || e.from === "p2")) {
-        casters.add(e.from);
+        setAnim(e.from, "attack2_loop", frameHold);
+        standAttack[e.from] = { file: "Special_1_P.png", until: performance.now() + frameHold + POSE_TAIL_MS };
+        lastAttackEndAt[e.from] = performance.now() + frameHold;
         if (e.dir === "left" || e.dir === "right") facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Jotaro THE WORLD: cast → zapni „ZA WARUDO" filter (obaja); wait → koniec čiastočnej timeline (pauza);
+      // Jotaro THE WORLD: cast → menace (Special_3_P) hrá v NORMÁLNYCH farbách; čas sa zamrazí (filter +
+      // zmrazenie animácií) AŽ po dohraní menace — pri timestop_wait v enterTimestopMode. wait → pauza;
       // ts_hit/ts_mirror → announce float nad zmrazeným súperom (bez zmeny HP); end → vypni filter
-      if (e.kind === "timestop_start") {
-        document.body.classList.add("timestop-mode");
-        if (e.from === "p1" || e.from === "p2") {
-          tsActive = true; tsJotaroSlot = e.from; tsFreezeAt = performance.now(); // zmraz animácie VŠETKÝCH okrem Jotara
-          spawnWorldCenter(e.from); // veľký stredový „menace" sprite (Special_3_P, zamrzne ako v náhľade)
-        }
+      if (e.kind === "timestop_start" && (e.from === "p1" || e.from === "p2")) {
+        spawnWorldCenter(e.from); // veľký stredový „menace" sprite (Special_3_P) — hrá až kým nezastane
       }
       if (e.kind === "timestop_wait") tsWait = true;
       if (e.kind === "ts_hit" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, `-${e.dmg} HP`, "ts-float");
@@ -3833,6 +3960,8 @@ function schedulePlayTimeline(timeline) {
         // (Countess sem už nechodí — jej center melee je jednotný vamp_strike s A1)
         setAnim(e.from, state?.[e.from]?.char === "medusa" ? "attack1_loop" : "attack2_loop", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
+        // Jotaro: figúra hrá Attack_2, stand Attack_2_P, VYMENIA si pozície (swap) — bez veľkého center overlayu
+        if (state?.[e.from]?.char === "jotaro") standAttack[e.from] = { file: "Attack_2_P.png", until: performance.now() + frameHold + POSE_TAIL_MS };
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", frameHold);
@@ -4094,6 +4223,8 @@ function schedulePlayTimeline(timeline) {
           const beatEl = highlightRoundBeat(e.from, e.action, beatCounts, playStarter); // posuň kurzor + odhal súpera
           lastActed[e.from] = { logEl, beatEl }; // ak hneď príde "invalid", prečiarkneme práve tieto
         }
+        // zapamätaj typ akcie (Jotarov stand rozlišuje move → blip vs dash → beh za Jotarom)
+        if (e.from === "p1" || e.from === "p2") curAction[e.from] = e.action?.type || null;
       }
       // prázdny gold beat (golden shield/mirror = pos 0, golden mana = 7/8) — len posuň zelenú šípku naň
       if (e.kind === "beat_empty" && (e.from === "p1" || e.from === "p2")) {
@@ -4150,6 +4281,7 @@ function clearActors() {
     el.style.left = "0px"; el.style.top = "0px";
     el.style.transform = "translateX(0) scaleX(1)";
     el.style.opacity = "1";
+    el.style.zIndex = ""; // Jotarov stand mohol byť pri swape zdvihnutý nad Jotara
     clearTimeout(el._hideT); clearTimeout(el._fadeT); el._logCell = null; // reset sledovania klonovej pozície
   });
   actorsEl.querySelectorAll(".sprite-clone-summon").forEach(n => n.remove());
@@ -4158,6 +4290,8 @@ function clearActors() {
   cloneSummonPose = { p1: null, p2: null };
   cloneDead = { p1: false, p2: false };
   standSummoned = { p1: false, p2: false }; standSummonStart = { p1: 0, p2: 0 }; standPrevChar = { p1: null, p2: null };
+  standAttack = { p1: null, p2: null }; standBlip = { p1: null, p2: null }; curAction = { p1: null, p2: null };
+  standHiddenByWorld = { p1: false, p2: false };
   tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // THE WORLD vizuál nesmie prežiť reset/novú hru
   youMarker.style.display = "none";
   actorsInitialized = false;
@@ -4318,13 +4452,18 @@ function drawCharSelectFrame(now) {
   if (abilityHoverChar === "escanor") markEscPridePreview(now); // cyklí zvýraznenie zóny podľa pride
   if (abilityHoverChar === "werewolf") markMoonPreview(now);    // cyklí fázu mesiaca + dmg pod mini-doskou
 
-  // malý castiaci mág v bunke castera mini-dosky — tiež animácia špeciálu (efektový sprite)
+  // malý castiaci mág v bunke castera mini-dosky — animácia špeciálu (efektový sprite). Jotaro je výnimka:
+  // casterom na mini-doske je ON (nie stredová Star Platinum póza), takže kreslíme jeho IDLE (ukotvený na nohy,
+  // normalizovaný na výšku mágov cez portraitFill).
   if (abilityHoverChar && abilityCasterCanvas && SPECIAL_ANIMS[abilityHoverChar]) {
     const dir = charDirFor(abilityHoverChar, me);
-    const fxAnim = { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
-    const offX = (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
+    const isJot = abilityHoverChar === "jotaro";
+    const fxAnim = isJot ? ANIM_DEF.idle : { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
+    const offX = isJot ? 0 : (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
+    const fillUse = isJot ? portraitFill("jotaro", 1.1) : 1.1;
+    const anchorUse = isJot ? 0.95 : 0.5; // Jotaro vypĺňa väčšinu framu → ukotvi na nohy
     if (dir) ensureSpriteMeta(dir, fxAnim.file)
-      .then(meta => drawSprite(abilityCasterCanvas.getContext("2d"), meta, fxAnim, now, abilityCasterCanvas.width, abilityCasterCanvas.height, 1.1, 0.5, true, offX))
+      .then(meta => drawSprite(abilityCasterCanvas.getContext("2d"), meta, fxAnim, now, abilityCasterCanvas.width, abilityCasterCanvas.height, fillUse, anchorUse, true, offX))
       .catch(() => {});
   }
 
@@ -4425,7 +4564,7 @@ const ABILITY_PREVIEW = {
   luffy:     { caster: null, dmg: null, secret: true, desc: '<span class="ca-secret">TOP SECRET</span>' },
   // Jotaro: THE WORLD (jednorazový time-stop) — bez konkrétnych čísel v texte (cost badge nesie 5).
   // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
-  jotaro:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once per game): time stops — take 3 extra actions while the foe is frozen; all their effects land at once when time resumes. Diagonal bouncing basic; his stand Star Platinum strikes both diagonals with Special 1" },
+  jotaro:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
 };
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
@@ -5194,7 +5333,7 @@ function emitLockIn(payload) {
 const tsOverlay = document.createElement("div");
 tsOverlay.id = "timestop-overlay";
 tsOverlay.className = "hidden";
-tsOverlay.innerHTML = `<div class="ts-overlay-text">⏱ ZA WARUDO — TIME HAS STOPPED…</div>`;
+tsOverlay.innerHTML = `<div class="ts-overlay-text">⏱ THE WORLD! - TIME HAS STOPPED…</div>`;
 document.body.appendChild(tsOverlay);
 function tsOverlaySet(on) { tsOverlay.classList.toggle("hidden", !on); }
 
@@ -5214,6 +5353,7 @@ function spawnWorldCenter(slot) {
   const dir = charDirFor("jotaro", slot);
   worldCenter.style.display = "block";
   const start = performance.now();
+  let blinkCleared = false;
   cancelAnimationFrame(worldCenterRaf);
   const draw = () => {
     const ctx = worldCenter.getContext("2d");
@@ -5222,6 +5362,11 @@ function spawnWorldCenter(slot) {
       const fi = Math.floor((performance.now() - start) / 1000 * fps);
       const idx = Math.min(total - 1, fi); // RAZ 0..N-1, potom drží posledný frame (zamrzne ako v náhľade)
       drawSprite(ctx, m, { file: "Special_3_P.png", frames: total, frameIndex: idx }, 0, worldCenter.width, worldCenter.height, 1, 0.5, true);
+      // celoplošné blikanie tiles trvá LEN po zastavenie stredovej SP animácie (keď menace zamrzne na poslednom frame)
+      if (!blinkCleared && fi >= total - 1) {
+        blinkCleared = true;
+        gridEl.querySelectorAll(".cell.preview-red").forEach(c => c.classList.remove("preview-red"));
+      }
     }).catch(() => {});
     worldCenterRaf = requestAnimationFrame(draw);
   };
@@ -5238,16 +5383,20 @@ function hideWorldCenter() {
 function enterTimestopMode() {
   const tsSlot = state?.timestop?.slot;
   if (!tsSlot || isSpectator) { tsPlanning = false; tsFrozen = false; tsOverlaySet(false); return; }
+  // TERAZ (menace dohral) zamrazíme čas: zmrazenie animácií board figúr (okrem Jotara) + filter (rieši sa nižšie).
+  // Pri reloade/reclaime sem prídeme bez predošlého timestop_start → dospawnujeme menace, nech je vidno.
+  tsActive = true; tsJotaroSlot = tsSlot; tsFreezeAt = performance.now();
+  if (worldCenter.style.display === "none") spawnWorldCenter(tsSlot);
   if (me === tsSlot) {
     // Jotarov hráč — plánovanie 3 zmrazených akcií (kvázi nové kolo, všetky typy nanovo)
     tsPlanning = true; tsFrozen = false;
     lockedIn = false;
     myQueue = [];
     goldenArmed = goldenMirrorArmed = goldenManaArmed = lastStandArmed = lastHopeArmed = false;
-    // filter time-stopu vidia OBAJA rovnako (aréna sa odfarbí obom); overlay „TIME HAS STOPPED" je len pre
-    // súpera — Jotaro plánuje, nesmie mu prekážať. Jotaro NEmá overlay, ale filter áno.
+    // filter time-stopu aj overlay „THE WORLD! — TIME HAS STOPPED…" vidia OBAJA. Overlay je pointer-events:none
+    // a hore na obrazovke, takže Jotarovi neprekáža v plánovaní zmrazenej trojice.
     document.body.classList.add("timestop-mode");
-    tsOverlaySet(false);
+    tsOverlaySet(true);
     lockBtn.classList.remove("locked", "ready"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
     closePickers(); renderQueue(); syncGoldenHalves(); syncGoldDualHalves(); updateUiLocks();
   } else {
@@ -6009,8 +6158,12 @@ function raf() {
     // Countess pri caste pasce: A5 (naratívna sekvencia) sa hrá RAZ od frame 0 — relatívny čas nižšie;
     // absolútny loop by začal v strede sekvencie (victory/preview loop ostáva)
     const vampCast = st.char === "countess" && aSt.key === "casting";
+    // Jotaro: pri výhre ostáva IDLE (special na výhru vedie stand Star Platinum, nie jeho telo);
+    // casting preňho ani nenastáva (útoky hrá cez attack2_loop) — teda nikdy nekreslí special sprite na tele
     let anim = stoned
       ? ANIM_DEF.idle
+      : (st.char === "jotaro" && aSt.key === "victory")
+        ? ANIM_DEF.idle
       : (aSt.key === "victory" || aSt.key === "casting")
         ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: !vampCast }
         : currentAnim(slot);
@@ -6047,7 +6200,8 @@ function raf() {
     const bAnchorY = jotaro ? 1 : 0.5;
     const bOffY = jotaro ? 4 : 0; // dorovnaj nohy na spodný okraj (jotaro má 5,6 % framu pod nohami)
     ensureSpriteMeta(dir, anim.file)
-      .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, bFill, bAnchorY, true, 0, bOffY, poseCrop))
+      // Jotaro: normalizuj fill podľa výšky framu (fh/REF), nech Run/Hurt (128 px) nevyjdú väčšie než Idle (144 px)
+      .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, jotaro ? bFill * (meta.fh / JOTARO_FRAME_REF_H) : bFill, bAnchorY, true, 0, bOffY, poseCrop))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
@@ -6088,23 +6242,73 @@ function raf() {
   ["p1", "p2"].forEach(slot => {
     const el = standEls[slot];
     const st = state?.[slot];
-    if (el.style.display === "none" || st?.char !== "jotaro" || st.x == null) return;
+    if (st?.char !== "jotaro" || st.x == null) return; // nie jotaro / neprítomný → skryl ho positionActors
+    // počas THE WORLD (svieti veľká stredová menace) je Star Platinum LEN v strede → board-standa skry;
+    // po EXECUTE (menace zmizne) sa znova zjaví pri Jotarovi cez summon intro (reset standSummoned).
+    if (worldCenter.style.display !== "none") {
+      if (el.style.display !== "none") { el.style.display = "none"; standSummoned[slot] = false; standSummonStart[slot] = 0; standHiddenByWorld[slot] = true; }
+      return;
+    }
+    // menace zmizla (EXECUTE / obnovenie času) → vráť standa hneď pri Jotarovi (pozícia z posledného
+    // positionActors = Jotarova bunka), znova sa prehrá summon intro (standSummoned bol resetnutý).
+    // Len keď ho skryl THE WORLD; iné skrytie (deploy pred positionActors) prenechaj positionActorsu.
+    if (el.style.display === "none") {
+      if (standHiddenByWorld[slot]) { el.style.display = "block"; standHiddenByWorld[slot] = false; }
+      else return;
+    }
     const ctx = el.getContext("2d");
     el.classList.toggle("alt-color", usesAltColor("jotaro", slot)); // jotaro má dirP2=jotaro → natívne, bez filtra
     const dir = charDirFor("jotaro", slot);
     const dead = (st.hp ?? 1) <= 0 || st.down;
-    let file = null, drawT = now;
-    if (!dead && !standSummoned[slot]) { // summon intro (Summon_P) RAZ od nasadenia
+    let file = null, drawT = now, loop = true, fps = 8;
+
+    // MOVE-blip: stand zmizne (Dead_P) na starej bunke a zjaví sa (Summon_P) na novej — snap (bez sklzu).
+    // Pozíciu tu riadi RAF (transition none); positionActors sa medzitým standu nedotýka (skip pri standBlip).
+    const blip = standBlip[slot];
+    if (!dead && blip) {
+      const t = now - blip.start;
+      if (t >= SP_BLIP_DEAD_MS + SP_BLIP_SUMMON_MS) {
+        standBlip[slot] = null; el.style.transition = ""; // koniec blipu — pozíciu zas preberá positionActors
+      } else {
+        const phase2 = t >= SP_BLIP_DEAD_MS;
+        const cx = phase2 ? st.x : blip.ox, cy = phase2 ? st.y : blip.oy;
+        const { left, top } = cellToPx(cx, cy);
+        const fc = computeFacing(state.p1, state.p2)[slot] || 1;
+        const sh = pairShift(slot, state) - fc * STAND_OFFSET; // pri pohybe je stand ZA Jotarom, vznáša sa
+        el.style.transition = "none";
+        el.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
+        el.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
+        el.style.zIndex = "";
+        el.style.transform = `translateX(${sh}px) translateY(${STAND_FLOAT_Y}px) scaleX(${fc})`;
+        file = phase2 ? "Summon_P.png" : "Dead_P.png";
+        drawT = phase2 ? (t - SP_BLIP_DEAD_MS) : t;
+        loop = false;
+        fps = phase2 ? 8 : 12; // Summon_P 5f/650ms, Dead_P 6f/500ms — dohrajú sa RAZ v rámci svojej fázy
+      }
+    }
+    if (!file && !dead && !standSummoned[slot]) { // summon intro (Summon_P) RAZ od nasadenia
       if (!standSummonStart[slot]) standSummonStart[slot] = now;
       const t = now - standSummonStart[slot];
       if (t >= SP_SUMMON_MS) standSummoned[slot] = true;
-      else { file = "Summon_P.png"; drawT = t; }
+      else { file = "Summon_P.png"; drawT = t; loop = false; fps = 6; }
     }
-    if (!file) file = standFileFor(slot);
-    // stand kreslený rovnako veľký ako Jotaro (JOTARO_BOARD_FILL), ukotvený na nohy, ale VZNÁŠA sa hore
-    // (STAND_FLOAT_Y) a je za Jotarom (nižší z-index cez .sprite-stand v CSS)
+    if (!file) {
+      // melee/S1/S2: stand hrá svoj útočný pás (loop v rámci beatu); inak podľa animácie Jotara
+      if (!dead && standSwapActive(slot)) file = standAttack[slot].file;
+      else file = standFileFor(slot);
+    }
+    // ukotvené za NOHY (anchorY 1 + per-frame feet x/botGap) — nohy ostanú STATICKÉ počas celej animácie
+    // (nešklbú sa zľava-doprava ani hore-dole, aj keď päsť vyletí bokom); fill normalizovaný podľa výšky framu.
+    // vertikálny float / swap-na-zem je v CSS transforme (positionActors / blip vyššie).
+    const anim = { file, fps, loop };
     ensureSpriteMeta(dir, file)
-      .then(meta => drawSprite(ctx, meta, { file, fps: 8, loop: true }, drawT, ACTOR_W, ACTOR_H, JOTARO_BOARD_FILL, 1, true, 0, STAND_FLOAT_Y))
+      .then(meta => {
+        const idx = spriteFrameIndex(anim, drawT, meta.frames);
+        const { x: fxo, g: botGap } = standFeet(file, idx);
+        const offX = -fxo * JOTARO_SCALE;              // vodorovné ukotvenie na nohy (nie na stred bboxu)
+        const offY = 4 + (botGap - 8) * JOTARO_SCALE;  // zvislé ukotvenie nôh na Jotarovu základňu
+        drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H, JOTARO_BOARD_FILL * (meta.fh / JOTARO_FRAME_REF_H), 1, true, offX, offY);
+      })
       .catch(() => {});
   });
 
@@ -6312,6 +6516,27 @@ function raf() {
       const idx = Math.floor((now - Number(cvs.dataset.born)) / 1000 * fps);
       ensureSpriteMeta(dir, file)
         .then(meta => drawSprite(ctx, meta, { file, fps, frameIndex: idx }, 0, cvs.width, cvs.height))
+        .catch(()=>{});
+      return;
+    }
+    // Jotarov pár (telo/stand): normalizovaný fill (fh/REF) + nohy ukotvené (anchorY 1) so zarovnaním
+    // cez botGap — nohy oboch figúr sedia na tej istej základni (rovnako ako na doske)
+    if (cvs.dataset.jfig) {
+      const anim = { file, fps: Number(cvs.dataset.fps) || 8, loop: true };
+      const t = performance.now();
+      ensureSpriteMeta(dir, file)
+        .then(meta => {
+          const fill = JOTARO_CENTER_FILL * (meta.fh / JOTARO_FRAME_REF_H);
+          const scale = Math.min(cvs.width, cvs.height) / meta.fh * fill; // px na obraze / px zdroja (výška určuje škálu)
+          const idx = spriteFrameIndex(anim, t, meta.frames);
+          const { x: fxo, g: botGap } = standFeet(file, idx);
+          // nohy oboch figúr zladené na spoločnú líniu (canvas-stred + INSET), per-frame stabilizované cez botGap
+          // (SP už „nelieta" nad Jotarom a nešklbe sa); horizontálne staticky (offX = -feetX), nech sa pri
+          // vyletení päste figúra nešmýka zľava-doprava. anchorY 0.5.
+          const offX = -fxo * scale;
+          const offY = cvs.height * JOTARO_CENTER_INSET - (meta.fh / 2 - botGap) * scale;
+          drawSprite(ctx, meta, anim, t, cvs.width, cvs.height, fill, 0.5, true, offX, offY);
+        })
         .catch(()=>{});
       return;
     }

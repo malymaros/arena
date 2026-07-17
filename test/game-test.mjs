@@ -1985,16 +1985,28 @@ async function main() {
   check(tj6.tl2[tj6.tl2.length - 1].p1.hp === 10, "TJ6: fire nezranený");
   invariantCheck(tj6.tl2, "TJ6");
 
-  /* ---------- TJ7: mirror counter — nabitý mirror → jeden odraz kumulatívneho súčtu na jotara ---------- */
+  /* ---------- TJ7: mirror + Jotarov štít — odraz mu ZNIČÍ štít namiesto zásahu ---------- */
   await freshJotaro();
-  // fire M(down)→(0,2) (POHYB zadarmo, nie dash — nech zostane mana na MI 4), potom MI (mirror); ostatné ako TJ6
+  // fire M(down)→(0,2) (POHYB zadarmo, nie dash — nech zostane mana na MI 4), potom MI (mirror); ostatné ako TJ6.
+  // frozen: A(up_left) trafí (0,2) — fire to odrazí; Jotaro si v zamrazení nabil S (shield) → odraz mu ho zničí.
   let tj7 = await playRoundTimestop([M("down"), MI, R], [R, SP, S], [A("up_left"), R, S]);
   check(fxOf2(tj7.tl2, "ts_mirror").length >= 1, "TJ7: zmrazený zásah ohlásený ako MIRRORED");
   check(fxOf2(tj7.tl2, "mirror").length === 1, "TJ7: jeden mirror odraz pri resume", `mirrors=${JSON.stringify(fxOf2(tj7.tl2, "mirror"))}`);
-  const tj7ref = sumEffects(tj7.tl2).hits.filter(h => h.target === "p2");
-  check(tj7ref.length === 1 && tj7ref[0].dmg === 1, "TJ7: kumulatívny odraz na jotara (1)", `hits=${JSON.stringify(sumEffects(tj7.tl2).hits)}`);
-  check(tj7.tl2[tj7.tl2.length - 1].p2.hp === 9, "TJ7: jotaro po odraze na 9 HP");
+  check(fxOf2(tj7.tl2, "block").filter(e => e.target === "p2").length === 1 && sumEffects(tj7.tl2).hits.filter(h => h.target === "p2").length === 0,
+    "TJ7: Jotarov štít zablokoval odraz (block, 0 dmg)", `blocks=${JSON.stringify(fxOf2(tj7.tl2, "block"))}, hits=${JSON.stringify(sumEffects(tj7.tl2).hits)}`);
+  check(tj7.tl2[tj7.tl2.length - 1].p2.hp === 10, "TJ7: jotaro nezranený (štít pohltil odraz)");
+  check(tj7.tl2[tj7.tl2.length - 1].p2.shield === false, "TJ7: štít po odraze spotrebovaný");
   invariantCheck(tj7.tl2, "TJ7");
+
+  /* ---------- TJ7b: mirror BEZ štítu — odraz zasiahne jotara (else vetva) ---------- */
+  await freshJotaro();
+  // ako TJ7, ale 3. zmrazená akcia je M(down) (nie shield) → Jotaro nemá štít → odraz mu dá 1 dmg
+  let tj7b = await playRoundTimestop([M("down"), MI, R], [R, SP, S], [A("up_left"), R, M("down")]);
+  check(fxOf2(tj7b.tl2, "mirror").length === 1, "TJ7b: jeden mirror odraz pri resume", `mirrors=${JSON.stringify(fxOf2(tj7b.tl2, "mirror"))}`);
+  const tj7bref = sumEffects(tj7b.tl2).hits.filter(h => h.target === "p2");
+  check(tj7bref.length === 1 && tj7bref[0].dmg === 1, "TJ7b: kumulatívny odraz na jotara (1)", `hits=${JSON.stringify(sumEffects(tj7b.tl2).hits)}`);
+  check(tj7b.tl2[tj7b.tl2.length - 1].p2.hp === 9, "TJ7b: jotaro po odraze na 9 HP");
+  invariantCheck(tj7b.tl2, "TJ7b");
 
   /* ---------- TJ13: obrana NEspotrebovaná, ak zmrazené akcie nič nezasiahli (D1) ---------- */
   await freshJotaro();

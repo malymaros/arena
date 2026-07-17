@@ -202,9 +202,10 @@ const VAMP_HEAL_BEAT_MS   = Math.round(450 * ANIM_SLOW);
 const VAMP_CAST_MS = Math.round(17 * 1000 / 6);
 // Naruto: summon klona — po pečatiach (special beaty) hrá Naruto + 2 kópie po bokoch Special_2 animáciu
 const CLONE_SUMMON_MS  = Math.round(1300 * ANIM_SLOW);
-// Jotaro THE WORLD: cast (Star Platinum „menace" + invert flash) pred pauzou; koniec (obnovenie času)
-// pred kumulatívnou aplikáciou. MUSIA sedieť s klientskými TIMESTOP_*_MS v client.js.
-const TIMESTOP_CAST_MS = Math.round(1400 * ANIM_SLOW);
+// Jotaro THE WORLD: cast = kým dohrá stredová „menace" animácia Star Platinum (Special_3_P: 4 framy @ 6 fps
+// ≈ 667 ms na klientovi) — AŽ POTOM sa zamrazí čas a Jotaro si vyberá (viď enterTimestopMode). MUSÍ byť
+// ≥ trvanie klientskej menace (preto fixné, nie škálované ANIM_SLOW). Koniec (obnovenie času) pred aplikáciou.
+const TIMESTOP_CAST_MS = 900;
 const TIMESTOP_END_MS  = Math.round(900 * ANIM_SLOW);
 
 // Last Stand (duálne tlačidlo s golden mana) — démon zabije hráča a oživí ho na plno; ďalšie kolo je posledné
@@ -2043,12 +2044,18 @@ function applyTimestopResume() {
     pushStateFrame(tl, [{ kind: "block", target: foeS, gold: ts.foeShieldGold }], SMALL_DELAY_MS);
     foe.shield = false; foe.shieldGold = false;
   } else if (ts.foeMirror) {
-    // mirror: nezraniteľný + JEDEN kumulatívny odraz celého súčtu na Jotara (raw — neblokuje sa, neodráža späť)
+    // mirror: foe nezraniteľný + JEDEN kumulatívny odraz celého súčtu späť na Jotara
     pushStateFrame(tl, [{ kind: "mirror", target: foeS, dmg: rawTotal, atk: "special", gold: ts.foeMirrorGold }], MIRROR_BEAM_MS);
-    jo.hp = Math.max(0, jo.hp - total);
-    notePrideHit(jslot);
-    pushStateFrame(tl, [{ kind: "hit", target: jslot, dmg: total, ...(parts.length > 1 ? { parts } : {}) }], SMALL_DELAY_MS);
     foe.mirror = false; foe.mirrorGold = false;
+    if (jo.shield) {
+      // Jotaro si počas zamrazenia nabil štít → odraz mu ho ZNIČÍ namiesto zásahu (jeden block, 0 dmg)
+      pushStateFrame(tl, [{ kind: "block", target: jslot, gold: jo.shieldGold }], SMALL_DELAY_MS);
+      jo.shield = false; jo.shieldGold = false;
+    } else {
+      jo.hp = Math.max(0, jo.hp - total);
+      notePrideHit(jslot);
+      pushStateFrame(tl, [{ kind: "hit", target: jslot, dmg: total, ...(parts.length > 1 ? { parts } : {}) }], SMALL_DELAY_MS);
+    }
   } else {
     // bez obrany: jeden kombinovaný hit s parts (súčet naraz, jeden hurt)
     foe.hp = Math.max(0, foe.hp - total);

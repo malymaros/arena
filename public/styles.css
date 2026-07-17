@@ -465,8 +465,24 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
 }
 #s1-picker.jotaro-s1 .arrow{ background: #7a4fd0; } /* šípky Special 1 v rovnakej fialovej */
+/* zamknutý stav (LOCK IN / otvorený picker / disabled): stlm fialový skin ako pri vamp-charge —
+   zhasni flicker + fialový glow a zošedni ❔ ikonu, nech je jasné, že je button neaktívny */
+.btn.act.mirror.jotaro-s1.locked-ui,
+.btn.act.mirror.jotaro-s1.locked-perm,
+.btn.act.mirror.jotaro-s1.locked-golden,
+.btn.act.mirror.jotaro-s1:disabled{
+  animation: none;
+  box-shadow: 0 0 0 3px #342c40, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.03),
+    inset 0 -4px 0 rgba(0,0,0,.55);
+}
 .btn.act.mirror.jotaro-s1.locked-ui .pix-ico.charge-mark,
-.btn.act.mirror.jotaro-s1:disabled .pix-ico.charge-mark{ animation: none; }
+.btn.act.mirror.jotaro-s1.locked-perm .pix-ico.charge-mark,
+.btn.act.mirror.jotaro-s1.locked-golden .pix-ico.charge-mark,
+.btn.act.mirror.jotaro-s1:disabled .pix-ico.charge-mark{
+  animation: none;
+  color: #9a8aac;
+  text-shadow: 2px 2px 0 #000;
+}
 /* výber smeru pre Move — popup nad tlačidlom v tvare kríža */
 .move-wrap{ position: relative; }
 .dir-picker{
