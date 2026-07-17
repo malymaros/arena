@@ -151,7 +151,7 @@ const TIMER_OPTIONS = new Set(["off", "30", "60", "120", "quickdraw"]);
 const DEFAULT_CONFIG = {
   format: "single",                              // "single" | "bo3" | "tournament"
   tilesPerRound: 1,                              // 1 | 2 | 3 — koľko tiles sa spawne na konci kola
-  tileWeights: { dmg: 50, heal: 10, mana: 10, ik: 10, power: 10, block: 10 }, // % šanca typu, spolu 100
+  tileWeights: { dmg: 75, heal: 5, mana: 5, ik: 5, power: 5, block: 5 }, // % šanca typu, spolu 100
   timer: "30",                                   // "off" | "30" | "60" | "120" | "quickdraw"
   tilePreview: true,                             // ukazovať hráčom vopred, kde na konci kola pribudnú tiles / kam sa presunú IK
 };
