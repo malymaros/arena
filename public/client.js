@@ -343,6 +343,8 @@ for (const _slot of ["p1", "p2"]) {
 let standSummoned = { p1: false, p2: false }; // stand už odohral summon intro (Summon_P) pri tomto nasadení
 let standHiddenByWorld = { p1: false, p2: false }; // board-standa skryla veľká THE WORLD menace → raf ho po jej zmiznutí vráti
 let standSummonStart = { p1: 0, p2: 0 };      // čas štartu summonu (Summon_P sa kreslí relatívnym časom, RAZ)
+let standDeadStart = { p1: 0, p2: 0 };        // čas štartu smrti (Dead_P sa prehrá RAZ, potom stand zmizne — nie loop)
+const SP_DEAD_MS = Math.round(6 * 1000 / 12); // Dead_P má 6 framov @ 12 fps (≈500ms) — po dohraní stand skryjeme
 let standPrevChar = { p1: null, p2: null };   // detekcia (re)nasadenia Jotara → reset summonu
 const STAND_OFFSET = 64;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane) — vznáša sa ďalej
 const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
@@ -4290,7 +4292,7 @@ function clearActors() {
   cloneSummonFx = [];
   cloneSummonPose = { p1: null, p2: null };
   cloneDead = { p1: false, p2: false };
-  standSummoned = { p1: false, p2: false }; standSummonStart = { p1: 0, p2: 0 }; standPrevChar = { p1: null, p2: null };
+  standSummoned = { p1: false, p2: false }; standSummonStart = { p1: 0, p2: 0 }; standDeadStart = { p1: 0, p2: 0 }; standPrevChar = { p1: null, p2: null };
   standAttack = { p1: null, p2: null }; standBlip = { p1: null, p2: null }; curAction = { p1: null, p2: null };
   standHiddenByWorld = { p1: false, p2: false };
   tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // THE WORLD vizuál nesmie prežiť reset/novú hru
@@ -6262,6 +6264,16 @@ function raf() {
     const dir = charDirFor("jotaro", slot);
     const dead = (st.hp ?? 1) <= 0 || st.down;
     let file = null, drawT = now, loop = true, fps = 8;
+
+    // smrť: stand sa „odsummonuje" — Dead_P sa prehrá RAZ a potom stand ZMIZNE (predtým loopoval → prebliakval).
+    if (dead) {
+      if (!standDeadStart[slot]) standDeadStart[slot] = now;
+      const t = now - standDeadStart[slot];
+      if (t >= SP_DEAD_MS) { el.style.display = "none"; return; } // Dead_P dohral → stand je preč
+      file = "Dead_P.png"; drawT = t; loop = false; fps = 12;
+    } else {
+      standDeadStart[slot] = 0; // Jotaro žije (napr. nová hra) → priprav sviežu smrť
+    }
 
     // MOVE-blip: stand zmizne (Dead_P) na starej bunke a zjaví sa (Summon_P) na novej — snap (bez sklzu).
     // Pozíciu tu riadi RAF (transition none); positionActors sa medzitým standu nedotýka (skip pri standBlip).
