@@ -861,6 +861,7 @@ const HEAD_CROP = {
   werewolf:  { cx: 0.73, cy: 0.62, size: 0.24, cxP2: 0.72 }, // zhrbený vlk hľadí doprava — hlava vpredu vpravo (bbox po recentrovaní x27–102, y71–127)
   countess:  { cx: 0.49, cy: 0.52, size: 0.19 }, // blond drdol (bbox y od 58/128) — hlava nad širokou sukňou
   onre:      { cx: 0.50, cy: 0.52, size: 0.19 }, // úzka prízračná figúra s rohom (bbox y od 58/128)
+  jotaro:    { cx: 0.51, cy: 0.30, size: 0.31 }, // namerané z Idle.png (144² frame): figúra x38–105 y24–135, hlava pás y24–57 x52–95 → stred hlavy vysoko vo frame
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
