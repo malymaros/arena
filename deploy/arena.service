@@ -5,9 +5,10 @@ After=network.target
 
 [Service]
 Type=simple
-# Používateľ, pod ktorým appka beží (na Ubuntu VM je štandardný účet "ubuntu")
-User=ubuntu
-WorkingDirectory=/home/ubuntu/arena
+# Používateľ, pod ktorým appka beží. Na GCP VM (Debian) je to účet "arena"
+# (odvodený z comentu SSH kľúča); na starej Oracle Ubuntu VM to bol "ubuntu".
+User=arena
+WorkingDirectory=/home/arena/arena
 # Node počúva na porte 3000, verejne ho vystaví Caddy (HTTPS reverse proxy)
 Environment=PORT=3000
 # Voliteľne: heslo pre /admin/reset-all  →  Environment=ADMIN_KEY=nejakeheslo

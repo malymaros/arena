@@ -19,13 +19,13 @@ Environment variables: `PORT` (default 3000), `ADMIN_KEY` (optional password for
 
 ## Deployment
 
-Production runs on **Oracle Cloud Always Free** at **https://arena.marosmaly.sk** (Ampere A1 VM, IP `138.2.172.142`). The app runs as the systemd service `arena` (`/home/ubuntu/arena`, `PORT=3000`), fronted by **Caddy** as an HTTPS reverse proxy (auto Let's Encrypt + transparent Socket.IO WebSocket passthrough). Deploy assets live in `deploy/` (`arena.service`, `Caddyfile`).
+Production runs on a **Google Cloud Compute Engine VM** at **https://arena.marosmaly.sk** (Debian 13, x86_64, IP `34.134.62.153`, zone `us-central1-a`). The app runs as the systemd service `arena` (`/home/arena/arena`, `PORT=3000`, login user **`arena`**), fronted by **Caddy** as an HTTPS reverse proxy (auto Let's Encrypt + transparent Socket.IO WebSocket passthrough). Deploy assets live in `deploy/` (`arena.service`, `Caddyfile`). DNS (A record → VM IP) is managed at **Websupport** (ns1/ns2/ns3.websupport.sk).
 
-**Full step-by-step guide (from scratch + migration): `docs/DEPLOY_ORACLE.md`.** It covers the two non-obvious gotchas the hard way: ports must be opened in **both** the VCN Security List **and** the OS iptables (the `ACCEPT` rules must sit **before** the trailing `REJECT`), and Always-Free ARM capacity is often exhausted (retry / other AD / x86 micro fallback).
+**Full step-by-step guide (from scratch + migration): `docs/DEPLOY_GCP.md`.** On GCP the only firewall step is one VPC rule (VM → Edit → Allow HTTP/HTTPS traffic) — no OS iptables gotcha like on Oracle. SSH uses a dedicated metadata key (`gcp_arena.key`, comment `arena` → the Linux username). *(The previous Oracle deploy — now dead — is archived in `docs/DEPLOY_ORACLE.md`; that guide's iptables ordering gotcha only applies to Oracle Ubuntu images.)*
 
 **Deploy a new version** (after `git push` to `main`):
 ```
-ssh -i C:\Users\maly\.ssh\oracle_arena_b.key ubuntu@138.2.172.142 "cd ~/arena && git pull && npm install --omit=dev && sudo systemctl restart arena"
+ssh -i C:\Users\maly\.ssh\gcp_arena.key arena@34.134.62.153 "cd ~/arena && git pull && npm install --omit=dev && sudo systemctl restart arena"
 ```
 Live logs: `journalctl -u arena -f`. Caddy config lives at `/etc/caddy/Caddyfile`; restart with `sudo systemctl restart caddy` after edits.
 

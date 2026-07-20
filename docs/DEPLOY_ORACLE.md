@@ -1,19 +1,23 @@
 # Deploy na Oracle Cloud (Always Free) — Node + systemd + Caddy HTTPS
 
+> ### 🔴 VYRADENÉ (2026-07-20)
+> Oracle VM je **mŕtvy a nedostupný** — produkcia bola migrovaná na **Google Cloud**.
+> **Aktuálny návod aj SSH/deploy príkazy: [`docs/DEPLOY_GCP.md`](DEPLOY_GCP.md).**
+> Tento dokument ostáva len ako **história** a kvôli Oracle-špecifickému
+> iptables gotcha (poradie `ACCEPT` pred `REJECT`), ktoré na GCP neplatí.
+
 Cieľ: hru vystaviť na `https://arena.marosmaly.sk`.
 Stack: **Ampere A1 Always Free VM** (Ubuntu) → **Node** ako **systemd** služba → **Caddy** reverse proxy (automatický Let's Encrypt HTTPS + WebSockety).
 
 Súbory v repe (`deploy/`): `arena.service`, `Caddyfile`.
 
-> ### 🟢 Aktuálne nasadenie (produkcia)
-> Hra **už beží** na **https://arena.marosmaly.sk**.
+> ### ⚪ Pôvodné nasadenie (už NEbeží)
 > - **VM:** Oracle Ampere A1.Flex (Always Free, AD-2), Ubuntu — public IP `138.2.172.142`
 > - **SSH:** `ssh -i C:\Users\maly\.ssh\oracle_arena_b.key ubuntu@138.2.172.142`
 > - **App:** systemd služba `arena` (`/home/ubuntu/arena`, `PORT=3000`), **Caddy** HTTPS proxy
-> - **Nová verzia (najčastejší úkon):** viď [sekcia 8 – Update](#8-update--prevádzka)
 >
-> Zvyšok tohto dokumentu je **kompletný postup od nuly** — použi ho, ak sa robí nová VM
-> alebo migrácia (napr. presun z platenej trial inštancie na Always Free shape).
+> Zvyšok tohto dokumentu je **kompletný postup od nuly** pre Oracle — použi ho len,
+> ak by si sa niekedy vracal na Oracle. Inak viď `docs/DEPLOY_GCP.md`.
 
 ---
 
