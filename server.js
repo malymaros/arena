@@ -3254,20 +3254,24 @@ function startMatch(config) {
   game.roster = null;
   game.mageHp = null;
   game.mageMana = null;
+  // PORADIE emitov je kritické: ruleta farieb (nepriehľadný celoobrazovkový overlay) musí dôjsť klientovi
+  // PRED prvým stavom, ktorý farbu prezradí (p2 má zrkadlený char-select + alt-color HUD). Na pomalom
+  // pripojení inak klient stihne vykresliť odkrytú plochu skôr, než ju overlay prekryje.
+  //  1) you_are — sloty sa práve prelosovali, klient potrebuje aktuálny slot pre `me` (join-time you_are
+  //     ešte mal default sloty a mohol byť nesprávny); color_roll ho číta.
+  //  2) color_roll — overlay sa zapne (zakryje predošlú obrazovku).
+  //  3) state — char-select/plocha sa vykreslí UŽ POD overlayom.
+  emitYouAre();
+  roomEmit("color_roll", {});
   if (config.format === "tournament") {
     // slepý draft tímov: pred hrou 1 si každý vyberie TEAM_SIZE postáv z celého poolu (choose_team);
     // mageHp/mageMana vzniknú až po potvrdení oboch (finishTeamSelect → startGame(1))
     game.roster = { A: null, B: null };
     game.phase = "team_select";
-    emitYouAre();
     emitStateMasked();
   } else {
-    startGame(1);
+    startGame(1); // emitne ešte raz you_are (neškodná duplicita) + state — oboje už po color_roll
   }
-  // ruleta farieb: pridelenie slotov je hotové (you_are už odišlo) — klient len prehrá točiacu sa
-  // strelku na yin-yang kruhu, ktorá skončí na farbe hráča (p1 = biely, p2 = čierny); v turnaji
-  // sa točí NAD team-selectom (draft čaká pod ňou, kým dobehne)
-  roomEmit("color_roll", {});
 }
 
 // oba tímy potvrdené → HP a mana každého draftnutého maga štartujú na plno / na START_MANA
