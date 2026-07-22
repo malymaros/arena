@@ -597,9 +597,12 @@ function snapshot() {
     } : null,
     // tournament: mŕtvi magovia (HP 0) per slot — pre HUD hlavy (mŕtvy = lebka); historické info (= počet prehier),
     // nie tajná voľba, preto ide obom stranám aj v bežnom snapshote
+    // pre PRÁVE NASADENÉHO maga ber ŽIVÉ hp z game.players (do game.mageHp sa zapíše až v handleGameEnd,
+    // ktorý beží AŽ PO emite finálneho stavu) — inak by mág padnutý v poslednom kole série nemal lebku
+    // (turnaj by skončil s 2 lebkami namiesto 3)
     mageDead: game.mageHp ? {
-      p1: rosterFor("p1").filter(k => (game.mageHp[game.seats.p1]?.[k] ?? 1) <= 0),
-      p2: rosterFor("p2").filter(k => (game.mageHp[game.seats.p2]?.[k] ?? 1) <= 0),
+      p1: rosterFor("p1").filter(k => (game.players.p1?.char === k ? game.players.p1.hp : (game.mageHp[game.seats.p1]?.[k] ?? 1)) <= 0),
+      p2: rosterFor("p2").filter(k => (game.players.p2?.char === k ? game.players.p2.hp : (game.mageHp[game.seats.p2]?.[k] ?? 1)) <= 0),
     } : null,
     // tournament: prenesené HP a mana všetkých 3 magov per slot — VEREJNÉ (vidí ich aj súper) pre HUD hlavy.
     // Pozn.: pre práve nasadeného maga je tu uložená (nie živá) hodnota — klient pri ňom berie živé hp/mana z p1/p2.
