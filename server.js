@@ -2204,14 +2204,17 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     const pBonus = powerBoost(slot, tl);
     const foeS = other(slot);
     const foe  = game.players[foeS];
-    // dráha: krok za krokom po okraj; stop na prvej figúre (klon pred súperom — bait pravidlo ako melee)
-    let x = actor.x, y = actor.y, target = null; // null | "clone" | "player"
+    // dráha: krok za krokom po okraj; stop na prvej figúre (klon pred súperom — bait pravidlo ako melee).
+    // Klon STACKNUTÝ na majiteľovej bunke = "stacked": pohltí len CLONE_DMG, zvyšok prejde na Naruta
+    // (rovnaké pravidlo ako pri basic/melee cez stacknutý pár) — nie plný bait.
+    let x = actor.x, y = actor.y, target = null; // null | "clone" | "player" | "stacked"
     const path = [];
     while (inBounds(x + delta[0], y + delta[1])) {
       x += delta[0]; y += delta[1];
       path.push([x, y]);
       const cloneHere  = !!(foe?.clone && foe.clone.x === x && foe.clone.y === y);
       const playerHere = !!(foe && foe.x === x && foe.y === y);
+      if (cloneHere && playerHere) { target = "stacked"; break; }
       if (cloneHere) { target = "clone"; break; }
       if (playerHere) { target = "player"; break; }
     }
@@ -2223,8 +2226,9 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     }
     const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * dealMul(slot) * labyrinthMul(slot) + pBonus;
     // istý zásah REÁLNEHO hráča (aj do štítu/zrkadla) odhalí prípadný labyrint pred animáciou;
-    // zásah klona-návnady labyrint neodhaľuje (kill klona ho nekončí — súper sa nesmie dozvedieť, že trafil klona)
-    if (target === "player") revealLabyrinths(tl);
+    // zásah klona-návnady labyrint neodhaľuje (kill klona ho nekončí — súper sa nesmie dozvedieť, že trafil klona).
+    // stacknutý pár: presah dopadne na REÁLNEHO majiteľa → odhaľuje ako player zásah
+    if (target === "player" || target === "stacked") revealLabyrinths(tl);
     // rozbehový cast: veľký Run+Attack v strede, malá postava tiež (casting), dráha bliká
     pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: path.map(c => [...c]) }], WOLF_CAST_MS);
     // samotný beh: presun na cieľovú bunku jedným sklzom (ako dash); niť labyrintu ráta všetky prejdené bunky
@@ -2235,6 +2239,18 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     // seknutie (Attack_2) na bunke terča; dmg/block/odraz dopadne až po ňom
     pushStateFrame(tl, [{ kind: "wolf_strike", from: slot, cell: [actor.x, actor.y] }], WOLF_STRIKE_MS);
     if (target === "player") applyHit(foeS, raw, tl, "special", false, pBonus);
+    else if (target === "stacked") {
+      // klon na majiteľovej bunke: so zdieľanou obranou reaguje pár ako jedna postava (applyHitPairDefended),
+      // bez obrany klon pohltí len CLONE_DMG (zomrie) a zvyšok moon dmg prejde na Naruta (ako basic/melee)
+      if (foe.shield || foe.mirror) applyHitPairDefended(foeS, raw, tl, "special", false);
+      else {
+        applyHitOnClone(foeS, CLONE_DMG, tl, "special");
+        if (!winnerNow()) {
+          const through = Math.max(0, raw - CLONE_DMG);
+          if (through > 0) applyHit(foeS, through, tl, "special", false, pBonus);
+        }
+      }
+    }
     else applyHitOnClone(foeS, raw, tl, "special");
     return;
   }
