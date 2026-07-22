@@ -3008,6 +3008,9 @@ function computeFacing(p1, p2) {
 const ESC_FEET_FRAC = 0.973;
 // escPrideDisplay: dočasné podržanie STAREJ veľkosti po kole — lev sa ukáže PRED zmenou, potom sa aplikuje nové pride
 let escPrideDisplay = { p1: null, p2: null };
+// postava, pre ktorú je escPrideDisplay zachytené — pri SWAPE (turnaj) sa char v strede kola zmení, takže
+// držaná veľkosť starej postavy (napr. vlkolakov mesiac) sa NESMIE aplikovať na novú (Escanor pride 0)
+let escPrideDisplayChar = { p1: null, p2: null };
 // levelová veľkosť postavy: Escanor = pride, Vlkolak = fáza mesiaca (rast 1.2^level od nôh);
 // vlkolakova ZÁKLADNÁ forma (nov) je zmenšená na 0.7× a rastie z nej (spln ≈ 1.21×), Escanor od 1×.
 // escPrideDisplay drží počas prehrávania kola STARÝ level pre oba prípady (nová veľkosť až po floate)
@@ -3015,14 +3018,19 @@ const escPrideMul = a => {
   const lvl = a?.char === "escanor" ? (a.pride || 0) : a?.char === "werewolf" ? (a.moon || 0) : null;
   if (lvl === null) return 1;
   const base = a.char === "werewolf" ? 0.7 : 1;
-  const pr = (a.slot && escPrideDisplay[a.slot] != null) ? escPrideDisplay[a.slot] : lvl;
+  // držanú veľkosť aplikuj len keď patrí TEJ ISTEJ postave (swap v strede kola mení char → inak by
+  // sa napr. vlkolakov mesiac 3 aplikoval na čerstvo swapnutého Escanora a nafúkol ho)
+  const held = (a.slot && escPrideDisplay[a.slot] != null && escPrideDisplayChar[a.slot] === a.char) ? escPrideDisplay[a.slot] : null;
+  const pr = held != null ? held : lvl;
   return base * Math.pow(1.2, Math.max(0, Math.min(3, pr)));
 };
 // Escanorove FX (WinSun, melee center, letiace slnko, výbuch, charge strela) škálujú s Pridom rovnako ako telo:
 // pride0 = súčasná (autorská) veľkosť ako u ostatných post­áv, rast NAD ňu (1.2^pride, pride3 ≈ 1.73×) — nikdy menšie.
 // Číta ten istý zdroj Pride ako telo (escPrideDisplay počas prehrávania kola, inak state[slot].pride).
 function escFxMul(slot) {
-  const pr = (escPrideDisplay[slot] != null) ? escPrideDisplay[slot] : (state?.[slot]?.pride || 0);
+  // držaný level ber len keď patrí Escanorovi (po swape z inej postavy drží char jej level — ignoruj)
+  const held = (escPrideDisplay[slot] != null && escPrideDisplayChar[slot] === "escanor") ? escPrideDisplay[slot] : null;
+  const pr = held != null ? held : (state?.[slot]?.pride || 0);
   return Math.pow(1.2, Math.max(0, Math.min(3, pr)));
 }
 // Charge (základná strela) je výnimka: má ostať relatívne malá → autorská veľkosť = PRIDE 3 (strop),
@@ -3652,6 +3660,7 @@ function schedulePlayTimeline(timeline) {
   clearProjectiles(); // žiadne staré projektily nesmú prejsť do nového kola
   escSpecialFired = false; // Escanor: choreografia specialu sa spustí max raz za kolo
   escPrideDisplay = { p1: null, p2: null }; // zruš prípadné podržanie starej veľkosti z minulého kola
+  escPrideDisplayChar = { p1: null, p2: null };
   actorsEl.querySelectorAll(".sun-fx, .esc-big").forEach(n => n.remove());
 
   const first = timeline[0];
@@ -3659,9 +3668,10 @@ function schedulePlayTimeline(timeline) {
   // s novou hodnotou → float (lev ▲▼ / nová fáza mesiaca)
   const lvlOf = (a) => a?.char === "escanor" ? (a.pride ?? 0) : a?.char === "werewolf" ? (a.moon ?? 0) : null;
   const preLvl = { p1: lvlOf(first.p1), p2: lvlOf(first.p2) };
+  const preChar = { p1: first.p1?.char || null, p2: first.p2?.char || null }; // char na začiatku kola (swap ho zmení)
   // drž veľkosť podľa levelu NA ZAČIATKU kola cez celé kolo (nová veľkosť sa aplikuje až po kole, keď sa
   // ukáže float) — inak by posledný frame (s novým levelom) zmenil veľkosť ešte pred floatom
-  for (const slot of ["p1", "p2"]) if (preLvl[slot] != null) escPrideDisplay[slot] = preLvl[slot];
+  for (const slot of ["p1", "p2"]) if (preLvl[slot] != null) { escPrideDisplay[slot] = preLvl[slot]; escPrideDisplayChar[slot] = preChar[slot]; }
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
   const playStarter = first.starter ?? state?.starter ?? "p1";
   // beat counts prežijú pauzu THE WORLD: pokračovacia timeline (tsResumePending) NEresetuje číslovanie,
@@ -3706,7 +3716,9 @@ function schedulePlayTimeline(timeline) {
       // (plynulý prechod). Bez zmeny → hneď pusti hold. Iná postava (swap) → hold len zruš.
       for (const slot of ["p1", "p2"]) {
         const nowLvl = lvlOf(state?.[slot]);
-        if (nowLvl === null) { escPrideDisplay[slot] = null; continue; }
+        // swap v strede kola (char sa zmenil) → žiadny float, len pusti držanie starej postavy na novú veľkosť
+        const charChanged = (state?.[slot]?.char || null) !== preChar[slot];
+        if (nowLvl === null || charChanged) { escPrideDisplay[slot] = null; escPrideDisplayChar[slot] = null; continue; }
         if (preLvl[slot] != null && nowLvl !== preLvl[slot]) {
           if (state[slot].char === "escanor") spawnPrideFloat(slot, nowLvl > preLvl[slot]); // lev NAD ním, veľkosť ešte stará
           else spawnMoonFloat(slot, nowLvl); // vlkolak: len nová fáza mesiaca, bez farieb a šípok
@@ -5937,10 +5949,15 @@ socket.on("state", (s) => {
   for (const slot of ["p1", "p2"]) {
     const c = s?.[slot]?.char || null;
     if (c === "escanor" && escPrevChar[slot] !== "escanor") {
-      // escPrevChar === null = čerstvo načítaná stránka (Ctrl+F5). Uprostred hry (turn>1) je Escanor už premenený →
-      // ukáž silnú formu (Stand, škálovaný podľa pride), NIE weak. Inak (nová hra / turnajový swap) premena bude.
+      // escPrevChar === null = čerstvo načítaná stránka (Ctrl+F5) ALEBO nasadenie na začiatku hry (medzi hrami
+      // sa char maže na null → char-select). Uprostred hry (turn>1) je Escanor už premenený → ukáž silnú
+      // formu (Stand, škálovaný podľa pride), NIE weak. Inak (nová hra) sa premena WeakIdle→Transform→Stand hrá.
       const fromReload = escPrevChar[slot] === null;
-      escTransformed[slot] = fromReload && (s.turn || 1) > 1;
+      // SWAP = char sa v rozohranej hre zmenil z INEJ živej postavy (nie null) na Escanora — vtedy premenu
+      // preskoč (Stand, pride 0 hneď), nech nekoliduje so swap animáciou. GAME START (fromReload) si premenu
+      // ponecháva aj v turnaji.
+      const fromSwap = escPrevChar[slot] !== null; // (swap je len v turnaji; medzi hrami je char null)
+      escTransformed[slot] = fromSwap || (fromReload && (s.turn || 1) > 1);
     }
     escPrevChar[slot] = c;
     // Jotaro: keď sa na slote (re)objaví (nasadenie/swap-in — nie mid-hra), prehraj summon intro standu znova
