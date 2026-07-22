@@ -6016,6 +6016,9 @@ socket.on("state", (s) => {
     } else if (mineMelee.char === "onre") {
       meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
+    } else if (mineMelee.char === "jotaro") {
+      meleeBtn.title = "Melee (−4 mana, 4 dmg, hits only an opponent on your cell)";
+      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(mCost); }
     } else {
       meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
