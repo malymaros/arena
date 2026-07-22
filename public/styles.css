@@ -1466,7 +1466,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 /* ---------- Lobby (úvodná obrazovka hosta) ---------- */
 .lobby{
   position: fixed; inset: 0; z-index: 9999; overflow: auto;
-  background: rgba(0,0,0,.82);
+  background: #08090c; /* NEPRIEHĽADNÉ — plocha za setupom nesmie presvitať (rovnako ako ruleta farieb) */
   display: flex; align-items: center; justify-content: center; padding: 24px;
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
 }
@@ -1511,7 +1511,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .lobby-start:disabled{ background: #444; color: #888; cursor: not-allowed; box-shadow: 0 0 0 2px #000; }
 
 .lobby-wait{
-  position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.82);
+  position: fixed; inset: 0; z-index: 9999; background: #08090c; /* NEPRIEHĽADNÉ — plocha za čakaním nesmie presvitať */
   display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 14px; color: #cfd2d6;
   letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6); line-height: 1.8;
