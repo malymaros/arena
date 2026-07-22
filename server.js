@@ -58,6 +58,7 @@ const BASIC_DMG_MAX = 4; // dmg klesá so vzdialenosťou: vedľa 3, ďalej 2, na
 const MELEE_COST = 4;
 const MELEE_DMG  = 8;  // úder zblízka — zasiahne len súpera na rovnakom políčku
 const MEDUSA_MELEE_DMG = 4; // Medúzin melee má širší dosah (vlastné políčko + diagonály) za nižší dmg
+const JOTARO_MELEE_DMG = 4; // Jotarov melee je slabší (balans) — 4 dmg namiesto plných 8
 const MELEE_REPEAT = 3; // švih v rovnakej kadencii ako special (beaty po SPECIAL_BEAT_MS)
 
 const SPECIAL_COST = 5;
@@ -1275,6 +1276,7 @@ function doMelee(slot, tl) {
   // Medúza šľahá chvostom širšie — vlastné políčko + 1 diagonálne na všetky strany, za nižší dmg.
   // Zasahované bunky idú v efekte (klient ich zvýrazní a nemusí zrkadliť logiku).
   const medusa = me.char === "medusa";
+  const myMeleeDmg = medusa ? MEDUSA_MELEE_DMG : (me.char === "jotaro" ? JOTARO_MELEE_DMG : MELEE_DMG);
   const cells = [[me.x, me.y]];
   if (medusa) {
     for (const [dx, dy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
@@ -1303,7 +1305,7 @@ function doMelee(slot, tl) {
   for (let r = 0; r < MELEE_REPEAT; r++) {
     pushStateFrame(tl, [{ kind: "melee", from: slot, cells: cells.concat(cloneCells) }], SPECIAL_BEAT_MS);
   }
-  const meleeRaw = (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) * labyrinthMul(slot) + pBonus; // maze buff: 2× počas labyrintu; POWER flat +2
+  const meleeRaw = myMeleeDmg * dealMul(slot) * labyrinthMul(slot) + pBonus; // maze buff: 2× počas labyrintu; POWER flat +2
   const cloneMeleeRaw = MELEE_DMG * dealMul(slot) * labyrinthMul(slot); // klon (vždy Narutov) seká za plný MELEE_DMG, bez POWER bonusu
   // stacknutý pár Naruto+klon na súperovej bunke seká dvakrát → na nekryté HP JEDEN úder so súčtom
   // (klient vypíše „8+8" a zanimuje ako jeden zásah); pri obrane sa rieši každý sek zvlášť
@@ -1323,7 +1325,7 @@ function doMelee(slot, tl) {
   if ((hitFoeCloneByMe || hitFoeCloneByClone) && !winnerNow()) {
     // obrana sa už prípadne „ukázala" na zásahu hráča tou istou akciou → bez duplicitných frame-ov
     // (majiteľov sek na klona nesie aj POWER bonus — mirror z klona ho odrazí ako súčasť plného dmg)
-    applyHitOnClone(opS, hitFoeCloneByMe ? (medusa ? MEDUSA_MELEE_DMG : MELEE_DMG) * dealMul(slot) + pBonus : CLONE_DMG * dealMul(slot),
+    applyHitOnClone(opS, hitFoeCloneByMe ? myMeleeDmg * dealMul(slot) + pBonus : CLONE_DMG * dealMul(slot),
       tl, "melee", hitFoeByMe || hitFoeByClone);
   }
 }
