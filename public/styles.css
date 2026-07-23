@@ -1229,6 +1229,22 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .char-card.hidden-char.glitch-flash .char-name { color: #7afff2; text-shadow: -2px 1px 0 #000, 2px 0 0 rgba(255,91,214,.75), 0 0 12px rgba(122,255,242,.75); }
 /* preview karty Hidden stránky (Luffy/Jotaro) — fialový skin hidden-char, ale zatiaľ nehrateľné (bez pointeru) */
 .char-card.preview-char { cursor: default; }
+/* „WIP" páska cez pravý horný roh preview karty — statická diagonála vo fialovom neóne
+   (overflow:hidden karty orezáva konce); pixel font + tvrdý outline/bevel ako zvyšok UI */
+.wip-ribbon {
+  position: absolute; top: 16px; right: -34px; z-index: 3; pointer-events: none;
+  width: 130px; text-align: center; transform: rotate(45deg);
+  padding: 4px 0;
+  background: #7a4fd0; color: #e8d9ff;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 10px; letter-spacing: 3px; line-height: 1;
+  text-shadow: 1px 1px 0 #000, 0 0 8px rgba(177,122,255,.6);
+  box-shadow:
+    0 0 0 2px #000,
+    inset 0 2px 0 rgba(255,255,255,.12),
+    inset 0 -3px 0 rgba(0,0,0,.5),
+    0 2px 6px rgba(0,0,0,.5);
+}
 /* „TOP SECRET" popis špeciálu preview postáv — fialový neón s flickerom ako Hidden nadpis */
 .ca-secret {
   color: #b17aff; font-weight: bold; letter-spacing: 3px;
