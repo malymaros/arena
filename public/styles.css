@@ -465,6 +465,33 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
     inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
 }
 #s1-picker.jotaro-s1 .arrow{ background: #7a4fd0; } /* šípky Special 1 v rovnakej fialovej */
+
+/* Luffy: recharge slot = prepínač módu (base↔Gear3) — rovnaký fialový „Hidden" skin, ikona ❔;
+   triedu prepína syncRechargeBtn podľa zvoleného mága */
+.btn.act.mana.luffy-switch{
+  background: #2c2438;
+  box-shadow: 0 0 0 3px #7a4fd0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 14px rgba(177,122,255,.35);
+  animation: hidden-flicker 3.2s linear infinite;
+}
+.btn.act.mana.luffy-switch .pix-ico.charge-mark{
+  width: 44px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 18px; line-height: 1; font-weight: 900; color: #d8c2ff; letter-spacing: 0;
+  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(177,122,255,.85);
+  animation: hidden-question-glitch 1.35s steps(2, end) infinite;
+}
+.btn.act.mana.luffy-switch:not(:disabled):not(.locked-ui):not(.locked-perm):not(.locked-golden):hover{
+  box-shadow: 0 0 0 3px #9a6ff0, 0 0 0 5px #000, inset 0 3px 0 rgba(255,255,255,.05),
+    inset 0 -4px 0 rgba(0,0,0,.5), 0 0 22px rgba(177,122,255,.55);
+}
+.btn.act.mana.luffy-switch.locked-ui, .btn.act.mana.luffy-switch.locked-perm,
+.btn.act.mana.luffy-switch.locked-golden, .btn.act.mana.luffy-switch:disabled{
+  animation: none; box-shadow: 0 0 0 3px #4a4358, 0 0 0 5px #000, inset 0 -4px 0 rgba(0,0,0,.5);
+}
+.btn.act.mana.luffy-switch.locked-ui .pix-ico.charge-mark, .btn.act.mana.luffy-switch.locked-perm .pix-ico.charge-mark,
+.btn.act.mana.luffy-switch.locked-golden .pix-ico.charge-mark, .btn.act.mana.luffy-switch:disabled .pix-ico.charge-mark{
+  animation: none; color: #8b90a6; text-shadow: 2px 2px 0 #000;
+}
 /* zamknutý stav (LOCK IN / otvorený picker / disabled): stlm fialový skin ako pri vamp-charge —
    zhasni flicker + fialový glow a zošedni ❔ ikonu, nech je jasné, že je button neaktívny */
 .btn.act.mirror.jotaro-s1.locked-ui,
@@ -553,6 +580,9 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .cell-picker .mini-target.foe{ background: #47201f; color: #ff8a7a; cursor: not-allowed; opacity: .85; } /* súperova aktuálna bunka / jeho klon */
 /* Countess/Onre: bunka s už položenou pascou v pickeri (recast ju nahradí — pokojne aj tá istá) */
 .cell-picker .mini-target.trap-here{ background: #5a1030; color: #ff7ab0; }
+/* Luffy special: bunka mimo platnej línie (dáma/veža) — zamknutá; cieľová bunka súpera zvýraznená */
+.cell-picker .mini-target.off-line{ background: #1a1d28; color: #3b4055; cursor: not-allowed; opacity: .4; }
+.cell-picker .mini-target.target-foe{ background: #47201f; color: #ff8a7a; }
 
 /* Colors */
 .btn.mana    { background: #1565c0; } /* Recharge (+4) — modrá ako mana bar */
@@ -1668,6 +1698,26 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   .pride-float.down .pf-lion{ background: #ff3b3b; } .pride-float.down .pf-arrow{ color: #ff3b3b; }
 
   /* Vlkolak: fáza mesiaca (ikona BEZ čísla) vľavo od postavy — rovnaké miesto ako Escanorov pride lev */
+  /* Luffy: odznak módu (Base / Gear 3) vľavo od postavy, veľkosťou ~ ako mesiac */
+  .luffy-badge{ position: absolute; left: 40px; top: 48px; z-index: 4; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .luffy-badge.hidden{ display: none; }
+  .luffy-badge img{ height: 46px; width: auto; image-rendering: pixelated; border-radius: 50%; filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)); }
+  .luffy-badge.gear3 img{ animation: pride-max-pulse 1.1s ease-in-out infinite; } /* gear3 pulzuje */
+  /* Luffy: info o speciali vpravo od postavy — veľká značka smeru + dmg + ☠️ (bez pozadia/rámu) */
+  .luffy-info{ position: absolute; right: 42px; top: 30px; z-index: 4; display: flex; pointer-events: none; }
+  .luffy-info.hidden{ display: none; }
+  .luffy-info .li-row{ display: flex; flex-direction: column; align-items: center; gap: 9px; } /* šípka hore, väčšia medzera, pod ňou dmg + ☠️ */
+  .luffy-info .li-arrows{ height: 46px; width: 46px; image-rendering: pixelated; filter: drop-shadow(0 2px 2px rgba(0,0,0,.85)); }
+  .luffy-info .li-dmg{ display: flex; align-items: center; gap: 4px; font-family: "Press Start 2P", Impact, sans-serif; font-size: 18px;
+    color: #ffb64a; text-shadow: 1px 1px 0 #000; }
+  .luffy-info .li-dmg .pix-ico{ width: 18px; height: 18px; vertical-align: 0; margin: 0; filter: drop-shadow(0 1px 1px rgba(0,0,0,.85)); }
+  /* Luffy: gear-závislé tlačidlá (range attack + special) — rohový odznak módu + jemný gear3 rám */
+  .btn.act.luffy-gear{ position: relative; }
+  .btn.act.luffy-gear::after{ content: ""; position: absolute; top: -6px; right: -6px; width: 26px; height: 26px; z-index: 3;
+    background: url("/assets/luffy/base.png") center/contain no-repeat; image-rendering: pixelated; border-radius: 50%;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,.9)); pointer-events: none; }
+  .btn.act.luffy-gear3::after{ background-image: url("/assets/luffy/gear3.png"); }
+  .btn.act.luffy-gear3{ box-shadow: 0 0 0 2px #ffcf3a, 0 0 10px rgba(255,185,70,.45); }
   .moon-badge{ position: absolute; left: 40px; top: 52px; z-index: 4; display: flex; align-items: center; pointer-events: none; }
   .moon-badge.hidden, .moon-dmg.hidden{ display: none; }
   .moon-badge img{ height: 42px; width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)); }

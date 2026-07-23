@@ -48,6 +48,12 @@
       <!-- Vlkolak: fáza mesiaca (ikona bez čísla) vľavo od postavy, dmg specialu pri danej fáze vpravo -->
       <div class="moon-badge hidden" id="moon-p1"><img src="/assets/moon_0.png" alt="Moon" /></div>
       <div class="moon-dmg hidden" id="mdmg-p1"></div>
+      <!-- Luffy: odznak módu (Base / Gear 3) vľavo od postavy (ako mesiac) -->
+      <div class="luffy-badge hidden" id="luffy-p1"><img src="/assets/luffy/base.png" alt="Mode" /></div>
+      <!-- Luffy: info o basic (šípky diag/orto) a speciali (šípky dáma/veža + dmg) vpravo od postavy -->
+      <div class="luffy-info hidden" id="luffy-info-p1">
+        <div class="li-row"><img class="li-arrows li-spec" alt=""><span class="li-dmg"></span></div>
+      </div>
       <div class="hud-stats">
         <div class="hud-stat">
           <span class="bar-label" title="HP"><span class="ico ico-hp pix-ico" data-pix="heart"></span><span class="bar-num hp-num">–</span></span>
@@ -89,6 +95,11 @@
       <!-- Vlkolak: fáza mesiaca (ikona bez čísla) vľavo od postavy, dmg specialu pri danej fáze vpravo -->
       <div class="moon-badge hidden" id="moon-p2"><img src="/assets/moon_0.png" alt="Moon" /></div>
       <div class="moon-dmg hidden" id="mdmg-p2"></div>
+      <!-- Luffy: odznak módu (Base / Gear 3) -->
+      <div class="luffy-badge hidden" id="luffy-p2"><img src="/assets/luffy/base.png" alt="Mode" /></div>
+      <div class="luffy-info hidden" id="luffy-info-p2">
+        <div class="li-row"><img class="li-arrows li-spec" alt=""><span class="li-dmg"></span></div>
+      </div>
       <div class="hud-stats">
         <div class="hud-stat">
           <span class="bar-label" title="HP"><span class="ico ico-hp pix-ico" data-pix="heart"></span><span class="bar-num hp-num">–</span></span>
@@ -327,12 +338,13 @@
           <div class="char-stats hidden" data-char="jotaro"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Jotaro</div>
         </div>
-        <!-- preview karta (zatiaľ NEHRATEĽNÁ): data-char je len na canvase (kreslenie/hover),
-             karta bez data-char = klik aj draft ju ignorujú; Luffy len P1 -->
-        <div class="char-card hidden-char preview-char" data-side="p1">
+        <!-- Luffy (One Piece) — HRATEĽNÝ (WIP), viazaný na P1 ako Vampire. WIP páska ostáva,
+             kým nebude hotový (base/gear3 módy, gear3 pull, chess special). -->
+        <div class="char-card hidden-char" data-char="luffy" data-side="p1">
           <canvas class="char-canvas" width="220" height="240" data-char="luffy"></canvas>
+          <div class="char-stats hidden" data-char="luffy"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Luffy</div>
-          <!-- rozpracovaná (zatiaľ nehrateľná) postava — diagonálna WIP páska v pravom hornom rohu -->
+          <!-- rozpracovaná postava — diagonálna WIP páska v pravom hornom rohu (ostáva do dokončenia) -->
           <div class="wip-ribbon">WIP</div>
         </div>
         <div class="char-card soon"><div class="soon-mark">???</div><div class="char-name">Coming soon</div></div>
