@@ -5575,16 +5575,16 @@ function renderMageHeads() {
     const dead = state?.mageDead?.[slot] || [];
     const cur = state?.[slot]?.char || null;
     const mineSlot = slot === me;
-    // side-postava (Countess/Onre) v rostri tejto strany a či je práve nasadená — swap DO/Z nej je zakázaný,
-    // čo reprezentuje GLITCH: (a) je nasadená → celá zvyšná lavička glitchuje (nedá sa od nej odísť),
-    // (b) je na lavičke → jej hlava glitchuje (nedá sa k nej prísť). Neklikateľné, fialové, s glitch HP.
-    const sideChar = mageOrderFor(slot).find(c => SIDE_CHARS[c]) || null;
-    const curIsSide = !!sideChar && cur === sideChar;
+    // side-postavy (Countess/Onre/Jotaro) v rostri tejto strany a či je práve nasadená niektorá z nich —
+    // swap DO/Z side-postavy je zakázaný, čo reprezentuje GLITCH: (a) je nasadená → celá zvyšná lavička
+    // glitchuje (nedá sa od nej odísť), (b) je na lavičke → jej hlava glitchuje (nedá sa k nej prísť).
+    // Pozor: p2 môže mať v rostri viac side-postáv naraz (napr. Jotaro + Onryō) — glitchovať musia OBE.
+    const curIsSide = !!cur && !!SIDE_CHARS[cur];
     return mageOrderFor(slot).map(char => {
       const isDead = dead.includes(char);
       const isCurrent = cur === char;
       // corrupt = táto hlava je „zamknutá" side-postavou (glitch); mŕtvy mág glitch nemá (má lebku)
-      const corrupt = !isDead && !!sideChar && (curIsSide ? !isCurrent : char === sideChar);
+      const corrupt = !isDead && (curIsSide ? !isCurrent : !!SIDE_CHARS[char]);
       const armed = mineSlot && myQueue.some(a => a.type === "swap" && a.to === char);
       // Last Stand pakt: buffnutý hráč vo final kole nestrieda — jeho lavička nie je klikateľná;
       // glitchujúca (corrupt) hlava tiež nie je klikateľná (nedá sa swapnúť do/zo side-postavy)
