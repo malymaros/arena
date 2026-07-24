@@ -1394,16 +1394,17 @@ function luffyArmFrame(now) {
   }
   if (armP > 0) {
     const ex = arm.ox + (tipX - arm.ox) * armP, ey = arm.oy + (tipY - arm.oy) * armP;
-    const thick = fist === "giant" ? 20 : 11; // hrúbky 1:1 podľa dema
-    ctx.save(); ctx.lineCap = "round";
-    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
-    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
-    ctx.restore();
-    // päsť sa kreslí na ŠPIČKE (ex,ey) + laditeľný posun (pozdĺž ruky / kolmo), aby zápästie sadlo na gumu
+    // stred päste (na špičke + laditeľný posun pozdĺž ruky / kolmo)
     const fk = fist === "giant" ? LUFFY_FIST.reach : LUFFY_FIST.pull;
     const perpU = (dir[0] !== 0) ? [0, 1] : [1, 0]; // kolmý smer na os úderu
     const fcx = ex + (dir[0] || 0) * fk.ax * TILE_W + perpU[0] * fk.perp * TILE_W;
     const fcy = ey + (dir[1] || 0) * fk.ax * TILE_H + perpU[1] * fk.perp * TILE_H;
+    // tenká guma končí v STREDE päste (nafúknutá päsť ju prekryje) → nevytŕča za päsťou k súperovi
+    const thick = fist === "giant" ? 20 : 11; // hrúbky 1:1 podľa dema
+    ctx.save(); ctx.lineCap = "round";
+    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(fcx, fcy); ctx.stroke();
+    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(fcx, fcy); ctx.stroke();
+    ctx.restore();
     const orient = (rec, sx, sy, sw, sh, size) => {
       if (!rec) return;
       ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(fcx, fcy);

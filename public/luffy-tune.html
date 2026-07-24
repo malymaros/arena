@@ -201,15 +201,16 @@ function drawFist(rec, sx,sy,sw,sh, cx,cy, d, size){
 // ── kresli gumenú ruku (kópia drawArm/luffyArmFrame) ───────────────────────────
 function drawArm(x0,y0,x1,y1,d,fistType){
   armCtx.clearRect(0,0,W,H);
-  const thick=fistType==="giant"?20:11;
-  armCtx.save(); armCtx.lineCap="round";
-  armCtx.strokeStyle="#d9a765"; armCtx.lineWidth=thick;      armCtx.beginPath(); armCtx.moveTo(x0,y0); armCtx.lineTo(x1,y1); armCtx.stroke();
-  armCtx.strokeStyle="#f2cf9b"; armCtx.lineWidth=thick*0.45; armCtx.beginPath(); armCtx.moveTo(x0,y0); armCtx.lineTo(x1,y1); armCtx.stroke();
-  armCtx.restore();
   const fk = FIST[phase] || FIST.reach;
   const perpU = (d[0]!==0)?[0,1]:[1,0];
   const fcx = x1 + (d[0]||0)*fk.ax*TILE_W + perpU[0]*fk.perp*TILE_W;
   const fcy = y1 + (d[1]||0)*fk.ax*TILE_H + perpU[1]*fk.perp*TILE_H;
+  // tenká guma končí v STREDE päste (päsť ju prekryje) → nevytŕča za päsťou
+  const thick=fistType==="giant"?20:11;
+  armCtx.save(); armCtx.lineCap="round";
+  armCtx.strokeStyle="#d9a765"; armCtx.lineWidth=thick;      armCtx.beginPath(); armCtx.moveTo(x0,y0); armCtx.lineTo(fcx,fcy); armCtx.stroke();
+  armCtx.strokeStyle="#f2cf9b"; armCtx.lineWidth=thick*0.45; armCtx.beginPath(); armCtx.moveTo(x0,y0); armCtx.lineTo(fcx,fcy); armCtx.stroke();
+  armCtx.restore();
   if(fistType==="giant") drawFist(giantRec, LUFFY_GIANT_FIST.sx,LUFFY_GIANT_FIST.sy,LUFFY_GIANT_FIST.s,LUFFY_GIANT_FIST.s, fcx,fcy, d, TILE_H*fk.size);
   else if(fistType==="grip") drawFist(fistRec, 1*fistRec.fw,0,fistRec.fw,fistRec.fh, fcx,fcy, d, TILE_H*fk.size);
 }
