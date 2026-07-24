@@ -1554,15 +1554,19 @@ function doLuffyGear3Basic(slot, dir, tl) {
   const defended = op.shield || op.mirror; // shield/mirror blokuje dmg AJ pull
   applyHit(opS, dmg, tl, "luffy_gp", false, pBonus);
 
-  // PRIŤIAHNUTIE: len keď zásah dopadol (nebránený) a súper žije — na bunku hneď vedľa Luffyho
+  // PRIŤIAHNUTIE: len keď zásah dopadol (nebránený) a súper žije — na bunku hneď vedľa Luffyho.
+  // Inak (obrana / smrť / už stojí vedľa) sa ruka len STIAHNE späť — klient tak vždy korektne uzavrie
+  // súvislú naťahovaciu ruku (žiadne visiace držanie po zásahu).
   if (!defended && op.hp > 0) {
     const px = me.x + delta[0], py = me.y + delta[1];
     if (px !== op.x || py !== op.y) {
       const from = [op.x, op.y];
       op.x = px; op.y = py;
       pushStateFrame(tl, [{ kind: "luffy_pull", from: slot, foe: opS, fromCell: from, toCell: [px, py], dir }], MOVE_DELAY_MS);
+      return;
     }
   }
+  pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS);
 }
 
 // Luffy SPECIAL = pohyb-a-úder ako šachová figúra. Base = DÁMA (4 dmg, Special_7 roll-bounce), gear3 = VEŽA

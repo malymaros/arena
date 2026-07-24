@@ -1259,48 +1259,103 @@ function spawnSoldierBeam(fromSlot, cell, holdMs) {
 /* ---------- bubliny -X HP / +Y MANA ---------- */
 function cellToPx(x, y) { return { left: x * (TILE_W + GAP), top: y * (TILE_H + GAP) }; }
 
-// Luffy GEAR 3 Giant Pistol: tenká gumová ruka + päsť (giant = L_GiantPunch okrúhla / grip = L_Fist).
-// Kreslí sa na overlay canvas nad doskou; špička (a arm) sa hýbe z aCell do bCell počas dur (ease-out).
+// Luffy GEAR 3 Giant Pistol — JEDNA súvislá naťahovacia ruka cez celú choreografiu (nie viac krátkodobých
+// canvasov). Fázy: "stretch" (giant päsť sa naťahuje origin→cieľ) → "hold" (úchop + záblesk, ruka drží
+// natiahnutá) → "pull" (grip päsť L_Fist ťahá súpera, špička sleduje jeho sklz) alebo "retract" (giant
+// päsť sa stiahne pri minutí/obrane). Prepínajú ich timeline handlery (reach/pull/retract). Perzistentný
+// canvas nad doskou; kreslí sa 1:1 podľa luffy-anim.html DEMO (guma + výrez päste, orientácia podľa smeru).
 const LUFFY_GIANT_FIST = { sx: 182, sy: 186, s: 134 }; // výrez okrúhlej päste z L_GiantPunch (frame 0)
-function spawnLuffyArm(originCell, aCell, bCell, dir, { fist = "giant", dur = 300 } = {}) {
-  if (!Array.isArray(originCell) || !Array.isArray(aCell) || !Array.isArray(bCell)) return;
+let luffyArm = null; // aktívna Giant Pistol ruka
+function luffyArmRemove() {
+  if (luffyArm) { luffyArm.dead = true; luffyArm.cv.remove(); luffyArm = null; }
+}
+const luffyCellCenter = c => { const p = cellToPx(c[0], c[1]); return [p.left + TILE_W / 2, p.top + TILE_H / 2]; };
+function luffyGiantReach(originCell, targetCell, dir, dur) {
+  luffyArmRemove();
+  if (!Array.isArray(originCell) || !Array.isArray(targetCell)) return;
   const W = board.w * TILE_W + (board.w - 1) * GAP, H = board.h * TILE_H + (board.h - 1) * GAP;
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
   Object.assign(cv.style, { position: "absolute", left: "0", top: "0", width: W + "px", height: H + "px", pointerEvents: "none", zIndex: 9, imageRendering: "pixelated" });
   actorsEl.appendChild(cv);
-  const ctx = cv.getContext("2d");
-  const center = c => { const p = cellToPx(c[0], c[1]); return [p.left + TILE_W / 2, p.top + TILE_H / 2]; };
-  const [oxc, oyc] = center(originCell);
-  const ox = oxc + (dir[0] || 0) * TILE_W * 0.18, oy = oyc - TILE_H * 0.06;
-  const [ax, ay] = center(aCell), [bx, by] = center(bCell);
-  const t0 = performance.now();
-  const ez = p => 1 - Math.pow(1 - p, 3);
-  let giantM = null, fistM = null;
-  ensureSpriteMeta("luffy", "L_GiantPunch.png").then(m => giantM = m).catch(() => {});
-  ensureSpriteMeta("luffy", "L_Fist.png").then(m => fistM = m).catch(() => {});
-  const orientFist = (rec, sx, sy, sw, sh, cx, cy, size) => {
-    if (!rec) return;
-    ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(cx, cy);
-    if (dir[0] < 0) ctx.scale(-1, 1); else if (dir[1] > 0) ctx.rotate(Math.PI / 2); else if (dir[1] < 0) ctx.rotate(-Math.PI / 2);
-    ctx.drawImage(rec.img, sx, sy, sw, sh, -size / 2, -size / 2, size, size); ctx.restore();
+  const [oxc, oyc] = luffyCellCenter(originCell);
+  const [bx, by] = luffyCellCenter(targetCell);
+  const arm = {
+    cv, ctx: cv.getContext("2d"), W, H, dir, dead: false,
+    ox: oxc + (dir[0] || 0) * TILE_W * 0.18, oy: oyc - TILE_H * 0.06, // guma vychádza z Luffyho ruky
+    tipX: bx, tipY: by, fist: "giant", flash: 0,
+    phase: "stretch", t0: performance.now(), dur: Math.max(1, dur), holdT0: 0,
+    giantM: null, fistM: null,
   };
-  function frame(now) {
-    if (!cv.isConnected) return;
-    const p = Math.min(1, (now - t0) / dur), tx = ax + (bx - ax) * ez(p), ty = ay + (by - ay) * ez(p);
-    ctx.clearRect(0, 0, W, H);
-    // veľkosti ladené na REÁLNU (normalizovanú) veľkosť Luffyho na doske — menšie než v demo
-    const thick = fist === "giant" ? 13 : 8;
-    ctx.save(); ctx.lineCap = "round";
-    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(tx, ty); ctx.stroke();
-    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(tx, ty); ctx.stroke();
-    ctx.restore();
-    if (fist === "giant") orientFist(giantM, LUFFY_GIANT_FIST.sx, LUFFY_GIANT_FIST.sy, LUFFY_GIANT_FIST.s, LUFFY_GIANT_FIST.s, tx, ty, TILE_H * 0.6);
-    else if (fistM) orientFist(fistM, 1 * fistM.fw, 0, fistM.fw, fistM.fh, tx, ty, TILE_H * 0.45);
-    if (p < 1) requestAnimationFrame(frame);
-    else setTimeout(() => cv.remove(), 70);
+  ensureSpriteMeta("luffy", "L_GiantPunch.png").then(m => { if (!arm.dead) arm.giantM = m; }).catch(() => {});
+  ensureSpriteMeta("luffy", "L_Fist.png").then(m => { if (!arm.dead) arm.fistM = m; }).catch(() => {});
+  luffyArm = arm;
+  requestAnimationFrame(luffyArmFrame);
+}
+// priťiahnutie: giant päsť sa prehodí na úchop (L_Fist) a špička sleduje súpera z jeho pôvodnej bunky na
+// cieľovú (LINEÁRNE — sync s CSS sklzom súpera cez --move-ms)
+function luffyGiantPull(fromCell, toCell, dir, dur) {
+  const arm = luffyArm;
+  if (!arm || !Array.isArray(fromCell) || !Array.isArray(toCell)) return;
+  const [ax, ay] = luffyCellCenter(fromCell), [bx, by] = luffyCellCenter(toCell);
+  arm.fist = "grip"; arm.dir = dir;
+  arm.px0 = ax; arm.py0 = ay; arm.px1 = bx; arm.py1 = by;
+  arm.phase = "pull"; arm.t0 = performance.now(); arm.dur = Math.max(1, dur);
+}
+// minutie/obrana: natiahnutá giant päsť sa stiahne späť k Luffymu
+function luffyGiantRetract(dir, dur) {
+  const arm = luffyArm;
+  if (!arm) return;
+  arm.dir = dir; arm.fist = "giant"; arm.flash = 0;
+  arm.phase = "retract"; arm.t0 = performance.now(); arm.dur = Math.max(1, dur);
+}
+function luffyArmFrame(now) {
+  const arm = luffyArm;
+  if (!arm || arm.dead || !arm.cv.isConnected) return;
+  const { ctx, W, H, dir } = arm;
+  const ez = q => 1 - Math.pow(1 - q, 3);
+  const p = Math.min(1, (now - arm.t0) / arm.dur);
+  let tipX = arm.tipX, tipY = arm.tipY, armP = 1, fist = arm.fist, flash = arm.flash;
+  if (arm.phase === "stretch") {
+    armP = ez(p); fist = "giant"; // guma dorastá origin→cieľ; špička ostáva na cieli, armP interpoluje dĺžku
+    if (p >= 1) { arm.phase = "hold"; arm.t0 = now; arm.dur = 1; arm.flash = 1; arm.holdT0 = now; } // úchop + záblesk
+  } else if (arm.phase === "hold") {
+    armP = 1; fist = "giant";
+    arm.flash = flash = Math.max(0, arm.flash - 0.06); // záblesk úderu doznieva; ruka drží natiahnutá
+    if (now - arm.holdT0 > 3200) { luffyArmRemove(); return; } // poistka: pull/retract by mal prísť skôr
+  } else if (arm.phase === "pull") {
+    fist = "grip"; armP = 1;
+    tipX = arm.px0 + (arm.px1 - arm.px0) * p; tipY = arm.py0 + (arm.py1 - arm.py0) * p;
+    arm.flash = flash = Math.max(0, arm.flash - 0.06);
+    if (p >= 1) { luffyArmRemove(); return; }
+  } else if (arm.phase === "retract") {
+    fist = "giant"; armP = 1 - ez(p); flash = 0;
+    if (p >= 1) { luffyArmRemove(); return; }
   }
-  requestAnimationFrame(frame);
+  ctx.clearRect(0, 0, W, H);
+  // záblesk úchopu POD päsťou (ako demo)
+  if (flash > 0) {
+    ctx.save(); ctx.globalAlpha = flash * 0.8; ctx.fillStyle = "#fff2a8";
+    const r = TILE_H * 0.5 * (1.1 - flash * 0.3);
+    ctx.beginPath(); ctx.arc(tipX, tipY, r, 0, 7); ctx.fill(); ctx.restore();
+  }
+  if (armP > 0) {
+    const ex = arm.ox + (tipX - arm.ox) * armP, ey = arm.oy + (tipY - arm.oy) * armP;
+    const thick = fist === "giant" ? 20 : 11; // hrúbky 1:1 podľa dema
+    ctx.save(); ctx.lineCap = "round";
+    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.restore();
+    const orient = (rec, sx, sy, sw, sh, size) => {
+      if (!rec) return;
+      ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(ex, ey);
+      if (dir[0] < 0) ctx.scale(-1, 1); else if (dir[1] > 0) ctx.rotate(Math.PI / 2); else if (dir[1] < 0) ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(rec.img, sx, sy, sw, sh, -size / 2, -size / 2, size, size); ctx.restore();
+    };
+    if (fist === "giant") orient(arm.giantM, LUFFY_GIANT_FIST.sx, LUFFY_GIANT_FIST.sy, LUFFY_GIANT_FIST.s, LUFFY_GIANT_FIST.s, TILE_H * 0.95);
+    else if (arm.fistM) orient(arm.fistM, 1 * arm.fistM.fw, 0, arm.fistM.fw, arm.fistM.fh, TILE_H * 0.7);
+  }
+  requestAnimationFrame(luffyArmFrame);
 }
 
 // Luffy gear3 special impact: Special_2 (radiálne päste) prehrané RAZ na cieľovej bunke
@@ -4182,12 +4237,20 @@ function schedulePlayTimeline(timeline) {
         cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
         spawnChargeAura(e.from, false, false, "clone", dark);
       }
-      // Luffy GEAR 3 Giant Pistol: nafúknutie pästí (Recharge2) + naťahovacia ruka (L_GiantPunch) po cieľ
+      // Luffy GEAR 3 Giant Pistol: nafúknutie pästí (Recharge2) + JEDNA súvislá naťahovacia ruka.
+      // windup = len póza; reach = spusti ruku (natiahnutie giant päste po cieľ, potom drží úchop);
+      // retract = stiahni ruku (minutie/obrana). Pull rieši samostatný efekt "luffy_pull" nižšie.
       if (e.kind === "luffy_gp" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, "luffypump", frameHold);
+        const d = WOLF_DIRS_CLIENT[e.dir] || [1, 0];
         if (e.phase === "reach" && Array.isArray(e.origin) && Array.isArray(e.target)) {
-          const d = WOLF_DIRS_CLIENT[e.dir] || [1, 0];
-          spawnLuffyArm(e.origin, e.origin, e.target, d, { fist: "giant", dur: e.ms || 320 });
+          // pumpovaciu pózu drž cez natiahnutie + úchop + priťiahnutie (nech sa nevráti do idle uprostred)
+          setAnim(e.from, "luffypump", frameHold + 1800);
+          luffyGiantReach(e.origin, e.target, d, e.ms || 320);
+        } else if (e.phase === "retract") {
+          setAnim(e.from, "luffypump", frameHold);
+          luffyGiantRetract(d, Math.min(frameHold, 460));
+        } else {
+          setAnim(e.from, "luffypump", frameHold); // windup
         }
       }
       // Luffy special roll: dogúľa sa na cieľovú bunku (pohyb cez snapshot). Base = Special_7 roll-bounce,
@@ -4210,12 +4273,13 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "luffy_chomp" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, e.hit ? "luffychomphit" : "luffychomp", frameHold);
       }
-      // Luffy priťiahnutie: úchopová päsť (L_Fist) drží súpera; súper sa prisunie (automaticky cez snapshot)
+      // Luffy priťiahnutie: rovnaká ruka sa prehodí na úchop (L_Fist) a špička sleduje súpera z jeho
+      // pôvodnej bunky na novú (súper sa prisunie cez snapshot — CSS sklz cez --move-ms = MOVE_MS)
       if (e.kind === "luffy_pull" && (e.from === "p1" || e.from === "p2")) {
-        const luf = state?.[e.from];
+        setAnim(e.from, "luffypump", frameHold);
         const d = WOLF_DIRS_CLIENT[e.dir] || [1, 0];
-        if (luf && luf.x != null && Array.isArray(e.fromCell) && Array.isArray(e.toCell))
-          spawnLuffyArm([luf.x, luf.y], e.fromCell, e.toCell, d, { fist: "grip", dur: frameHold });
+        if (Array.isArray(e.fromCell) && Array.isArray(e.toCell))
+          luffyGiantPull(e.fromCell, e.toCell, d, MOVE_MS);
       }
       // Fire Wizard skonzumoval Damage dlaždicu (boost zo specialu) / caster POWER tile — krátky flare na bunke
       if (e.kind === "tile_consume" && Array.isArray(e.cell)) {
