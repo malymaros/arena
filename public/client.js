@@ -635,8 +635,8 @@ const ANIM_DEF = {
   luffyrolltravel: { file: "Special_7.png", fps: 14, loop: false, maxFrame: 6 },              // dogúľanie k bunke
   luffychomp:      { file: "Special_7.png", fps: 10, loop: false, startFrame: 7 },            // cvaknutie + zotavenie (minutie)
   luffychomphit:   { file: "Special_7.png", fps: 10, loop: false, startFrame: 7, maxFrame: 9 }, // cvaknutie, zastaví (zásah)
-  luffyball:     { file: "Special_1.png", fps: 8, loopFrom: 7 },              // gear3: premena na guľu (transform + spin) NA štartovacej bunke
-  luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7 },           // gear3: už-guľa (drží guľový frame) počas gúľania k cieľu
+  luffyball:     { file: "Special_1.png", fps: 8, loopFrom: 7 },                       // gear3: premena na guľu (transform + spin) NA štartovacej bunke
+  luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7, loop: true },        // gear3: gúľajúca sa guľa počas presunu k cieľu — LOOPuje guľové framy 7–8 (nie statický frame)
   luffyimpact:   { file: "Special_2.png", fps: 8,  loop: false },
   // Vlkolak: beh charge specialu (Run+Attack) + seknutie na bunke terča (WolfStrike.png → alias Attack_2.png);
   // neloopové → raf ho kreslí relatívnym časom od setAnim (drawT), inak by viselo na poslednom frame
@@ -786,7 +786,7 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
   const startF = anim.startFrame || 0;
   const idx = anim.frameIndex != null ? Math.max(0, Math.min(total - 1, anim.frameIndex))
             : anim.loopFrom != null ? (elapsedF < total ? elapsedF : anim.loopFrom + ((elapsedF - anim.loopFrom) % (total - anim.loopFrom)))
-            : anim.loop ? elapsedF % total
+            : anim.loop ? startF + (elapsedF % (lastIdx - startF + 1)) // loop RESPEKTUJE startFrame/maxFrame (startFrame 0 → identické s pôvodným elapsedF % total)
                         : Math.min(lastIdx, startF + elapsedF);
   // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu — kreslí sa len stredový pás postavy
   // cropRightFrac: NAVYŠE odreže časť SPRAVA v sprite-priestore (sprite mieri doprava, flip rieši CSS) —
@@ -4336,11 +4336,11 @@ function schedulePlayTimeline(timeline) {
         if (e.form === "gear3") luffyCenterRemove(); else spawnLuffyCenter(e.from, "base");
         setAnim(e.from, e.form === "gear3" ? "luffyballspin" : "luffyrolltravel", frameHold);
       }
-      // gear3 special: dogúľal sa na bunku → VÝBUCH cez Special_2 (vždy pri dorazení, dmg rieši applyHit)
+      // gear3 special: dogúľal sa na bunku → guľa sa „rozbalí" cez Special_2 (radiálne päste) a HNEĎ potom
+      // je tam už len idle Luffy (impact 3f @ 8fps ≈ 375 ms, potom setAnim revertne na idle). dmg rieši applyHit.
       if (e.kind === "luffy_explode" && (e.from === "p1" || e.from === "p2")) {
         luffyCenterRemove(); // poistka — stredový sprite je preč pred výbuchom
-        setAnim(e.from, "luffyball", frameHold); // drž guľu počas výbuchu
-        if (Array.isArray(e.target)) spawnLuffyImpact(e.target);
+        setAnim(e.from, "luffyimpact", 380); // guľa prehrá Special_2 raz, hneď potom idle
       }
       // base special cvaknutie NA cieľovej bunke: zásah → zastaví na cvaknutí (luffychomphit),
       // minutie → dohrá aj zotavenie (luffychomp). „Zásah" = na bunke bol hráč/klon (aj so štítom/mirrorom).
