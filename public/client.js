@@ -230,6 +230,10 @@ const LUFFY_BOARD_OFF_Y = 4;
 // procedurálna gumená ruka, ktorá sa naťahuje od tela po reálnu bunku súpera a nesie giant päsť na špičke.
 // (frac = koľko šírky framu odseknúť sprava; laditeľné podľa toho, kde v pásoch končí Luffyho telo)
 const LUFFY_ARM_CROP = { luffygiantpunch: 0.56, luffyrocketpull: 0.5 };
+// Odkiaľ vychádza gumená ruka (napojenie na Luffyho telo): podiel TILE_W/TILE_H od STREDU jeho bunky.
+// fx = dopredu v smere úderu (Luffy je na bunke vycentrovaný); fy = hore k ramenu (záporné = vyššie).
+// Luffy je malý (fill 0.58) a ukotvený na nohy → rameno je citeľne NAD stredom bunky.
+const LUFFY_ARM_ORIGIN = { fx: 0.08, fy: -0.20 };
 // Star Platinum `_P` pásy (a Jotarove telo) majú v ÚTOČNÝCH pózach figúru zámerne posunutú tak, aby BBOX
 // ostal centrovaný (napr. pri údere päsť vyletí bokom a telo/nohy sú odtlačené na druhú stranu). Keby sme
 // kreslili centrované na frame, NOHY by pri animácii uskakovali zľava doprava a hore-dole. Preto ukotvujeme
@@ -1309,7 +1313,7 @@ function luffyGiantReach(originCell, targetCell, dir, dur) {
   const [bx, by] = luffyCellCenter(targetCell);
   const arm = {
     cv, ctx: cv.getContext("2d"), W, H, dir, dead: false,
-    ox: oxc + (dir[0] || 0) * TILE_W * 0.18, oy: oyc - TILE_H * 0.06, // guma vychádza z Luffyho ruky
+    ox: oxc + (dir[0] || 0) * TILE_W * LUFFY_ARM_ORIGIN.fx, oy: oyc + TILE_H * LUFFY_ARM_ORIGIN.fy, // guma vychádza z Luffyho ramena
     tipX: bx, tipY: by, fist: "giant", flash: 0,
     phase: "stretch", t0: performance.now(), dur: Math.max(1, dur), holdT0: 0,
     giantM: null, fistM: null,
