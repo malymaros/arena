@@ -1407,6 +1407,40 @@ function spawnLuffyImpact(cell) {
   }).catch(() => {});
 }
 
+// Luffy special STREDOVÁ animácia (veľký sprite v strede arény ako pri iných specialoch):
+//   gear3 = premena na guľu + rotácia (Special_1: f0–6 premena, potom loop od f7 = „gúľajúca sa guľa",
+//           presne ako v náhľade výberu postavy). Zmizne, keď sa guľa na doske rozgúľa (luffy_roll ju odstráni),
+//           až potom sa guľa presunie na cieľ a vybuchne.
+//   base  = Special_7 (rozbeh→kotúľ→cvaknutie) — hero-shot sprevádzajúci dogúľanie k bunke.
+let luffyCenterEl = null;
+function luffyCenterRemove() {
+  if (luffyCenterEl) { luffyCenterEl.dead = true; luffyCenterEl.remove(); luffyCenterEl = null; }
+}
+function spawnLuffyCenter(slot, form) {
+  luffyCenterRemove();
+  const dir  = charDirFor("luffy", slot);
+  const file = form === "gear3" ? "Special_1.png" : "Special_7.png";
+  const anim = form === "gear3" ? { file, fps: 8, loopFrom: 7 } : { file, fps: 12, loop: true };
+  const px = Math.round(TILE_H * SPECIAL_SCALE);
+  const cvs = document.createElement("canvas");
+  cvs.width = px; cvs.height = px;
+  cvs.className = "luffy-center"; // VLASTNÁ trieda — NIE .special-center (updateSpecialCenter ju maže každý frame)
+  if (usesAltColor("luffy", slot)) cvs.classList.add("alt-color");
+  const flip = computeFacing(state?.p1, state?.p2)[slot] || 1;
+  Object.assign(cvs.style, { position: "absolute", left: "50%", top: "50%", transform: `translate(-50%, -50%) scaleX(${flip})`, zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
+  actorsEl.appendChild(cvs);
+  luffyCenterEl = cvs;
+  const ctx = cvs.getContext("2d");
+  const t0 = performance.now();
+  ensureSpriteMeta(dir, file).then(m => {
+    (function step(now) {
+      if (!cvs.isConnected || cvs.dead) return;
+      drawSprite(ctx, m, anim, now - t0, px, px);
+      requestAnimationFrame(step);
+    })(performance.now());
+  }).catch(() => {});
+}
+
 // súbežné bubliny nad tým istým hráčom sa stackujú nad seba, aby sa neprekrývali
 let floatTimes = { p1: [], p2: [] };
 function floatOffsetFor(slot) {
@@ -2767,6 +2801,8 @@ function renderGrid(s, effects = []) {
     }
     // vlkolakovo seknutie — zvýrazni bunku terča (ako melee)
     if (e?.kind === "wolf_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
+    // Luffy special: cieľová bunka bliká, kam sa guľa/Luffy dogúľa a vybuchne (počas roll → explode/chomp)
+    if ((e?.kind === "luffy_roll" || e?.kind === "luffy_explode" || e?.kind === "luffy_chomp") && Array.isArray(e.target)) previewSet.add(`${e.target[0]},${e.target[1]}`);
     // Countess/Onre: seknutie po charge/teleporte — zvýrazni bunku terča; trigger pasce — bunka sa rozžiari
     if (e?.kind === "vamp_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
     // Countess: úder (A1) aj liečivé beaty (A2/A3/A4) sa zrkadlia do veľkého stredového spritu —
@@ -3794,6 +3830,7 @@ function showGameOverSequence(winner) {
       if (hudTurn) hudTurn.innerHTML = `GAME OVER<span class="go-verdict ${cls}">${verdict}</span>${scoreLine}`;
       // uprac overlay z poslednej akcie (special/melee cast) — po game over ho už renderGrid neuprace
       actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
+      luffyCenterRemove();
       // víťazova postavička spamuje cast animáciu priamo na svojom políčku (žiadny extra sprite)
       if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
       goOverlay.classList.remove("hidden");
@@ -3811,6 +3848,7 @@ function playGameEndAnim(winner, after) {
     let afterDeathWait = 300;
     if (winner !== "draw" && loser) { setAnim(loser, "dead", 1200); afterDeathWait = 1300; }
     actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
+    luffyCenterRemove();
     if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
     setTimeout(() => { if (after) after(); }, afterDeathWait);
   }, waitAttack);
@@ -4287,16 +4325,20 @@ function schedulePlayTimeline(timeline) {
       }
       // Luffy special roll: dogúľa sa na cieľovú bunku (pohyb cez snapshot). Base = Special_7 roll-bounce,
       // gear3 = balón; pri zásahu v gear3 aj Special_2 impact (radiálne päste) na cieľovej bunke.
-      // gear3 special: premena na GUĽU na štartovacej bunke (Luffy ešte nehýbe)
+      // gear3 special: STREDOVÁ premena na guľu + rotácia (Luffy ešte nehýbe na štartovacej bunke)
       if (e.kind === "luffy_ball_form" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "luffyball", frameHold);
+        spawnLuffyCenter(e.from, "gear3"); // veľká guľa v strede sa gúľa ako v náhľade výberu
       }
       if (e.kind === "luffy_roll" && (e.from === "p1" || e.from === "p2")) {
-        // gear3: už je guľa → drž guľu (bez opätovnej premeny) počas gúľania; base: dogúľanie (beh/kotúľ)
+        // gear3: stredová guľa ZMIZNE → guľa na doske sa rozgúľa k cieľu; base: stredový hero-shot (Special_7)
+        // sprevádza dogúľanie. Cieľová bunka bliká (rieši renderGrid cez e.target).
+        if (e.form === "gear3") luffyCenterRemove(); else spawnLuffyCenter(e.from, "base");
         setAnim(e.from, e.form === "gear3" ? "luffyballspin" : "luffyrolltravel", frameHold);
       }
       // gear3 special: dogúľal sa na bunku → VÝBUCH cez Special_2 (vždy pri dorazení, dmg rieši applyHit)
       if (e.kind === "luffy_explode" && (e.from === "p1" || e.from === "p2")) {
+        luffyCenterRemove(); // poistka — stredový sprite je preč pred výbuchom
         setAnim(e.from, "luffyball", frameHold); // drž guľu počas výbuchu
         if (Array.isArray(e.target)) spawnLuffyImpact(e.target);
       }
@@ -4304,6 +4346,7 @@ function schedulePlayTimeline(timeline) {
       // minutie → dohrá aj zotavenie (luffychomp). „Zásah" = na bunke bol hráč/klon (aj so štítom/mirrorom).
       if (e.kind === "luffy_chomp" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, e.hit ? "luffychomphit" : "luffychomp", frameHold);
+        luffyCenterRemove(); // base: stredový hero-shot zmizne pri cvaknutí NA bunke
       }
       // Luffy priťiahnutie: rovnaká ruka sa prehodí na úchop (L_Fist) a špička sleduje súpera z jeho
       // pôvodnej bunky na novú (súper sa prisunie cez snapshot — CSS sklz cez --move-ms = MOVE_MS)

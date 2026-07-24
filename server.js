@@ -1527,12 +1527,17 @@ function doLuffyGear3Basic(slot, dir, tl) {
   me.mana -= BASIC_COST;
   const pBonus = powerBoost(slot, tl);
 
-  // scan po prvú figúru súpera (hráč / klon-návnada) alebo okraj
-  let x = me.x, y = me.y, dist = 0, hit = false, cloneDecoy = false;
+  // scan po prvú figúru súpera (hráč / klon) alebo okraj. Klon STACKNUTÝ na majiteľovej bunke = "stacked":
+  // pohltí len CLONE_DMG, zvyšok prejde na Naruta (rovnaké pravidlo ako basic/melee/werewolf charge) — nie
+  // plný bait ako klon-návnada mimo majiteľovej bunky.
+  let x = me.x, y = me.y, dist = 0, hit = false, cloneDecoy = false, stacked = false;
   while (inBounds(x + delta[0], y + delta[1])) {
     x += delta[0]; y += delta[1]; dist++;
-    if (op && op.x === x && op.y === y) { hit = true; break; }
-    if (op?.clone && op.clone.x === x && op.clone.y === y) { hit = true; cloneDecoy = true; break; }
+    const cloneHere  = !!(op?.clone && op.clone.x === x && op.clone.y === y);
+    const playerHere = !!(op && op.x === x && op.y === y);
+    if (cloneHere && playerHere) { hit = true; stacked = true; break; }
+    if (playerHere) { hit = true; break; }
+    if (cloneHere) { hit = true; cloneDecoy = true; break; }
   }
   const target = [x, y];
 
@@ -1551,10 +1556,23 @@ function doLuffyGear3Basic(slot, dir, tl) {
     return;
   }
 
-  // reálny hráč: istý zásah → odhaľ labyrint pred úderom; obrana sa vyhodnotí v applyHit
+  // reálny hráč (aj stacknutý pár s klonom): istý zásah → odhaľ labyrint pred úderom; obrana v applyHit
   revealLabyrinths(tl);
   const defended = op.shield || op.mirror; // shield/mirror blokuje dmg AJ pull
-  applyHit(opS, dmg, tl, "luffy_gp", false, pBonus);
+  if (stacked) {
+    // klon na majiteľovej bunke: so zdieľanou obranou reaguje pár ako jedna postava (applyHitPairDefended),
+    // bez obrany klon pohltí CLONE_DMG (zomrie) a ZVYŠOK dmg prejde na Naruta — potom (ak žije) pull
+    if (defended) applyHitPairDefended(opS, dmg, tl, "luffy_gp", false);
+    else {
+      applyHitOnClone(opS, CLONE_DMG, tl, "luffy_gp");
+      if (!winnerNow()) {
+        const through = Math.max(0, dmg - CLONE_DMG);
+        if (through > 0) applyHit(opS, through, tl, "luffy_gp", false, pBonus);
+      }
+    }
+  } else {
+    applyHit(opS, dmg, tl, "luffy_gp", false, pBonus);
+  }
 
   // PRIŤIAHNUTIE: len keď zásah dopadol (nebránený) a súper žije — na bunku hneď vedľa Luffyho.
   // Inak (obrana / smrť / už stojí vedľa) sa ruka len STIAHNE späť — klient tak vždy korektne uzavrie
@@ -1575,6 +1593,7 @@ function doLuffyGear3Basic(slot, dir, tl) {
 // (8 dmg, balón + Special_2 impact). Cieľová bunka na platnej línii (aj vlastná); Luffy sa NA ňu dogúľa a dá
 // dmg tomu, kto na nej stojí (súper / klon). Ide cez obrany ako každý dmg special.
 const LUFFY_SPECIAL_DMG = { base: 4, gear3: 8 };
+const LUFFY_BALL_FORM_MS = Math.round(900 * ANIM_SLOW); // gear3: STREDOVÁ premena na guľu + rotácia (Special_1: ~1.1s premena + viditeľné rolovanie; Luffy ešte stojí, guľa sa na doske rozgúľa až potom)
 const LUFFY_ROLL_MS = Math.round(700 * ANIM_SLOW);   // gear3 balón roll
 const LUFFY_TRAVEL_MS = Math.round(340 * ANIM_SLOW); // base: dogúľanie k bunke (run/roll)
 const LUFFY_CHOMP_MS  = Math.round(340 * ANIM_SLOW); // base: cvaknutie NA bunke
@@ -1604,15 +1623,18 @@ function doLuffySpecial(slot, tl, cell) {
   const dmg = LUFFY_SPECIAL_DMG[gear3 ? "gear3" : "base"] * dealMul(slot) * labyrinthMul(slot) + pBonus;
 
   const foeOnTarget = !!(op && op.x === cell.x && op.y === cell.y);
-  const cloneOnTarget = !foeOnTarget && !!(op?.clone && op.clone.x === cell.x && op.clone.y === cell.y);
+  const cloneOnCell = !!(op?.clone && op.clone.x === cell.x && op.clone.y === cell.y);
+  const stacked = foeOnTarget && cloneOnCell;            // Naruto + klon na cieľovej bunke
+  const cloneDecoyOnTarget = cloneOnCell && !foeOnTarget; // klon-návnada sám na bunke
 
-  if (foeOnTarget) revealLabyrinths(tl); // istý zásah reálneho hráča → odhaľ labyrint pred rolovaním
+  if (foeOnTarget) revealLabyrinths(tl); // istý zásah reálneho hráča (aj stacknutý) → odhaľ pred rolovaním
 
-  const willHit = foeOnTarget || cloneOnTarget; // na cieľovej bunke stojí súper/klon (aj keď má štít/mirror)
+  const willHit = foeOnTarget || cloneOnCell; // na cieľovej bunke stojí súper/klon (aj keď má štít/mirror)
   const path = luffyLinePath(me.x, me.y, cell.x, cell.y);
   if (gear3) {
-    // gear3: najprv PREMENA na guľu NA ŠTARTOVACEJ bunke (Luffy ešte nehýbe), POTOM dogúľanie k cieľu, potom VÝBUCH
-    pushStateFrame(tl, [{ kind: "luffy_ball_form", from: slot }], LUFFY_TRAVEL_MS);
+    // gear3: najprv STREDOVÁ premena na guľu + rotácia (Luffy ešte nehýbe, guľa sa gúľa ako v náhľade výberu),
+    // POTOM (keď stredový sprite zmizne) sa guľa na doske dogúľa k cieľu, potom VÝBUCH
+    pushStateFrame(tl, [{ kind: "luffy_ball_form", from: slot }], LUFFY_BALL_FORM_MS);
     me.x = cell.x; me.y = cell.y;
     pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, form: "gear3", target: [cell.x, cell.y], ...trackSteps(slot, path) }], LUFFY_ROLL_MS);
     pushStateFrame(tl, [{ kind: "luffy_explode", from: slot, target: [cell.x, cell.y], hit: willHit }], LUFFY_CHOMP_MS);
@@ -1623,8 +1645,19 @@ function doLuffySpecial(slot, tl, cell) {
     pushStateFrame(tl, [{ kind: "luffy_chomp", from: slot, target: [cell.x, cell.y], hit: willHit }], LUFFY_CHOMP_MS);
   }
 
-  if (foeOnTarget) applyHit(opS, dmg, tl, "luffy_special", false, pBonus);
-  else if (cloneOnTarget) applyHitOnClone(opS, dmg, tl, "luffy_special");
+  if (stacked) {
+    // klon na cieľovej bunke: zdieľaná obrana kryje pár ako jedna postava; bez obrany klon pohltí
+    // CLONE_DMG (zomrie) a zvyšok prejde na Naruta (rovnaké pravidlo ako basic/melee/werewolf charge)
+    if (op.shield || op.mirror) applyHitPairDefended(opS, dmg, tl, "luffy_special", false);
+    else {
+      applyHitOnClone(opS, CLONE_DMG, tl, "luffy_special");
+      if (!winnerNow()) {
+        const through = Math.max(0, dmg - CLONE_DMG);
+        if (through > 0) applyHit(opS, through, tl, "luffy_special", false, pBonus);
+      }
+    }
+  } else if (foeOnTarget) applyHit(opS, dmg, tl, "luffy_special", false, pBonus);
+  else if (cloneDecoyOnTarget) applyHitOnClone(opS, dmg, tl, "luffy_special");
   // miss = čistý presun (roll/chomp frame už odohral)
 }
 
