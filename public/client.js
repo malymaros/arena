@@ -237,7 +237,7 @@ const LUFFY_ARM_CROP = { luffygiantpunch: 0.56, luffyrocketpull: 0.5 };
 // reach = natiahnutie (giant päsť), pull = priťiahnutie (grip päsť). thick = hrúbka gumy (px), size = päsť × TILE_H.
 const LUFFY_ARM = {
   reach: { O: { x: 0.42, y: 0.07 }, T: { x: -0.50, y: 0.08 }, P: { x: -0.20, y: 0.00, size: 0.95 }, thick: 13 },
-  pull:  { O: { x: -0.08, y: 0.03 }, T: { x: -0.14, y: 0.03 }, P: { x: 0.10, y: 0.02, size: 0.96 }, thick: 18 },
+  pull:  { O: { x: -0.08, y: 0.03 }, T: { x: -0.29, y: 0.03 }, P: { x: -0.06, y: 0.02, size: 0.96 }, thick: 18 },
 };
 // (along,perp) v smerovom rámci → [dx,dy] px offset (zrkadlí rot() v luffy-tune.html)
 const luffyRot = (d, a, b) =>
@@ -4072,8 +4072,12 @@ function schedulePlayTimeline(timeline) {
       if (curAction[slot] === "dash") { standBlip[slot] = null; return; } // dash → Run_P (rieši standFileFor)
       if (before.x !== frm.x || before.y !== frm.y) standBlip[slot] = { start: performance.now(), ox: before.x, oy: before.y };
     };
-    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
-    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
+    // Luffy priťiahnutie: ťahaný súper sa NEmá rozbehnúť (nech to nevyzerá, že tam sám beží) — drž ho
+    // v idle, len sa sklzne k Luffymu. Ťahaný = súper toho, kto pull vyvolal (e.from).
+    const pullEff = (frame.effects || []).find(e => e.kind === "luffy_pull" && (e.from === "p1" || e.from === "p2"));
+    const pulledSlot = pullEff ? (pullEff.from === "p1" ? "p2" : "p1") : null;
+    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", pulledSlot === "p1" ? "idle" : "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
+    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", pulledSlot === "p2" ? "idle" : "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
 
     const shooters = new Set(); // basic strela — jednorazová póza
     const casters  = new Set(); // special — looping, malá postava sa animuje súbežne s veľkým sprite-om
