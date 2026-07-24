@@ -4918,7 +4918,7 @@ const ABILITY_PREVIEW = {
   onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
   // Luffy: recharge prepína mód (base ↔ Gear 3). Zóna specialu (dáma base / veža gear3) + dmg (4/8) cyklí
   // pod mini-doskou (formCycle — ako Escanorov pride / vlkolakov moon náhľad), preto žiadny effect/stats riadok.
-  luffy:     { caster: { x: 2, y: 1 }, dmg: null, formCycle: true, desc: "Recharge switches Gear. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge - fewer angles, double the punch." },
+  luffy:     { caster: { x: 2, y: 1 }, dmg: null, formCycle: true, desc: "Recharge switches Gear. Pick a cell and Luffy rolls there to smash whoever stands on it. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge — fewer angles, double the punch." },
   // Jotaro: THE WORLD (jednorazový time-stop) — bez konkrétnych čísel v texte (cost badge nesie 5).
   // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
   jotaro:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
