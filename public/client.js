@@ -230,6 +230,21 @@ const LUFFY_BOARD_OFF_Y = 4;
 // procedurálna gumená ruka, ktorá sa naťahuje od tela po reálnu bunku súpera a nesie giant päsť na špičke.
 // (frac = koľko šírky framu odseknúť sprava; laditeľné podľa toho, kde v pásoch končí Luffyho telo)
 const LUFFY_ARM_CROP = { luffygiantpunch: 0.56, luffyrocketpull: 0.5 };
+// Giant Pistol gumená ruka — geometria naladená v public/luffy-tune.html.
+// Body v ZLOMKOCH dlaždice v „smerovom" rámci (x = dopredu k súperovi, y = výška, hore = záporné):
+//   O = napojenie gumy na Luffym (referencia = Luffyho bunka)
+//   T = koniec gumy | P = stred obrovskej päste (referencia oboch = cieľová bunka)
+// reach = natiahnutie (giant päsť), pull = priťiahnutie (grip päsť). thick = hrúbka gumy (px), size = päsť × TILE_H.
+const LUFFY_ARM = {
+  reach: { O: { x: 0.42, y: 0.07 }, T: { x: -0.50, y: 0.08 }, P: { x: -0.20, y: 0.00, size: 0.95 }, thick: 13 },
+  pull:  { O: { x: -0.08, y: 0.03 }, T: { x: -0.14, y: 0.03 }, P: { x: 0.10, y: 0.02, size: 0.96 }, thick: 18 },
+};
+// (along,perp) v smerovom rámci → [dx,dy] px offset (zrkadlí rot() v luffy-tune.html)
+const luffyRot = (d, a, b) =>
+  d[0] > 0 ? [a * TILE_W, b * TILE_H] :
+  d[0] < 0 ? [-a * TILE_W, b * TILE_H] :
+  d[1] > 0 ? [b * TILE_W, a * TILE_H] :
+             [b * TILE_W, -a * TILE_H];
 // Star Platinum `_P` pásy (a Jotarove telo) majú v ÚTOČNÝCH pózach figúru zámerne posunutú tak, aby BBOX
 // ostal centrovaný (napr. pri údere päsť vyletí bokom a telo/nohy sú odtlačené na druhú stranu). Keby sme
 // kreslili centrované na frame, NOHY by pri animácii uskakovali zľava doprava a hore-dole. Preto ukotvujeme
@@ -1305,12 +1320,10 @@ function luffyGiantReach(originCell, targetCell, dir, dur) {
   cv.width = W; cv.height = H;
   Object.assign(cv.style, { position: "absolute", left: "0", top: "0", width: W + "px", height: H + "px", pointerEvents: "none", zIndex: 9, imageRendering: "pixelated" });
   actorsEl.appendChild(cv);
-  const [oxc, oyc] = luffyCellCenter(originCell);
-  const [bx, by] = luffyCellCenter(targetCell);
   const arm = {
     cv, ctx: cv.getContext("2d"), W, H, dir, dead: false,
-    ox: oxc + (dir[0] || 0) * TILE_W * 0.18, oy: oyc - TILE_H * 0.06, // guma vychádza z Luffyho ruky
-    tipX: bx, tipY: by, fist: "giant", flash: 0,
+    originCell, targetCell, fromCell: null, toCell: null,
+    cfg: LUFFY_ARM.reach, fist: "giant", flash: 0,
     phase: "stretch", t0: performance.now(), dur: Math.max(1, dur), holdT0: 0,
     giantM: null, fistM: null,
   };
@@ -1324,63 +1337,74 @@ function luffyGiantReach(originCell, targetCell, dir, dur) {
 function luffyGiantPull(fromCell, toCell, dir, dur) {
   const arm = luffyArm;
   if (!arm || !Array.isArray(fromCell) || !Array.isArray(toCell)) return;
-  const [ax, ay] = luffyCellCenter(fromCell), [bx, by] = luffyCellCenter(toCell);
-  arm.fist = "grip"; arm.dir = dir;
-  arm.px0 = ax; arm.py0 = ay; arm.px1 = bx; arm.py1 = by;
+  arm.fist = "grip"; arm.dir = dir; arm.cfg = LUFFY_ARM.pull;
+  arm.fromCell = fromCell; arm.toCell = toCell;
   arm.phase = "pull"; arm.t0 = performance.now(); arm.dur = Math.max(1, dur);
 }
 // minutie/obrana: natiahnutá giant päsť sa stiahne späť k Luffymu
 function luffyGiantRetract(dir, dur) {
   const arm = luffyArm;
   if (!arm) return;
-  arm.dir = dir; arm.fist = "giant"; arm.flash = 0;
+  arm.dir = dir; arm.fist = "giant"; arm.cfg = LUFFY_ARM.reach; arm.flash = 0;
   arm.phase = "retract"; arm.t0 = performance.now(); arm.dur = Math.max(1, dur);
 }
 function luffyArmFrame(now) {
   const arm = luffyArm;
   if (!arm || arm.dead || !arm.cv.isConnected) return;
-  const { ctx, W, H, dir } = arm;
+  const { ctx, W, H, dir, cfg } = arm;
   const ez = q => 1 - Math.pow(1 - q, 3);
   const p = Math.min(1, (now - arm.t0) / arm.dur);
-  let tipX = arm.tipX, tipY = arm.tipY, armP = 1, fist = arm.fist, flash = arm.flash;
+  let armP = 1, flash = arm.flash;
+  let targetCell = arm.targetCell; // pri pull sa cieľ sklzuje z fromCell na toCell
   if (arm.phase === "stretch") {
-    armP = ez(p); fist = "giant"; // guma dorastá origin→cieľ; špička ostáva na cieli, armP interpoluje dĺžku
+    armP = ez(p); // guma + päsť dorastajú od O k cieľu, armP interpoluje dĺžku
     if (p >= 1) { arm.phase = "hold"; arm.t0 = now; arm.dur = 1; arm.flash = 1; arm.holdT0 = now; } // úchop + záblesk
   } else if (arm.phase === "hold") {
-    armP = 1; fist = "giant";
+    armP = 1;
     arm.flash = flash = Math.max(0, arm.flash - 0.06); // záblesk úderu doznieva; ruka drží natiahnutá
     if (now - arm.holdT0 > 3200) { luffyArmRemove(); return; } // poistka: pull/retract by mal prísť skôr
   } else if (arm.phase === "pull") {
-    fist = "grip"; armP = 1;
-    tipX = arm.px0 + (arm.px1 - arm.px0) * p; tipY = arm.py0 + (arm.py1 - arm.py0) * p;
+    armP = 1;
+    targetCell = [arm.fromCell[0] + (arm.toCell[0] - arm.fromCell[0]) * p,
+                  arm.fromCell[1] + (arm.toCell[1] - arm.fromCell[1]) * p];
     arm.flash = flash = Math.max(0, arm.flash - 0.06);
     if (p >= 1) { luffyArmRemove(); return; }
   } else if (arm.phase === "retract") {
-    fist = "giant"; armP = 1 - ez(p); flash = 0;
+    armP = 1 - ez(p); flash = 0;
     if (p >= 1) { luffyArmRemove(); return; }
   }
+  // 3 body v px (O = napojenie na tele, Tt = koniec gumy, Pp = stred päste pri plnom natiahnutí)
+  const [oxc, oyc] = luffyCellCenter(arm.originCell);
+  const [txc, tyc] = luffyCellCenter(targetCell);
+  const oOff = luffyRot(dir, cfg.O.x, cfg.O.y);
+  const tOff = luffyRot(dir, cfg.T.x, cfg.T.y);
+  const pOff = luffyRot(dir, cfg.P.x, cfg.P.y);
+  const O = [oxc + oOff[0], oyc + oOff[1]];
+  const Tt = [txc + tOff[0], tyc + tOff[1]];
+  const Pp = [txc + pOff[0], tyc + pOff[1]];
+  const Tc = [O[0] + (Tt[0] - O[0]) * armP, O[1] + (Tt[1] - O[1]) * armP]; // aktuálny koniec gumy
+  const Pc = [O[0] + (Pp[0] - O[0]) * armP, O[1] + (Pp[1] - O[1]) * armP]; // aktuálny stred päste
   ctx.clearRect(0, 0, W, H);
   // záblesk úchopu POD päsťou (ako demo)
   if (flash > 0) {
     ctx.save(); ctx.globalAlpha = flash * 0.8; ctx.fillStyle = "#fff2a8";
     const r = TILE_H * 0.5 * (1.1 - flash * 0.3);
-    ctx.beginPath(); ctx.arc(tipX, tipY, r, 0, 7); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(Pc[0], Pc[1], r, 0, 7); ctx.fill(); ctx.restore();
   }
   if (armP > 0) {
-    const ex = arm.ox + (tipX - arm.ox) * armP, ey = arm.oy + (tipY - arm.oy) * armP;
-    const thick = fist === "giant" ? 20 : 11; // hrúbky 1:1 podľa dema
+    const thick = cfg.thick;
     ctx.save(); ctx.lineCap = "round";
-    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
-    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(O[0], O[1]); ctx.lineTo(Tc[0], Tc[1]); ctx.stroke();
+    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(O[0], O[1]); ctx.lineTo(Tc[0], Tc[1]); ctx.stroke();
     ctx.restore();
     const orient = (rec, sx, sy, sw, sh, size) => {
       if (!rec) return;
-      ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(ex, ey);
+      ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(Pc[0], Pc[1]);
       if (dir[0] < 0) ctx.scale(-1, 1); else if (dir[1] > 0) ctx.rotate(Math.PI / 2); else if (dir[1] < 0) ctx.rotate(-Math.PI / 2);
       ctx.drawImage(rec.img, sx, sy, sw, sh, -size / 2, -size / 2, size, size); ctx.restore();
     };
-    if (fist === "giant") orient(arm.giantM, LUFFY_GIANT_FIST.sx, LUFFY_GIANT_FIST.sy, LUFFY_GIANT_FIST.s, LUFFY_GIANT_FIST.s, TILE_H * 0.95);
-    else if (arm.fistM) orient(arm.fistM, 1 * arm.fistM.fw, 0, arm.fistM.fw, arm.fistM.fh, TILE_H * 0.7);
+    if (arm.fist === "giant") orient(arm.giantM, LUFFY_GIANT_FIST.sx, LUFFY_GIANT_FIST.sy, LUFFY_GIANT_FIST.s, LUFFY_GIANT_FIST.s, TILE_H * cfg.P.size);
+    else if (arm.fistM) orient(arm.fistM, 1 * arm.fistM.fw, 0, arm.fistM.fw, arm.fistM.fh, TILE_H * cfg.P.size);
   }
   requestAnimationFrame(luffyArmFrame);
 }
