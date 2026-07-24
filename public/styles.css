@@ -527,6 +527,9 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .dir-picker .arrow.left{  grid-area: left; }
 .dir-picker .arrow.right{ grid-area: right; }
 .dir-picker .arrow.down{  grid-area: down; }
+/* Luffy Gear3 basic — len doľava/doprava (skry ↑/↓, jeden riadok) */
+.dir-picker.lr-only{ grid-template-areas: "left right"; }
+.dir-picker.lr-only .arrow.up, .dir-picker.lr-only .arrow.down{ display: none; }
 
 /* Buttons — pixel look: hranaté, čierny obrys, svetlá horná a tmavá dolná hrana */
 .btn {

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luffy Gear3 — ladenie napojenia ruky</title>
+<style>
+  :root { --bg:#12141c; --card:#1b1e2b; --line:#2c3142; --txt:#e6e8f0; --mut:#8b90a6; --accent:#ffcf3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; }
+  header { padding:12px 20px; border-bottom:1px solid var(--line); }
+  h1 { font-size:16px; margin:0; } h1 b { color:var(--accent); }
+  .wrap { display:flex; gap:24px; padding:18px 20px; align-items:flex-start; flex-wrap:wrap; }
+  #boardWrap { position:relative; transform-origin:top left; }
+  .board { position:relative;
+           width:calc(4*260px + 3*10px); height:calc(3*185px + 2*10px);
+           display:grid; grid-template-columns:repeat(4,260px); grid-template-rows:repeat(3,185px); gap:10px; }
+  .cell { border:2px solid #333a4f; border-radius:8px; background:#191c27; }
+  .cell:nth-child(odd){ background:#1d2130; }
+  .cell.luffy { border-color:var(--accent); box-shadow:inset 0 0 0 2px rgba(255,207,58,.25); }
+  .cell.foe { border-color:#ff6b6b; box-shadow:inset 0 0 0 2px rgba(255,107,107,.25); }
+  #arm  { position:absolute; left:0; top:0; pointer-events:none; z-index:5; image-rendering:pixelated; }
+  #actor{ position:absolute; pointer-events:none; z-index:6; }
+  #actor canvas, #foe canvas { image-rendering:pixelated; }
+  #foe  { position:absolute; pointer-events:none; z-index:6; }
+  #origin { position:absolute; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%;
+            background:#39ff88; box-shadow:0 0 0 2px #0008; z-index:8; pointer-events:none; }
+  .panel { min-width:320px; max-width:380px; display:flex; flex-direction:column; gap:14px; }
+  .grp { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .gl { color:var(--mut); font-size:12px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+  .row { display:flex; align-items:center; gap:10px; margin:6px 0; }
+  .row label { width:150px; color:var(--mut); font-size:13px; }
+  .row input[type=range]{ flex:1; accent-color:var(--accent); }
+  .row output { min-width:52px; text-align:right; color:var(--txt); font-variant-numeric:tabular-nums; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; }
+  button { background:#232838; color:var(--txt); border:1px solid var(--line); border-radius:7px; padding:6px 11px; cursor:pointer; font-size:13px; }
+  button:hover { border-color:var(--accent); }
+  button.on { border-color:var(--accent); background:#2a2410; color:var(--accent); }
+  pre { background:#0d0f16; border:1px solid var(--line); border-radius:8px; padding:12px; margin:0;
+        color:#b7f7c9; font:13px/1.55 ui-monospace,Consolas,monospace; white-space:pre-wrap; }
+  .hint { color:var(--mut); font-size:12px; }
+  label.chk { display:flex; align-items:center; gap:6px; color:var(--mut); font-size:13px; }
+</style>
+</head>
+<body>
+<header><h1><b>Luffy Gear3</b> — ladenie napojenia gumenej ruky na telo (geometria 1:1 s hrou)</h1></header>
+
+<div class="wrap">
+  <div id="boardWrap">
+    <div class="board" id="board"></div>
+    <canvas id="arm"></canvas>
+    <div id="foe"><canvas id="foeCv"></canvas></div>
+    <div id="actor"><canvas id="actorCv"></canvas></div>
+    <div id="origin"></div>
+  </div>
+
+  <div class="panel">
+    <div class="grp">
+      <div class="gl">Scéna</div>
+      <div class="row"><label>Fáza</label>
+        <div class="btns" id="phaseBtns">
+          <button data-ph="windup">windup (Rocket)</button>
+          <button class="on" data-ph="reach">reach (Punch)</button>
+          <button data-ph="pull">pull (RocketPull)</button>
+        </div>
+      </div>
+      <div class="row"><label>Smer</label>
+        <div class="btns" id="dirBtns">
+          <button class="on" data-dir="right">→</button>
+          <button data-dir="left">←</button>
+          <button data-dir="up">↑</button>
+          <button data-dir="down">↓</button>
+        </div>
+      </div>
+      <div class="row"><label>Vzdialenosť súpera</label>
+        <input type="range" id="dist" min="1" max="3" step="1" value="2"><output id="distv">2</output></div>
+      <div class="row"><label class="chk"><input type="checkbox" id="showOrigin" checked> zelený bod = napojenie</label></div>
+      <div class="row"><label class="chk"><input type="checkbox" id="zoom"> zoom 60%</label></div>
+    </div>
+
+    <div class="grp">
+      <div class="gl">LUFFY_ARM_ORIGIN — napojenie na telo</div>
+      <div class="row"><label>fx (dopredu →)</label><input type="range" id="fx" min="-0.30" max="0.80" step="0.01" value="0.44"><output id="fxv">0.44</output></div>
+      <div class="row"><label>fy (hore ↑, záporné)</label><input type="range" id="fy" min="-0.60" max="0.30" step="0.01" value="0.06"><output id="fyv">0.06</output></div>
+    </div>
+
+    <div class="grp">
+      <div class="gl">LUFFY_FIST — poloha päste na špičke (dosadnutie na gumu)</div>
+      <div class="row"><label>ax (pozdĺž ruky →)</label><input type="range" id="fax" min="-0.60" max="0.60" step="0.01" value="0"><output id="faxv">0.00</output></div>
+      <div class="row"><label>perp (kolmo, dole +)</label><input type="range" id="fperp" min="-0.40" max="0.40" step="0.01" value="0"><output id="fperpv">0.00</output></div>
+      <div class="row"><label>size (×TILE_H)</label><input type="range" id="fsize" min="0.40" max="1.40" step="0.01" value="0.95"><output id="fsizev">0.95</output></div>
+    </div>
+
+    <div class="grp">
+      <div class="gl">LUFFY_ARM_CROP — orez zapečenej ruky z tela</div>
+      <div class="row"><label>giantpunch (reach)</label><input type="range" id="cropP" min="0" max="0.85" step="0.01" value="0.56"><output id="cropPv">0.56</output></div>
+      <div class="row"><label>rocketpull (pull)</label><input type="range" id="cropR" min="0" max="0.85" step="0.01" value="0.50"><output id="cropRv">0.50</output></div>
+    </div>
+
+    <div class="grp">
+      <div class="gl">Hodnoty do client.js</div>
+      <pre id="out"></pre>
+      <div class="hint" style="margin-top:8px">Nastav tak, aby guma vychádzala z Luffyho ramena a plynulo prešla do giant päste. Potom mi napíš čísla (alebo že sedia) a zapečiem ich.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── geometria 1:1 s hrou (client.js) ─────────────────────────────────────────
+const TILE_W=260, TILE_H=185, GAP=10, ACTOR_SCALE=1.875;
+const ACTOR_W=Math.round(TILE_W*ACTOR_SCALE), ACTOR_H=Math.round(TILE_H*ACTOR_SCALE);
+const LUFFY_BOARD_FILL=0.58, LUFFY_FRAME_REF_H=128, LUFFY_BOARD_OFF_Y=4;
+const LUFFY_GIANT_FIST={sx:182, sy:186, s:134};   // výrez okrúhlej giant päste z L_GiantPunch frame 0
+const G="/assets/luffy/";
+const BOARD_W=4, BOARD_H=3;
+
+// fázy → telový sprite + orez
+const PHASE = {
+  windup: { file:"L_GiantRocket.png",  frame:1, crop:0,    fist:null,    hasArm:false },
+  reach:  { file:"L_GiantPunch.png",   frame:2, cropKey:"cropP", fist:"giant", hasArm:true },
+  pull:   { file:"L_RocketPull.png",   frame:1, cropKey:"cropR", fist:"grip",  hasArm:true },
+};
+
+// ── loader ────────────────────────────────────────────────────────────────────
+const cache=new Map();
+function load(file){
+  if(cache.has(file)) return cache.get(file);
+  const img=new Image(); img.src=G+file;
+  const rec={img,ready:false,frames:1,fw:1,fh:1};
+  img.onload=()=>{ rec.ready=true; rec.fh=img.height; rec.frames=Math.max(1,Math.round(img.width/img.height)); rec.fw=img.width/rec.frames; redraw(); };
+  cache.set(file,rec); return rec;
+}
+const giantRec=load("L_GiantPunch.png"), fistRec=load("L_Fist.png"), foeIdle=load("Idle.png");
+Object.values(PHASE).forEach(p=>load(p.file));
+
+// ── plocha ──────────────────────────────────────────────────────────────────
+const boardEl=document.getElementById("board");
+const cells=[];
+for(let y=0;y<BOARD_H;y++) for(let x=0;x<BOARD_W;x++){ const c=document.createElement("div"); c.className="cell"; c.dataset.x=x; c.dataset.y=y; boardEl.appendChild(c); cells.push(c); }
+const armCv=document.getElementById("arm"); const armCtx=armCv.getContext("2d");
+const W=BOARD_W*TILE_W+(BOARD_W-1)*GAP, H=BOARD_H*TILE_H+(BOARD_H-1)*GAP;
+armCv.width=W; armCv.height=H;
+const actorEl=document.getElementById("actor"), actorCv=document.getElementById("actorCv"), actorCtx=actorCv.getContext("2d");
+const foeEl=document.getElementById("foe"), foeCv=document.getElementById("foeCv"), foeCtx=foeCv.getContext("2d");
+const originDot=document.getElementById("origin");
+actorCv.width=ACTOR_W; actorCv.height=ACTOR_H; foeCv.width=ACTOR_W; foeCv.height=ACTOR_H;
+
+const LUFFY={x:1,y:1};
+const DIRV={ right:[1,0], left:[-1,0], up:[0,-1], down:[0,1] };
+
+// ── stav z ovládania ──────────────────────────────────────────────────────────
+let phase="reach", dir="right", dist=2;
+const val=id=>parseFloat(document.getElementById(id).value);
+// origin napojenia ruky — samostatne pre reach a pull
+const ORIGIN = { reach:{fx:0.44,fy:0.06}, pull:{fx:0.44,fy:0.15} };
+// poloha päste na špičke — samostatne pre reach (giant) a pull (grip)
+const FIST = { reach:{ax:-0.40,perp:-0.09,size:1.00}, pull:{ax:0,perp:0,size:0.70} };
+function syncOriginSliders(){ const o=ORIGIN[phase]; if(!o) return;
+  document.getElementById("fx").value=o.fx; document.getElementById("fxv").textContent=o.fx.toFixed(2);
+  document.getElementById("fy").value=o.fy; document.getElementById("fyv").textContent=o.fy.toFixed(2);
+  const f=FIST[phase]; if(!f) return;
+  document.getElementById("fax").value=f.ax;     document.getElementById("faxv").textContent=f.ax.toFixed(2);
+  document.getElementById("fperp").value=f.perp; document.getElementById("fperpv").textContent=f.perp.toFixed(2);
+  document.getElementById("fsize").value=f.size; document.getElementById("fsizev").textContent=f.size.toFixed(2); }
+
+function cellLeft(x){ return x*(TILE_W+GAP); }
+function cellTop(y){ return y*(TILE_H+GAP); }
+function cellCenter(x,y){ return [cellLeft(x)+TILE_W/2, cellTop(y)+TILE_H/2]; }
+
+// clamp cieľovej bunky na dosku
+function foeCell(){
+  const d=DIRV[dir];
+  let fx=LUFFY.x+d[0]*dist, fy=LUFFY.y+d[1]*dist;
+  fx=Math.max(0,Math.min(BOARD_W-1,fx)); fy=Math.max(0,Math.min(BOARD_H-1,fy));
+  return [fx,fy];
+}
+
+// ── kresli telo (presná kópia drawSprite z client.js pre Luffyho) ──────────────
+function drawBody(rec, frameIdx, cropRightFrac){
+  actorCtx.clearRect(0,0,ACTOR_W,ACTOR_H);
+  if(!rec.ready) return;
+  const fw=rec.fw, fh=rec.fh;
+  const fill=LUFFY_BOARD_FILL*(fh/LUFFY_FRAME_REF_H);
+  const scale=Math.min(ACTOR_W/fw, ACTOR_H/fh)*fill;
+  const cropRPx=Math.round(fw*Math.max(0,Math.min(0.9,cropRightFrac)));
+  const sx=Math.min(frameIdx,rec.frames-1)*fw;
+  const sw=Math.max(1, fw-cropRPx);
+  const dw=sw*scale, dh=fh*scale;
+  const dx=(ACTOR_W-dw)/2, dy=(ACTOR_H-dh)*1 + LUFFY_BOARD_OFF_Y; // anchorY=1 (nohy)
+  actorCtx.imageSmoothingEnabled=false;
+  actorCtx.drawImage(rec.img, sx,0, sw,fh, dx,dy, dw,dh);
+}
+
+// ── kresli päsť (kópia drawFistOriented) ───────────────────────────────────────
+function drawFist(rec, sx,sy,sw,sh, cx,cy, d, size){
+  if(!rec.ready) return;
+  armCtx.save(); armCtx.imageSmoothingEnabled=false; armCtx.translate(cx,cy);
+  if(d[0]<0) armCtx.scale(-1,1); else if(d[1]>0) armCtx.rotate(Math.PI/2); else if(d[1]<0) armCtx.rotate(-Math.PI/2);
+  armCtx.drawImage(rec.img, sx,sy,sw,sh, -size/2,-size/2, size,size); armCtx.restore();
+}
+// ── kresli gumenú ruku (kópia drawArm/luffyArmFrame) ───────────────────────────
+function drawArm(x0,y0,x1,y1,d,fistType){
+  armCtx.clearRect(0,0,W,H);
+  const thick=fistType==="giant"?20:11;
+  armCtx.save(); armCtx.lineCap="round";
+  armCtx.strokeStyle="#d9a765"; armCtx.lineWidth=thick;      armCtx.beginPath(); armCtx.moveTo(x0,y0); armCtx.lineTo(x1,y1); armCtx.stroke();
+  armCtx.strokeStyle="#f2cf9b"; armCtx.lineWidth=thick*0.45; armCtx.beginPath(); armCtx.moveTo(x0,y0); armCtx.lineTo(x1,y1); armCtx.stroke();
+  armCtx.restore();
+  const fk = FIST[phase] || FIST.reach;
+  const perpU = (d[0]!==0)?[0,1]:[1,0];
+  const fcx = x1 + (d[0]||0)*fk.ax*TILE_W + perpU[0]*fk.perp*TILE_W;
+  const fcy = y1 + (d[1]||0)*fk.ax*TILE_H + perpU[1]*fk.perp*TILE_H;
+  if(fistType==="giant") drawFist(giantRec, LUFFY_GIANT_FIST.sx,LUFFY_GIANT_FIST.sy,LUFFY_GIANT_FIST.s,LUFFY_GIANT_FIST.s, fcx,fcy, d, TILE_H*fk.size);
+  else if(fistType==="grip") drawFist(fistRec, 1*fistRec.fw,0,fistRec.fw,fistRec.fh, fcx,fcy, d, TILE_H*fk.size);
+}
+
+// ── hlavné prekreslenie ─────────────────────────────────────────────────────────
+function redraw(){
+  const ph=PHASE[phase];
+  const d=DIRV[dir];
+  const [fx,fy]=foeCell();
+
+  // zvýrazni bunky
+  cells.forEach(c=>{ c.classList.remove("luffy","foe");
+    if(+c.dataset.x===LUFFY.x && +c.dataset.y===LUFFY.y) c.classList.add("luffy");
+    if(ph.hasArm && +c.dataset.x===fx && +c.dataset.y===fy) c.classList.add("foe"); });
+
+  // Luffyho telo — pozícia canvasu ako v hre (spodok canvasu = spodok bunky), flip pre ľavý smer
+  const px=cellLeft(LUFFY.x)-(ACTOR_W-TILE_W)/2, py=cellTop(LUFFY.y)-(ACTOR_H-TILE_H);
+  actorEl.style.left=px+"px"; actorEl.style.top=py+"px";
+  actorEl.style.transform = d[0]<0 ? "scaleX(-1)" : "scaleX(1)";
+  const bodyRec=load(ph.file);
+  const crop = ph.cropKey ? val(ph.cropKey) : (ph.crop||0);
+  drawBody(bodyRec, ph.frame, crop);
+
+  // súper (idle, otočený k Luffymu) — len keď je ruka aktívna
+  if(ph.hasArm){
+    foeEl.style.display="block";
+    const fpx=cellLeft(fx)-(ACTOR_W-TILE_W)/2, fpy=cellTop(fy)-(ACTOR_H-TILE_H);
+    foeEl.style.left=fpx+"px"; foeEl.style.top=fpy+"px";
+    foeEl.style.transform = (fx>LUFFY.x || (fx===LUFFY.x)) ? "scaleX(-1)" : "scaleX(1)"; // pozerá k Luffymu
+    if(foeIdle.ready){ const fill=LUFFY_BOARD_FILL*(foeIdle.fh/LUFFY_FRAME_REF_H); const s=Math.min(ACTOR_W/foeIdle.fw,ACTOR_H/foeIdle.fh)*fill;
+      const dw=foeIdle.fw*s, dh=foeIdle.fh*s; foeCtx.clearRect(0,0,ACTOR_W,ACTOR_H); foeCtx.imageSmoothingEnabled=false;
+      foeCtx.drawImage(foeIdle.img,0,0,foeIdle.fw,foeIdle.fh,(ACTOR_W-dw)/2,(ACTOR_H-dh)+LUFFY_BOARD_OFF_Y,dw,dh); }
+  } else { foeEl.style.display="none"; }
+
+  // gumená ruka + origin
+  const [oxc,oyc]=cellCenter(LUFFY.x,LUFFY.y);
+  const o = ORIGIN[phase] || ORIGIN.reach;
+  const ox=oxc + (d[0]||0)*TILE_W*o.fx;
+  const oy=oyc + TILE_H*o.fy;
+  if(ph.hasArm){
+    const [bx,by]=cellCenter(fx,fy);
+    // tip = na pull tesne pri Luffym (dojazd), inak na cieli
+    let tip = phase==="pull" ? cellCenter(LUFFY.x+d[0], LUFFY.y+d[1]) : [bx,by];
+    // ruka letí ROVNO v osi útoku — na perpendikulárnej osi drží výšku/šírku ramena (origin), nie stred cieľovej bunky
+    if(d[0]!==0) tip=[tip[0], oy]; else if(d[1]!==0) tip=[ox, tip[1]];
+    drawArm(ox,oy, tip[0],tip[1], d, ph.fist);
+  } else { armCtx.clearRect(0,0,W,H); }
+
+  // zelený bod napojenia (v súradniciach boardu = rovnaké ako arm canvas)
+  originDot.style.display = (document.getElementById("showOrigin").checked && ph.hasArm) ? "block" : "none";
+  originDot.style.left=ox+"px"; originDot.style.top=oy+"px";
+
+  // výpis hodnôt
+  const f2=n=>n.toFixed(2);
+  document.getElementById("out").textContent =
+    `const LUFFY_ARM_ORIGIN = {\n`+
+    `  reach: { fx: ${f2(ORIGIN.reach.fx)}, fy: ${f2(ORIGIN.reach.fy)} },\n`+
+    `  pull:  { fx: ${f2(ORIGIN.pull.fx)}, fy: ${f2(ORIGIN.pull.fy)} },\n`+
+    `};\n`+
+    `const LUFFY_FIST = {\n`+
+    `  reach: { ax: ${f2(FIST.reach.ax)}, perp: ${f2(FIST.reach.perp)}, size: ${f2(FIST.reach.size)} },\n`+
+    `  pull:  { ax: ${f2(FIST.pull.ax)}, perp: ${f2(FIST.pull.perp)}, size: ${f2(FIST.pull.size)} },\n`+
+    `};\n`+
+    `const LUFFY_ARM_CROP = { luffygiantpunch: ${f2(val("cropP"))}, luffyrocketpull: ${f2(val("cropR"))} };`;
+}
+
+// ── ovládanie ────────────────────────────────────────────────────────────────
+document.querySelectorAll("#phaseBtns button").forEach(b=>b.onclick=()=>{ phase=b.dataset.ph;
+  document.querySelectorAll("#phaseBtns button").forEach(x=>x.classList.toggle("on",x===b)); syncOriginSliders(); redraw(); });
+document.querySelectorAll("#dirBtns button").forEach(b=>b.onclick=()=>{ dir=b.dataset.dir;
+  document.querySelectorAll("#dirBtns button").forEach(x=>x.classList.toggle("on",x===b)); redraw(); });
+// fx/fy zapisujú do origin AKTUÁLNEJ fázy (reach/pull majú vlastné)
+["fx","fy"].forEach(id=>{ const o=document.getElementById(id+"v"); document.getElementById(id).oninput=e=>{ const v=parseFloat(e.target.value); o.textContent=v.toFixed(2); if(ORIGIN[phase]) ORIGIN[phase][id]=v; redraw(); }; });
+// fist ax/perp/size zapisujú do FIST aktuálnej fázy
+const FIST_MAP={fax:"ax",fperp:"perp",fsize:"size"};
+Object.keys(FIST_MAP).forEach(id=>{ const o=document.getElementById(id+"v"); document.getElementById(id).oninput=e=>{ const v=parseFloat(e.target.value); o.textContent=v.toFixed(2); if(FIST[phase]) FIST[phase][FIST_MAP[id]]=v; redraw(); }; });
+["cropP","cropR"].forEach(id=>{ const o=document.getElementById(id+"v"); document.getElementById(id).oninput=e=>{ o.textContent=parseFloat(e.target.value).toFixed(2); redraw(); }; });
+document.getElementById("dist").oninput=e=>{ dist=+e.target.value; document.getElementById("distv").textContent=dist; redraw(); };
+document.getElementById("showOrigin").onchange=redraw;
+document.getElementById("zoom").onchange=e=>{ document.getElementById("boardWrap").style.transform = e.target.checked ? "scale(0.6)" : "scale(1)"; };
+
+syncOriginSliders();
+redraw();
+</script>
+</body>
+</html>

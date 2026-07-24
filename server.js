@@ -913,8 +913,10 @@ function validQueue(queue, slot) {
       if (a.type === "special" && isJotaro && game.players[slot]?.worldUsed && a.dir !== "left" && a.dir !== "right") return false;
       if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
       if (a.type === "attack") {
-        const wantDiag = meChar === "luffy" ? (simForm !== "gear3") : side; // Luffy gear3 = ortogonálny
-        if (!(wantDiag ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
+        if (meChar === "luffy") {
+          if (simForm === "gear3") { if (a.dir !== "left" && a.dir !== "right") return false; } // Gear3 basic = len doľava/doprava
+          else if (!DIAG_DIRS[a.dir]) return false;                                             // base = diagonálny
+        } else if (!(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
       }
     }
   }
