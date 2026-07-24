@@ -6116,6 +6116,7 @@ function showLobby() {
       tileWeights: weights,
       timer: pick("lobby-timer") || "off",
       tilePreview: (pick("lobby-preview") || "on") === "on",
+      colorPref: pick("lobby-color") || "random",
     };
     if (Object.values(weights).reduce((a, b) => a + b, 0) !== 100) return;
     socket.emit("configure_match", config);
@@ -6171,8 +6172,10 @@ socket.on("you_are", (info) => {
 const colorRollEl = document.getElementById("color-roll");
 const crArrowEl   = document.getElementById("cr-arrow");
 const crResultEl  = document.getElementById("cr-result");
-socket.on("color_roll", () => {
+socket.on("color_roll", (info) => {
   if (!colorRollEl || (me !== "p1" && me !== "p2")) return; // divák ruletu nepotrebuje
+  // host si zvolil pevnú farbu → žiadna ruleta, char-select sa ukáže rovno (netreba nič skrývať)
+  if (info && info.animate === false) { colorRollEl.classList.add("hidden"); return; }
   const white = me === "p1";
   colorRollEl.classList.remove("hidden");
   colorRollEl.style.opacity = "";

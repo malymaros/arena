@@ -3419,7 +3419,13 @@ function startMatch(config) {
   // ešte PRED animáciou ruletky na klientovi (color_roll nižšie je už len divadlo s hotovým výsledkom).
   // FORCE_FIRST_STARTER=A|B pripne osobu na p1/bieleho (testy). Sloty sú fixné na celú sériu;
   // v sérii (bo3/tournament) sa štartér jednotlivých hier strieda (viď startGame).
-  const white = FORCE_FIRST_STARTER || (Math.random() < 0.5 ? "A" : "B");
+  // Host (osoba A) si mohol farbu zvoliť: white → A=p1(biely), black → A=p2(čierny), random → losuje sa.
+  // Priorita: FORCE_FIRST_STARTER (testy) > voľba hosta > náhoda.
+  let white;
+  if (FORCE_FIRST_STARTER) white = FORCE_FIRST_STARTER;
+  else if (config.colorPref === "white") white = "A";
+  else if (config.colorPref === "black") white = "B";
+  else white = Math.random() < 0.5 ? "A" : "B";
   game.seats = { p1: white, p2: otherPerson(white) };
   game.series = {
     gameIndex: 0,
@@ -3438,7 +3444,8 @@ function startMatch(config) {
   //  2) color_roll — overlay sa zapne (zakryje predošlú obrazovku).
   //  3) state — char-select/plocha sa vykreslí UŽ POD overlayom.
   emitYouAre();
-  roomEmit("color_roll", {});
+  // ruleta jin-yang beží len keď farbu naozaj losujeme (random); pri pevnej voľbe hosta ju preskočíme
+  roomEmit("color_roll", { animate: config.colorPref === "random" });
   if (config.format === "tournament") {
     // slepý draft tímov: pred hrou 1 si každý vyberie TEAM_SIZE postáv z celého poolu (choose_team);
     // mageHp/mageMana vzniknú až po potvrdení oboch (finishTeamSelect → startGame(1))
@@ -3502,7 +3509,9 @@ function sanitizeConfig(raw) {
     weights[k] = v; sum += v;
   }
   if (sum !== 100) return null; // percentá musia dať presne 100
-  return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview };
+  // farba hosta (osoby A): white/black si host vyberie pevne, random = losuje sa (default)
+  const colorPref = ["white", "black"].includes(raw.colorPref) ? raw.colorPref : "random";
+  return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref };
 }
 
   /* -------------------- Room lifecycle (per-room, closure) -------------------- */
