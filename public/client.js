@@ -230,21 +230,6 @@ const LUFFY_BOARD_OFF_Y = 4;
 // procedurálna gumená ruka, ktorá sa naťahuje od tela po reálnu bunku súpera a nesie giant päsť na špičke.
 // (frac = koľko šírky framu odseknúť sprava; laditeľné podľa toho, kde v pásoch končí Luffyho telo)
 const LUFFY_ARM_CROP = { luffygiantpunch: 0.56, luffyrocketpull: 0.5 };
-// Odkiaľ vychádza gumená ruka (napojenie na Luffyho telo): podiel TILE_W/TILE_H od STREDU jeho bunky.
-// fx = dopredu v smere úderu (Luffy je na bunke vycentrovaný); fy = hore k ramenu (záporné = vyššie).
-// Luffy je malý (fill 0.58) a ukotvený na nohy → rameno je citeľne NAD stredom bunky.
-// Napojenie gumenej ruky na telo — SAMOSTATNE pre reach (natiahnutie) a pull (priťiahnutie), lebo Luffy
-// drží ruku v L_GiantPunch inde než v L_RocketPull. fx = dopredu v smere úderu, fy = od stredu bunky (kladné = nižšie).
-const LUFFY_ARM_ORIGIN = {
-  reach: { fx: 0.44, fy: 0.06 },
-  pull:  { fx: 0.44, fy: 0.15 },
-};
-// Poloha päste na ŠPIČKE ruky — aby jej zápästie správne dosadlo na tenkú dokreslenú gumu.
-// ax = pozdĺž ruky (+ dopredu od špičky), perp = kolmo na os úderu (+ dole pri horizontále / + vpravo pri vertikále), size = ×TILE_H.
-const LUFFY_FIST = {
-  reach: { ax: -0.40, perp: -0.09, size: 1.00 }, // giant päsť (L_GiantPunch výrez)
-  pull:  { ax: 0, perp: 0, size: 0.70 }, // grip (L_Fist)
-};
 // Star Platinum `_P` pásy (a Jotarove telo) majú v ÚTOČNÝCH pózach figúru zámerne posunutú tak, aby BBOX
 // ostal centrovaný (napr. pri údere päsť vyletí bokom a telo/nohy sú odtlačené na druhú stranu). Keby sme
 // kreslili centrované na frame, NOHY by pri animácii uskakovali zľava doprava a hore-dole. Preto ukotvujeme
@@ -1322,15 +1307,10 @@ function luffyGiantReach(originCell, targetCell, dir, dur) {
   actorsEl.appendChild(cv);
   const [oxc, oyc] = luffyCellCenter(originCell);
   const [bx, by] = luffyCellCenter(targetCell);
-  const ox = oxc + (dir[0] || 0) * TILE_W * LUFFY_ARM_ORIGIN.reach.fx;
-  const oy = oyc + TILE_H * LUFFY_ARM_ORIGIN.reach.fy; // guma vychádza z Luffyho ramena
-  // ruka letí ROVNO v osi útoku — na perpendikulárnej osi drží výšku/šírku ramena (origin), nie stred cieľovej bunky
-  let tipX = bx, tipY = by;
-  if (dir[0] !== 0) tipY = oy; else if (dir[1] !== 0) tipX = ox;
   const arm = {
     cv, ctx: cv.getContext("2d"), W, H, dir, dead: false,
-    ox, oy, tipX, tipY, fist: "giant", flash: 0,
-    ocx: oxc, ocy: oyc, // stred Luffyho bunky — pull si prepočíta vlastný (nižší) origin
+    ox: oxc + (dir[0] || 0) * TILE_W * 0.18, oy: oyc - TILE_H * 0.06, // guma vychádza z Luffyho ruky
+    tipX: bx, tipY: by, fist: "giant", flash: 0,
     phase: "stretch", t0: performance.now(), dur: Math.max(1, dur), holdT0: 0,
     giantM: null, fistM: null,
   };
@@ -1346,13 +1326,7 @@ function luffyGiantPull(fromCell, toCell, dir, dur) {
   if (!arm || !Array.isArray(fromCell) || !Array.isArray(toCell)) return;
   const [ax, ay] = luffyCellCenter(fromCell), [bx, by] = luffyCellCenter(toCell);
   arm.fist = "grip"; arm.dir = dir;
-  // pull má vlastnú výšku napojenia (Luffy v L_RocketPull drží ruku inde než v L_GiantPunch)
-  arm.ox = arm.ocx + (dir[0] || 0) * TILE_W * LUFFY_ARM_ORIGIN.pull.fx;
-  arm.oy = arm.ocy + TILE_H * LUFFY_ARM_ORIGIN.pull.fy;
   arm.px0 = ax; arm.py0 = ay; arm.px1 = bx; arm.py1 = by;
-  // rovná ruka aj počas ťahu — perpendikulárna os drží výšku/šírku ramena (origin)
-  if (dir[0] !== 0) { arm.py0 = arm.oy; arm.py1 = arm.oy; }
-  else if (dir[1] !== 0) { arm.px0 = arm.ox; arm.px1 = arm.ox; }
   arm.phase = "pull"; arm.t0 = performance.now(); arm.dur = Math.max(1, dur);
 }
 // minutie/obrana: natiahnutá giant päsť sa stiahne späť k Luffymu
@@ -1394,25 +1368,19 @@ function luffyArmFrame(now) {
   }
   if (armP > 0) {
     const ex = arm.ox + (tipX - arm.ox) * armP, ey = arm.oy + (tipY - arm.oy) * armP;
-    // stred päste (na špičke + laditeľný posun pozdĺž ruky / kolmo)
-    const fk = fist === "giant" ? LUFFY_FIST.reach : LUFFY_FIST.pull;
-    const perpU = (dir[0] !== 0) ? [0, 1] : [1, 0]; // kolmý smer na os úderu
-    const fcx = ex + (dir[0] || 0) * fk.ax * TILE_W + perpU[0] * fk.perp * TILE_W;
-    const fcy = ey + (dir[1] || 0) * fk.ax * TILE_H + perpU[1] * fk.perp * TILE_H;
-    // tenká guma končí v STREDE päste (nafúknutá päsť ju prekryje) → nevytŕča za päsťou k súperovi
     const thick = fist === "giant" ? 20 : 11; // hrúbky 1:1 podľa dema
     ctx.save(); ctx.lineCap = "round";
-    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(fcx, fcy); ctx.stroke();
-    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(fcx, fcy); ctx.stroke();
+    ctx.strokeStyle = "#d9a765"; ctx.lineWidth = thick;        ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.strokeStyle = "#f2cf9b"; ctx.lineWidth = thick * 0.45; ctx.beginPath(); ctx.moveTo(arm.ox, arm.oy); ctx.lineTo(ex, ey); ctx.stroke();
     ctx.restore();
     const orient = (rec, sx, sy, sw, sh, size) => {
       if (!rec) return;
-      ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(fcx, fcy);
+      ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(ex, ey);
       if (dir[0] < 0) ctx.scale(-1, 1); else if (dir[1] > 0) ctx.rotate(Math.PI / 2); else if (dir[1] < 0) ctx.rotate(-Math.PI / 2);
       ctx.drawImage(rec.img, sx, sy, sw, sh, -size / 2, -size / 2, size, size); ctx.restore();
     };
-    if (fist === "giant") orient(arm.giantM, LUFFY_GIANT_FIST.sx, LUFFY_GIANT_FIST.sy, LUFFY_GIANT_FIST.s, LUFFY_GIANT_FIST.s, TILE_H * fk.size);
-    else if (arm.fistM) orient(arm.fistM, 1 * arm.fistM.fw, 0, arm.fistM.fw, arm.fistM.fh, TILE_H * fk.size);
+    if (fist === "giant") orient(arm.giantM, LUFFY_GIANT_FIST.sx, LUFFY_GIANT_FIST.sy, LUFFY_GIANT_FIST.s, LUFFY_GIANT_FIST.s, TILE_H * 0.95);
+    else if (arm.fistM) orient(arm.fistM, 1 * arm.fistM.fw, 0, arm.fistM.fw, arm.fistM.fh, TILE_H * 0.7);
   }
   requestAnimationFrame(luffyArmFrame);
 }
