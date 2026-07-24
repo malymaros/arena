@@ -414,6 +414,8 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   padding: 0; width: 72px; height: 60px; flex: none;
 }
 .btn.act .cost{ font-size: 11px; font-weight: 800; opacity: .95; }
+/* Luffy: swap znak (⇆) na mana buttone — nie emoji, textový glyph s fallback fontom nech sa istotne vykreslí */
+.btn.act .cost .luffy-swap{ font-family: "Segoe UI Symbol", system-ui, sans-serif; font-weight: 900; margin-left: 2px; }
 /* Farebná identita ťahov: pohyb = neutrálna šedá, útok = červená, mágia = purpurová,
    obrana = cyan, zdroje = modrá, golden = zlatá; silnejší ťah = tmavší odtieň rodiny */
 .btn.move{ background: #757575; } /* Move — neutrálna šedá */

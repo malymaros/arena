@@ -5342,7 +5342,7 @@ function syncRechargeBtn(char) {
     delete ico.dataset.emoji; delete ico.dataset.done;
     ico.classList.add("charge-mark");
     ico.textContent = "???";
-    if (cost) { cost.innerHTML = `+4${miniPix("💧")}${miniPix("🔀")}`; hydratePix(cost); } // +4 mana + swap znak (prepnutie gearu)
+    if (cost) { cost.innerHTML = `+4${miniPix("💧")}<span class="luffy-swap">⇆</span>`; hydratePix(cost); } // +4 mana + swap znak (prepnutie gearu)
     rechargeBtn.title = "Switch Gear (Base ↔ Gear 3) — also recharges mana (+4); works even at full mana";
   } else if (ico) {
     ico.classList.remove("charge-mark");
