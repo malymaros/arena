@@ -619,6 +619,11 @@ const ANIM_DEF = {
   // gear3→base. maxFrame = bez posledných 2 framov (skončí v pumpnutej póze, nie v uvoľnení späť).
   luffypump:    { file: "Recharge2.png", fps: 10, loop: false, maxFrame: 4 },
   luffydeflate: { file: "Special_3.png", fps: 10, loop: false, maxFrame: 9 },
+  // Gear3 basic (Giant Pistol) telové pózy: windup (päsť vzad) → úder (natiahnutá ruka) → priťiahnutie (reeluje) / minutie (stiahne)
+  luffygiantrocket:  { file: "L_GiantRocket.png",  fps: 8,  loop: false }, // 2f — nabratie, giant päsť vzad
+  luffygiantpunch:   { file: "L_GiantPunch.png",   fps: 10, loop: false }, // 3f — vystrelenie päste vpred
+  luffyrocketpull:   { file: "L_RocketPull.png",   fps: 12, loop: false }, // 5f — ruka sa sťahuje, ťahá súpera
+  luffygiantretract: { file: "L_GiantRetract.png", fps: 12, loop: false }, // 4f — minutie: stiahnutie naprázdno
   // Luffy special roll: base = Special_7 (rozbeh→kotúľ→puf-hlava bounce); gear3 = balón (Recharge round frame)
   // + Special_2 impact (radiálne päste) na cieľovej bunke
   // base special 2 fázy: dogúľanie (run/roll f0–6) počas cesty, potom cvaknutie na cieľovej bunke (f7+).
@@ -4255,20 +4260,21 @@ function schedulePlayTimeline(timeline) {
         cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
         spawnChargeAura(e.from, false, false, "clone", dark);
       }
-      // Luffy GEAR 3 Giant Pistol: nafúknutie pästí (Recharge2) + JEDNA súvislá naťahovacia ruka.
-      // windup = len póza; reach = spusti ruku (natiahnutie giant päste po cieľ, potom drží úchop);
-      // retract = stiahni ruku (minutie/obrana). Pull rieši samostatný efekt "luffy_pull" nižšie.
+      // Luffy GEAR 3 Giant Pistol: telové pózy L_GiantRocket → L_GiantPunch → L_RocketPull + JEDNA súvislá
+      // naťahovacia ruka (canvas dosiahne REÁLNU bunku súpera aj na 2–3 bunky).
+      // windup = nabratie (päsť vzad); reach = úder (vystrelenie vpred) + spusti ruku; retract = minutie (stiahne sa).
+      // Pull rieši samostatný efekt "luffy_pull" nižšie.
       if (e.kind === "luffy_gp" && (e.from === "p1" || e.from === "p2")) {
         const d = WOLF_DIRS_CLIENT[e.dir] || [1, 0];
         if (e.phase === "reach" && Array.isArray(e.origin) && Array.isArray(e.target)) {
-          // pumpovaciu pózu drž cez natiahnutie + úchop + priťiahnutie (nech sa nevráti do idle uprostred)
-          setAnim(e.from, "luffypump", frameHold + 1800);
+          // úderovú pózu drž cez natiahnutie + úchop + priťiahnutie (nech sa nevráti do idle uprostred)
+          setAnim(e.from, "luffygiantpunch", frameHold + 1800);
           luffyGiantReach(e.origin, e.target, d, e.ms || 320);
         } else if (e.phase === "retract") {
-          setAnim(e.from, "luffypump", frameHold);
+          setAnim(e.from, "luffygiantretract", frameHold);
           luffyGiantRetract(d, Math.min(frameHold, 460));
         } else {
-          setAnim(e.from, "luffypump", frameHold); // windup
+          setAnim(e.from, "luffygiantrocket", frameHold); // windup
         }
       }
       // Luffy special roll: dogúľa sa na cieľovú bunku (pohyb cez snapshot). Base = Special_7 roll-bounce,
@@ -4294,7 +4300,7 @@ function schedulePlayTimeline(timeline) {
       // Luffy priťiahnutie: rovnaká ruka sa prehodí na úchop (L_Fist) a špička sleduje súpera z jeho
       // pôvodnej bunky na novú (súper sa prisunie cez snapshot — CSS sklz cez --move-ms = MOVE_MS)
       if (e.kind === "luffy_pull" && (e.from === "p1" || e.from === "p2")) {
-        setAnim(e.from, "luffypump", frameHold);
+        setAnim(e.from, "luffyrocketpull", frameHold); // telo: ruka reeluje späť a ťahá súpera k Luffymu
         const d = WOLF_DIRS_CLIENT[e.dir] || [1, 0];
         if (Array.isArray(e.fromCell) && Array.isArray(e.toCell))
           luffyGiantPull(e.fromCell, e.toCell, d, MOVE_MS);
