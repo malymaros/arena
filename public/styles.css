@@ -1011,6 +1011,15 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   display: flex; align-items: center; gap: 3px;
   text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
 .ca-moon .pix-ico.mini { width: 15px; height: 15px; vertical-align: 0; margin-left: 0; }
+/* Luffy: mód (base/gear3) + dmg pod mini-doskou — rovnaký štýl ako moon/pride badge */
+.ca-luffy { display: flex; align-items: center; gap: 6px; }
+.ca-luffy.hidden { display: none; }
+.ca-luffy img { height: 34px; width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)); }
+.ca-luffy.gear3-max img { animation: pride-max-pulse 1s ease-in-out infinite; } /* gear3 = silnejší → pulz ako max */
+.ca-luffy .ca-luffy-dmg { font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 15px; color: #ffd24a;
+  display: flex; align-items: center; gap: 3px;
+  text-shadow: -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000, 0 2px 3px rgba(0,0,0,.9); }
+.ca-luffy .pix-ico.mini { width: 15px; height: 15px; vertical-align: 0; margin-left: 0; }
 .ca-text {
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
   font-size: 11px; color: #cfd2d6; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6);

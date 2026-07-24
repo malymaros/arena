@@ -694,6 +694,7 @@ let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let escPridePreview = null;      // Escanor char-select: cyklenie pride 0→3 v náhľade zóny (viď markEscPridePreview)
 let moonPreview = null;          // Vlkolak char-select: cyklenie fázy mesiaca 0→3 + dmg (viď markMoonPreview)
+let luffyPreview = null;         // Luffy char-select: cyklenie módu base↔gear3 (zóna dáma/veža + dmg 4/8; viď markLuffyPreview)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
 
 // počas special castu skryjeme bežný actor sprite
@@ -921,6 +922,7 @@ const HEAD_CROP = {
   countess:  { cx: 0.49, cy: 0.52, size: 0.19 }, // blond drdol (bbox y od 58/128) — hlava nad širokou sukňou
   onre:      { cx: 0.50, cy: 0.52, size: 0.19 }, // úzka prízračná figúra s rohom (bbox y od 58/128)
   jotaro:    { cx: 0.51, cy: 0.30, size: 0.31 }, // namerané z Idle.png (144² frame): figúra x38–105 y24–135, hlava pás y24–57 x52–95 → stred hlavy vysoko vo frame
+  luffy:     { cx: 0.49, cy: 0.21, size: 0.33 }, // slamák + tvár z Idle.png (128² frame): figúra x38–89 y8–119, hlava/klobúk r8–44 (strieška x42–83) → stred (x62,y26)
 };
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
@@ -4804,17 +4806,19 @@ function drawCharSelectFrame(now) {
 
   if (abilityHoverChar === "escanor") markEscPridePreview(now); // cyklí zvýraznenie zóny podľa pride
   if (abilityHoverChar === "werewolf") markMoonPreview(now);    // cyklí fázu mesiaca + dmg pod mini-doskou
+  if (abilityHoverChar === "luffy") markLuffyPreview(now);      // cyklí mód base↔gear3 (zóna dáma/veža + dmg 4/8)
 
   // malý castiaci mág v bunke castera mini-dosky — animácia špeciálu (efektový sprite). Jotaro je výnimka:
   // casterom na mini-doske je ON (nie stredová Star Platinum póza), takže kreslíme jeho IDLE (ukotvený na nohy,
   // normalizovaný na výšku mágov cez portraitFill).
-  if (abilityHoverChar && abilityCasterCanvas && SPECIAL_ANIMS[abilityHoverChar]) {
+  if (abilityHoverChar && abilityCasterCanvas && (SPECIAL_ANIMS[abilityHoverChar] || abilityHoverChar === "luffy")) {
     const dir = charDirFor(abilityHoverChar, me);
-    const isJot = abilityHoverChar === "jotaro";
-    const fxAnim = isJot ? ANIM_DEF.idle : { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
-    const offX = isJot ? 0 : (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
-    const fillUse = isJot ? portraitFill("jotaro", 1.1) : 1.1;
-    const anchorUse = isJot ? 0.95 : 0.5; // Jotaro vypĺňa väčšinu framu → ukotvi na nohy
+    // Jotaro aj Luffy: casterom na mini-doske je ON — kreslíme IDLE (nie cast/efektový sprite), ukotvený na nohy
+    const isIdle = abilityHoverChar === "jotaro" || abilityHoverChar === "luffy";
+    const fxAnim = isIdle ? ANIM_DEF.idle : { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
+    const offX = isIdle ? 0 : (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
+    const fillUse = isIdle ? portraitFill(abilityHoverChar, 1.1) : 1.1;
+    const anchorUse = isIdle ? 0.95 : 0.5; // Jotaro/Luffy vypĺňajú väčšinu framu → ukotvi na nohy
     if (dir) ensureSpriteMeta(dir, fxAnim.file)
       .then(meta => drawSprite(abilityCasterCanvas.getContext("2d"), meta, fxAnim, now, abilityCasterCanvas.width, abilityCasterCanvas.height, fillUse, anchorUse, true, offX))
       .catch(() => {});
@@ -4912,8 +4916,9 @@ const ABILITY_PREVIEW = {
   // bonus ikona (heal/drain) sa ukazuje v stats riadku pri dmg (3☠️❤️ / 3☠️💧), nie v texte popisu
   countess:  { caster: { x: 0, y: 1 }, dmg: 3, bonus: "❤️", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
   onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
-  // Luffy (WIP): recharge prepína mód (base ↔ Gear 3). Special zatiaľ nedorobený → bez zóny.
-  luffy:     { caster: { x: 0, y: 1 }, dmg: null, effect: { num: "", emoji: "🔀" }, desc: "WIP: Recharge switches mode (Base ↔ Gear 3). Base: diagonal bouncing punch. Gear 3 (bigger): stretchy giant fist that pulls the foe in." },
+  // Luffy: recharge prepína mód (base ↔ Gear 3). Zóna specialu (dáma base / veža gear3) + dmg (4/8) cyklí
+  // pod mini-doskou (formCycle — ako Escanorov pride / vlkolakov moon náhľad), preto žiadny effect/stats riadok.
+  luffy:     { caster: { x: 0, y: 1 }, dmg: null, formCycle: true, desc: "Recharge switches Gear. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge - fewer angles, double the punch." },
   // Jotaro: THE WORLD (jednorazový time-stop) — bez konkrétnych čísel v texte (cost badge nesie 5).
   // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
   jotaro:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
@@ -4934,7 +4939,9 @@ function renderAbilityPreview(char) {
     ? new Set()
     : def.target
       ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
-      : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
+      : (def.formCycle && char === "luffy")
+        ? luffyHitSet(caster, "base", w, h) // Luffy: zóna dogúľania (dáma) — cyklí sa v markLuffyPreview
+        : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
   grid.innerHTML = "";
@@ -4967,6 +4974,10 @@ function renderAbilityPreview(char) {
   moonPreview = def.moonCycle ? { lvl: 0, last: 0 } : null;
   const caMoon = document.getElementById("ca-moon");
   if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
+  // Luffy: cyklenie módu base↔gear3 — zóna (dáma/veža) + badge (base.png/gear3.png) + dmg (4/8) pod mini-doskou
+  luffyPreview = def.formCycle ? { grid, caster, form: "base", last: 0 } : null;
+  const caLuffy = document.getElementById("ca-luffy");
+  if (caLuffy) { caLuffy.classList.toggle("hidden", !def.formCycle); if (def.formCycle) syncCaLuffy("base"); }
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → obal do JEDNÉHO divu (.ca-text je flex,
   // inak by sa každý textový kúsok/ikona stali samostatným flex-itemom a text sa rozhádže), potom hydratuj ikony
@@ -5009,6 +5020,38 @@ function markMoonPreview(now) {
   if (now - s.last >= 1500) { s.last = now; s.lvl = (s.lvl + 1) % 4; syncCaMoon(s.lvl); }
 }
 
+// Luffy char-select: množina bún zóny specialu (dáma base / veža gear3) z pozície castera
+function luffyHitSet(caster, form, w, h) {
+  const set = new Set();
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+    if (!(x === caster.x && y === caster.y) && luffyReachesCell(caster.x, caster.y, x, y, form)) set.add(`${x},${y}`);
+  return set;
+}
+// Luffy char-select: mód (base/gear3) + dmg pod mini-doskou (base.png/gear3.png; gear3 pulzuje ako max)
+function syncCaLuffy(form) {
+  const el = document.getElementById("ca-luffy"); if (!el) return;
+  const gear3 = form === "gear3";
+  const img = el.querySelector("img");
+  const src = gear3 ? "/assets/luffy/gear3.png" : "/assets/luffy/base.png";
+  if (img && !img.getAttribute("src").endsWith(src)) img.src = src;
+  el.classList.toggle("gear3-max", gear3);
+  const dmgEl = el.querySelector(".ca-luffy-dmg");
+  if (dmgEl) { dmgEl.innerHTML = `${gear3 ? 8 : 4}<span class="pix-ico mini" data-emoji="☠️"></span>`; hydratePix(dmgEl); }
+}
+// Luffy char-select: cyklenie módu base↔gear3 (badge + zóna dáma/veža, tempo ako pride/moon náhľad)
+function markLuffyPreview(now) {
+  const s = luffyPreview; if (!s) return;
+  if (!s.last) s.last = now;
+  if (now - s.last >= 1500) { s.last = now; s.form = s.form === "base" ? "gear3" : "base"; syncCaLuffy(s.form); }
+  const hit = luffyHitSet(s.caster, s.form, board.w || 4, board.h || 3);
+  s.grid.querySelectorAll(".mini-cell").forEach(c => {
+    if (c.classList.contains("caster")) return;
+    const on = hit.has(`${c.dataset.gx},${c.dataset.gy}`);
+    if (on && !c.classList.contains("hit")) { c.style.animationDelay = -(now % 1000) + "ms"; c.classList.add("hit"); }
+    else if (!on) c.classList.remove("hit");
+  });
+}
+
 // Escanor char-select: prekresli zvýraznené bunky pre daný pride level (cyklí 0→3 v drawCharSelectFrame)
 function markEscPridePreview(now) {
   const s = escPridePreview; if (!s) return;
@@ -5032,6 +5075,7 @@ function clearAbilityPreview() {
   abilityCasterCanvas = null;
   escPridePreview = null;
   moonPreview = null;
+  luffyPreview = null;
   charAbilityEl?.classList.add("hidden");
 }
 selEl.querySelectorAll(".char-card").forEach(card => {
@@ -5298,7 +5342,7 @@ function syncRechargeBtn(char) {
     delete ico.dataset.emoji; delete ico.dataset.done;
     ico.classList.add("charge-mark");
     ico.textContent = "???";
-    if (cost) { cost.innerHTML = `+4${miniPix("💧")}`; hydratePix(cost); }
+    if (cost) { cost.innerHTML = `+4${miniPix("💧")}${miniPix("🔀")}`; hydratePix(cost); } // +4 mana + swap znak (prepnutie gearu)
     rechargeBtn.title = "Switch Gear (Base ↔ Gear 3) — also recharges mana (+4); works even at full mana";
   } else if (ico) {
     ico.classList.remove("charge-mark");
