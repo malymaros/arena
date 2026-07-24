@@ -1166,6 +1166,20 @@ function spawnMoonFloat(slot, level) {
   setTimeout(() => el.remove(), 1700);
 }
 
+// Luffy: pri rechargi (prepnutie módu) float s odznakom NOVEJ formy nad postavou (base = slamák, gear3 = päsť)
+function spawnLuffyModeFloat(slot, form) {
+  const p = state?.[slot]; if (!p || p.x == null) return;
+  const gear3 = form === "gear3";
+  const { left, top } = cellToPx(p.x, p.y);
+  const el = document.createElement("div");
+  el.className = "luffy-mode-float" + (gear3 ? " gear3" : "");
+  el.innerHTML = `<img src="/assets/luffy/${gear3 ? "gear3" : "base"}.png" alt="" />`;
+  el.style.left = (left + TILE_W / 2) + "px";
+  el.style.top = (top - 24) + "px";
+  actorsEl.appendChild(el);
+  setTimeout(() => el.remove(), 1700);
+}
+
 /* ---------- Vojak: snajperský lúč + výbuch ---------- */
 // výbuch (Explosion.png, prehrá sa raz) na bunke — dopad specialového lúča aj koniec letu granátu
 function spawnExplosionAt(cell, slot, sizeMul = 1.4, fps = 12) {
@@ -4232,7 +4246,11 @@ function schedulePlayTimeline(timeline) {
         spawnChargeAura(e.from, false, false, "actor", dark); // „Goku" nabíjacia aura na postave
         if (state?.[e.from]?.char === "soldier") setAnim(e.from, "recharge", frameHold); // Vojak má vlastnú recharge pózu
         // Luffy: recharge PREPÍNA mód → prehraj prepínaciu pózu (base→gear3 = pumpovanie pästí, gear3→base = splasknutie)
-        if (state?.[e.from]?.char === "luffy") setAnim(e.from, e.luffyForm === "gear3" ? "luffypump" : "luffydeflate", frameHold);
+        // a ukáž nad ním float s odznakom NOVEJ formy (na ktorú sa práve prepol)
+        if (state?.[e.from]?.char === "luffy") {
+          setAnim(e.from, e.luffyForm === "gear3" ? "luffypump" : "luffydeflate", frameHold);
+          if (e.luffyForm === "base" || e.luffyForm === "gear3") spawnLuffyModeFloat(e.from, e.luffyForm);
+        }
         // klon sa „nabíja" naprázdno tiež — aura+float na oboch, nech recharge neprezradí pravého
         cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
         spawnChargeAura(e.from, false, false, "clone", dark);
