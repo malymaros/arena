@@ -1851,7 +1851,11 @@ function applyHit(targetSlot, rawDmg, tl, kind = "basic", fromClone = false, bon
     const atk = game.players[atkSlot];
     // delay = čas dopadu beamu (nie SMALL_DELAY_MS), aby dmg padol hneď ako beam zasiahne — bez medzery;
     // atk/dmg riadia hrúbku a štýl beamu na klientovi (basic podľa dmg, melee hrubý, special fialovo prepletený)
-    pushStateFrame(tl, [{ kind: "mirror", target: targetSlot, dmg: rawDmg, atk: kind, gold: !!t.mirrorGold }], MIRROR_BEAM_MS);
+    // fromClone: akciu vystrelil útočníkov klon (nie skutočný útočník) → odraz musí letieť DO KLONA a rozplynúť
+    //   ho, nie do skutočného útočníka (destCell = klonova bunka; inak beam mieri na Naruta a prezradí, ktorý je pravý)
+    const mirrorFx = { kind: "mirror", target: targetSlot, dmg: rawDmg, atk: kind, gold: !!t.mirrorGold };
+    if (fromClone && atk.clone) mirrorFx.destCell = [atk.clone.x, atk.clone.y];
+    pushStateFrame(tl, [mirrorFx], MIRROR_BEAM_MS);
     if (fromClone) {
       // odraz klonovej akcie letí do klona a rozplynie ho — akcia však na obrancu dopadla, labyrint končí
       killClone(atkSlot, tl);

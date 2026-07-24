@@ -2090,12 +2090,15 @@ function centerOf(slot) {
 // rázová vlna + sklenené úlomky, lúč vystrelí späť do útočníka, board sa otrasie
 // originCell (voliteľné): odraz vychádza z inej bunky než z obrancu — napr. zásah na KLONOVI cez zdieľaný
 // mirror, aby lúč nešiel z pravého Naruta (to by prezradilo, ktorý je skutočný)
-function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = false, originCell = null) {
+function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = false, originCell = null, destCell = null) {
   const d = Array.isArray(originCell)
     ? (() => { const { left, top } = cellToPx(originCell[0], originCell[1]); return { x: left + TILE_W / 2, y: top + TILE_H / 2 }; })()
     : centerOf(defenderSlot);
   if (!d) return;
-  const a = centerOf(defenderSlot === "p1" ? "p2" : "p1");
+  // destCell: útok vystrelil útočníkov klon → beam letí do klonovej bunky, nie do pravého útočníka (slot center)
+  const a = Array.isArray(destCell)
+    ? (() => { const { left, top } = cellToPx(destCell[0], destCell[1]); return { x: left + TILE_W / 2, y: top + TILE_H / 2 }; })()
+    : centerOf(defenderSlot === "p1" ? "p2" : "p1");
 
   const add = (cls, style) => {
     const el = document.createElement("div");
@@ -4442,7 +4445,9 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
         // odraz na KLONOVI (e.cell) vychádza z klonovej bunky, nie z pravého Naruta — inak by prezradil skutočného
-        spawnMirrorReflect(e.target, e.dmg, e.atk, !!e.gold, Array.isArray(e.cell) ? e.cell : null);
+        // e.destCell: útok vystrelil útočníkov klon → odraz letí DO klonovej bunky (nie do pravého útočníka)
+        spawnMirrorReflect(e.target, e.dmg, e.atk, !!e.gold, Array.isArray(e.cell) ? e.cell : null,
+          Array.isArray(e.destCell) ? e.destCell : null);
         if (Array.isArray(e.cell)) spawnCellFloat(e.cell, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
         else spawnFloat(e.target, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
       }
