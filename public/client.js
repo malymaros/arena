@@ -225,6 +225,11 @@ const LUFFY_FRAME_REF_H = 128;
 // (anchorY 1) na rovnakú nožnú líniu ako mágovia (fire wizard): mág pri fille 0.95 sedí ~8 px nad
 // spodkom canvasu, tak Luffyho spodok zdvihneme o toľko istého (offsetY záporné = hore).
 const LUFFY_BOARD_OFF_Y = 4;
+// Gear3 basic (Giant Pistol): telové pózy L_GiantPunch/L_RocketPull majú natiahnutú ruku + giant päsť
+// ZAPEČENÚ v sprite (vpravo). Kreslíme len Luffyho TELO (odrežeme pravú časť framu) — dosah rieši
+// procedurálna gumená ruka, ktorá sa naťahuje od tela po reálnu bunku súpera a nesie giant päsť na špičke.
+// (frac = koľko šírky framu odseknúť sprava; laditeľné podľa toho, kde v pásoch končí Luffyho telo)
+const LUFFY_ARM_CROP = { luffygiantpunch: 0.56, luffyrocketpull: 0.5 };
 // Star Platinum `_P` pásy (a Jotarove telo) majú v ÚTOČNÝCH pózach figúru zámerne posunutú tak, aby BBOX
 // ostal centrovaný (napr. pri údere päsť vyletí bokom a telo/nohy sú odtlačené na druhú stranu). Keby sme
 // kreslili centrované na frame, NOHY by pri animácii uskakovali zľava doprava a hore-dole. Preto ukotvujeme
@@ -767,7 +772,7 @@ function ensureSpriteMeta(charDir, file) {
     img.src = `/assets/${charDir}/${file}`;
   });
 }
-function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0, cropXFrac=0) {
+function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0, cropXFrac=0, cropRightFrac=0) {
   // anim.frames prepíše odhad počtu framov (keď framy nie sú štvorcové a inference zlyhá)
   const total = anim.frames || meta.frames;
   const fw = anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
@@ -784,9 +789,12 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
             : anim.loop ? elapsedF % total
                         : Math.min(lastIdx, startF + elapsedF);
   // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu — kreslí sa len stredový pás postavy
-  const cropPx = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
+  // cropRightFrac: NAVYŠE odreže časť SPRAVA v sprite-priestore (sprite mieri doprava, flip rieši CSS) —
+  //   napr. Luffyho zapečená natiahnutá ruka+päsť: necháme len telo, dosah kreslí procedurálna guma
+  const cropPx  = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
+  const cropRPx = Math.round(fw * Math.max(0, Math.min(0.9, cropRightFrac)));
   const sx = idx * fw + cropPx;
-  const sw = fw - 2 * cropPx;
+  const sw = Math.max(1, fw - 2 * cropPx - cropRPx);
   const scale = Math.min(dstW / fw, dstH / meta.fh) * fill; // výška ostáva „normálna" (škáluje sa podľa plnej výšky/šírky framu)
   const dw = sw * scale, dh = meta.fh * scale;
   // anchorY: 0 = hore, 0.5 = stred, 1 = dole; offsetX/offsetY = posun v px (záporné offsetY dvíha hore)
@@ -6562,6 +6570,8 @@ function raf() {
     }
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
+    // Luffy Gear3 basic: odrež zapečenú natiahnutú ruku+päsť z tela (dosah kreslí procedurálna guma)
+    const armCrop = LUFFY_ARM_CROP[animState[slot].key] || 0;
     // Transform (loop:false) a WinSunBoard s loopFrom (zdvih raz, potom chvost — aj pri victory) musia ísť
     // od frame 0 → relatívny čas; inak (loop) globálny now je ok
     const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
@@ -6571,7 +6581,7 @@ function raf() {
                 : (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
                 : escWinsun ? (now - (animState[slot].start || 0))
                 : (VAMP_ONESHOT_KEYS.has(aSt.key) || vampCast) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast) hrá RAZ od frame 0, potom drží pózu
-                : (aSt.key === "luffypump" || aSt.key === "luffydeflate" || aSt.key === "luffyrolltravel" || aSt.key === "luffychomp" || aSt.key === "luffychomphit" || aSt.key === "luffyball" || aSt.key === "luffyballspin" || aSt.key === "luffyimpact") ? (now - (aSt.start || 0)) // Luffy prepínacie/roll pózy hrajú RAZ od frame 0
+                : (aSt.key === "luffypump" || aSt.key === "luffydeflate" || aSt.key === "luffyrolltravel" || aSt.key === "luffychomp" || aSt.key === "luffychomphit" || aSt.key === "luffyball" || aSt.key === "luffyballspin" || aSt.key === "luffyimpact" || aSt.key === "luffygiantrocket" || aSt.key === "luffygiantpunch" || aSt.key === "luffyrocketpull" || aSt.key === "luffygiantretract") ? (now - (aSt.start || 0)) // Luffy prepínacie/roll/Giant Pistol pózy hrajú RAZ od frame 0
                 : (stoned ? 0 : now);
     // Jotarov pás má figúru cez ~78 % framu (mágovia ~52 %) a nohy 5,6 % nad spodkom framu → pri fill 0.95/
     // anchorY 0.5 je „obrovský" a nohy vysoko. Kreslíme ho menší (JOTARO_BOARD_FILL) a ukotvený na nohy
@@ -6585,7 +6595,7 @@ function raf() {
       // Jotaro/Luffy: normalizuj fill podľa výšky framu (fh/REF), nech rôzne pásy nevyjdú rôzne veľké
       .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H,
         jotaro ? bFill * (meta.fh / JOTARO_FRAME_REF_H) : luffy ? bFill * (meta.fh / LUFFY_FRAME_REF_H) : bFill,
-        bAnchorY, true, 0, bOffY, poseCrop))
+        bAnchorY, true, 0, bOffY, poseCrop, armCrop))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
