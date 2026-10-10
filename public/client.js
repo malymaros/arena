@@ -27,6 +27,7 @@ const C = {
   get ensureSpriteMeta() { return ensureSpriteMeta; },
   get drawSprite() { return drawSprite; },
   get setAnim() { return setAnim; },
+  get ANIM_DEF() { return ANIM_DEF; },
 };
 // háčiky choreografie per postava (effect / boardAnim / centerCanvas / drawCenter - popis v public/chars/fx/index.js)
 const CHAR_FX = Object.fromEntries(Object.entries(CHAR_FX_FACTORIES).map(([k, f]) => [k, f(C)]));
@@ -921,8 +922,8 @@ function updateSpecialCenter(casts) {
     if (cfx?.drawCenter) cvs.dataset.fxChar = caster.char;
     // one-shot stredový sprite (Countess A-sheety): hrá RAZ od vzniku canvasu (= od začiatku svojho
     // frame-u) a drží posledný frame - absolútny loop by naratívnu sekvenciu začal v strede.
-    // Platí pre melee/heal casty (sp.once) aj pre jej trap cast (special bez sp.file → A5)
-    if (sp.once || (caster.char === "countess" && !sp.file)) {
+    // Platí pre melee/heal casty (sp.once); jej trap cast (A5) nastaví to isté register fx (centerCanvas)
+    if (sp.once) {
       cvs.dataset.once = "1";
       cvs.dataset.born = String(performance.now());
     }
@@ -2661,12 +2662,10 @@ function renderGrid(s, effects = []) {
     if ((e?.kind === "luffy_roll" || e?.kind === "luffy_explode" || e?.kind === "luffy_chomp") && Array.isArray(e.target)) previewSet.add(`${e.target[0]},${e.target[1]}`);
     // Countess/Onre: seknutie po charge/teleporte - zvýrazni bunku terča; trigger pasce - bunka sa rozžiari
     if (e?.kind === "vamp_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
-    // Countess: úder (A1) aj liečivé beaty (A2/A3/A4) sa zrkadlia do veľkého stredového spritu -
-    // one-shot od začiatku svojho beatu (once), nie absolútny loop; Onre stredový overlay nemá
-    if ((e?.kind === "vamp_strike" || e?.kind === "vamp_heal_cast") && s?.[e.from]?.char === "countess") {
-      const def = ANIM_DEF[e.anim] ?? ANIM_DEF.va1;
-      meleeCasts.push({ from: e.from, file: def.file, fps: def.fps, once: true });
-    }
+    // efekt autora zrkadlený do veľkého stredového spritu (register fx centerCast; Countess: úder A1 a liečivé
+    // beaty A2–A4 ako one-shot od začiatku svojho beatu; Onre stredový overlay nemá)
+    const fxCast = e && CHAR_FX[s?.[e.from]?.char]?.centerCast?.(e);
+    if (fxCast) meleeCasts.push(fxCast);
     if (e?.kind === "trap_trigger" && Array.isArray(e.cell)) trapFlashCells.push(e.cell);
   }
 
@@ -3227,7 +3226,7 @@ function attachQueueHover(el, a, idx) {
     // Vampire/Onryō: dash = charge - hover ukáže dráhu behu (stop na viditeľnej figúre súpera)
     el.addEventListener("mouseenter", () => {
       const p = ghostPos(idx); const char = ghostCharAt(idx);
-      if (p && (char === "countess" || char === "onre")) showPreviewCells(cellsForVampChargePreview(p, a.dir, state?.[otherSlot()]));
+      if (p && VAMP_CHARS[char]) showPreviewCells(cellsForVampChargePreview(p, a.dir, state?.[otherSlot()]));
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special") {
@@ -3899,9 +3898,8 @@ function schedulePlayTimeline(timeline) {
         const p = state?.[e.from];
         if (p && p.x != null) spawnClonePuff([p.x, p.y], true);
         fadeActor(e.from, 0, 1, frameHold);
-        // zjavenie bez behania: Onre s výkrikom (Scream), Countess v idle - zruš auto-run z posunu pozície
-        if (state?.[e.from]?.char === "onre") setAnim(e.from, "scream", frameHold);
-        else setAnim(e.from, "idle");
+        // zjavenie bez behania v idle - zruš auto-run z posunu pozície (Onre s výkrikom: register fx, effect nižšie)
+        setAnim(e.from, "idle");
       }
       // trigger bez many na útok - teleport prebehol, úder nepadol (LOW MANA float bez prečiarknutia)
       if (e.kind === "trap_no_mana" && (e.target === "p1" || e.target === "p2")) {
@@ -6167,9 +6165,6 @@ function raf() {
     else if (!lyingDead && aSt.key === "dead") { aSt.key = "idle"; aSt.until = 0; }
     // skamenená postava = zamrznutá socha (fixný idle frame; sivý nádych rieši actorFilter); smrť má prednosť
     const stoned = (st.stone || 0) > 0 && !lyingDead;
-    // Countess pri caste pasce: A5 (naratívna sekvencia) sa hrá RAZ od frame 0 - relatívny čas nižšie;
-    // absolútny loop by začal v strede sekvencie (victory/preview loop ostáva)
-    const vampCast = st.char === "countess" && aSt.key === "casting";
     // Jotaro: pri výhre ostáva IDLE (special na výhru vedie stand Star Platinum, nie jeho telo);
     // casting preňho ani nenastáva (útoky hrá cez attack2_loop) - teda nikdy nekreslí special sprite na tele
     let anim = stoned
@@ -6179,9 +6174,10 @@ function raf() {
       : (st.char === "luffy" && aSt.key === "victory")
         ? { file: "Win.png", fps: 6, loop: true } // Luffy víťazí → Win.png (nemá SPECIAL_ANIMS)
       : (aSt.key === "victory" || aSt.key === "casting")
-        ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: !vampCast }
+        ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
         : currentAnim(slot);
-    // póza podľa choreografie postavy (register fx; Vojak: mieriaca póza + výšľah v synchróne so stredovým overlayom)
+    // póza podľa choreografie postavy (register fx; Vojak: mieriaca póza + výšľah v synchróne so stredovým overlayom;
+    // Countess: A5 cast pasce RAZ od frame 0) - anim.fromStart = relatívny čas od setAnim (drawT nižšie)
     anim = CHAR_FX[st.char]?.boardAnim?.({ slot, st, aSt, now, stoned, lyingDead, anim }) ?? anim;
     // Escanor: počas premeny hraj Transform; pred premenou (idle) hraj slabú formu WeakIdle;
     // víťazstvo = STREDOVÁ special animácia na jeho postavičke (WinSunBoard: zdvih slnka raz, potom ústa + preblik)
@@ -6202,7 +6198,7 @@ function raf() {
     const drawT = tsFrozenActor ? tsFreezeAt
                 : (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
                 : escWinsun ? (now - (animState[slot].start || 0))
-                : (VAMP_ONESHOT_KEYS.has(aSt.key) || vampCast) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast) hrá RAZ od frame 0, potom drží pózu
+                : (VAMP_ONESHOT_KEYS.has(aSt.key) || anim.fromStart) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast) hrá RAZ od frame 0, potom drží pózu
                 : (aSt.key === "luffypump" || aSt.key === "luffydeflate" || aSt.key === "luffyrolltravel" || aSt.key === "luffychomp" || aSt.key === "luffychomphit" || aSt.key === "luffyball" || aSt.key === "luffyballspin" || aSt.key === "luffyimpact" || aSt.key === "luffygiantrocket" || aSt.key === "luffygiantpunch" || aSt.key === "luffyrocketpull" || aSt.key === "luffygiantretract") ? (now - (aSt.start || 0)) // Luffy prepínacie/roll/Giant Pistol pózy hrajú RAZ od frame 0
                 : (stoned ? 0 : now);
     // Jotarov pás má figúru cez ~78 % framu (mágovia ~52 %) a nohy 5,6 % nad spodkom framu → pri fill 0.95/

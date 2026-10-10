@@ -7,10 +7,13 @@
 //                                 (step) na mieste pôvodných vetiev; frameHold = trvanie frame-u
 //   boardAnim({ slot, st, aSt, now, stoned, lyingDead, anim }) → anim
 //                                 póza malej figúry na doske v raf (aSt = animState slotu); vráť anim bez zmeny,
-//                                 ak sa postavy netýka
+//                                 ak sa postavy netýka; anim.fromStart = hrá RAZ od frame 0 (čas od setAnim)
 //   centerCanvas(cvs, sp)         vznik veľkého stredového spritu castu (sp = cast záznam: from, file?, fps?…)
 //   drawCenter(cvs, ctx, now) → true  raf stredového spritu - true = nakreslené (inak bežný loop)
+//   centerCast(e) → sp | null     efekt autora zrkadlený do stredového spritu (renderGrid; sp ako melee cast)
 import soldier from "./soldier.js";
 import werewolf from "./werewolf.js";
+import countess from "./countess.js";
+import onre from "./onre.js";
 
-export const CHAR_FX_FACTORIES = { soldier, werewolf };
+export const CHAR_FX_FACTORIES = { soldier, werewolf, countess, onre };
