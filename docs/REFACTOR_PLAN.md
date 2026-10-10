@@ -191,7 +191,13 @@ previews importujú `shared/geometry.js`.
       `actionAnims` (melee/strela/recharge póza), `planSpecialWarn`/`planClone`/`planRechargeAlwaysUseful` (⚠ v lište).
       Overenie: varovania == stará logika (33 696 prípadov), browser-smoke --compare bez rozdielu. V client.js ostáva
       76 vetiev podľa mena (zo ~155) - choreografia timeline (Escanor slnko, Jotaro stand, Luffy, Vojak, Vampire, HUD odznaky).
-- [ ] **6b - choreografia do registra.** V `client.js` ostáva ~155 vetiev podľa mien
+- [ ] **6c - choreografia do registra `public/chars/fx/<key>.js`** (rozpracované). Továreň `(C) → háčiky`
+      (`effect`, `boardAnim`, `centerCanvas`, `drawCenter` - popis v `fx/index.js`), `C` = lenivé gettery
+      klientského scope v `client.js`. Hotové: **Vojak** (mierenie, laser, lúč, výšľah), **Vlkolak** (otočenie,
+      `wolfrun`/`wolfstrike`). Overenie: browser-smoke `--compare` 0 chýb, sonda 52/52, assety zhodné; stopa sa
+      líši len v počte `charge-aura.gold` (±2 - Last Stand aura v raf je časovaná hodinami, šum). Ďalej:
+      Countess/Onryō, Naruto, Luffy, Jotaro, Escanor.
+- [ ] **6b - choreografia do registra (pôvodný návrh).** V `client.js` ostáva ~155 vetiev podľa mien
       (najviac escanor 33, jotaro 30, luffy 23, countess/onre 24, werewolf 14, soldier 12, medusa 10). Návrh:
       háčiky klientskej postavy (`onEffect(kind, e, ctx)` pre vlastné efekty timeline, `castOverlay`,
       `boardScale` pre pride/moon/gear3 veľkosť, `buttons` pre special/dash/mirror skin a picker) - po jednej
