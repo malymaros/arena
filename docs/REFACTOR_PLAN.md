@@ -172,6 +172,23 @@ previews importujú `shared/geometry.js`.
       `xxxModule(E)`; `E` = vnútorný scope enginu (getter/setter pre `game`/`rand`/`actionSteps` + funkcie). Čisto
       organizačné: difftest 4 840 zápasov = 0 rozdielov, golden 48/48, `npm test`. game.js 2 472 → ~1 850 riadkov.
 
+## Etapa 6 - stav
+
+- [x] **6a - dáta postáv v klientskom registri `public/chars/<key>.js`** (+ `index.js` s popisom polí, `common.js`):
+      meno a priečinky spritov, efektový sprite specialu, vlastné animácie, aliasy súborov, poloha/výrez hlavy,
+      odstup na zdieľanej bunke, veľkosť portrétu, teleport swapu, náhľady vo výbere, side/vamp. Z `client.js`
+      zmizlo 17 tabuliek (~200 riadkov); `index.js` z registra skladá rovnomenné tabuľky, ktoré `client.js` importuje.
+      Overenie: tabuľky z registra == pôvodné literály z HEAD (hodnoty, aj poradie kľúčov tam, kde sa iterujú).
+- [x] **`tools/browser-smoke.mjs`** - dymový test klienta v reálnom prehliadači (headless Chrome/Edge cez CDP):
+      boti hrajú seedované zápasy (všetkých 13 postáv, aj side-postavy a turnaj so swapmi), prehliadač ich sleduje
+      ako divák pri 8× zrýchlenom čase, plus hover všetkých kariet vo výbere. Padá na JS výnimkách, console.error
+      a 4xx; `--compare` spustí to isté nad HEAD a porovná množinu načítaných spritov.
+- [ ] **6b - choreografia a skiny tlačidiel do registra.** V `client.js` ostáva ~155 vetiev podľa mien
+      (najviac escanor 33, jotaro 30, luffy 23, countess/onre 24, werewolf 14, soldier 12, medusa 10). Návrh:
+      háčiky klientskej postavy (`onEffect(kind, e, ctx)` pre vlastné efekty timeline, `castOverlay`,
+      `boardScale` pre pride/moon/gear3 veľkosť, `buttons` pre special/dash/mirror skin a picker) - po jednej
+      postave, každý krok overený browser-smoke `--compare`.
+
 ## Rozhodnutia (na schválenie)
 
 1. **„Explicitný ctx" v Etape 1 = inštancia enginu, nie parameter každej funkcie.** Engine je factory

@@ -1,6 +1,13 @@
 // public/client.js
 // herná geometria (zóny specialov, dráhy striel, ghost simulácia) - ten istý modul používa server (engine)
 import * as G from "/shared/geometry.js";
+// klientský register postáv (public/chars/<key>.js) - dáta postáv: meno/priečinky, animácie, aliasy súborov,
+// výrezy hláv, odstupy, teleport, náhľady vo výbere (význam polí: public/chars/index.js)
+import {
+  CHAR_META, SIDE_CHARS, VAMP_CHARS, SPECIAL_ANIMS, FX_OFFSET_X, CHAR_ANIMS, SPRITE_FILE_ALIAS, PORTRAIT_SCALE,
+  HEAD_CX, HEAD_TOP, HEAD_CROP, PAIR_SHIFT, TELEPORT_DIR, TELEPORT_COUNT, TELEPORT_FX, PREVIEW_CAST, ABILITY_PREVIEW,
+} from "/chars/index.js";
+import { SPECIAL_FPS } from "/chars/common.js";
 // trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
 // (inak by sa vrátený hráč stal divákom a server by prestal brať jeho lock_in)
 let arenaId = null;
@@ -490,13 +497,6 @@ youMarker.className = "you-marker";
 youMarker.innerHTML = `<div class="you-marker-bob"><span class="you-tag">YOU</span><span class="you-tip"></span></div>`;
 youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
-// horizontálny stred hlavy v rámci sprite (0..1) - postavy nie sú centrované; zmerané z Idle.png,
-// jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
-const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50, soldier: 0.47, werewolf: 0.50, countess: 0.49, onre: 0.50, jotaro: 0.47 };
-// vrch hlavy ako zlomok výšky actor canvasu - Medúza je vztýčená vyššie než mágovia (vrch figúry
-// ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
-// Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128); Vlkolak je zhrbený nízko (vrch figúry ~0.55 framu)
-const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48, werewolf: 0.55, countess: 0.45, onre: 0.45, jotaro: 0.45 };
 
 // zelená šípka pod round-script lištou - počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
@@ -537,71 +537,12 @@ document.documentElement.style.setProperty("--charge-ms", CHARGE_STEP_MS + "ms")
 
 // Special anim
 const SPECIAL_SCALE = 4.8;
-const SPECIAL_FPS   = 6;
-const SPECIAL_ANIMS = {
-  fire:      { file: "Flame_jet.png",    fps: SPECIAL_FPS, loop: true },
-  lightning: { file: "Light_charge.png", fps: SPECIAL_FPS, loop: true },
-  wanderer:  { file: "Magic_sphere.png", fps: SPECIAL_FPS, loop: true },
-  medusa:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true },
-  minotaur:  { file: "Walk.png",         fps: SPECIAL_FPS, loop: true }, // bez vlastného fx spritu - cast = veľký kráčajúci Minotaur (blúdenie labyrintom)
-  naruto:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true }, // pečate rukami (summon tieňového klona)
-  escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder - plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
-  soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // loop len pre victory/preview - pri caste NECYKLÍ: mierenie (frame 0 + laser sight) → jeden výšľah → lúč (SOLDIER_AIM/FIRE)
-  werewolf:  { file: "Run+Attack.png",   fps: SPECIAL_FPS, loop: true }, // rozbeh charge - veľký stredový sprite hrá LEN Run+Attack (Attack_2 seknutie je na malej figúre pri dopade)
-  countess:  { file: "A5.png",           fps: SPECIAL_FPS, loop: true }, // kladenie pasce - celá útočná sekvencia A1–A4 (17f); pri caste sa hrá RAZ od frame 0 (server drží jeden dlhý VAMP_CAST_MS frame), loop len pre victory/preview. Cieľová bunka sa NEzvýrazňuje, pasca je tajná
-  onre:      { file: "Scream.png",       fps: SPECIAL_FPS, loop: true }, // kladenie pasce - prízračný výkrik
-  jotaro:    { file: "Special_2_P.png",  fps: SPECIAL_FPS, loop: true }, // Star Platinum úder (stred castu; F5 doladí per special1/2 + THE WORLD)
-};
-// niektoré efektové sprity majú obsah mimo stredu framu - vodorovná korekcia (zlomok šírky canvasu) v náhľade
-const FX_OFFSET_X = { lightning: 0.18 };
 
-// Normalizácia veľkosti postavy v KARTÁCH výberu a HUD PORTRÉTE: mágovia vypĺňajú frame len z ~51 %
-// výšky (veľa vzduchu), Medúza 59 % a Minotaur 72 % - pri rovnakom fill preto pôsobia príliš veľkí.
-// Násobič ich zmenšuje na porovnateľnú výšku postavy; na BOARDE ostávajú zámerne väčší (bez násobiča).
-// luffy/jotaro (Hidden preview): ich pásy majú figúru takmer cez celý frame (88 % / 78 % výšky),
-// kým mágovia ~52 % - normalizácia na výšku mágov v karte (66/112 ≈ .59, resp. ·(112/144) ≈ .66)
-const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7, countess: 0.93, onre: 0.93, luffy: 0.59, jotaro: 0.66 };
+// veľkosť postavy v karte výberu / HUD portréte (portraitScale z registra; na BOARDE bez násobiča)
 const portraitFill = (char, base) => base * (PORTRAIT_SCALE[char] ?? 1);
 
-const CHAR_META = {
-  fire:      { name: "Fire Wizard",      dir: "fire", dirP2: "fire_2" },
-  lightning: { name: "Lightning Mage",   dir: "lightning", dirP2: "lightning_2" },
-  // Wanderer: p2 = wanderer_2 - do pixelov zapečený bývalý alt-color filter
-  // (saturate .22 + brightness 1.4), vizuálne totožné, už bez CSS filtra (tools/sprites-wanderer)
-  wanderer:  { name: "Wanderer Magician",dir: "wanderer", dirP2: "wanderer_2" },
-  // Medúza: pravá strana (p2) má NATÍVNU tmavú paletu (Medusa2) namiesto CSS alt-color filtra;
-  // Charge.png = prefarbený fire fireball (zeleno-žltý / fialový) vygenerovaný per paleta
-  medusa:    { name: "Medusa",           dir: "medusa/Medusa", dirP2: "medusa/Medusa2" },
-  // Minotaur: natívna p2 paleta (Minotaur_2, hnedý so sekerou); Charge.png = prefarbený fire fireball per paleta
-  minotaur:  { name: "Minotaur",         dir: "minotaur/Minotaur_1", dirP2: "minotaur/Minotaur_2" },
-  // Naruto: natívna p2 paleta (žltý kostým + zlatá čakra - paletový swap z kostýmov v sheete)
-  naruto:    { name: "Naruto",           dir: "naruto/Naruto_1", dirP2: "naruto/Naruto_2" },
-  // Escanor: zatiaľ LEN ukážka vo výbere (nová stránka vľavo), nedá sa zvoliť ani hrať.
-  // Natívna paleta; p2 = escanor_2 (zelené oblečenie prefarbené na červené). V karte: WeakIdle, hover IntroStand.
-  escanor:   { name: "Escanor",          dir: "escanor", dirP2: "escanor_2" },
-  // Vojak: p2 = soldier_2 (uniforma prefarbená na čiernu - tools/sprites-soldier); Charge.png = kotúľajúci sa granát
-  soldier:   { name: "Soldier",          dir: "soldier", dirP2: "soldier_2" },
-  // Vlkolak: natívna p2 paleta (Werewolf_2, teplejší odtieň); Charge.png = prefarbený fire fireball per paleta
-  // (P1 mesačná modrá, P2 krvavá červená) - tools/sprites-werewolf
-  werewolf:  { name: "Werewolf",         dir: "Werewolf_1", dirP2: "Werewolf_2" },
-  // Hidden stránka (easter egg): postavy viazané na stranu - Vampire VÝHRADNE P1, Onryō VÝHRADNE P2
-  // (karty per strana skrýva CSS cez data-side; hrateľné len v single/bo3, turnaj Hidden stránku nepustí).
-  // Onre hrá vždy vpravo vo svojej natívnej palete → dirP2 = ten istý priečinok (žiadny albino filter).
-  countess:  { name: "Vampire", dir: "Countess_Vampire" },
-  onre:      { name: "Onryō",   dir: "Onre", dirP2: "Onre" },
-  // Hidden preview postavy (zatiaľ NEHRATEĽNÉ - karta bez data-char, klik/draft ju ignorujú):
-  // Luffy len P1, Jotaro len P2; Jotaro vpravo v natívnej palete (dirP2 = ten istý priečinok).
-  luffy:     { name: "Luffy",   dir: "luffy" },
-  jotaro:    { name: "Jotaro",  dir: "jotaro", dirP2: "jotaro" }
-};
-// side-postavy viazané na slot (zrkadlo serverového SIDE_CHARS); v turnaji sa dajú draftnúť, ale
-// swap DO/Z nich je zakázaný - v HUD hlavách to reprezentuje glitch (viď renderMageHeads).
-// Jotaro (stand Star Platinum) je side-bound na p2 ako Onryō.
-const SIDE_CHARS = { countess: "p1", onre: "p2", jotaro: "p2", luffy: "p1" };
-// vamp kit (charge/trap/vamp melee/mirror-imunita) - PODMNOŽINA side-bound; Jotaro NIE
-// (dashuje/melee normálne, special nie je pasca, nie je mirror-imúnny, dash bez ❔ skinu)
-const VAMP_CHARS = { countess: 1, onre: 1 };
-// je `key` side-postava viazaná na `slot`? (p2 má viac: onre, jotaro)
+// je `key` side-postava viazaná na `slot`? (SIDE_CHARS z registra; p2 má viac: onre, jotaro). V turnaji sa
+// dajú draftnúť, ale swap DO/Z nich je zakázaný - v HUD hlavách to reprezentuje glitch (viď renderMageHeads).
 function sideCharBoundTo(key, slot) { return SIDE_CHARS[key] === slot; }
 // sprite priečinok postavy pre daný slot - postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
@@ -610,71 +551,22 @@ function charDirFor(char, slot) {
 }
 function usesAltColor(char, slot) { return slot === "p2" && !CHAR_META[char]?.dirP2; }
 const ANIM_DEF = {
-  idle:    { file: "Idle.png",     fps: 6,  loop: true  },
-  run:     { file: "Run.png",      fps: 12, loop: true  },
-  attack:  { file: "Attack_1.png", fps: 10, loop: false },
+  idle: { file: "Idle.png",     fps: 6,  loop: true  },
+  run: { file: "Run.png",      fps: 12, loop: true  },
+  attack: { file: "Attack_1.png", fps: 10, loop: false },
   attack2: { file: "Attack_2.png", fps: 10, loop: false },
   // looping variant pre melee - malá postava sa seká súbežne s veľkým sprite-om (inak by zamrzla na poslednom frame).
   // special nemá vlastný key: malá postava kreslí svoj efektový sprite (SPECIAL_ANIMS) cez key "casting" priamo v raf.
   attack2_loop: { file: "Attack_2.png", fps: 10, loop: true },
   attack1_loop: { file: "Attack_1.png", fps: 10, loop: true }, // melee Medúzy - šľah celým telom (Attack_1)
-  hurt:    { file: "Hurt.png",     fps: 10, loop: false },
+  hurt: { file: "Hurt.png",     fps: 10, loop: false },
   // flinch = to isté PNG ako hurt, ale klon ho ZRKADLÍ (hurt/dead klon potláča na idle, aby zásah naň nič neprezradil).
   // Používa sa pri neplatnej akcii (žiadny dmg) → aj Naruto aj klon trhnú rovnako a nedá sa rozoznať pravý.
-  flinch:  { file: "Hurt.png",     fps: 10, loop: false },
-  dead:    { file: "Dead.png",     fps: 7,  loop: false },
-  // Naruto: summon klona - po pečatiach hrá postava (aj kópie po bokoch) Special_2 (dýchanie)
-  special2:{ file: "Special_2.png", fps: 6, loop: true },
+  flinch: { file: "Hurt.png",     fps: 10, loop: false },
+  dead: { file: "Dead.png",     fps: 7,  loop: false },
   victory: { file: "Idle.png", fps: 6, loop: true }, // placeholder - raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
-  // Escanor: WeakIdle = slabá „denná" forma (pred premenou); Transform = premena → chytí sekeru (hrá sa RAZ pri nasadení)
-  weakidle:  { file: "WeakIdle.png", fps: 5,  loop: true },
-  transform: { file: "Transform.png", fps: 5, loop: false }, // slow-mo premena - nech si ju hráči všimnú
-  cruelhold: { file: "CruelSunHold.png", fps: 11, loop: true }, // special fáza 2: malá postava nesie veľké slnko
-  // Escanor special fáza 1: zdvih ruky so slnkom RAZ, potom už len ústa + preblikávajúce slnko (posledné 4 framy);
-  // loopFrom potrebuje čas od štartu animácie (raf: drawT = now - animState.start)
-  winsun:  { file: "WinSunBoard.png", fps: 7, loopFrom: 4 },
-  wintalk: { file: "WinTalk.png",     fps: 5, loop: true }, // special fáza 3 (slnko letí na cieľ): len otvára/zatvára ústa, bez slnka a bez zdvihu
-  // Vojak: vlastná póza pri recharge (ostatné postavy hrajú len auru v idle); loop - neslučkové anims
-  // sa kreslia absolútnym časom (držali by len posledný frame), slučka sa pri frameHold ~1s prehrá raz
-  recharge: { file: "Recharge.png", fps: 12, loop: true },
-  // Luffy: pumpovanie pästí (Recharge2, 7f) = prepnutie base→gear3 + windup gear3 basicu; Special_3 (12f) = splasknutie
-  // gear3→base. maxFrame = bez posledných 2 framov (skončí v pumpnutej póze, nie v uvoľnení späť).
-  luffypump:    { file: "Recharge2.png", fps: 10, loop: false, maxFrame: 4 },
-  luffydeflate: { file: "Special_3.png", fps: 10, loop: false, maxFrame: 9 },
-  // Gear3 basic (Giant Pistol) telové pózy: windup (päsť vzad) → úder (natiahnutá ruka) → priťiahnutie (reeluje) / minutie (stiahne)
-  luffygiantrocket:  { file: "L_GiantRocket.png",  fps: 8,  loop: false }, // 2f - nabratie, giant päsť vzad
-  luffygiantpunch:   { file: "L_GiantPunch.png",   fps: 10, loop: false }, // 3f - vystrelenie päste vpred
-  luffyrocketpull:   { file: "L_RocketPull.png",   fps: 12, loop: false }, // 5f - ruka sa sťahuje, ťahá súpera
-  luffygiantretract: { file: "L_GiantRetract.png", fps: 12, loop: false }, // 4f - minutie: stiahnutie naprázdno
-  // Luffy special roll: base = Special_7 (rozbeh→kotúľ→puf-hlava bounce); gear3 = balón (Recharge round frame)
-  // + Special_2 impact (radiálne päste) na cieľovej bunke
-  // base special 2 fázy: dogúľanie (run/roll f0–6) počas cesty, potom cvaknutie na cieľovej bunke (f7+).
-  luffyrolltravel: { file: "Special_7.png", fps: 14, loop: false, maxFrame: 6 },              // dogúľanie k bunke
-  luffychomp:      { file: "Special_7.png", fps: 10, loop: false, startFrame: 7 },            // cvaknutie + zotavenie (minutie)
-  luffychomphit:   { file: "Special_7.png", fps: 10, loop: false, startFrame: 7, maxFrame: 9 }, // cvaknutie, zastaví (zásah)
-  luffyball:     { file: "Special_1.png", fps: 8, loopFrom: 7 },                       // gear3: premena na guľu (transform + spin) NA štartovacej bunke
-  luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7, loop: true },        // gear3: gúľajúca sa guľa počas presunu k cieľu - LOOPuje guľové framy 7–8 (nie statický frame)
-  luffyimpact:   { file: "Special_2.png", fps: 8,  loop: false },
-  // Vlkolak: beh charge specialu (Run+Attack) + seknutie na bunke terča (WolfStrike.png → alias Attack_2.png);
-  // neloopové → raf ho kreslí relatívnym časom od setAnim (drawT), inak by viselo na poslednom frame
-  wolfrun:    { file: "Run+Attack.png", fps: 12, loop: true },
-  wolfstrike: { file: "WolfStrike.png", fps: 5, loop: false },
-  // Countess/Onre: beh melee-charge (Run) + seknutie na bunke terča (VampStrike.png → alias Attack_4/Attack_3);
-  // neloopové seknutie kreslí raf relatívnym časom (drawT) ako wolfstrike
-  vamprun:    { file: "Run.png", fps: 12, loop: true },
-  vampstrike: { file: "VampStrike.png", fps: 8, loop: false },
-  // Countess melee/pasca (podľa vampire_attack_guide): úder = A1 (krvavý bolt zapečený vo framoch),
-  // po dopadnutom dmg liečivé beaty A2→A3→A4 a až po nich +HP - jednotné pre charge melee, center
-  // melee aj trigger pasce. Onreho trigger úder ostáva Attack_1; na bunke pasce sa zjavuje s výkrikom
-  // (Scream). Všetko neloopové → kreslené relatívnym časom (VAMP_ONESHOT_KEYS), inak by viseli na
-  // poslednom frame. fps ladené tak, aby sa švih prehral CELÝ v rámci svojho beatu
-  // (VAMP_TRAP_STRIKE/WOLF_STRIKE 900 ms, VAMP_HEAL_BEAT 810 ms)
-  vattack1:   { file: "Attack_1.png", fps: 10, loop: false }, // Onre trap úder: 6f = 600 ms
-  va1:        { file: "A1.png", fps: 7, loop: false }, // úder + bolt: 6f = 857 ms
-  va2:        { file: "A2.png", fps: 4, loop: false }, // heal beat 1 (kvapky): 3f = 750 ms
-  va3:        { file: "A3.png", fps: 3, loop: false }, // heal beat 2 (véčko): 2f = 667 ms
-  va4:        { file: "A4.png", fps: 8, loop: false }, // heal beat 3 (vlna): 6f = 750 ms
-  scream:     { file: "Scream.png",   fps: 8,  loop: false }  // 7f = 875 ms (zmestí sa do TELEPORT_IN)
+  // animácie konkrétnych postáv (Escanor, Luffy, vlkolak, Vampire/Onryō…) - public/chars/<key>.js, pole anims
+  ...CHAR_ANIMS,
 };
 // neloopové one-shot animácie kreslené relatívnym časom od setAnim (hrajú RAZ od frame 0, potom držia pózu)
 const VAMP_ONESHOT_KEYS = new Set(["wolfstrike", "vampstrike", "vattack1", "va1", "va2", "va3", "va4", "scream"]);
@@ -752,21 +644,8 @@ const TEAM_SIZE = 3; // musí sedieť so serverovým TEAM_SIZE
 let hudDeadSince = { p1: 0, p2: 0 };
 
 /* ---------- sprite helpers ---------- */
-// Minotaur nemá Run/Attack_1/Attack_2 súbory - jeho sheet používa Walk/Attack; alias per priečinok,
-// nech všetky ANIM_DEF/SPECIAL cesty fungujú bez per-char výnimiek v kóde
-const SPRITE_FILE_ALIAS = {
-  "minotaur/": { "Run.png": "Walk.png", "Attack_1.png": "Attack.png", "Attack_2.png": "Attack.png" },
-  // Vojak (prefix chytí aj soldier_2): basic útok = hod granátom, melee = výstrel zblízka (Shot_1)
-  "soldier": { "Attack_1.png": "Grenade.png", "Attack_2.png": "Shot_1.png" },
-  // Vlkolak (prefix chytí Werewolf_1 aj _2): melee = Attack_3; natívny Attack_2 je rezervovaný pre
-  // seknutie charge specialu (kľúč wolfstrike žiada fiktívny WolfStrike.png → mapuje sa naň)
-  "Werewolf_": { "Attack_2.png": "Attack_3.png", "WolfStrike.png": "Attack_2.png" },
-  // Vampire: Charge.png generuje tools/sprites-countess-onre (centrovaná červená strela);
-  // VampStrike sa u nej už nepoužíva (úder = A1), alias ostáva pre istotu
-  "Countess_Vampire": { "VampStrike.png": "Attack_4.png" },
-  // Onryō: Charge.png generuje tools/sprites-countess-onre (prízračný recolor); seknutie charge = Attack_3
-  "Onre": { "VampStrike.png": "Attack_3.png" },
-};
+// alias súboru per priečinok (spriteAlias postavy, napr. Minotaur nemá Run/Attack_1/Attack_2 - jeho sheet
+// má Walk/Attack), nech všetky ANIM_DEF/SPECIAL cesty fungujú bez per-char výnimiek v kóde
 function spriteFileFor(charDir, file) {
   for (const pfx in SPRITE_FILE_ALIAS) {
     if (charDir.startsWith(pfx) && SPRITE_FILE_ALIAS[pfx][file]) return SPRITE_FILE_ALIAS[pfx][file];
@@ -824,8 +703,6 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
 
 /* ---------- Teleport (výmena maga v turnaji) - dvojfázová explózia ---------- */
 // framy sú JEDNOTLIVÉ číslované PNG (nie horizontálny strip ako ostatné sprity) → vlastný loader/prehrávač
-const TELEPORT_DIR   = { fire: "Fire", lightning: "Lightning", wanderer: "Wanderer" };
-const TELEPORT_COUNT = { fire: 6, lightning: 10, wanderer: 10 };
 const _teleFrames = {}; // char -> Promise<HTMLImageElement[]>
 function ensureTeleportFrames(char) {
   if (_teleFrames[char]) return _teleFrames[char];
@@ -840,14 +717,6 @@ function ensureTeleportFrames(char) {
   }
   return (_teleFrames[char] = Promise.all(proms).then(() => imgs));
 }
-// per-mág: veľkosť explózie (× rozmer políčka) + kotvenie ("feet" = od nôh nahor, "torso" = na stred torza)
-// bottomTrim = zlomok výšky PNG, ktorý je pod viditeľným obsahom priehľadný (obsah vo frame nesiaha po spodok)
-// dy = dodatočný posun celej explózie NADOL (× výška políčka) - ručné doladenie per mág
-const TELEPORT_FX = {
-  fire:      { scale: 1.0, anchor: "feet" },   // oheň horí od zeme, zmestí sa do políčka
-  lightning: { scale: 1.6, anchor: "feet", bottomTrim: 0.17, dy: 0.20 }, // blesk šľahá od nôh nahor
-  wanderer:  { scale: 1.6, anchor: "torso", dy: 0.12 },
-};
 const TORSO_FRAC = 0.66; // stred torza ako zlomok výšky actor boxu (0 = hore, 1 = päty)
 // prehraj explóziu CENTROVANÚ na POSTAVU daného slotu (char = ktorého maga framy); durationMs = trvanie (= frame.delayMs)
 // opacity: vždy 0.75 (obe fázy teleportu rovnako semi-transparentné)
@@ -908,24 +777,7 @@ function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
 }
 
 /* ---------- Mage head ikona (HUD hlavy + swap badge) - ANIMOVANÝ výrez hlavy z Idle sprite ---------- */
-// per-mág výrez hlavy z framu (cx,cy = stred výrezu ako zlomok šírky/výšky framu; size = strana štvorca ako zlomok výšky).
-// Hodnoty vylaď cez /head-cropper.html a nahraď ich sem. cxP2 = korekcia pre natívny p2 sheet (dirP2),
-// keď v ňom figúra sedí inde než v p1 sheete (Minotaur_2 je o ~0.05 šírky framu vpravo oproti Minotaur_1).
-const HEAD_CROP = {
-  fire:      { cx: 0.40, cy: 0.55, size: 0.26 },
-  lightning: { cx: 0.41, cy: 0.58, size: 0.26 },
-  wanderer:  { cx: 0.47, cy: 0.56, size: 0.27 },
-  medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
-  minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51, cyP2: 0.43 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2/cyP2 = korekcia na posunutú figúru v Minotaur_2
-  naruto:    { cx: 0.50, cy: 0.58, size: 0.26 }, // bojový postoj (Stance) - figúra centrovaná, bottom-anchor
-  escanor:   { cx: 0.52, cy: 0.755, size: 0.11 }, // hlava zo slabej formy (WeakIdle) - figúra je DROBNÁ (~22×63 px pri spodku 226px framu), preto malý výrez nízko; cx mierne vpravo od stredu figúry = hlava v okienku mierne vľavo
-  soldier:   { cx: 0.46, cy: 0.555, size: 0.22 }, // hlava namerané z Idle.png riadky 62–82 (stred x ≈ 0.46) - telo sa nakláňa doprava, hlava je nad ľavou nohou
-  werewolf:  { cx: 0.73, cy: 0.62, size: 0.24, cxP2: 0.72 }, // zhrbený vlk hľadí doprava - hlava vpredu vpravo (bbox po recentrovaní x27–102, y71–127)
-  countess:  { cx: 0.49, cy: 0.52, size: 0.19 }, // blond drdol (bbox y od 58/128) - hlava nad širokou sukňou
-  onre:      { cx: 0.50, cy: 0.52, size: 0.19 }, // úzka prízračná figúra s rohom (bbox y od 58/128)
-  jotaro:    { cx: 0.51, cy: 0.30, size: 0.31 }, // namerané z Idle.png (144² frame): figúra x38–105 y24–135, hlava pás y24–57 x52–95 → stred hlavy vysoko vo frame
-  luffy:     { cx: 0.49, cy: 0.21, size: 0.33 }, // slamák + tvár z Idle.png (128² frame): figúra x38–89 y8–119, hlava/klobúk r8–44 (strieška x42–83) → stred (x62,y26)
-};
+// výrez hlavy = headCrop postavy v registri (public/chars/<key>.js, ladí sa cez /head-cropper.html)
 const mageHeadHtml = (char, cls = "", slot = "") => `<canvas class="mage-head ${cls}" data-char="${char}"${slot ? ` data-slot="${slot}"` : ""} width="52" height="52"></canvas>`;
 // vykresli AKTUÁLNY idle frame maga orezaný na hlavu (volané z raf → hlava sa animuje)
 function drawMageHeadAnim(cvs, char, now) {
@@ -3238,7 +3090,6 @@ const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho vráti 0.
 // Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere - bunka je aj tak
 // prezradená), vlastný sprite odstúpi presne ako pri normálnej zdieľanej bunke mimo labyrintu.
-const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60, jotaro: 78, luffy: 78 }; // vlk je široký (zhrbený) - väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu; Jotaro je zavalitý + má za sebou stand
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2) return 0;
@@ -4671,16 +4522,8 @@ function drawEscanorCard(ctx, cvs, now) {
   }
 }
 
-// Hidden preview postavy (Luffy/Jotaro): bez hoveru Idle, po nadídení cast animácia RAZ a potom
-// slučka chvosta (loopFrom; frames-1 = statický posledný frame). fill dorovnáva väčší frame castu
-// na mierku Idle (drawSprite škáluje podľa výšky framu - inak by postava pri hoveri skočila);
-// obe kreslenia idú cez portraitFill (PORTRAIT_SCALE normalizuje figúru na výšku mágov).
-const PREVIEW_CAST = {
-  luffy:  { file: "Special_1.png",   frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
-  // Jotaro je hrateľný, ale kartu kreslíme preview štýlom (Idle + hover = Star Platinum „menace" Special_3_P,
-  // správne zarovnané nohy cez PREVIEW_OFF_Y); dead-mag stav rieši drawCharSelectFrame PRED touto vetvou
-  jotaro: { file: "Special_3_P.png", frames: 4, fps: 6, loopFrom: 3, fill: 1.31 * 160 / 144 },
-};
+// Hidden preview postavy (Luffy/Jotaro, previewCast v registri): bez hoveru Idle, po nadídení cast animácia
+// RAZ a potom slučka chvosta (loopFrom); obe kreslenia idú cez portraitFill.
 const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
 // offsetY −39 (mágovia −52): ich pásy sú bottom-anchored s malým PAD, mágovia majú vo frame
 // väčší spodný okraj - s −52 stáli o ~13 px vyššie; −39 dorovnáva nohy na úroveň mágov (~189 px)
@@ -4835,35 +4678,8 @@ teamConfirmBtn?.addEventListener("click", () => {
 
 /* ---------- Náhľad špeciálu mága (hover vo výbere) ---------- */
 const charAbilityEl = document.getElementById("char-ability");
-// reprezentatívna pozícia castera, ktorá najlepšie ukáže tvar zásahu daného mága + cena many špeciálu
+// cena many špeciálu v náhľade (pozícia castera a popis = abilityPreview postavy v registri)
 const SPECIAL_MANA = 5;
-const ABILITY_PREVIEW = {
-  // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview;
-  // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
-  escanor:   { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
-  fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Boost range ±1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
-  lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
-  wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round he doesn't use mirror +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
-  // dmg: null = bez dmg - stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
-  medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
-  minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands, where you hunt with 2× dmg. Their steps weave a thread; stepping on it reveals your silhouette" },
-  naruto:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
-  // Vojak: cieľová bunka je voľba hráča - náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
-  soldier:   { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
-  // Vlkolak: charge - náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg podľa fázy
-  // mesiaca cykluje pod mini-doskou (moonCycle - ako Escanorov pride náhľad), preto žiadny effect/stats riadok
-  werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
-  // Countess/Onre: pasca - náhľad ukazuje príkladovú cieľovú bunku (target) ako Vojak
-  // bonus ikona (heal/drain) sa ukazuje v stats riadku pri dmg (3☠️❤️ / 3☠️💧), nie v texte popisu
-  countess:  { caster: { x: 0, y: 1 }, dmg: 3, bonus: "❤️", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell - when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
-  onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell - when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
-  // Luffy: recharge prepína mód (base ↔ Gear 3). Zóna specialu (dáma base / veža gear3) + dmg (4/8) cyklí
-  // pod mini-doskou (formCycle - ako Escanorov pride / vlkolakov moon náhľad), preto žiadny effect/stats riadok.
-  luffy:     { caster: { x: 1, y: 1 }, dmg: null, formCycle: true, desc: "Recharge switches Gear. Pick a cell and Luffy rolls there to smash whoever stands on it. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge." },
-  // Jotaro: THE WORLD (jednorazový time-stop) - bez konkrétnych čísel v texte (cost badge nesie 5).
-  // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
-  jotaro:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
-};
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
   if (!def || !charAbilityEl) return;

@@ -50,19 +50,19 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
 ## 2. Assety a sprite pipeline
 
 - Sprite sheety sú **horizontálne stripy** v `public/assets/<char>/`; počet framov = `width / height`
-  (framy musia byť **štvorcové**). Neštvorcové → uveď `frames:` v `ANIM_DEF`.
+  (framy musia byť **štvorcové**). Neštvorcové → uveď `frames:` v definícii animácie (`anims` postavy).
 - Očakávané súbory: `Idle.png`, `Run.png`, `Attack_1.png`, `Attack_2.png`, `Hurt.png`, `Dead.png`,
   `Charge.png` (projektil basic útoku), plus special sprity.
-- **Chýbajúce animácie** namapuj cez `SPRITE_FILE_ALIAS` v `client.js` (napr. Minotaur nemá `Run.png`
+- **Chýbajúce animácie** namapuj cez `spriteAlias` v `public/chars/<key>.js` (napr. Minotaur nemá `Run.png`
   → alias na `Walk.png`). Nemusíš duplikovať súbory.
-- **p2 paleta:** buď natívny druhý sheet (`dirP2` v `CHAR_META` — medusa/minotaur/naruto), alebo nechaj
+- **p2 paleta:** buď natívny druhý sheet (`meta.dirP2` v `public/chars/<key>.js` — medusa/minotaur/naruto), alebo nechaj
   CSS `alt-color` filter (fire/lightning/wanderer). Natívny sheet = krajšie, ale treba druhú sadu assetov.
 - **Projektil (`Charge.png`):** ak nemáš vlastný, prefarbi fireball (viď medusa/minotaur) alebo sprav
   vlastný (naruto = chakra špirála). Per-paleta kópie pre p2.
 - Ak assety vznikajú extrakciou z ripnutého sheetu, urob **reprodukovateľnú pipeline** ako
   `tools/sprites-naruto/` (skript + README), nech sa dá regenerovať.
-- **Ladenie pozície hlavy:** `HEAD_CX` (horizontálny stred tela) a `HEAD_TOP` (vrch hlavy pre „YOU"
-  vlajku) v `client.js` — hodnoty vylaď cez `/head-cropper.html`.
+- **Ladenie pozície hlavy:** `headCx` (horizontálny stred tela), `headTop` (vrch hlavy pre „YOU"
+  vlajku) a `headCrop` (výrez hlavy do HUD) v `public/chars/<key>.js` — hodnoty vylaď cez `/head-cropper.html`.
 
 ---
 
@@ -90,14 +90,15 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
 - [ ] Ak stav treba pred súperom **skrývať** (labyrint) — uprav redakciu (`redactActor`, `redactHunterActor`,
       `redactEffect`, `redactTimelineFor`).
 
-### `public/client.js` (render/animácie/vstup)
-- [ ] **`CHAR_META`** — `{ name, dir, dirP2? }`.
-- [ ] **`HEAD_CX`, `HEAD_TOP`** — pozícia tela/hlavy.
-- [ ] **`SPECIAL_ANIMS`** — efektový sprite specialu (file, fps, loop).
-- [ ] **`ANIM_DEF`** / **`SPRITE_FILE_ALIAS`** — ak treba nové anim kľúče alebo aliasy chýbajúcich súborov.
+### `public/chars/<key>.js` (klientský register — dáta postavy)
+- [ ] Nový súbor + riadok v `CHAR_LIST` v `public/chars/index.js` (tam je popis všetkých polí):
+      **`meta`** `{ name, dir, dirP2? }`, **`specialAnim`** (efektový sprite specialu), **`headCx`/`headTop`/`headCrop`**,
+      `pairShift`, `portraitScale`, **`abilityPreview`** (popis + náhľadová zóna v char-selecte), podľa potreby
+      `anims` (nové anim kľúče), `spriteAlias` (chýbajúce súbory), `side`/`vamp`, `teleport*`, `previewCast`.
+
+### `public/client.js` (render/animácie/vstup — choreografia je zatiaľ tu, register ju postupne preberá)
 - [ ] **`cellsForSpecialPreview(meState, dir)`** — náhľad zóny pri hoveri/caste; zónu ber zo
       `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
-- [ ] **`ABILITY_PREVIEW`** — popis + náhľadová zóna v char-selecte.
 - [ ] **Label special tlačidla** (blok `if (specChar === …)` v state handleri, ~riadok 3600) — cost badge
       + tooltip pre nový special. Pozor: číta sa cez `ghostCharAt()` (turnaj swap).
 - [ ] Ak má special **smer** — pridaj do pickera (ako medusa) a do `actionIcon`/`actionBadgeView` (šípky).
