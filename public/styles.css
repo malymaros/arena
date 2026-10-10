@@ -2375,6 +2375,18 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
     animation: floatUp .9s ease-out forwards;
     color: #c3c8d2;
   }
+  /* vypršaný čas - PASS: postava „premýšľa" (THINKING bublina, tlmená lavanda) */
+  .think-float {
+    position: absolute;
+    z-index: 5;
+    font-weight: 900;
+    font-size: 18px;
+    text-shadow: 0 2px 0 rgba(0,0,0,.45);
+    pointer-events: none;
+    white-space: nowrap;
+    animation: floatUp .9s ease-out forwards;
+    color: #c9b8f0;
+  }
   /* Pútnik použil mirror → prišiel o pasívnu manu - MIRROR USED bublina (zrkadlovo modrosivá) */
   .wander-nomana-float {
     position: absolute;

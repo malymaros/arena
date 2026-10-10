@@ -142,6 +142,19 @@ previews importujú `shared/geometry.js`.
 - Overenie: golden 48/48 bez zmeny; rozdielový test HEAD vs nový engine na 15 300 headless zápasoch
   (ťažisko Naruto) - jediný rozdiel je zámerná oprava z rozhodnutia 5 (8 zápasov Naruto vs Naruto).
 
+## Etapa 4 - stav
+
+- [x] **Register postáv `engine/characters/`** - special každej postavy (`resolve` / `validate` / `random`)
+      je v jej súbore; `doSpecial` je len mana gate + dispatch (z ~280 riadkov vetiev). Zónové speciály
+      (fire/lightning/wanderer) zdieľajú `zone.js`, Vampire/Onryō `vampires.js`.
+- [x] **Explicitný `ctx`** (rozhodnutie 1): postavy pristupujú k enginu len cez `ctx` z `createEngine`.
+- [x] **Kit postavy**: `attack` (ortho/diag/luffy), `mirrorSlot` (mirror/special1), `meleeDmg`, `healTile` -
+      `validQueue`, `validBasicAction`, `fillFromDraft`, `doMelee` a heal dlaždica čítajú kit namiesto mien.
+- [x] `tools/difftest.mjs` - trvalý rozdielový test (engine z gitu vs pracovný strom, headless, autoLock).
+- Overenie: po každom kroku difftest 2 420 zápasov = 0 rozdielov, golden 48/48, engine scenáre.
+- Zostáva v engine (etapa 5 - háčiky): Escanor pride, vlkolak moon, Luffyho forma (recharge), vamp kit
+  (charge, trigger pasce, mirror imunita), Jotarov THE WORLD; klientská choreografia (etapa 6).
+
 ## Rozhodnutia (na schválenie)
 
 1. **„Explicitný ctx" v Etape 1 = inštancia enginu, nie parameter každej funkcie.** Engine je factory
@@ -190,3 +203,11 @@ previews importujú `shared/geometry.js`.
 12. **Dmg dlaždica a klon (ROZHODNUTÉ - bez zmeny)**: pravidlo z bodu 11 platí pre zásahy AKCIAMI. Damage
     dlaždica klona zámerne nezabíja (len kozmetický `clone_hit` −1 float), aby Narutov klon nebol príliš slabý;
     IK dlaždica ho zabíja.
+13. **Vypršaný čas = PASS namiesto náhodných akcií (ROZHODNUTÉ, APLIKOVANÉ)**: pôvodne náhodné doplnenie vedelo
+    zahrať akcie, ktoré hráč ručne zahrať nemôže (Luffy Gear 3 basic hore/dole). Rozhodnutie zadávateľa: zjednodušiť -
+    rozpracované akcie ostanú, každý NEVYPLNENÝ slot je `pass` („THINKING" nad postavou), stojí 2 many za každý pass
+    (najviac toľko, koľko hráč má) a je to bežná akcia - SPOTREBUJE súperovu nachystanú obranu. Zmizli tým náhodné
+    generátory na klientovi (~40 riadkov s vetvami podľa postáv), v `fillFromDraft` aj `special.random` v postavách.
+    Headless nástroje (`npm run sim`, `tools/difftest.mjs`) hrajú cez `tools/random-bot.mjs` (náhodné fronty cez
+    `lockIn`, platnosť rozhoduje engine). Overenie: bežná hra botov HEAD vs nový engine 2 420 zápasov = 0 rozdielov;
+    PASS scenáre v `test/engine-scenarios.mjs`. Golden bez zmeny (nepoužíva časovač).

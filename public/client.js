@@ -2680,6 +2680,7 @@ function actionIcon(action, ownerSlot) {
     // analógia k Vampire/Onryō, ktorých charge v dash slote sa ukazuje ako obyčajný dash (nemaskuje smer útoku)
     case "special1": return "🪞";
     case "stoned":   return "🗿";
+    case "pass":     return "💭"; // vypršaný čas - nevyplnený slot
     case "swap":     return "🌀";
     case "unknown":  return "❓"; // labyrint - akcia súpera je pre prekliateho redigovaná
     default:         return "?";
@@ -3426,6 +3427,7 @@ function actionBadgeView(a, ownerSlot) {
     case "last_stand":    return { cls: "golden",   html: LS_BADGE_IMG };
     case "demon":         return { cls: "demon",    html: LS_BADGE_IMG };
     case "stoned":        return { cls: "stoned",   text: "🗿" };
+    case "pass":          return { cls: "pass",     text: "💭" }; // vypršaný čas - nevyplnený slot
     case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "", usesAltColor(a.to, ownerSlot) ? "alt-color" : "", ownerSlot) };
     case "last_hope":     return { cls: "lasthope", html: LH_BADGE_IMG };
     case "unknown":       return { cls: "unknown",  text: "❓" }; // labyrint - redigovaná akcia súpera
@@ -4331,6 +4333,11 @@ function schedulePlayTimeline(timeline) {
           acted.beatEl?.classList.add("act-invalid");
         }
         spawnFloat(e.target, "🗿 STONED", "stone-float");
+      }
+      // PASS (vypršaný čas, nevyplnený slot): postava „premýšľa" + úbytok many (oneskorený, nech sa floaty neprekryjú)
+      if (e.kind === "pass" && (e.from === "p1" || e.from === "p2")) {
+        spawnFloat(e.from, "💭 THINKING", "think-float");
+        if ((e.mana ?? 0) > 0) { const who = e.from, m = e.mana; setTimeout(() => spawnFloat(who, `−${m} MANA`, "drain-float"), 400); }
       }
       // zásah Medúziným specialom - postava skamenie (sivú sochu kreslí raf zo state.stone)
       if (e.kind === "petrify" && (e.target === "p1" || e.target === "p2")) {
@@ -6062,7 +6069,6 @@ function toggleSwap(char) {
 /* ---------- Turn timer (server-riadený displej + auto-lock) ---------- */
 // server posiela zostávajúci čas (event `turn_timer` aj `state.timerMs`), takže displej sedí so serverom
 // a po refreshi sa zosynchronizuje; klient pri vypršaní auto-lockne (drží už rozpracovanú frontu)
-const TIMER_DIRS = ["up", "down", "left", "right"];
 let serverTimerEndsAt = 0; // performance.now()-based deadline zo servera (0 = bez limitu)
 
 // DOČASNÁ DIAGNOSTIKA časovača - zapni cez ?tdebug=1; loguje prečo sa časovač (ne)zobrazí
@@ -6106,48 +6112,8 @@ function tickTurnTimer(now) {
 // vyprší čas - náhodne doplň nevyplnené z 3 základných akcií a zamkni (gold akcie sa nikdy nepridajú samé)
 function autoLockTimeout() {
   if (uiLocked() || playing || !me || state?.[me]?.locked) { stopTurnTimer(); return; }
-  const used = new Set(myQueue.map(a => a.type));
-  // golden predťah už pokrýva štít/mirror - nedopĺňaj ich (inak by sa akcia zahrala 2× a server lock odmietol)
-  if (goldenArmed) used.add("shield");
-  if (goldenMirrorArmed) used.add("mirror");
-  const gc = ghostCharAt();
-  const diagChar = !!SIDE_CHARS[gc];               // diagonálny attack (Countess/Onre/Jotaro)
-  const vampChar = gc === "countess" || gc === "onre"; // special = pasca s bunkou
-  const isJotaro = gc === "jotaro";
-  // Jotaro nemá mirror akciu → vyhoď z poolu (inak by server lock odmietol); special1 nedopĺňame (voliteľný)
-  const pool = ["recharge", "shield", "mirror", "melee", "special", "move", "dash", "attack"]
-    .filter(t => !used.has(t) && !(t === "mirror" && isJotaro));
-  const DIAG_KEYS = ["up_left", "up_right", "down_left", "down_right"];
-  while (myQueue.length < 3 && pool.length) {
-    const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-    if (t === "attack" && gc === "luffy") myQueue.push({ type: t, dir: luffyEffForm() === "gear3" ? ["left", "right"][Math.floor(Math.random() * 2)] : DIAG_KEYS[Math.floor(Math.random() * 4)] });
-    else if (t === "attack" && diagChar) myQueue.push({ type: t, dir: DIAG_KEYS[Math.floor(Math.random() * 4)] });
-    else if (t === "special" && vampChar) myQueue.push({ type: t, cell: { x: (Math.random() * board.w) | 0, y: (Math.random() * board.h) | 0 } }); // pasca - ľubovoľná bunka
-    else if (t === "special" && gc === "luffy") { // Luffy special = bunka na platnej línii (dáma/veža) z ghost pozície
-      const gp = ghostPos() || state?.[me]; const form = luffyEffForm();
-      const opts = [];
-      for (let yy = 0; yy < board.h; yy++) for (let xx = 0; xx < board.w; xx++) if (gp && luffyReachesCell(gp.x, gp.y, xx, yy, form)) opts.push({ x: xx, y: yy });
-      myQueue.push({ type: t, cell: opts[Math.floor(Math.random() * opts.length)] || { x: gp?.x || 0, y: gp?.y || 0 } });
-    }
-    else if (t === "special" && isJotaro) myQueue.push(state?.[me]?.worldUsed ? { type: t, dir: Math.random() < 0.5 ? "left" : "right" } : { type: t }); // Special 2 (smer) / THE WORLD (bez args)
-    else if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
-    else if (t === "special" && (ghostCharAt() === "medusa" || ghostCharAt() === "escanor")) myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
-    else if (t === "special" && ghostCharAt() === "werewolf") myQueue.push({ type: t, dir: WOLF_DIR_KEYS_CLIENT[Math.floor(Math.random() * WOLF_DIR_KEYS_CLIENT.length)] }); // Vlkolakov charge - náhodný z 8 smerov
-    else if (t === "special" && ghostCharAt() === "soldier") {
-      // Vojakov special potrebuje cieľovú bunku - náhodná platná (nie vlastná ghost, nie súperova figúra/klon;
-      // skrytý súper v labyrinte má x null → neblokuje sa), inak by server celý lock odmietol
-      const gp = ghostPos(), opp = state?.[otherSlot()];
-      const opts = [];
-      for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) {
-        if (gp && gp.x === x && gp.y === y) continue;
-        if (opp && opp.x === x && opp.y === y) continue;
-        if (opp?.clone && opp.clone.x === x && opp.clone.y === y) continue;
-        opts.push({ x, y });
-      }
-      if (opts.length) myQueue.push({ type: t, cell: opts[Math.floor(Math.random() * opts.length)] });
-    }
-    else myQueue.push({ type: t });
-  }
+  // vypršaný čas: rozpracované akcie ostanú, každý nevyplnený slot = PASS (THINKING, −2 many na serveri)
+  while (myQueue.length < 3) myQueue.push({ type: "pass" });
   const payload = [...myQueue];
   if (goldenArmed) payload.unshift({ type: "golden_shield" });
   else if (goldenMirrorArmed) payload.unshift({ type: "golden_mirror" });

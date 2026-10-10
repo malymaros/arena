@@ -5,24 +5,21 @@
 import {
   FORCE_FIRST_STARTER, ARENA_SEED, seededRng, BOARD, START_POS, START_HP,
   START_MANA, MAX_MANA, WANDERER_MANA_REGEN, BASIC_COST, BASIC_DMG_MAX, MELEE_COST,
-  MELEE_DMG, MEDUSA_MELEE_DMG, JOTARO_MELEE_DMG, MELEE_REPEAT, SPECIAL_COST, SOLDIER_SPECIAL_DMG,
-  WOLF_MOON_DMG, WOLF_DIRS, WOLF_DIR_KEYS, moonLevelFor, SIDE_CHARS, VAMP_CHARS,
-  DIAG_DIRS, DIAG_DIR_KEYS, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS, VAMP_TRAP_DMG,
-  VAMP_TRAP_BONUS, VAMP_SHOT_RANGE, WORLD_COST, JOTARO_S1_COST, JOTARO_S1_DMG, JOTARO_S2_COST,
-  JOTARO_S2_DMG, STONE_ACTIONS, CLONE_DMG, RECHARGE_GAIN, SHIELD_COST, MIRROR_COST,
-  GOLDEN_COST, GOLDEN_MIRROR_COST, DASH_COST, GOLDEN_MANA_GAIN, POWER_TILE_BONUS, DEMON_COST,
-  DEMON_DMG, ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE,
-  TIMER_OPTIONS, DEFAULT_CONFIG, ANIM_SLOW, MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS,
-  SPECIAL_REPEAT, SPECIAL_BEAT_MS, SOLDIER_AIM_MS, SOLDIER_BEAM_MS, SOLDIER_GRENADE_BLAST_MS, ESC_SPECIAL_MS,
-  WOLF_CAST_MS, WOLF_STRIKE_MS, CHARGE_STEP_MS, MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS,
-  LAB_REVEAL_MS, VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS, VAMP_CAST_MS, CLONE_SUMMON_MS, TIMESTOP_CAST_MS,
-  TIMESTOP_END_MS, LS_APPEAR_MS, LS_DRAIN_MS, LS_KILL_MS, LS_REVIVE_MS, LS_RISE_MS,
-  LS_SETTLE_MS, LS_B_LEAVE_MS, LS_B_CENTER_MS, LS_B_DRAIN_MS, LS_B_KILL_MS, LH_APPEAR_MS,
-  LH_DRAIN_MS, LH_SETTLE_MS,
-  QUICKDRAW_MS,
+  MELEE_DMG, MELEE_REPEAT, SPECIAL_COST, WOLF_DIRS, moonLevelFor, SIDE_CHARS,
+  VAMP_CHARS, DIAG_DIRS, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS,
+  VAMP_TRAP_DMG, VAMP_TRAP_BONUS, WORLD_COST, JOTARO_S1_COST, JOTARO_S1_DMG, STONE_ACTIONS,
+  CLONE_DMG, RECHARGE_GAIN, SHIELD_COST, MIRROR_COST, GOLDEN_COST, GOLDEN_MIRROR_COST,
+  DASH_COST, GOLDEN_MANA_GAIN, POWER_TILE_BONUS, DEMON_COST, DEMON_DMG, ACTION_TYPES,
+  MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS, ANIM_SLOW,
+  MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS,
+  WOLF_STRIKE_MS, CHARGE_STEP_MS, MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, LAB_REVEAL_MS,
+  VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS, TIMESTOP_CAST_MS, TIMESTOP_END_MS, LS_APPEAR_MS, LS_DRAIN_MS,
+  LS_KILL_MS, LS_REVIVE_MS, LS_RISE_MS, LS_SETTLE_MS, LS_B_LEAVE_MS, LS_B_CENTER_MS,
+  LS_B_DRAIN_MS, LS_B_KILL_MS, LH_APPEAR_MS, LH_DRAIN_MS, LH_SETTLE_MS, QUICKDRAW_MS, PASS_MANA_COST,
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
+import { CHARACTERS } from "./characters/index.js";
 
 export function createEngine(io = {}) {
   // --- háčiky na vonkajší svet (server: sockety/časovač; headless simulácia ich môže vynechať) ---
@@ -38,6 +35,18 @@ export function createEngine(io = {}) {
 
   let game = null;
   let rand = Math.random; // všetka herná náhoda (pri ARENA_SEED seedovaná v startMatch)
+
+  // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
+  // (framy, damage pipeline, statusy, labyrint, power tile). Funkcie sú hoistované, ctx vzniká hneď.
+  const ctx = {
+    get game() { return game; },
+    other, inBounds,
+    pushStateFrame, pushInvalid,
+    powerBoost, dealMul, labyrinthMul, fireOnDmgTile,
+    revealLabyrinths, strikeZone, strikeCell,
+    applyPetrify, applyLabyrinth, applyStatusOnClone,
+    killClone, trackSteps, doJotaroWorld,
+  };
 
 function newPlayer(slot) {
   const pos = START_POS[slot];
@@ -377,42 +386,18 @@ function pushInvalid(tl, who, ms = SMALL_DELAY_MS, reason = null) {
 function other(slot) { return slot === "p1" ? "p2" : "p1"; }
 
 
-// Medúzin special: vlastné políčko + VŠETKY políčka striktne vo zvolenom smere (left/right)
-// v jej riadku a v riadkoch bezprostredne susedných (±1) - zo stredného radu tak pokryje všetky 3 riadky.
-// Musí sedieť s cellsForSpecialPreview v client.js (udržiavané paralelne).
-function medusaCells(me, dir) { return G.medusaCells(game.board, me, dir); }
 // Fire Wizard stojí na Damage dlaždici? Vtedy sa jeho special rozšíri o riadky ±1
 // (dlaždice sú trvalé a vznikli v predošlých kolách, takže existujú v čase resolveTurn).
 function fireOnDmgTile(me) {
   return !!me && me.char === "fire" &&
     game.tiles.some(t => t.type === "dmg" && t.x === me.x && t.y === me.y);
 }
-function specialDamageAndHit(players, slot) {
-  const me   = players[slot];
-  const foeS = slot === "p1" ? "p2" : "p1";
-  const foe  = players[foeS];
-  if (!me || !foe) return { dmg:0, hit:null };
-  // zónové speciály (fire riadok/±1 na Damage dlaždici, lightning opačná farba, wanderer diagonála) - zóna zo shared/geometry
-  if (me.char !== "fire" && me.char !== "lightning" && me.char !== "wanderer") return { dmg:0, hit:null };
-  return specialZoneHas(me, foe.x, foe.y) ? { dmg: SPECIAL_ZONE_DMG[me.char], hit: foeS } : { dmg:0, hit:null };
-}
-// je pozícia [x,y] v zóne specialu daného castera? (len dmg speciály - na test zásahu KLONA;
-// musí sedieť so specialDamageAndHit aj s cellsForSpecialPreview v client.js)
-function specialZoneHas(me, x, y) { return G.zoneHas(game.board, me, x, y, fireOnDmgTile(me)); }
-// raw dmg zóny (kvôli odrazu pri zásahu klona); soldier = snajperský lúč na jednu zvolenú bunku
-// (jeho „zónu" nesie akcia - cell - preto nemá vetvu v specialZoneHas, klona testuje vlastná vetva doSpecial)
-const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8, escanor: 8, soldier: SOLDIER_SPECIAL_DMG };
 
-// Escanor: zóna smerového specialu podľa pride levelu. dir = "left" | "right" (ako Medúza).
-// F = bunka pred Escanorom v danom smere; 0=F, 1=F+diagonály, 2=F+3×3 okolie, 3=celá plocha.
-// MUSÍ sedieť s cellsForSpecialPreview v client.js (paralelne udržiavané).
-function escanorCells(me, dir) { return G.escanorCells(game.board, me, dir); }
 
 // Jotaro Special 1 (v mirror slote): smerový (left/right) - OBE diagonálne bunky zvolenej strany
 // (x±1, y−1) a (x±1, y+1). Rovná bunka (x±1, y) NIE. Na kraji dosky len bunky v ploche (môže byť prázdna).
 // Jotaro Special 2 (po THE WORLD): jediná susedná bunka (x±1, y). Obe MUSIA sedieť s cellsForSpecialPreview.
 function jotaroS1Cells(me, dir) { return G.jotaroS1Cells(game.board, me, dir); }
-function jotaroS2Cells(me, dir) { return G.jotaroS2Cells(game.board, me, dir); }
 
 /* ---- Narutov tieňový klon ---- */
 // Klon nemá HP - zmizne pri akomkoľvek zásahu od súpera (dmg aj status speciály), pri IK tile,
@@ -480,6 +465,20 @@ function trackCloneSteps(slot, cells) {
 
 // 3 akcie, každý typ max 1× za kolo, len známe typy a smery (move, attack aj dash nesú dir)
 // voliteľný úvod last_hope (len nebuffnutý hráč vo final kole) → potom golden_shield/golden_mirror (nestartér) → 3 akcie → sufix golden_mana
+// kit postavy z registra (engine/characters): tvar basicu a obsah mirror slotu
+function kitOf(char) { return { attack: "ortho", mirrorSlot: "mirror", meleeDmg: MELEE_DMG, healTile: "plus1", ...(CHARACTERS[char]?.kit || {}) }; }
+// platný smer basicu pre postavu? form = Luffyho mód v čase basicu (base = diagonálny, gear3 = len ←/→);
+// anyForm = draft/auto-fill, kde forma v čase basicu ešte nie je istá (Luffy: diag aj ortogonálny)
+function attackDirOk(char, dir, form, anyForm = false) {
+  const k = kitOf(char).attack;
+  if (k === "diag") return !!DIAG_DIRS[dir];
+  if (k === "luffy") {
+    if (anyForm) return !!(DIAG_DIRS[dir] || MOVE_DIRS.has(dir));
+    return form === "gear3" ? (dir === "left" || dir === "right") : !!DIAG_DIRS[dir];
+  }
+  return MOVE_DIRS.has(dir);
+}
+
 function validQueue(queue, slot) {
   if (!Array.isArray(queue)) return false;
   let q = queue;
@@ -513,11 +512,11 @@ function validQueue(queue, slot) {
   // swap (výmena maga) je platný typ len v turnaji; smie byť vo fronte až 2× (výnimka z „každý typ raz za kolo")
   const isTournament = !!game.mageHp && game.config?.format === "tournament";
   if (types.some(t => !ACTION_TYPES.has(t)
-        && t !== "stoned"
+        && t !== "stoned" && t !== "pass"
         && !(t === "demon" && canDemon)
         && !(t === "swap" && isTournament))) return false;
-  // každý NE-swap typ najviac 1×; swapov najviac 2 (ciele sa overia nižšie); stoned passov môže byť viac
-  const nonSwap = types.filter(t => t !== "swap" && t !== "stoned");
+  // každý NE-swap typ najviac 1×; swapov najviac 2 (ciele sa overia nižšie); stoned a pass sa môžu opakovať
+  const nonSwap = types.filter(t => t !== "swap" && t !== "stoned" && t !== "pass");
   if (new Set(nonSwap).size !== nonSwap.length) return false;
   const swaps = q.filter(a => a.type === "swap");
   if (swaps.length > 2) return false;
@@ -548,28 +547,20 @@ function validQueue(queue, slot) {
   if (goldenPre === "golden_shield" && types.includes("shield")) return false;
   if (goldenPre === "golden_mirror" && types.includes("mirror")) return false;
   {
-    // Vampire/Onryō/Jotaro: basic strieľa DIAGONÁLNE (4 diagonálne smery); Vampire/Onryō majú melee bez
-    // smeru a dash = charge. Jotaro dashuje/melee normálne, ale nemá mirror (v tom slote má special1).
+    // tvar basicu a mirror slot podľa kitu postavy (Vampire/Onryō/Jotaro diagonálne, Jotaro má special1
+    // namiesto mirroru, Luffy podľa formy)
     const meChar = game.players[slot]?.char;
-    const side = !!SIDE_CHARS[meChar];
-    const isJotaro = meChar === "jotaro";
+    const special1Slot = kitOf(meChar).mirrorSlot === "special1";
     // Luffy: basic je DIAGONÁLNY v base, ORTOGONÁLNY v gear3. Recharge prepína mód → simuluj formu
     // cez frontu (recharge PRED basicom zmení, na aký smer sa basic validuje).
     let simForm = game.players[slot]?.form;
     for (const a of q) {
       if (a.type === "recharge" && meChar === "luffy") simForm = simForm === "gear3" ? "base" : "gear3";
-      if (a.type === "mirror" && isJotaro) return false;        // Jotaro nemá mirror akciu
-      if (a.type === "special1" && !isJotaro) return false;     // special1 je len Jotarov
+      if (a.type === "mirror" && special1Slot) return false;   // postava nemá mirror akciu (Jotaro)
+      if (a.type === "special1" && !special1Slot) return false; // special1 len ak ho má v mirror slote
       if (a.type === "special1" && a.dir !== "left" && a.dir !== "right") return false;
-      // Jotarov special: po THE WORLD (worldUsed) je to Special 2 - smerový (left/right); inak THE WORLD (bez smeru)
-      if (a.type === "special" && isJotaro && game.players[slot]?.worldUsed && a.dir !== "left" && a.dir !== "right") return false;
       if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
-      if (a.type === "attack") {
-        if (meChar === "luffy") {
-          if (simForm === "gear3") { if (a.dir !== "left" && a.dir !== "right") return false; } // Gear3 basic = len doľava/doprava
-          else if (!DIAG_DIRS[a.dir]) return false;                                             // base = diagonálny
-        } else if (!(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
-      }
+      if (a.type === "attack" && !attackDirOk(meChar, a.dir, simForm)) return false;
     }
   }
   // Vojak: special nesie cieľovú bunku {x,y}. Cieľ nesmie byť súperova AKTUÁLNA bunka (ani jeho tieňový
@@ -588,26 +579,11 @@ function validQueue(queue, slot) {
     for (let i = 0; i < q.length; i++) {
       const a = q[i];
       const { x: sx, y: sy, char: simChar, form: simForm2 } = sim[i]; // stav PRED akciou i
-      if (a.type === "special" && simChar === "soldier") {
-        const c = a.cell;
-        if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
-        if (c.x === sx && c.y === sy) return false; // vlastná (ghost) bunka
-        if (!meP?.labyrinth && foe) {
-          if (foe.x === c.x && foe.y === c.y) return false;
-          if (foe.clone && foe.clone.x === c.x && foe.clone.y === c.y) return false;
-        }
-      }
-      // Countess/Onre: special (pasca) nesie cieľovú bunku - BEZ obmedzení (aj súperova aktuálna,
-      // aj vlastná), stačí platná bunka v ploche. (Jotaro NIE - jeho special je smerový bez bunky.)
-      if (a.type === "special" && VAMP_CHARS[simChar]) {
-        const c = a.cell;
-        if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
-      }
-      // Luffy: special nesie cieľovú bunku na platnej línii (dáma base / veža gear3) z GHOST pozície;
-      // special presunie Luffyho na tú bunku (ovplyvní ghost neskorších akcií).
-      if (a.type === "special" && simChar === "luffy") {
-        const c = a.cell;
-        if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !luffySpecialReaches(sx, sy, c.x, c.y, simForm2)) return false;
+      // argumenty specialu (cieľová bunka Vojaka/Luffyho/pasce, smer Jotarovho Special 2) overí postava;
+      // v labyrinte je súper skrytý → foe null (prekliaty Vojak smie trafiť stojaceho lovca)
+      if (a.type === "special") {
+        const validate = CHARACTERS[simChar]?.special.validate;
+        if (validate && !validate(ctx, a, { x: sx, y: sy, form: simForm2, worldUsed: !!meP?.worldUsed, foe: meP?.labyrinth ? null : foe })) return false;
       }
     }
   }
@@ -883,7 +859,7 @@ function doMelee(slot, tl) {
   // Medúza šľahá chvostom širšie - vlastné políčko + 1 diagonálne na všetky strany, za nižší dmg.
   // Zasahované bunky idú v efekte (klient ich zvýrazní a nemusí zrkadliť logiku).
   const medusa = me.char === "medusa";
-  const myMeleeDmg = medusa ? MEDUSA_MELEE_DMG : (me.char === "jotaro" ? JOTARO_MELEE_DMG : MELEE_DMG);
+  const myMeleeDmg = kitOf(me.char).meleeDmg; // Medúza/Jotaro slabší melee (kit postavy)
   const cells = G.meleeCells(game.board, me, me.char);
   // vlastný klon seká paralelne na SVOJEJ bunke (rovnaký dmg ako Naruto)
   const cloneCells = me.clone ? [[me.clone.x, me.clone.y]] : [];
@@ -1125,55 +1101,6 @@ function doLuffyGear3Basic(slot, dir, tl) {
   pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS);
 }
 
-// Luffy SPECIAL = pohyb-a-úder ako šachová figúra. Base = DÁMA (4 dmg, Special_7 roll-bounce), gear3 = VEŽA
-// (8 dmg, balón + Special_2 impact). Cieľová bunka na platnej línii (aj vlastná); Luffy sa NA ňu dogúľa a dá
-// dmg tomu, kto na nej stojí (súper / klon). Ide cez obrany ako každý dmg special.
-const LUFFY_SPECIAL_DMG = { base: 4, gear3: 8 };
-const LUFFY_BALL_FORM_MS = Math.round(900 * ANIM_SLOW); // gear3: STREDOVÁ premena na guľu + rotácia (Special_1: ~1.1s premena + viditeľné rolovanie; Luffy ešte stojí, guľa sa na doske rozgúľa až potom)
-const LUFFY_ROLL_MS = Math.round(700 * ANIM_SLOW);   // gear3 balón roll
-const LUFFY_TRAVEL_MS = Math.round(340 * ANIM_SLOW); // base: dogúľanie k bunke (run/roll)
-const LUFFY_CHOMP_MS  = Math.round(340 * ANIM_SLOW); // base: cvaknutie NA bunke
-function luffySpecialReaches(fx, fy, tx, ty, form) { return G.luffySpecialReaches(game.board, fx, fy, tx, ty, form); }
-function luffyLinePath(fx, fy, tx, ty) { return G.luffyLinePath(fx, fy, tx, ty); }
-function doLuffySpecial(slot, tl, cell) {
-  const me = game.players[slot];
-  const opS = other(slot);
-  const op = game.players[opS];
-  if (me.mana < SPECIAL_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
-  if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !luffySpecialReaches(me.x, me.y, cell.x, cell.y, me.form)) { pushInvalid(tl, slot); return; }
-  me.mana -= SPECIAL_COST;
-  const pBonus = powerBoost(slot, tl);
-  const gear3 = me.form === "gear3";
-  const dmg = LUFFY_SPECIAL_DMG[gear3 ? "gear3" : "base"] * dealMul(slot) * labyrinthMul(slot) + pBonus;
-
-  const foeOnTarget = !!(op && op.x === cell.x && op.y === cell.y);
-  const cloneOnCell = !!(op?.clone && op.clone.x === cell.x && op.clone.y === cell.y);
-  const stacked = foeOnTarget && cloneOnCell;            // Naruto + klon na cieľovej bunke
-  const cloneDecoyOnTarget = cloneOnCell && !foeOnTarget; // klon-návnada sám na bunke
-
-  if (foeOnTarget) revealLabyrinths(tl); // istý zásah reálneho hráča (aj stacknutý) → odhaľ pred rolovaním
-
-  const willHit = foeOnTarget || cloneOnCell; // na cieľovej bunke stojí súper/klon (aj keď má štít/mirror)
-  const path = luffyLinePath(me.x, me.y, cell.x, cell.y);
-  if (gear3) {
-    // gear3: najprv STREDOVÁ premena na guľu + rotácia (Luffy ešte nehýbe, guľa sa gúľa ako v náhľade výberu),
-    // POTOM (keď stredový sprite zmizne) sa guľa na doske dogúľa k cieľu, potom VÝBUCH
-    pushStateFrame(tl, [{ kind: "luffy_ball_form", from: slot }], LUFFY_BALL_FORM_MS);
-    me.x = cell.x; me.y = cell.y;
-    pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, form: "gear3", target: [cell.x, cell.y], ...trackSteps(slot, path) }], LUFFY_ROLL_MS);
-    pushStateFrame(tl, [{ kind: "luffy_explode", from: slot, target: [cell.x, cell.y], hit: willHit }], LUFFY_CHOMP_MS);
-  } else {
-    // base: najprv DOGÚĽANIE (beh/kotúľ) k bunke, potom CVAKNUTIE zubami NA bunke (hit=zastaví na cvaknutí)
-    me.x = cell.x; me.y = cell.y;
-    pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, form: "base", target: [cell.x, cell.y], ...trackSteps(slot, path) }], LUFFY_TRAVEL_MS);
-    pushStateFrame(tl, [{ kind: "luffy_chomp", from: slot, target: [cell.x, cell.y], hit: willHit }], LUFFY_CHOMP_MS);
-  }
-
-  // stacknutý pár / hráč / klon-návnada na cieľovej bunke (rovnaké pravidlo ako basic/melee/werewolf charge)
-  const who = stacked ? "stacked" : foeOnTarget ? "player" : cloneDecoyOnTarget ? "clone" : null;
-  if (who) strikeCell(opS, who, dmg, tl, { kind: "luffy_special", bonus: pBonus });
-  // miss = čistý presun (roll/chomp frame už odohral)
-}
 
 // Countess/Onre sú IMÚNNE voči mirroru: súperov mirror sa voči ich dmg správa ako obyčajný štít
 // (bloklne celý dmg, nič neodráža; spotrebuje sa bežne ako obrana krytej akcie)
@@ -1205,10 +1132,6 @@ function noteFrozenClone(ownerSlot) {
   if (ts && o?.clone) ts.cloneEvents.push({ ownerSlot, cell: [o.clone.x, o.clone.y] });
 }
 
-function randomTrapCell() {
-  const c = pickCell(() => true);
-  return c ? { x: c.x, y: c.y } : null;
-}
 
 // zánik pasce s viditeľnou deštrukciou - vidia ju OBAJA hráči (zámer: súper sa dozvie, že riziko pominulo)
 function breakTrap(slot, tl) {
@@ -1727,287 +1650,17 @@ function applyTimestopResume() {
   game.timestop = null;
 }
 
+// special: spoločný mana gate, samotné vyhodnotenie deklaruje postava (engine/characters/<postava>.js).
+// Návratová hodnota (PAUSE pri Jotarovom THE WORLD) sa prepošle hore do kola.
 function doSpecial(slot, tl, dir = null, cell = null) {
   const actor = game.players[slot];
   if (!actor) return;
-
   // Bez many -> len spätná väzba (Hurt na klientovi + low mana výstraha), žiadna special animácia
   if (actor.mana < SPECIAL_COST) {
     pushInvalid(tl, slot, SMALL_DELAY_MS, "mana");
     return;
   }
-
-  // Luffy: special = pohyb-a-úder ako šachová figúra (base dáma / gear3 veža) - nesie cieľovú bunku
-  if (actor.char === "luffy") { doLuffySpecial(slot, tl, cell); return; }
-
-  // Medúza: special nedáva dmg - súpera v zóne SKAMENÍ (preskočí najbližšie 2 základné akcie).
-  // Zóna má smer (left/right); zásah ide cez obrany (shield blokuje, mirror odrazí kameň na Medúzu).
-  if (actor.char === "medusa") {
-    if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
-    actor.mana -= SPECIAL_COST;
-    const cells = medusaCells(actor, dir);
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
-    // súperov tieňový klon v zóne skamenenie nezvládne - zmizne (zóna zasahuje hráča aj klona naraz)
-    const cloneInZone = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
-    // istý zásah (aj do štítu/zrkadla) - prípadný labyrint sa odhalí ešte PRED nádychmi
-    if (inZone && !(foe.stone > 0)) revealLabyrinths(tl);
-    for (let r = 0; r < SPECIAL_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
-    }
-    if (!inZone && !cloneInZone) {
-      pushStateFrame(tl, [], SMALL_DELAY_MS);
-      return;
-    }
-    const foeStruck = inZone && !(foe.stone > 0);
-    if (inZone) {
-      // už skamenený súper: útok bez efektu, žiadny refresh countera
-      if (foe.stone > 0) pushInvalid(tl, slot, SMALL_DELAY_MS, "already_stone");
-      else applyPetrify(foeS, tl);
-    }
-    if (cloneInZone) applyStatusOnClone(foeS, tl, "petrify", foeStruck);
-    return;
-  }
-
-  // Minotaur: special nedáva dmg - CELOPLOŠNÝ (zasiahne súpera vždy), prenesie ho do LABYRINTU:
-  // súper nevidí board (len vlastnú bunku + svoju niť), kým jeden hráč nezasiahne druhého.
-  // Ide cez obrany ako petrify (shield blokuje, mirror odrazí - v labyrinte skončí sám Minotaur).
-  if (actor.char === "minotaur") {
-    actor.mana -= SPECIAL_COST;
-    const cells = G.allCells(game.board);
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    // istý zásah - kasterov prípadný VLASTNÝ labyrint (mirror match) sa odhalí ešte pred nádychmi
-    if (foe && !foe.labyrinth) revealLabyrinths(tl);
-    for (let r = 0; r < SPECIAL_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, cells }], SPECIAL_BEAT_MS);
-    }
-    if (!foe) { pushStateFrame(tl, [], SMALL_DELAY_MS); return; }
-    // súper už blúdi v labyrinte: útok bez efektu, niť sa neresetuje
-    if (foe.labyrinth) { pushInvalid(tl, slot, SMALL_DELAY_MS, "already_lost"); return; }
-    applyLabyrinth(foeS, tl);
-    // celoplošný special zasiahne aj súperovho tieňového klona (obrana ho kryje - už sa ukázala vyššie)
-    applyStatusOnClone(foeS, tl, "labyrinth", true);
-    return;
-  }
-
-  // Naruto: special nedáva dmg - TIEŇOVÝ KLON. Range self: nedá sa blokovať ani odraziť,
-  // ale Naruto musí stáť na bunke SÁM (bez súpera; vlastný klon nevadí). Recast s aktívnym
-  // klonom: starý klon najprv zmizne ako po zásahu, potom beží bežný summon. Klon vzniká na
-  // Narutovej bunke (kým zdieľajú bunku, kreslí sa len jeden - a stojaci klon absorbuje
-  // najbližší jednoterčový zásah namiesto Naruta).
-  if (actor.char === "naruto") {
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    // summon vyžaduje bunku bez súpera - súper stojaci na Narutovej bunke je JEDINÝ spôsob, ako special
-    // zablokovať. NOVÉ PRAVIDLO: máš naň manu → minie sa aj tak. Starý klon zaniká VŽDY (recast aj blok)
-    // ešte PRED animáciou pečatí - Naruto sa naň nakoncentruje bez ohľadu na to, či nový vznikne.
-    actor.mana -= SPECIAL_COST;
-    killClone(slot, tl);
-    if (foe && foe.x === actor.x && foe.y === actor.y) {
-      for (let r = 0; r < SPECIAL_REPEAT; r++)
-        pushStateFrame(tl, [{ kind: "special", from: slot, cells: [[actor.x, actor.y]] }], SPECIAL_BEAT_MS);
-      pushInvalid(tl, slot, SMALL_DELAY_MS, "not_alone");
-      return;
-    }
-    // pečate (Special.png) v rovnakej kadencii ako ostatné speciály; zóna = vlastná bunka
-    for (let r = 0; r < SPECIAL_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, cells: [[actor.x, actor.y]] }], SPECIAL_BEAT_MS);
-    }
-    // summon choreografia: Naruto + kópia na tej istej bunke tvárou v tvár hrajú Special_2, potom klon vznikne na jeho bunke
-    pushStateFrame(tl, [{ kind: "clone_summon", from: slot, cell: [actor.x, actor.y] }], CLONE_SUMMON_MS);
-    actor.clone = { x: actor.x, y: actor.y };
-    pushStateFrame(tl, [{ kind: "clone_born", from: slot, cell: [actor.x, actor.y] }], SMALL_DELAY_MS);
-    return;
-  }
-
-  // Vojak: snajperský lúč na ZVOLENÚ bunku (akcia nesie cell - validQueue overil hranice, súperovu
-  // aktuálnu bunku aj vlastnú ghost pozíciu; v labyrinte prekliateho vojaka sa súperova bunka neblokuje).
-  // 10 dmg tomu, kto na bunke STOJÍ v momente výstrelu - súper je zraniteľný, len keď sa pohne (alebo
-  // stojaci lovec, keď strieľa prekliaty vojak). Ide cez obrany ako každý dmg special (shield blokuje,
-  // mirror odrazí 10); samotného vojaka lúč nikdy nezraní (vlastnú bunku ani nejde zvoliť).
-  if (actor.char === "soldier") {
-    if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !inBounds(cell.x, cell.y)) { pushInvalid(tl, slot); return; }
-    actor.mana -= SPECIAL_COST;
-    const pBonus = powerBoost(slot, tl); // POWER tile: +2 k lúču; spotreba pri použití - aj keď lúč mine
-    const cells = [[cell.x, cell.y]];
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    const inZone = !!(foe && foe.x === cell.x && foe.y === cell.y);
-    const cloneStruck = !!(foe?.clone && foe.clone.x === cell.x && foe.clone.y === cell.y);
-    // istý zásah reálneho hráča (aj do štítu/zrkadla) odhalí prípadný labyrint ešte pred animáciou
-    if (inZone) revealLabyrinths(tl);
-    // mierenie: JEDEN dlhý cast frame (nie opakované beaty - sniperka nestrieľa dávkou) - veľký sprite
-    // drží mieriacu pózu, laser sight sa ustáli na cieli a výšľah vyjde raz tesne pred lúčom
-    pushStateFrame(tl, [{ kind: "special", from: slot, cells }], SOLDIER_AIM_MS);
-    // lúč zo zbrane + výbuch na cieľovej bunke - zásah (hit/block/odraz) padne až po dolete
-    pushStateFrame(tl, [{ kind: "soldier_beam", from: slot, cell: [cell.x, cell.y] }], SOLDIER_BEAM_MS);
-    const dmg = SPECIAL_ZONE_DMG.soldier * dealMul(slot) + pBonus;
-    // klon-návnada na cieli zomiera (obrana kryje/odráža)
-    if (inZone || cloneStruck) strikeZone(foeS, inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus });
-    else pushStateFrame(tl, [], SMALL_DELAY_MS);
-    return;
-  }
-
-  // Vlkolak (werewolf): „moon charge" - rozbehne sa jedným z 8 smerov (aj diagonály) a zastane na PRVEJ
-  // figúre súpera v dráhe (klon-návnada absorbuje úder skôr než súper - ako pri melee) alebo na okraji
-  // plochy. Vlastnú bunku nezasahuje (súper na vlkolakovej bunke = beh na okraj bez hitu, ako basic).
-  // Zásah = WOLF_MOON_DMG[moon] (bez falloffu podľa vzdialenosti) cez obrany ako každý dmg special
-  // (shield blokuje, mirror odrazí plný moon dmg) - vlkolak ale na bunke terča OSTÁVA STÁŤ aj pri
-  // bloku/odraze (hit je hit). Bez terča je akcia len presun na poslednú bunku smeru; charge z okrajovej
-  // bunky von z plochy sa VYKONÁ podľa wall pravidla (mana preč, wall_bump, neprečiarkuje sa).
-  if (actor.char === "werewolf") {
-    const delta = WOLF_DIRS[dir];
-    if (!delta) { pushInvalid(tl, slot); return; }
-    actor.mana -= SPECIAL_COST;
-    // POWER tile: ráta sa ŠTARTOVÁ bunka (na nej vlkolak stojí v momente vyhodnotenia; beh je až potom);
-    // spotreba pri použití - aj pri behu bez terča či náraze do steny
-    const pBonus = powerBoost(slot, tl);
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    // dráha: krok za krokom po okraj; stop na prvej figúre (klon pred súperom - bait pravidlo ako melee).
-    // Klon STACKNUTÝ na majiteľovej bunke = "stacked": pohltí len CLONE_DMG, zvyšok prejde na Naruta
-    // (rovnaké pravidlo ako pri basic/melee cez stacknutý pár) - nie plný bait.
-    const { path, target } = G.runPath(game.board, actor.x, actor.y, delta, foe); // target: null | "clone" | "player" | "stacked"
-    // charge do steny z okrajovej bunky - akcia sa vykoná na mieste: rozbehová póza + náraz (OUT OF BOUNDS)
-    if (!path.length) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: [] }], WOLF_CAST_MS);
-      pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
-      return;
-    }
-    const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * dealMul(slot) * labyrinthMul(slot) + pBonus;
-    // istý zásah REÁLNEHO hráča (aj do štítu/zrkadla) odhalí prípadný labyrint pred animáciou;
-    // zásah klona-návnady labyrint neodhaľuje (kill klona ho nekončí - súper sa nesmie dozvedieť, že trafil klona).
-    // stacknutý pár: presah dopadne na REÁLNEHO majiteľa → odhaľuje ako player zásah
-    if (target === "player" || target === "stacked") revealLabyrinths(tl);
-    // rozbehový cast: veľký Run+Attack v strede, malá postava tiež (casting), dráha bliká
-    pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: path.map(c => [...c]) }], WOLF_CAST_MS);
-    // samotný beh: presun na cieľovú bunku jedným sklzom (ako dash); niť labyrintu ráta všetky prejdené bunky
-    actor.x = path[path.length - 1][0];
-    actor.y = path[path.length - 1][1];
-    pushStateFrame(tl, [{ kind: "wolf_charge", from: slot, dir }, ...trackSteps(slot, path)], MOVE_DELAY_MS);
-    if (!target) return; // dobehol na okraj bez terča - len presun
-    // seknutie (Attack_2) na bunke terča; dmg/block/odraz dopadne až po ňom
-    pushStateFrame(tl, [{ kind: "wolf_strike", from: slot, cell: [actor.x, actor.y] }], WOLF_STRIKE_MS);
-    // hráč / stacknutý pár (obrana kryje pár ako jednu postavu, bez nej soak CLONE_DMG) / klon-návnada
-    strikeCell(foeS, target, raw, tl, { kind: "special", bonus: pBonus });
-    return;
-  }
-
-  // Countess Vampire / Onre: special = PASCA na zvolenej bunke (cell-picker ako Vojak, BEZ obmedzení -
-  // aj súperova aktuálna bunka; trigger až pri opätovnom vstupe/prechode, státie netriggeruje). Značku
-  // vidí len caster (player.trap aj trap_set sa súperovi redigujú). Max 1 pasca - recast starú nahradí
-  // (pokojne aj tou istou bunkou). Trigger rieši resolveTrapsAfterAction/triggerTrap po súperovej akcii.
-  if (VAMP_CHARS[actor.char]) {
-    if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y) || !inBounds(cell.x, cell.y)) { pushInvalid(tl, slot); return; }
-    actor.mana -= SPECIAL_COST;
-    // cast bliká CELOU plochou (ako Minotaurov special) - pasca môže byť hocikde, plný blik jej polohu
-    // neprezradí (blikajúca len cieľová bunka by áno).
-    // Countess: JEDEN dlhý frame - A5 (celá útočná sekvencia) sa hrá RAZ od frame 0; beaty by ju
-    // reštartovali. Onre: pôvodné beaty (Scream loop reštart nevadí).
-    const castCells = G.allCells(game.board);
-    if (actor.char === "countess") {
-      pushStateFrame(tl, [{ kind: "special", from: slot, cells: castCells }], VAMP_CAST_MS);
-    } else {
-      for (let r = 0; r < SPECIAL_REPEAT; r++) {
-        pushStateFrame(tl, [{ kind: "special", from: slot, cells: castCells }], SPECIAL_BEAT_MS);
-      }
-    }
-    actor.trap = { x: cell.x, y: cell.y };
-    pushStateFrame(tl, [{ kind: "trap_set", from: slot, cell: [cell.x, cell.y] }], SMALL_DELAY_MS);
-    return;
-  }
-
-  // Jotaro: special = THE WORLD (jednorazový time-stop). Po ňom (worldUsed) sa button natrvalo zmení na
-  // Special 2 = smerový (left/right) 8 dmg útok na JEDINÚ susednú bunku (x±1, y); cez obrany ako každý dmg
-  // special (shield blokuje, mirror odrazí 8). Cast z krajného stĺpca von z plochy = wall-rule whiff.
-  if (actor.char === "jotaro") {
-    if (!actor.worldUsed) return doJotaroWorld(slot, tl); // THE WORLD (mana gate 5 už overený vyššie)
-    // Special 2
-    if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
-    actor.mana -= JOTARO_S2_COST;
-    const pBonus = powerBoost(slot, tl);
-    const cells = jotaroS2Cells(actor, dir);
-    if (!cells.length) { // susedná bunka mimo plochy → útok do steny (vykoná sa, mana preč, neprečiarkuje sa)
-      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: [], offboard: true }], SPECIAL_BEAT_MS);
-      return;
-    }
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
-    const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
-    if (inZone) revealLabyrinths(tl);
-    pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
-    const dmg = JOTARO_S2_DMG * dealMul(slot) + pBonus;
-    if (inZone || cloneStruck) strikeZone(foeS, inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus });
-    else pushStateFrame(tl, [], SMALL_DELAY_MS);
-    return;
-  }
-
-  // Escanor: smerový (left/right) dmg special; rozsah zóny podľa pride levelu (8 dmg). Cez obrany ako
-  // ostatné dmg speciály (shield blokuje, mirror odrazí 8 na Escanora). Zóna = escanorCells (pride).
-  if (actor.char === "escanor") {
-    if (dir !== "left" && dir !== "right") { pushInvalid(tl, slot); return; }
-    actor.mana -= SPECIAL_COST;
-    const pBonus = powerBoost(slot, tl); // POWER tile: +2 k slnku; spotreba pri použití - aj pri hode do autu
-    const cells = escanorCells(actor, dir);
-    // hod slnka MIMO plochy (kotva F von z dosky → prázdna zóna, aj pri pride 3): akcia sa VYKONÁ ako útok
-    // do steny - mana je preč, choreografia prebehne (slnko odletí do autu), klient ukáže OUT OF BOUNDS,
-    // akcia sa NEprečiarkuje; žiadny dmg ani zásah klona
-    if (!cells.length) {
-      pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells, offboard: true }], ESC_SPECIAL_MS);
-      return;
-    }
-    const foeS = other(slot);
-    const foe  = game.players[foeS];
-    const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
-    const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
-    if (inZone) revealLabyrinths(tl); // istý zásah odhalí prípadný labyrint pred animáciou
-    // 1 special frame drží celú choreografiu (klient ju spustí); zásah dopadne až po nej (ESC_SPECIAL_MS)
-    pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], ESC_SPECIAL_MS);
-    const dmg = SPECIAL_ZONE_DMG.escanor; // 8
-    if (inZone || cloneStruck) strikeZone(foeS, inZone, cloneStruck, dmg * dealMul(slot) + pBonus, tl, { kind: "special", bonus: pBonus });
-    else pushStateFrame(tl, [], SMALL_DELAY_MS);
-    return;
-  }
-
-  actor.mana -= SPECIAL_COST;
-  // POWER tile (fire/lightning/wanderer zónové speciály): +2 k zóne; spotreba pri použití - aj keď zóna minie
-  const pBonus = powerBoost(slot, tl);
-
-  // vyhodnotenie zásahu je deterministické už pred nádychmi (pozície sa počas nich nemenia) -
-  // istý zásah odhalí prípadný labyrint ešte PRED animáciou špeciálu
-  const { dmg, hit } = specialDamageAndHit(game.players, slot);
-  // súperov tieňový klon v zóne - zomiera spolu so zásahom hráča (zóna zasahuje oboch naraz)
-  const zFoeS = other(slot);
-  const zFoe  = game.players[zFoeS];
-  const cloneStruck = !!(zFoe?.clone && specialZoneHas(actor, zFoe.clone.x, zFoe.clone.y));
-  if (dmg > 0 && hit) revealLabyrinths(tl);
-
-  // Fire Wizard: ak special dostal boost zo stojacej Damage dlaždice (rozšírenie zóny o riadky ±1),
-  // po animácii ju SKONZUMUJE (zmizne pre oboch - nezávisle od toho, či special zasiahol/bol blokovaný)
-  const fireConsumes = fireOnDmgTile(actor);
-
-  // 3× „nádych“ (caster animuje špeciál; klient bliká rozsah)
-  for (let r = 0; r < SPECIAL_REPEAT; r++) {
-    pushStateFrame(tl, [{ kind: "special", from: slot }], SPECIAL_BEAT_MS);
-  }
-
-  // spotreba Damage dlaždice AŽ PO nádychoch (animácia dokončená) - krátky flare na klientovi
-  if (fireConsumes) {
-    game.tiles = game.tiles.filter(t => !(t.type === "dmg" && t.x === actor.x && t.y === actor.y));
-    pushStateFrame(tl, [{ kind: "tile_consume", from: slot, cell: [actor.x, actor.y] }], SMALL_DELAY_MS);
-  }
-
-  // Naruto + jeho klon = tá istá postava so zdieľanou obranou → ak zóna zasiahne oboch, block/odraz/hit idú NARAZ
-  const ownerHit = !!(dmg > 0 && hit); // hit === zFoeS (súper bol v zóne)
-  if (ownerHit || cloneStruck) {
-    // zóna minula súpera, ale trafila jeho klona → klon reaguje sám (POWER bonus nesie aj tento zásah)
-    strikeZone(zFoeS, ownerHit, cloneStruck, (SPECIAL_ZONE_DMG[actor.char] || 0) * dealMul(slot) + pBonus, tl, { kind: "special", bonus: pBonus });
-  } else {
-    pushStateFrame(tl, [], SMALL_DELAY_MS);
-  }
+  return CHARACTERS[actor.char]?.special.resolve(ctx, slot, tl, { dir, cell });
 }
 
 // Démon útok (len buffnutý hráč v poslednom kole): veľký démon v strede sa animuje ako special,
@@ -2099,8 +1752,18 @@ function doAction(slot, action, tl) {
     case "shield":   return doShield(slot, tl);
     case "mirror":   return doMirror(slot, tl);
     case "demon":    return doDemon(slot, tl);
+    case "pass":     return doPass(slot, tl);
     default: break;
   }
+}
+
+// PASS - nevyplnený slot pri vypršaní času: hráč „premýšľa" (THINKING nad postavou) a stratí PASS_MANA_COST
+// many (najviac toľko, koľko má). Je to bežná akcia - súperovu nachystanú obranu spotrebuje.
+function doPass(slot, tl) {
+  const p = game.players[slot];
+  const lost = Math.min(PASS_MANA_COST, Math.max(0, p.mana));
+  p.mana -= lost;
+  pushStateFrame(tl, [{ kind: "pass", from: slot, mana: lost }], SMALL_DELAY_MS);
 }
 
 /* -------------------- Special tiles -------------------- */
@@ -2160,13 +1823,14 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     pushStateFrame(tl, [{ kind: "tile_proc", tile: tile.type, cell: [p.x, p.y] }], 600);
     game.tiles.splice(idx, 1); // jediné spotrebovateľné políčka
     if (tile.type === "heal") {
-      // Lightning: heal dlaždica ju lieči na plné HP (ostatní +1)
-      const healAmount = p.char === "lightning" ? START_HP : p.hp + 1;
+      // heal dlaždica: +1 HP; postava s kitom healTile "full" (Lightning) sa vylieči na plné HP
+      const superHeal = kitOf(p.char).healTile === "full";
+      const healAmount = superHeal ? START_HP : p.hp + 1;
       const healed = Math.min(START_HP, healAmount) - p.hp;
       p.hp += healed;
       if (healed > 0) {
         // Lightning full-heal pasívka: klient ukáže „SUPER HEAL" float namiesto obyčajného +N HP
-        pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed, super: p.char === "lightning" }], SMALL_DELAY_MS);
+        pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed, super: superHeal }], SMALL_DELAY_MS);
       } else {
         pushStateFrame(tl, [], SMALL_DELAY_MS); // pri plnom HP sa spotrebuje naprázdno
       }
@@ -2307,24 +1971,18 @@ function validBasicAction(a, used, allowDemon = false, char = null) {
   if (!a) return false;
   const known = ACTION_TYPES.has(a.type) || (allowDemon && a.type === "demon");
   if (!known || used.has(a.type)) return false;
-  const side = !!SIDE_CHARS[char];      // diagonálny basic (Countess/Onre/Jotaro)
-  const isJotaro = char === "jotaro";
-  if (a.type === "mirror" && isJotaro) return false;    // Jotaro nemá mirror (v tom slote má special1)
-  if (a.type === "special1" && !isJotaro) return false; // special1 je len Jotarov
+  const special1Slot = kitOf(char).mirrorSlot === "special1";
+  if (a.type === "mirror" && special1Slot) return false;   // postava nemá mirror (Jotaro - v tom slote special1)
+  if (a.type === "special1" && !special1Slot) return false;
   if (a.type === "special1" && a.dir !== "left" && a.dir !== "right") return false;
   if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
-  // Luffy: basic je diag (base) / ortogonálny (gear3) podľa formy - tu (draft/auto-fill) akceptuj oboje,
-  // presnú formu vynúti autoritatívny validQueue pri lock_in.
-  if (a.type === "attack") {
-    if (char === "luffy") { if (!(DIAG_DIRS[a.dir] || MOVE_DIRS.has(a.dir))) return false; }
-    else if (!(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
-  }
+  // Luffy: forma v čase basicu tu (draft/auto-fill) nie je istá - akceptuj oboje, presnú formu vynúti validQueue
+  if (a.type === "attack" && !attackDirOk(char, a.dir, null, true)) return false;
   return true;
 }
-// hráč, ktorý sa nestihol locknúť: zachová svoju rozpracovanú frontu (draft) a chýbajúce do 3 doplní náhodne
-// exclude = typy, ktoré už pokrýva golden predťah (shield pri golden_shield, mirror pri golden_mirror) -
-// nesmú sa pridať ani z draftu, ani z náhodného doplnenia (inak by sa akcia zahrala 2× za kolo)
-function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limit = 3, char = null, slot = null) {
+// vypršaný čas: zahraj, čo má hráč rozpracované (draft - len platné akcie), a každý zvyšný slot do limitu
+// vyplň PASS-om (THINKING, −PASS_MANA_COST many) - žiadne náhodné akcie
+function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limit = 3, char = null) {
   const q = [], used = new Set(exclude);
   for (const a of (Array.isArray(draftQueue) ? draftQueue : [])) {
     if (q.length >= limit) break;
@@ -2332,59 +1990,11 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limi
     q.push({ type: a.type, dir: a.dir || null, cell: a.cell || null }); // cell = cieľ Vojakovho/Countess/Onre specialu
     used.add(a.type);
   }
-  const isJotaro = char === "jotaro";
-  // special1 je len Jotarov; Jotaro naopak nemá mirror (v tom slote má special1) - vyhoď z náhodného poolu
-  const pool = [...ACTION_TYPES].filter(t => !used.has(t)
-    && !(t === "special1" && !isJotaro) && !(t === "mirror" && isJotaro));
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  const dirs = [...MOVE_DIRS];
-  const side = !!SIDE_CHARS[char]; // diagonálny attack (Countess/Onre/Jotaro)
-  const vamp = !!VAMP_CHARS[char]; // special s bunkou = pasca (len Countess/Onre)
-  const lr = () => (rand() < 0.5 ? "left" : "right");
-  while (q.length < limit && pool.length) {
-    const t = pool.shift();
-    if (t === "attack" && char === "luffy") { // Luffy: gear3 = ortogonálny, base = diagonálny
-      const gear3 = game.players[slot]?.form === "gear3";
-      q.push({ type: t, dir: gear3 ? dirs[Math.floor(rand() * dirs.length)] : DIAG_DIR_KEYS[Math.floor(rand() * DIAG_DIR_KEYS.length)] });
-    }
-    else if (t === "attack" && side) q.push({ type: t, dir: DIAG_DIR_KEYS[Math.floor(rand() * DIAG_DIR_KEYS.length)] });
-    else if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(rand() * dirs.length)] });
-    else if (t === "special1") q.push({ type: t, dir: lr() }); // Jotarov special1 - smer left/right
-    else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: lr() }); // Medúzin/Escanorov special potrebuje smer
-    else if (t === "special" && char === "werewolf") q.push({ type: t, dir: WOLF_DIR_KEYS[Math.floor(rand() * WOLF_DIR_KEYS.length)] }); // Vlkolakov charge - náhodný z 8 smerov
-    else if (t === "special" && char === "soldier") q.push({ type: t, cell: randomSoldierTarget(slot) }); // Vojakov special potrebuje cieľovú bunku
-    else if (t === "special" && char === "luffy") q.push({ type: t, cell: randomLuffySpecialTarget(slot) }); // Luffy special = bunka na platnej línii
-    else if (t === "special" && vamp) q.push({ type: t, cell: randomTrapCell() }); // pasca - ľubovoľná bunka
-    else if (t === "special" && isJotaro) q.push(game.players[slot]?.worldUsed ? { type: t, dir: lr() } : { type: t }); // Special 2 (smer) / THE WORLD (bez args)
-    else q.push({ type: t });
-  }
+  while (q.length < limit) q.push({ type: "pass" });
   return q;
 }
 
-// náhodná platná cieľová bunka Vojakovho specialu (timeout auto-fill) - rovnaké pravidlá ako validQueue:
-// nie vlastná bunka, nie súperova figúra ani jeho klon (v labyrinte prekliateho sa súper neblokuje)
-function randomSoldierTarget(slot) {
-  const meP = slot ? game.players[slot] : null;
-  const foe = slot ? game.players[other(slot)] : null;
-  const c = pickCell((x, y) => {
-    if (meP && meP.x === x && meP.y === y) return false;
-    if (meP && !meP.labyrinth && foe) {
-      if (foe.x === x && foe.y === y) return false;
-      if (foe.clone && foe.clone.x === x && foe.clone.y === y) return false;
-    }
-    return true;
-  });
-  return c ? { x: c.x, y: c.y } : null;
-}
 
-// náhodná platná cieľová bunka Luffyho specialu (timeout auto-fill) - na platnej línii (dáma base / veža gear3)
-// z jeho AKTUÁLNEJ pozície a formy; vlastná bunka povolená
-function randomLuffySpecialTarget(slot) {
-  const meP = slot ? game.players[slot] : null;
-  if (!meP) return null;
-  const c = pickCell((x, y) => luffySpecialReaches(meP.x, meP.y, x, y, meP.form));
-  return c ? { x: c.x, y: c.y } : c;
-}
 
 /* -------------------- Last Stand (frame-driven) -------------------- */
 // pomocné: plynulé prepísanie HP+many cez zopár frame-ov (HUD sa hýbe zo snapshotov)
@@ -2944,7 +2554,7 @@ function autoLock() {
     const stone = Math.min(3, p.stone || 0);
     p.queue = [
       ...Array.from({ length: stone }, () => ({ type: "stoned" })),
-      ...fillFromDraft(p.draft?.queue, exclude, !!p.lastStandBuff, 3 - stone, p.char, slot),
+      ...fillFromDraft(p.draft?.queue, exclude, !!p.lastStandBuff, 3 - stone, p.char),
     ];
     p.locked = true;
   }

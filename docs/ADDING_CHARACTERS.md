@@ -68,16 +68,19 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
 
 ## 3. Kontrolný zoznam — čo treba upraviť (podľa súborov)
 
-### `engine/game.js` + `engine/constants.js` (autoritatívna logika; `server.js` sú len sockety)
-- [ ] **`CHARS`** (~riadok 71) — pridaj kľúč postavy. Toto ju sprístupní pre `choose_character`,
-      `choose_team` (turnaj) aj validáciu.
-- [ ] **`specialDamageAndHit(players, slot)`** — vetva pre nový special: vráti `{dmg, hit}` (hit = slot
-      zasiahnutého alebo `null`). Len pre **dmg** speciály.
-- [ ] **`specialZoneHas(me, x, y)`** — MUSÍ zodpovedať zóne z `specialDamageAndHit` (používa sa na test
-      zásahu klona). Drž ich synchronizované.
-- [ ] **`SPECIAL_ZONE_DMG`** (~riadok 446) — raw dmg zóny (kvôli odrazu/klonovi).
-- [ ] **`doSpecial(slot, …)`** — ak special nie je štandardná dmg zóna, pridaj vetvu (ako medusa/minotaur/
-      naruto). Statusové/summon speciály tu majú vlastnú vetvu s `pushStateFrame`-ami a `return`.
+### `engine/` (autoritatívna logika; `server.js` sú len sockety)
+- [ ] **`CHARS`** v `engine/constants.js` — pridaj kľúč postavy (side-postava: `SIDE_CHARS`). Toto ju
+      sprístupní pre `choose_character`, `choose_team` (turnaj) aj validáciu.
+- [ ] **`engine/characters/<postava>.js`** + registrácia v `engine/characters/index.js` — postava sa
+      deklaruje na jednom mieste (vzor: `escanor.js`, `soldier.js`, zónové `simple.js`):
+      - `kit`: `attack` (`ortho`/`diag`/`luffy`), `mirrorSlot` (`mirror`/`special1`), `meleeDmg`, `healTile`
+        → validácia fronty aj auto-fill sa riadia kitom, netreba písať vetvy podľa mena;
+      - `special.resolve(ctx, slot, tl, { dir, cell })` — vyhodnotenie (mana gate je v `doSpecial`);
+        dmg ide VÝHRADNE cez `ctx.strikeZone` / `ctx.strikeCell` (damage pipeline - obrany, klon, labyrint,
+        THE WORLD sa riešia samy), frame-y cez `ctx.pushStateFrame`, pred istým zásahom `ctx.revealLabyrinths`;
+      - `special.validate(ctx, a, sim)` — ak special nesie cieľ (bunka/smer), odmietnutie pri `lock_in`;
+- [ ] **Geometriu zóny** (ak ju kreslí aj klient) daj do `shared/geometry.js` a volaj ju zo special aj
+      z klientského `cellsForSpecialPreview` - nikdy ju nepíš dvakrát.
 - [ ] Ak special zavádza **nový stav** hráča (napr. `stone`, `labyrinth`, `clone`) — pridaj pole do
       `newPlayer()` (default) aj do `cloneActor()` (serializácia do snapshotu). Inak sa stav neprenesie klientovi.
 - [ ] Ak stav treba pred súperom **skrývať** (labyrint) — uprav redakciu (`redactActor`, `redactHunterActor`,
@@ -88,8 +91,8 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
 - [ ] **`HEAD_CX`, `HEAD_TOP`** — pozícia tela/hlavy.
 - [ ] **`SPECIAL_ANIMS`** — efektový sprite specialu (file, fps, loop).
 - [ ] **`ANIM_DEF`** / **`SPRITE_FILE_ALIAS`** — ak treba nové anim kľúče alebo aliasy chýbajúcich súborov.
-- [ ] **`cellsForSpecialPreview(meState, dir)`** — náhľad zóny pri hoveri/caste. MUSÍ zodpovedať
-      `specialZoneHas`/`specialDamageAndHit` na serveri. (Trojica server×2 + client sa udržiava paralelne!)
+- [ ] **`cellsForSpecialPreview(meState, dir)`** — náhľad zóny pri hoveri/caste; zónu ber zo
+      `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
 - [ ] **`ABILITY_PREVIEW`** — popis + náhľadová zóna v char-selecte.
 - [ ] **Label special tlačidla** (blok `if (specChar === …)` v state handleri, ~riadok 3600) — cost badge
       + tooltip pre nový special. Pozor: číta sa cez `ghostCharAt()` (turnaj swap).

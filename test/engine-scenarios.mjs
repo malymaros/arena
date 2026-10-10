@@ -114,5 +114,31 @@ for (const [label, p2setup] of [
   check(!!sc.game.players.p2.clone, `R11 (${label}): obrancov klon prežil (mirror ho kryl)`);
 }
 
-console.log(failures ?`\n${failures} ENGINE SCENÁROV ZLYHALO` : "\nENGINE SCENÁRE PREŠLI");
+/* ---- Vypršaný čas: nevyplnené sloty = PASS (THINKING, −2 many, spotrebuje súperovu obranu) ---- */
+{
+  const timelines = [];
+  const e = createEngine({ seed: 1, emitState: (tl) => { if (tl) timelines.push(tl); } });
+  e.startMatch(e.sanitizeConfig(CFG));
+  e.chooseCharacter("A", "fire");
+  e.chooseCharacter("B", "lightning");
+  e.game.players.p1.mana = 5;
+  e.game.players.p2.mana = 3;
+  e.game.players.p1.shield = true;                  // p1 má nachystaný štít - kryje najbližšiu akciu p2
+  e.draftQueue("A", { queue: [R] });                // p1 stihol rozpracovať 1 akciu, p2 nič
+  e.autoLock();                                     // vypršal čas
+  const tl = timelines.flat();
+  const passes = (slot) => fx(tl, "pass").filter(x => x.from === slot);
+  const acts = (slot) => fx(tl, "action").filter(x => x.from === slot).map(x => x.action.type);
+  check(JSON.stringify(acts("p1")) === '["recharge","pass","pass"]', "PASS: rozpracovaná akcia ostane, zvyšok pass", JSON.stringify(acts("p1")));
+  check(JSON.stringify(acts("p2")) === '["pass","pass","pass"]', "PASS: hráč bez draftu = 3× pass", JSON.stringify(acts("p2")));
+  check(JSON.stringify(passes("p2").map(x => x.mana)) === "[2,1,0]", "PASS: −2 many za pass, mana neklesne pod 0 (3 → 1 → 0 → 0)", JSON.stringify(passes("p2")));
+  check(e.game.players.p2.mana === 0, "PASS: p2 skončí s 0 many", String(e.game.players.p2.mana));
+  check(passes("p1").length === 2 && passes("p1").every(x => x.mana === 2), "PASS: p1 (po recharge) platí 2× po 2", JSON.stringify(passes("p1")));
+  // p1 začína kolo → jeho štít kryje prvú akciu p2 (pass) → pass ho spotrebuje
+  const p2first = tl.findIndex(f => f.effects?.some(x => x.kind === "pass" && x.from === "p2"));
+  check(p2first > 0 && tl[p2first + 1]?.p1?.shield === false, "PASS: spotrebuje súperovu nachystanú obranu",
+    `shield po passe = ${tl[p2first + 1]?.p1?.shield}`);
+}
+
+console.log(failures ? `\n${failures} ENGINE SCENÁROV ZLYHALO` : "\nENGINE SCENÁRE PREŠLI");
 process.exit(failures ? 1 : 0);

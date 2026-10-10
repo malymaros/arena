@@ -122,6 +122,8 @@ export const TEAM_SIZE = 3;
 // časový limit na ťah - vyhodnocuje a auto-lockuje klient (server lock validuje ako bežný)
 export const TIMER_OPTIONS = new Set(["off", "30", "60", "120", "quickdraw"]);
 export const QUICKDRAW_MS = 60000; // quick-draw: po locku prvého hráča má druhý toľkoto na ťah
+// vypršaný čas na ťah: každý NEVYPLNENÝ slot je PASS („THINKING") - stojí toľkoto many (max. čo hráč má)
+export const PASS_MANA_COST = 2;
 
 // predvolené nastavenia (predvyplnia lobby na klientovi)
 export const DEFAULT_CONFIG = {

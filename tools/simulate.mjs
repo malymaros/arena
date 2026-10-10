@@ -1,11 +1,12 @@
 // tools/simulate.mjs - headless simulácia zápasov priamo cez engine (bez servera, socketov a čakania).
-// Hráči ťahajú náhodne cez engine.autoLock() (rovnaká logika ako pri vypršaní časovača na ťah),
+// Hráči ťahajú náhodne (tools/random-bot.mjs - náhodné fronty, o platnosti rozhoduje engine),
 // takže výsledky hovoria o stabilite enginu, nie o balanse postáv.
 // Spustenie:  node tools/simulate.mjs [počet zápasov na dvojicu=20] [p1postava p2postava]
 //   napr.     node tools/simulate.mjs 50
 //             node tools/simulate.mjs 200 naruto jotaro
 import { createEngine } from "../engine/game.js";
 import { CHARS } from "../engine/constants.js";
+import { playBotMatch } from "./random-bot.mjs";
 
 const N = Number(process.argv[2]) || 20;
 const pairArg = process.argv.slice(3, 5);
@@ -16,15 +17,9 @@ const CONFIG = {
   format: "single", tilesPerRound: 2, timer: "off", tilePreview: true, colorPref: "white", // osoba A = p1
   tileWeights: { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 },
 };
-// THE WORLD: Jotaro musí poslať 3 zmrazené akcie - skús pevných kandidátov, kým ich engine neprijme
-const TS_CANDIDATES = [
-  [{ type: "recharge" }, { type: "shield" }, { type: "move", dir: "left" }],
-  [{ type: "recharge" }, { type: "shield" }, { type: "move", dir: "right" }],
-  [{ type: "recharge" }, { type: "shield" }, { type: "melee" }],
-];
 
 function playMatch(ch1, ch2, seed) {
-  let result = null, rounds = 0, frames = 0;
+  let result = null, frames = 0;
   const engine = createEngine({
     seed,
     emit: (ev, payload) => { if (ev === "game_result") result = payload; },
@@ -35,17 +30,7 @@ function playMatch(ch1, ch2, seed) {
   engine.chooseCharacter("B", ch2);
   const g = () => engine.game;
   if (g().players.p1.char !== ch1 || g().players.p2.char !== ch2) throw new Error(`voľba postáv zlyhala ${ch1}/${ch2}`);
-  while (!result && rounds < MAX_ROUNDS) {
-    if (g().timestop?.mode === "waiting") {
-      const person = g().seats[g().timestop.slot];
-      let ok = false;
-      for (const q of TS_CANDIDATES) { engine.timestopActions(person, q, (r) => { ok = !!r?.ok; }); if (ok) break; }
-      if (!ok) throw new Error("THE WORLD: žiadna platná zmrazená fronta");
-      continue;
-    }
-    rounds++;
-    engine.autoLock();
-  }
+  const rounds = playBotMatch(engine, seed, () => !!result, MAX_ROUNDS);
   return { winner: result?.gameWinner ?? null, rounds, frames };
 }
 
