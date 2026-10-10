@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "start": "node server.js",
-        "test": "node test/game-test.mjs"
+        "test": "node test/game-test.mjs",
+        "golden": "node test/golden.mjs",
+        "golden:update": "node test/golden.mjs --update"
     },
     "dependencies": {
         "express": "^4.19.2",

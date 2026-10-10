@@ -18,7 +18,7 @@ function startServer() {
     // FORCE_FIRST_STARTER: v produkcii sa osoby losujú na sloty (p1 = biely, začína každú hru) —
     // testy fixujú osobu A (host) na p1, aby deterministické scenáre (golden akcie nestartéra, démon startera…) sedeli
     // PLAYER_KEYS: explicitné testovacie heslo (server vyžaduje heslo; default je "hamara") — deterministické, nezávislé od dev prostredia
-    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass" },
+    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ARENA_SEED: process.env.ARENA_SEED || "1" },
     stdio: "ignore",
   });
   return new Promise((resolve) => setTimeout(() => resolve(proc), 1200));
@@ -133,10 +133,10 @@ function configureMatch(host, opts = {}) {
   });
 }
 
-async function freshGame(c1, c2) {
+async function freshGame(c1, c2, opts = {}) {
   c1.sock.emit("retry");
   await new Promise(r => setTimeout(r, 150));
-  configureMatch(c1);
+  configureMatch(c1, opts);
   await new Promise(r => setTimeout(r, 150));
   c1.sock.emit("choose_character", "fire");
   c2.sock.emit("choose_character", "lightning");
@@ -274,7 +274,9 @@ async function main() {
   invariantCheck(tl, "T7");
 
   /* ---------- Test 8: vertikálny zásah — dist=1 → 3 dmg ---------- */
-  await freshGame(c1, c2);
+  // bez IK dlaždíc: náhodné IK (10 dmg) v ceste predtým občas ukončilo hru pred výstrelom (nestabilný T8).
+  // Retry ako v T4 tu nestačí - pri ARENA_SEED sa RNG v startMatch nasemienkuje nanovo, IK by padlo zakaždým rovnako.
+  await freshGame(c1, c2, { tileWeights: { dmg: 80, heal: 12, mana: 8, ik: 0 } });
   // kolo 1: P1 (0,1)→(1,1), P2 (3,1)→(2,1)
   tl = await playRound(c1, c2, [M("right"), R, S], [M("left"), R, S]);
   // kolo 2 (začína P2): ťah1: P2 hore (2,1)→(2,0), P1 doprava (1,1)→(2,1); ťah2: P1 strieľa hore

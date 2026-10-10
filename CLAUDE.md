@@ -13,9 +13,11 @@ A 2-player turn-based browser arena game (wizard duel on a 4×3 grid — `BOARD`
 ```
 npm start        # node server.js → http://localhost:3000
 npm test         # integration tests — boots the server on :3996, drives 2 socket clients (test/game-test.mjs)
+npm run golden          # golden-master: 48 seeded matches, timelines compared to test/golden/*.json (server on :3995)
+npm run golden:update   # rewrite the golden files - only for a deliberate behaviour change, explain it in the commit
 ```
 
-Environment variables: `PORT` (default 3000), `ADMIN_KEY` (optional password for admin reset; if unset, reset is open), `FORCE_FIRST_STARTER` (`A`|`B` — pins the otherwise random game-1 starter; used by the tests).
+Environment variables: `PORT` (default 3000), `ADMIN_KEY` (optional password for admin reset; if unset, reset is open), `FORCE_FIRST_STARTER` (`A`|`B` — pins the otherwise random game-1 starter; used by the tests), `ARENA_SEED` (integer - all game randomness goes through the room's `rand()`, re-seeded at every `startMatch`, so identical inputs give bit-identical timelines; the tests default to `1`). Never call `Math.random` in game logic - use `rand()`.
 
 ## Deployment
 

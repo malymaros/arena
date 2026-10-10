@@ -43,6 +43,20 @@ const PLAYER_KEYS = new Set((process.env.PLAYER_KEYS || "hamara").split(",").map
 // biely (p1, vľavo) začína hru 1 (v sérii sa štartér hier strieda) - losuje sa, KTO z osôb A/B
 // je biely (startMatch); testy si osobu na slote p1 vedia zafixovať cez env (A alebo B)
 const FORCE_FIRST_STARTER = ["A", "B"].includes(process.env.FORCE_FIRST_STARTER) ? process.env.FORCE_FIRST_STARTER : null;
+// ARENA_SEED: deterministická náhoda (testy / golden master) - RNG roomky sa ním nanovo nasemienkuje pri každom
+// startMatch, takže rovnaký priebeh zápasu (rovnaké vstupy) dá bit po bite rovnaké timeline. Bez seedu Math.random.
+const ARENA_SEED = /^\d+$/.test(process.env.ARENA_SEED || "") ? Number(process.env.ARENA_SEED) : null;
+// mulberry32 - malý, rýchly seedovateľný PRNG s výstupom v [0, 1) ako Math.random
+function seededRng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 /* -------------------- Game constants -------------------- */
 const BOARD = { w: 4, h: 3 };
@@ -264,6 +278,7 @@ function createRoom(id) {
   let roomDestroyTimer = null;                // po odpojení oboch: po grace roomku zruší
   let pendingMatchConfig = null;              // host stlačil START, ale 2. hráč ešte nie je → čaká sa; po jeho príchode sa spustí
   let game = null;
+  let rand = Math.random;                     // všetka herná náhoda roomky (pri ARENA_SEED seedovaná v startMatch)
   const spectators = new Set();               // diváci tejto roomky (dostávajú nemaskovaný stav cez roomEmit)
 
   // per-room emit: nahrádza io.emit - pošle len hráčom A/B a divákom TEJTO roomky (nie cudzím)
@@ -2707,7 +2722,7 @@ function pickCell(filterFn) {
   for (let y = 0; y < game.board.h; y++)
     for (let x = 0; x < game.board.w; x++)
       if (filterFn(x, y)) cells.push({ x, y });
-  return cells.length ? cells[Math.floor(Math.random() * cells.length)] : null;
+  return cells.length ? cells[Math.floor(rand() * cells.length)] : null;
 }
 
 // koniec ťahu: pickupy (heal/mana) a damage políčka (dmg/IK); štít tile damage neblokuje.
@@ -2804,7 +2819,7 @@ function rollTileType(weights) {
   const order = ["dmg", "heal", "mana", "ik", "power", "block"];
   const total = order.reduce((a, k) => a + Math.max(0, weights?.[k] || 0), 0);
   if (total <= 0) return null;
-  let r = Math.random() * total;
+  let r = rand() * total;
   for (const k of order) {
     r -= Math.max(0, weights?.[k] || 0);
     if (r < 0) return k;
@@ -2922,22 +2937,22 @@ function fillFromDraft(draftQueue, exclude = new Set(), allowDemon = false, limi
   // special1 je len Jotarov; Jotaro naopak nemá mirror (v tom slote má special1) - vyhoď z náhodného poolu
   const pool = [...ACTION_TYPES].filter(t => !used.has(t)
     && !(t === "special1" && !isJotaro) && !(t === "mirror" && isJotaro));
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const dirs = [...MOVE_DIRS];
   const side = !!SIDE_CHARS[char]; // diagonálny attack (Countess/Onre/Jotaro)
   const vamp = !!VAMP_CHARS[char]; // special s bunkou = pasca (len Countess/Onre)
-  const lr = () => (Math.random() < 0.5 ? "left" : "right");
+  const lr = () => (rand() < 0.5 ? "left" : "right");
   while (q.length < limit && pool.length) {
     const t = pool.shift();
     if (t === "attack" && char === "luffy") { // Luffy: gear3 = ortogonálny, base = diagonálny
       const gear3 = game.players[slot]?.form === "gear3";
-      q.push({ type: t, dir: gear3 ? dirs[Math.floor(Math.random() * dirs.length)] : DIAG_DIR_KEYS[Math.floor(Math.random() * DIAG_DIR_KEYS.length)] });
+      q.push({ type: t, dir: gear3 ? dirs[Math.floor(rand() * dirs.length)] : DIAG_DIR_KEYS[Math.floor(rand() * DIAG_DIR_KEYS.length)] });
     }
-    else if (t === "attack" && side) q.push({ type: t, dir: DIAG_DIR_KEYS[Math.floor(Math.random() * DIAG_DIR_KEYS.length)] });
-    else if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(Math.random() * dirs.length)] });
+    else if (t === "attack" && side) q.push({ type: t, dir: DIAG_DIR_KEYS[Math.floor(rand() * DIAG_DIR_KEYS.length)] });
+    else if (t === "move" || t === "attack" || t === "dash") q.push({ type: t, dir: dirs[Math.floor(rand() * dirs.length)] });
     else if (t === "special1") q.push({ type: t, dir: lr() }); // Jotarov special1 - smer left/right
     else if (t === "special" && (char === "medusa" || char === "escanor")) q.push({ type: t, dir: lr() }); // Medúzin/Escanorov special potrebuje smer
-    else if (t === "special" && char === "werewolf") q.push({ type: t, dir: WOLF_DIR_KEYS[Math.floor(Math.random() * WOLF_DIR_KEYS.length)] }); // Vlkolakov charge - náhodný z 8 smerov
+    else if (t === "special" && char === "werewolf") q.push({ type: t, dir: WOLF_DIR_KEYS[Math.floor(rand() * WOLF_DIR_KEYS.length)] }); // Vlkolakov charge - náhodný z 8 smerov
     else if (t === "special" && char === "soldier") q.push({ type: t, cell: randomSoldierTarget(slot) }); // Vojakov special potrebuje cieľovú bunku
     else if (t === "special" && char === "luffy") q.push({ type: t, cell: randomLuffySpecialTarget(slot) }); // Luffy special = bunka na platnej línii
     else if (t === "special" && vamp) q.push({ type: t, cell: randomTrapCell() }); // pasca - ľubovoľná bunka
@@ -3453,6 +3468,7 @@ function handleGameEnd(timelineDurationMs) {
 
 /* -------------------- Match / game start -------------------- */
 function startMatch(config) {
+  if (ARENA_SEED !== null) rand = seededRng(ARENA_SEED); // deterministický priebeh zápasu (testy)
   game.config = config;
   // BIELY (p1, vľavo) začína hru 1 - náhodné je, KTO je biely: osoby A/B sa vylosujú na sloty
   // ešte PRED animáciou ruletky na klientovi (color_roll nižšie je už len divadlo s hotovým výsledkom).
@@ -3464,7 +3480,7 @@ function startMatch(config) {
   if (FORCE_FIRST_STARTER) white = FORCE_FIRST_STARTER;
   else if (config.colorPref === "white") white = "A";
   else if (config.colorPref === "black") white = "B";
-  else white = Math.random() < 0.5 ? "A" : "B";
+  else white = rand() < 0.5 ? "A" : "B";
   game.seats = { p1: white, p2: otherPerson(white) };
   game.series = {
     gameIndex: 0,
