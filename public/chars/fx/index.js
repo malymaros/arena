@@ -11,9 +11,11 @@
 //   centerCanvas(cvs, sp)         vznik veľkého stredového spritu castu (sp = cast záznam: from, file?, fps?…)
 //   drawCenter(cvs, ctx, now) → true  raf stredového spritu - true = nakreslené (inak bežný loop)
 //   centerCast(e) → sp | null     efekt autora zrkadlený do stredového spritu (renderGrid; sp ako melee cast)
+//   clearOverlays()               koniec hry/medzihra - zmaž vlastné overlaye, ktoré renderGrid nemaže
 import soldier from "./soldier.js";
 import werewolf from "./werewolf.js";
 import countess from "./countess.js";
 import onre from "./onre.js";
+import luffy from "./luffy.js";
 
-export const CHAR_FX_FACTORIES = { soldier, werewolf, countess, onre };
+export const CHAR_FX_FACTORIES = { soldier, werewolf, countess, onre, luffy };
