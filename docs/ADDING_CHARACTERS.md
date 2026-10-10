@@ -68,7 +68,7 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
 
 ## 3. Kontrolný zoznam — čo treba upraviť (podľa súborov)
 
-### `server.js` (autoritatívna logika)
+### `engine/game.js` + `engine/constants.js` (autoritatívna logika; `server.js` sú len sockety)
 - [ ] **`CHARS`** (~riadok 71) — pridaj kľúč postavy. Toto ju sprístupní pre `choose_character`,
       `choose_team` (turnaj) aj validáciu.
 - [ ] **`specialDamageAndHit(players, slot)`** — vetva pre nový special: vráti `{dmg, hit}` (hit = slot
@@ -117,7 +117,7 @@ Tieto musia **vždy sedieť dokopy**, inak sa náhľad rozíde s realitou alebo 
    `cellsForSpecialPreview` (klientský náhľad). Zmena v jednom → zmena vo všetkých troch.
 2. **Časovanie animácií:** serverové `*_MS`/`delayMs` konštanty ↔ klientské `*_MS` (`MOVE_MS`,
    `ATTACK_SWING_MS`…) a `ANIM_SLOW`. Ak sa rozídu, animácia nesedí s timeline.
-3. **`ANIM_SLOW`** je v `server.js` aj `client.js` — musia byť rovnaké.
+3. **`ANIM_SLOW`** je v `engine/constants.js` aj `client.js` — musia byť rovnaké.
 4. **Každý nový `pushStateFrame` efekt** musí mať obsluhu na klientovi — inak sa stav „teleportuje"
    bez animácie.
 

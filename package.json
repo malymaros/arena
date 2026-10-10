@@ -6,7 +6,8 @@
         "start": "node server.js",
         "test": "node test/game-test.mjs",
         "golden": "node test/golden.mjs",
-        "golden:update": "node test/golden.mjs --update"
+        "golden:update": "node test/golden.mjs --update",
+        "sim": "node tools/simulate.mjs"
     },
     "dependencies": {
         "express": "^4.19.2",

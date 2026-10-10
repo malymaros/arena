@@ -101,6 +101,25 @@ previews importujú `shared/geometry.js`.
       cielené scenáre, ak etapa 3 zasiahne tieto cesty. Turnaj (swap) golden zatiaľ nepokrýva.
 - [x] oprava nestabilného T8 - beží bez IK dlaždíc (náhodné IK v ceste ukončilo hru pred výstrelom)
 
+## Etapa 1 - stav
+
+- [x] `engine/constants.js` - všetky herné konštanty a čisté helpery (1:1 z vrchu `server.js`).
+- [x] `engine/game.js` - `createEngine(io)`: celý herný stav a logika roomky (akcie, zásahy, dlaždice,
+      labyrint, THE WORLD, Last Stand, vyhodnotenie kola, štart zápasu/hry, redakcia snapshotov) + príkazy
+      hráčov `chooseTeam`/`chooseCharacter`/`lockIn`/`timestopActions`/`draftQueue` a `autoLock` (herná
+      časť vypršania časovača). Kód presunutý 1:1, zmeny len na hranici:
+      `snapshot` berie mená/„čakám na súpera" z háčikov, medzihra série ide cez `io.schedule`,
+      seed možno dať cez `io.seed` (prednosť pred env `ARENA_SEED`), `QUICKDRAW_MS` presunuté do konštánt.
+- [x] `server.js` (~480 riadkov) - register roomiek, sedenie/reconnect, diváci, časovač kola, maskované emity;
+      socket handlery sú tenké obaly nad príkazmi enginu.
+- [x] headless: `npm run sim` (`tools/simulate.mjs`) - náhodné zápasy priamo cez engine, ~1 ms/zápas.
+- Overenie: `npm test` + golden master 48/48 bit po bite zhodné; simulátor 6 050 zápasov bez chyby.
+
 ## Rozhodnutia (na schválenie)
 
-_(zatiaľ prázdne)_
+1. **„Explicitný ctx" v Etape 1 = inštancia enginu, nie parameter každej funkcie.** Engine je factory
+   s vlastnou closure (`game`, `rand`) a všetok vonkajší kontakt ide cez háčiky `io`. Prepísať ~3 300 riadkov
+   na `fn(ctx, …)` by bol veľký diff bez zmeny správania; explicitný `ctx` sa zavedie postupne pri rozdeľovaní
+   `engine/game.js` na moduly (`damage.js`, `tiles.js`, … v etapách 3-5), kde ho moduly reálne potrebujú.
+2. **Redakcia snapshotov (labyrint, pasca, slepý draft) je v enginu, nie v `server.js`** - sú to herné
+   pravidlá (čo kto smie vedieť) a potrebujú plný herný stav; server len rozhoduje, komu čo poslať.
