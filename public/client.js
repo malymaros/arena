@@ -3102,6 +3102,12 @@ function ghostCharAt(idx = myQueue.length) {
 const PLAN_MAX_MANA = 10;
 const PLAN_RECHARGE = 4;
 const PLAN_COST = { attack: 1, melee: 4, dash: 4, special: 5, special1: 4, shield: 2, mirror: 4, demon: 10 };
+// súper Vampire/Onryō je mirror-imúnny: mirror (aj golden) sa voči jeho dmg správa len ako štít
+// (súper v turnaji nemôže z/do side-postavy swapnúť, takže jeho postava platí celé kolo)
+function foeMirrorImmune() {
+  return !!VAMP_CHARS[state?.[me === "p1" ? "p2" : "p1"]?.char];
+}
+const MIRROR_IMMUNE_WARN = "Opponent is immune to mirrors - it only blocks like a shield (no reflect)";
 function planWarnings() {
   const out = myQueue.map(() => null);
   const mine = state?.[me];
@@ -3129,6 +3135,7 @@ function planWarnings() {
       if (char === "luffy") form = form === "gear3" ? "base" : "gear3";
       continue;
     }
+    if (a.type === "mirror" && foeMirrorImmune()) { out[i] = MIRROR_IMMUNE_WARN; continue; }
     if (a.type === "special" && char === "naruto") { hasClone = true; continue; }
     if (!p) continue;
     const wallSafe = char === "naruto" && hasClone; // klonova figúra môže akciu vykonať aj tak
@@ -3606,7 +3613,8 @@ function renderQueue() {
       if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
       // akcia podľa plánu nebude mať efekt → žltý ⚠ v rohu + dôvod v tooltipe
-      const warn = b.kind === "act" ? warnings[b.idx] : null;
+      const warn = b.kind === "act" ? warnings[b.idx]
+        : (filled.type === "golden_mirror" && foeMirrorImmune()) ? MIRROR_IMMUNE_WARN : null;
       if (warn) {
         el.classList.add("q-warn");
         el.title = "⚠ " + warn;
