@@ -4,22 +4,22 @@
 // bez nich engine beží headless (testy/simulácie). Kód je zatiaľ presunutý 1:1 zo server.js closure.
 import {
   FORCE_FIRST_STARTER, ARENA_SEED, seededRng, BOARD, START_POS, START_HP,
-  START_MANA, MAX_MANA, WANDERER_MANA_REGEN, BASIC_COST, BASIC_DMG_MAX, MELEE_COST,
-  MELEE_DMG, MELEE_REPEAT, SPECIAL_COST, WOLF_DIRS, moonLevelFor, SIDE_CHARS,
-  VAMP_CHARS, DIAG_DIRS, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS,
-  VAMP_TRAP_DMG, VAMP_TRAP_BONUS, WORLD_COST, JOTARO_S1_COST, JOTARO_S1_DMG, STONE_ACTIONS,
-  CLONE_DMG, RECHARGE_GAIN, SHIELD_COST, MIRROR_COST, GOLDEN_COST, GOLDEN_MIRROR_COST,
-  DASH_COST, GOLDEN_MANA_GAIN, POWER_TILE_BONUS, DEMON_COST, DEMON_DMG, ACTION_TYPES,
-  MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS, ANIM_SLOW,
-  MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS,
-  WOLF_STRIKE_MS, CHARGE_STEP_MS, MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, LAB_REVEAL_MS,
-  VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS, TIMESTOP_CAST_MS, TIMESTOP_END_MS, LS_APPEAR_MS, LS_DRAIN_MS,
-  LS_KILL_MS, LS_REVIVE_MS, LS_RISE_MS, LS_SETTLE_MS, LS_B_LEAVE_MS, LS_B_CENTER_MS,
-  LS_B_DRAIN_MS, LS_B_KILL_MS, LH_APPEAR_MS, LH_DRAIN_MS, LH_SETTLE_MS, QUICKDRAW_MS, PASS_MANA_COST,
+  START_MANA, MAX_MANA, BASIC_COST, BASIC_DMG_MAX, MELEE_COST, MELEE_DMG,
+  MELEE_REPEAT, SPECIAL_COST, WOLF_DIRS, SIDE_CHARS, DIAG_DIRS, VAMP_TRAP_DMG,
+  VAMP_TRAP_BONUS, WORLD_COST, JOTARO_S1_COST, JOTARO_S1_DMG, STONE_ACTIONS, CLONE_DMG,
+  RECHARGE_GAIN, SHIELD_COST, MIRROR_COST, GOLDEN_COST, GOLDEN_MIRROR_COST, DASH_COST,
+  GOLDEN_MANA_GAIN, POWER_TILE_BONUS, DEMON_COST, DEMON_DMG, ACTION_TYPES, MOVE_DIRS,
+  MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS, MOVE_DELAY_MS, SMALL_DELAY_MS,
+  ACTION_GAP_MS, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS, MIRROR_BEAM_MS,
+  TELEPORT_OUT_MS, TELEPORT_IN_MS, LAB_REVEAL_MS, VAMP_TRAP_STRIKE_MS, TIMESTOP_CAST_MS, TIMESTOP_END_MS,
+  LS_APPEAR_MS, LS_DRAIN_MS, LS_KILL_MS, LS_REVIVE_MS, LS_RISE_MS, LS_SETTLE_MS,
+  LS_B_LEAVE_MS, LS_B_CENTER_MS, LS_B_DRAIN_MS, LS_B_KILL_MS, LH_APPEAR_MS, LH_DRAIN_MS,
+  LH_SETTLE_MS, QUICKDRAW_MS, PASS_MANA_COST,
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
 import { CHARACTERS } from "./characters/index.js";
+import { vampMeleeLand } from "./characters/vampires.js";
 
 export function createEngine(io = {}) {
   // --- háčiky na vonkajší svet (server: sockety/časovač; headless simulácia ich môže vynechať) ---
@@ -45,7 +45,7 @@ export function createEngine(io = {}) {
     powerBoost, dealMul, labyrinthMul, fireOnDmgTile,
     revealLabyrinths, strikeZone, strikeCell,
     applyPetrify, applyLabyrinth, applyStatusOnClone,
-    killClone, trackSteps, doJotaroWorld,
+    killClone, trackSteps, doJotaroWorld, vampShotRoute,
   };
 
 function newPlayer(slot) {
@@ -465,6 +465,8 @@ function trackCloneSteps(slot, cells) {
 
 // 3 akcie, každý typ max 1× za kolo, len známe typy a smery (move, attack aj dash nesú dir)
 // voliteľný úvod last_hope (len nebuffnutý hráč vo final kole) → potom golden_shield/golden_mirror (nestartér) → 3 akcie → sufix golden_mana
+// postavy, ktorých dash slot je charge (prepísaný dash - Vampire/Onryō): ghost simulácia beží po prvú figúru
+const DASH_IS_CHARGE = Object.fromEntries(Object.values(CHARACTERS).filter(c => c.dash).map(c => [c.key, true]));
 // kit postavy z registra (engine/characters): tvar basicu a obsah mirror slotu
 function kitOf(char) { return { attack: "ortho", mirrorSlot: "mirror", meleeDmg: MELEE_DMG, healTile: "plus1", ...(CHARACTERS[char]?.kit || {}) }; }
 // platný smer basicu pre postavu? form = Luffyho mód v čase basicu (base = diagonálny, gear3 = len ←/→);
@@ -575,7 +577,7 @@ function validQueue(queue, slot) {
     // ghost simulácia fronty (move/dash/charge/vlkolak/Luffy special, swap, Luffyho mód) - tá istá funkcia ako
     // klientský ghost; v labyrinte je súper skrytý → charge beží na okraj (prekliaty ho nevidí)
     const sim = G.simulateQueue(game.board, { x: meP?.x, y: meP?.y, char: meP?.char, form: meP?.form },
-      q, meP?.labyrinth ? null : foe, VAMP_CHARS);
+      q, meP?.labyrinth ? null : foe, DASH_IS_CHARGE);
     for (let i = 0; i < q.length; i++) {
       const a = q[i];
       const { x: sx, y: sy, char: simChar, form: simForm2 } = sim[i]; // stav PRED akciou i
@@ -599,10 +601,10 @@ function validTimestopQueue(queue, slot) {
   const types = queue.map(a => a && a.type);
   if (types.some(t => !allowed.has(t))) return false;
   if (new Set(types).size !== types.length) return false; // každý typ max 1×
-  const side = !!SIDE_CHARS[game.players[slot]?.char]; // Jotaro strieľa diagonálne
+  const char = game.players[slot]?.char; // tvar basicu podľa kitu (Jotaro strieľa diagonálne)
   for (const a of queue) {
     if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
-    if (a.type === "attack" && !(side ? DIAG_DIRS[a.dir] : MOVE_DIRS.has(a.dir))) return false;
+    if (a.type === "attack" && !attackDirOk(char, a.dir, game.players[slot]?.form)) return false;
     if (a.type === "special1" && a.dir !== "left" && a.dir !== "right") return false;
   }
   return true;
@@ -653,8 +655,9 @@ function doMove(slot, dir, tl) {
 
 function doDash(slot, dir, tl) {
   const a = game.players[slot];
-  // Vampire/Onryō nemajú dash - ich dash slot je pohybové melee (charge). Jotaro dashuje normálne.
-  if (VAMP_CHARS[a.char]) return doVampCharge(slot, dir, tl);
+  // postava môže dash slot prepísať (Vampire/Onryō: charge - pohybové melee)
+  const dashOverride = CHARACTERS[a.char]?.dash;
+  if (dashOverride) return dashOverride(ctx, slot, dir, tl);
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
   if (!delta) { pushInvalid(tl, slot); return; }
   if (a.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
@@ -689,18 +692,8 @@ function doDash(slot, dir, tl) {
 function doRecharge(slot, tl) {
   const a = game.players[slot];
 
-  // Luffy: recharge je jeho „glitch" akcia - doplní manu (ak nie je plná) A VŽDY prepne mód (base↔gear3),
-  // aj pri plnej mane (vtedy sa nepreškrtne - prepnutie je jeho efekt).
-  if (a.char === "luffy") {
-    const before = a.mana;
-    a.mana = Math.min(MAX_MANA, a.mana + RECHARGE_GAIN);
-    const gained = a.mana - before;
-    a.form = a.form === "gear3" ? "base" : "gear3";
-    const cells = a.clone ? [[a.x, a.y], [a.clone.x, a.clone.y]] : [[a.x, a.y]];
-    // dlhší frame, nech sa prepínacia póza (Recharge2 base→gear3 / Special_3 gear3→base) stihne prehrať
-    pushStateFrame(tl, [{ kind: "recharge", from: slot, cells, amount: gained, luffyForm: a.form }], Math.round(700 * ANIM_SLOW));
-    return;
-  }
+  // postava môže recharge prepísať (Luffy: doplní manu a prepne formu) - true = vyriešené
+  if (CHARACTERS[a.char]?.recharge?.(ctx, slot, tl)) return;
 
   // Na maxime many -> neplatné, žiadna modrá animácia/bublina
   if (a.mana >= MAX_MANA) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana_full"); return; }
@@ -735,7 +728,8 @@ function doBasic(slot, dir, tl) {
   const op  = game.players[opS];
 
   // Luffy GEAR 3: basic = Giant Pistol (naťahovacia ruka + priťiahnutie súpera) - vlastná vetva
-  if (me.char === "luffy" && me.form === "gear3") return doLuffyGear3Basic(slot, dir, tl);
+  // postava môže basic prepísať (Luffy Gear 3: Giant Pistol) - true = vyriešené
+  if (CHARACTERS[me.char]?.basic?.(ctx, slot, dir, tl)) return;
 
   // ortogonálne + diagonálne smery (Vampire/Onryō strieľajú diagonálne - validQueue gate-uje per postava)
   const delta = WOLF_DIRS[dir];
@@ -757,7 +751,7 @@ function doBasic(slot, dir, tl) {
   const cloneDelta = [delta[0], -delta[1]];
   // Vampire/Onryō/Luffy(base): strela letí po lomenej diagonálnej dráhe (route) s odrazom; ostatní priamo.
   // (Luffy gear3 sem nedôjde - má vlastnú vetvu doLuffyGear3Basic vyššie.)
-  const route = SIDE_CHARS[me.char] ? vampShotRoute(me.x, me.y, dir) : null;
+  const route = kitOf(me.char).attack !== "ortho" ? vampShotRoute(me.x, me.y, dir) : null; // diagonálna bounce strela (kit)
   const shots = [{ x: me.x, y: me.y, dist: 0, clone: false, d: delta, dir, done: false, spent: false, route }];
   if (me.clone) shots.push({ x: me.clone.x, y: me.clone.y, dist: 0, clone: true, d: cloneDelta, dir: cloneDir, done: false, spent: false, route: null });
 
@@ -847,8 +841,9 @@ function doMelee(slot, tl) {
   const opS = other(slot);
   const op  = game.players[opS];
 
-  // Vampire/Onryō majú vlastný melee (úder na vlastnej bunke + bonus). Jotaro melee normálne.
-  if (VAMP_CHARS[me.char]) return doVampMelee(slot, tl);
+  // postava môže melee prepísať (Vampire/Onryō: úder na vlastnej bunke)
+  const meleeOverride = CHARACTERS[me.char]?.melee;
+  if (meleeOverride) return meleeOverride(ctx, slot, tl);
 
   if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
   me.mana -= MELEE_COST;
@@ -858,7 +853,6 @@ function doMelee(slot, tl) {
   // úder sa švihne vždy (mana je preč aj pri minutí); bežne zasiahne len súpera na rovnakom políčku,
   // Medúza šľahá chvostom širšie - vlastné políčko + 1 diagonálne na všetky strany, za nižší dmg.
   // Zasahované bunky idú v efekte (klient ich zvýrazní a nemusí zrkadliť logiku).
-  const medusa = me.char === "medusa";
   const myMeleeDmg = kitOf(me.char).meleeDmg; // Medúza/Jotaro slabší melee (kit postavy)
   const cells = G.meleeCells(game.board, me, me.char);
   // vlastný klon seká paralelne na SVOJEJ bunke (rovnaký dmg ako Naruto)
@@ -904,208 +898,16 @@ function doMelee(slot, tl) {
 }
 
 /* ---- Vampire / Onryō: melee + charge + pasca ---- */
-// bonus po REÁLNE dopadnutom dmg (nie pri bloku - mirror sa voči nim správa tiež ako blok):
-// Vampire lieči zo skutočne spôsobeného HP lossu; Onryō najprv odoberie súperovu manu.
-// Caster si potom doplní len to, čo sa zmestí do capu - presah prepadá.
-// Vampire NElieči naraz so zásahom - pri charge/trap bonuse najprv idú beaty A2 → A3 → A4,
-// až po nich sa doplnia HP; Onryō drainuje hneď.
-// amount: charge VAMP_CHARGE_BONUS, trap VAMP_TRAP_BONUS.
-function vampBonus(slot, tl, amount, hpSource = amount) {
-  const p = game.players[slot];
-  const foeS = other(slot);
-  const foe = game.players[foeS];
-  if (p.char === "countess") {
-    for (const a of ["va2", "va3", "va4"]) {
-      pushStateFrame(tl, [{ kind: "vamp_heal_cast", from: slot, anim: a }], VAMP_HEAL_BEAT_MS);
-    }
-    const healed = Math.min(amount, Math.max(0, hpSource), START_HP - p.hp);
-    if (healed > 0) {
-      p.hp += healed;
-      pushStateFrame(tl, [{ kind: "heal", target: slot, amount: healed }], SMALL_DELAY_MS);
-    }
-    return;
-  }
-  const drained = Math.min(amount, Math.max(0, foe.mana));
-  if (drained <= 0) return;
-  const gained = Math.min(drained, MAX_MANA - p.mana);
-  foe.mana -= drained;
-  p.mana += gained;
-  pushStateFrame(tl, [{ kind: "mana_drain", from: slot, target: foeS, drained, gained }], SMALL_DELAY_MS);
-}
 
-// Dopad Vampire/Onryō melee-typu úderu (own-cell melee / charge / trap) na bunku, kde caster PRÁVE stojí.
-// Rieši všetky varianty s Narutovým klonom rovnako ako doMelee (stackedMelee):
-//   • samotný hráč      → strikeCell "player" (+ bonus z REÁLNE spôsobeného HP lossu)
-//   • klon-návnada sám   → strikeCell "clone" (zožerie úder celý, žiadny bonus)
-//   • stacknutý pár       → strikeCell "stacked": s obranou kryje pár ako JEDNA postava (bez bonusu);
-//     bez obrany klon pohltí CLONE_DMG (zomrie) a ZVYŠOK úderu prejde na majiteľa (bonus z tohto zvyšku)
-// Predtým stacknutý pár zabíjal len klona a majiteľ nedostal nič - chyba (klon nemal byť plný bait
-// na vlastnej bunke). bonusAmount 0 = melee bez heal/drain bonusu. consumeDefense: len trap beží mimo
-// resolveTurn slučky (ktorá inak spotrebuje súperovu obranu za akciu castera), tak si ju spotrebuje sám.
-// Vracia true, ak úder na niečo dopadol (na rozlíšenie whiffu naprázdno).
-// powerBonus = POWER tile prídavok už obsiahnutý v raw - len na rozpis hit framu (samostatný „-2" float)
-function vampMeleeLand(ownerSlot, raw, bonusAmount, tl, consumeDefense = false, powerBonus = 0) {
-  const me   = game.players[ownerSlot];
-  const foeS = other(ownerSlot);
-  const foe  = game.players[foeS];
-  const foeAt   = !!(foe && foe.x === me.x && foe.y === me.y);
-  const cloneAt = !!(foe?.clone && foe.clone.x === me.x && foe.clone.y === me.y);
-  const stacked    = foeAt && cloneAt;   // Naruto + klon na jednej bunke
-  const playerHere = foeAt && !cloneAt;  // len hráč (klon inde alebo žiadny)
-  const decoyHere  = cloneAt && !foeAt;  // klon-návnada sám
-  const shieldArmed = foe.shield, mirrorArmed = foe.mirror;
-  const defended = shieldArmed || mirrorArmed;
-  if (stacked) {
-    // s obranou kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok na majiteľa (bonus zo zvyšku)
-    const hpBefore = foe.hp;
-    strikeCell(foeS, "stacked", raw, tl, { kind: "melee", bonus: powerBonus });
-    if (!defended && bonusAmount > 0) vampBonus(ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
-  } else if (playerHere) {
-    const hpBefore = foe.hp;
-    strikeCell(foeS, "player", raw, tl, { kind: "melee", bonus: powerBonus });
-    if (bonusAmount > 0 && !defended) vampBonus(ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
-  } else if (decoyHere) {
-    strikeCell(foeS, "clone", raw, tl, { kind: "melee" }); // klon-návnada zožerie úder celý
-  }
-  if (consumeDefense && (playerHere || stacked || decoyHere)) {
-    if (shieldArmed) { foe.shield = false; foe.shieldGold = false; }
-    if (mirrorArmed) { foe.mirror = false; foe.mirrorGold = false; }
-  }
-  return playerHere || stacked || decoyHere;
-}
 
-// Melee Vampire/Onryō: úder LEN na vlastnej bunke (bez smeru) - VAMP_MELEE_DMG, bez bonusu.
-// Vampire opakuje A1 v troch beat-och ako Onryō melee; dmg padá až po celej choreografii.
-function doVampMelee(slot, tl) {
-  const me  = game.players[slot];
-  const opS = other(slot);
-  const op  = game.players[opS];
-  if (me.mana < MELEE_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
-  me.mana -= MELEE_COST;
-  // POWER tile: +2 k úderu; spotreba pri použití - aj pri whiffe na prázdnej bunke
-  const pBonus = powerBoost(slot, tl);
-  const raw = VAMP_MELEE_DMG * dealMul(slot) * labyrinthMul(slot) + pBonus;
-  // reálny zásah hráča (aj stacknutého páru s klonom) odhalí labyrint PRED údermi
-  if (op && op.x === me.x && op.y === me.y) revealLabyrinths(tl);
-  if (me.char === "countess") {
-    for (let r = 0; r < MELEE_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y], anim: "va1" }], VAMP_TRAP_STRIKE_MS);
-    }
-  } else {
-    for (let r = 0; r < MELEE_REPEAT; r++) {
-      pushStateFrame(tl, [{ kind: "melee", from: slot, cells: [[me.x, me.y]] }], SPECIAL_BEAT_MS);
-    }
-  }
-  vampMeleeLand(slot, raw, 0, tl, false, pBonus); // own-cell melee bez heal/drain bonusu; klon-návnada/stacknutý pár rieši helper
-}
 
-// Charge Vampire/Onryō (nahrádza dash, rovnaká cena): pohybové melee - beh zvoleným smerom po PRVÚ
-// figúru súpera (klon-návnada pred hráčom) alebo po okraj (bez cieľa = čisté premiestnenie);
-// VAMP_CHARGE_DMG + VAMP_CHARGE_BONUS pri dopadnutom dmg. Na bunke terča OSTÁVA STÁŤ aj pri bloku.
-// Charge do steny z okrajovej bunky = wall rule (mana preč, náraz, neprečiarkuje sa).
-function doVampCharge(slot, dir, tl) {
-  const me  = game.players[slot];
-  const opS = other(slot);
-  const op  = game.players[opS];
-  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
-  if (!delta) { pushInvalid(tl, slot); return; }
-  if (me.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
-  me.mana -= DASH_COST;
-  // POWER tile: ráta sa ŠTARTOVÁ bunka (caster na nej stojí v momente vyhodnotenia akcie, beh je až potom);
-  // spotreba pri použití - aj keď charge skončí čistým premiestnením bez terča či nárazom do steny
-  const pBonus = powerBoost(slot, tl);
-  const raw = VAMP_CHARGE_DMG * dealMul(slot) * labyrinthMul(slot) + pBonus;
 
-  // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár)
-  const { path, target } = G.runPath(game.board, me.x, me.y, delta, op);
-  const hit = !!target;
-  if (!path.length) {
-    pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
-    return;
-  }
-  me.x = path[path.length - 1][0];
-  me.y = path[path.length - 1][1];
-  // istý zásah reálneho hráča (aj stacknutého páru, aj do obrany) - odhaľ labyrint pred behom
-  if (op && op.x === me.x && op.y === me.y) revealLabyrinths(tl);
-  pushStateFrame(tl, [{ kind: "vamp_charge", from: slot, dir }, ...trackSteps(slot, path)], MOVE_DELAY_MS);
-  if (!hit) return; // dobehla na okraj bez terča - len presun
-  // Vampire seká A1 (jednotný úder podľa attack guide), Onryō pôvodný vampstrike (alias Attack_3)
-  pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y],
-    ...(me.char === "countess" ? { anim: "va1" } : {}) }], WOLF_STRIKE_MS);
-  vampMeleeLand(slot, raw, VAMP_CHARGE_BONUS, tl, false, pBonus); // hráč / klon-návnada / stacknutý pár rieši helper
-}
-
-// Luffy GEAR 3 basic = Giant Pistol s priťiahnutím súpera. Luffy STOJÍ; naťahovacia ruka letí ortogonálne
-// po prvú figúru súpera (klon-návnada / hráč). Pri zásahu dmg (falloff ako base 3/2/1) + PRIŤIAHNE súpera
-// na bunku hneď vedľa Luffyho (pos+dir). Obrana (shield/mirror) blokuje dmg AJ priťiahnutie.
-const GP_WINDUP_MS = Math.round(360 * ANIM_SLOW); // nafúknutie pästí (Recharge2)
-const GP_REACH_MS  = Math.round(320 * ANIM_SLOW); // naťahovanie ruky (L_GiantPunch)
-function doLuffyGear3Basic(slot, dir, tl) {
-  const me = game.players[slot];
-  const opS = other(slot);
-  const op  = game.players[opS];
-  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
-  if (!delta) { pushInvalid(tl, slot); return; }
-  if (me.mana < BASIC_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
-  me.mana -= BASIC_COST;
-  const pBonus = powerBoost(slot, tl);
-
-  // scan po prvú figúru súpera (hráč / klon) alebo okraj. Klon STACKNUTÝ na majiteľovej bunke = "stacked":
-  // pohltí len CLONE_DMG, zvyšok prejde na Naruta (rovnaké pravidlo ako basic/melee/werewolf charge) - nie
-  // plný bait ako klon-návnada mimo majiteľovej bunky.
-  let x = me.x, y = me.y, dist = 0, hit = false, cloneDecoy = false, stacked = false;
-  while (inBounds(x + delta[0], y + delta[1])) {
-    x += delta[0]; y += delta[1]; dist++;
-    const cloneHere  = !!(op?.clone && op.clone.x === x && op.clone.y === y);
-    const playerHere = !!(op && op.x === x && op.y === y);
-    if (cloneHere && playerHere) { hit = true; stacked = true; break; }
-    if (playerHere) { hit = true; break; }
-    if (cloneHere) { hit = true; cloneDecoy = true; break; }
-  }
-  const target = [x, y];
-
-  // nafúknutie pästí + naťahovanie ruky (FX na klientovi kreslí gumu + L_GiantPunch podľa origin/target/dir)
-  pushStateFrame(tl, [{ kind: "luffy_gp", phase: "windup", from: slot, dir, ms: GP_WINDUP_MS }], GP_WINDUP_MS);
-  pushStateFrame(tl, [{ kind: "luffy_gp", phase: "reach", from: slot, dir, origin: [me.x, me.y], target, hit, ms: GP_REACH_MS }], GP_REACH_MS);
-
-  if (!hit) { pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS); return; }
-
-  const dmg = Math.max(1, BASIC_DMG_MAX - dist) * dealMul(slot) * labyrinthMul(slot) + pBonus;
-
-  // klon-návnada (mimo majiteľovej bunky): pohltí úder, žiadny pull
-  if (cloneDecoy) {
-    strikeCell(opS, "clone", dmg, tl, { kind: "luffy_gp" });
-    pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS);
-    return;
-  }
-
-  // reálny hráč (aj stacknutý pár s klonom): istý zásah → odhaľ labyrint pred úderom; obrana v resolveStrike
-  revealLabyrinths(tl);
-  const defended = op.shield || op.mirror; // shield/mirror blokuje dmg AJ pull
-  // stacknutý pár: so zdieľanou obranou reaguje ako jedna postava, bez nej klon pohltí CLONE_DMG a zvyšok
-  // prejde na Naruta - potom (ak žije) pull
-  strikeCell(opS, stacked ? "stacked" : "player", dmg, tl, { kind: "luffy_gp", bonus: pBonus });
-
-  // PRIŤIAHNUTIE: len keď zásah dopadol (nebránený) a súper žije - na bunku hneď vedľa Luffyho.
-  // Inak (obrana / smrť / už stojí vedľa) sa ruka len STIAHNE späť - klient tak vždy korektne uzavrie
-  // súvislú naťahovaciu ruku (žiadne visiace držanie po zásahu).
-  if (!defended && op.hp > 0) {
-    const px = me.x + delta[0], py = me.y + delta[1];
-    if (px !== op.x || py !== op.y) {
-      const from = [op.x, op.y];
-      op.x = px; op.y = py;
-      pushStateFrame(tl, [{ kind: "luffy_pull", from: slot, foe: opS, fromCell: from, toCell: [px, py], dir }], MOVE_DELAY_MS);
-      return;
-    }
-  }
-  pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS);
-}
 
 
 // Countess/Onre sú IMÚNNE voči mirroru: súperov mirror sa voči ich dmg správa ako obyčajný štít
 // (bloklne celý dmg, nič neodráža; spotrebuje sa bežne ako obrana krytej akcie)
 function mirrorImmune(atkSlot) {
-  return !!VAMP_CHARS[game.players[atkSlot]?.char];
+  return !!kitOf(game.players[atkSlot]?.char).mirrorImmune;
 }
 
 /* ---- Pasca (Countess/Onre special) ---- */
@@ -1200,7 +1002,7 @@ function triggerTrap(ownerSlot, tl) {
   // trap-melee je akcia castera mimo resolveTurn slučky → zásah si spotrebuje súperovu obranu sám
   // (consumeDefense). Heal beaty A2→A3→A4 + doplnenie HP / mana drain rieši vampBonus vnútri helpera;
   // stacknutý pár Naruto+klon: klon pohltí CLONE_DMG, zvyšok prejde na Naruta a bonus je z toho zvyšku.
-  const hitSomething = vampMeleeLand(ownerSlot, raw, VAMP_TRAP_BONUS, tl, true);
+  const hitSomething = vampMeleeLand(ctx, ownerSlot, raw, VAMP_TRAP_BONUS, tl, true);
   if (!hitSomething) pushStateFrame(tl, [], SMALL_DELAY_MS); // súper bunkou len prebehol - úder naprázdno
   return true;
 }
@@ -1259,7 +1061,26 @@ function revealLabyrinths(tl) {
 // (petrify/banish) sa NEpočítajú. Vyhodnotí sa na konci kola v resolveTurn (−1 pride), flag sa tam nuluje.
 function notePrideHit(slot) {
   const p = game.players[slot];
-  if (p.char === "escanor") p.prideHit = true;
+  CHARACTERS[p.char]?.on?.hitTaken?.(ctx, p);
+}
+// háčik postavy (engine/characters) pre hráča na slote
+function charHook(slot, name, ...args) {
+  const p = game.players[slot];
+  return CHARACTERS[p.char]?.on?.[name]?.(ctx, p, ...args);
+}
+// snímka roundStart z kola - len ak je na slote STÁLE tá istá postava (swap uprostred kola ju zahodí)
+function roundInfo(slot) {
+  const ci = game.roundCtx?.charInfo?.[slot];
+  return ci && ci.char === game.players[slot].char ? ci.data : undefined;
+}
+// spoločný reset stavu postáv pri nasadení (voľba postavy / swap) + háčik deploy novej postavy
+function deployReset(slot) {
+  const p = game.players[slot];
+  p.pride = 0;        // Escanor: nasadenie začína na pride 0
+  p.prideHit = false; // zásahy predchodcu sa na nového maga neprenášajú
+  p.form = "base";    // Luffy: začína v base móde
+  p.moon = 0;         // Vlkolak: fázu nastaví jeho deploy háčik podľa (preneseného) HP
+  charHook(slot, "deploy");
 }
 
 /* ==================== Damage pipeline ==================== */
@@ -1729,11 +1550,9 @@ function doSwap(slot, to, tl) {
   pushStateFrame(tl, [{ kind: "teleport_out", from: slot, char: from }], TELEPORT_OUT_MS);
   // prepni identitu + nasaď HP/manu nového maga
   me.char = to;
-  me.pride = 0; // Escanor: nasadenie swapom začína na pride 0
-  me.prideHit = false; // zásahy predchodcu sa na nového maga neprenášajú
   me.hp = game.mageHp[person][to];
   me.mana = game.mageMana[person][to];
-  me.moon = to === "werewolf" ? moonLevelFor(me.hp) : 0; // Vlkolak: fáza HNEĎ podľa preneseného HP
+  deployReset(slot); // pride/forma/mesiac nového maga (vlkolak: fáza HNEĎ podľa preneseného HP)
   // (2) nový mág sa objaví
   pushStateFrame(tl, [{ kind: "teleport_in", from: slot, char: to }], TELEPORT_IN_MS);
 }
@@ -2061,22 +1880,13 @@ function resolveTurn() {
   // (fronta aj golden flagy sa počas kola menia/miznú). Na konci kola: použil obranu ALEBO dostal zásah
   // (p.prideHit z notePrideHit) → −1, inak → +1. Číta sa FRONTA, nie výsledok - obrana zmarená BLOCK tile
   // (blocked_shield/mirror) teda pride uberá tiež (skúsil sa brániť) - zámer.
-  const escUsedDefense = {};
-  for (const slot of ["p1", "p2"]) {
-    const p = game.players[slot];
-    if (p.char !== "escanor") continue;
-    escUsedDefense[slot] = !!p.golden || !!p.goldenMirror ||
-      (p.queue || []).some(a => a && (a.type === "shield" || a.type === "mirror"));
-  }
+  // háčik roundStart postáv: snímka PRED spracovaním kola (fronta aj golden flagy sa počas kola menia/miznú) -
+  // Escanor (použil obranu → pride), Pútnik (použil mirror → bez regenu). Ukladá sa do roundCtx (THE WORLD resume).
+  const charInfo = {};
+  for (const slot of ["p1", "p2"]) charInfo[slot] = { char: game.players[slot].char, data: charHook(slot, "roundStart") };
   // Pútnik (wanderer): ak v tomto kole použil mirror (obyčajný ALEBO golden), pasívna +many na konci kola NEpríde.
   // Zachyť PRED spracovaním kola - golden flag aj fronta (golden predťah) sa počas kola menia/miznú (ako pri Escanorovi).
   // Číta sa FRONTA, nie výsledok - mirror zmarený BLOCK tile regen tiež ruší (zámer, hoci mana ostala).
-  const wandererUsedMirror = {};
-  for (const slot of ["p1", "p2"]) {
-    const p = game.players[slot];
-    if (p.char !== "wanderer") continue;
-    wandererUsedMirror[slot] = !!p.goldenMirror || (p.queue || []).some(a => a && a.type === "mirror");
-  }
   // doom: zachyť na začiatku kola - true len v buffnutom (poslednom) kole, NIE v aktivačnom (vtedy sa nastaví až v gold fáze)
   const doomSlot = game.players.p1.lastStandDoom ? "p1" : game.players.p2.lastStandDoom ? "p2" : null;
 
@@ -2138,7 +1948,7 @@ function resolveTurn() {
   game.roundCtx = {
     tl, order, i: 0, slotIdx: 0, ended: false,
     stonedStep: null, tookStoned: null,
-    escUsedDefense, wandererUsedMirror, doomSlot,
+    charInfo, doomSlot,
     second, emittedUpTo: 0,
   };
   runRoundLoop();
@@ -2226,7 +2036,7 @@ function runRoundLoop() {
 // tiles, emit timeline, reset a naplánovanie ďalšieho kola. Číta game.roundCtx a na konci ho vynuluje.
 function finishRound() {
   const ctx = game.roundCtx;
-  const { tl, order, escUsedDefense, wandererUsedMirror, doomSlot } = ctx;
+  const { tl, order, doomSlot } = ctx;
   let ended = ctx.ended;
 
   // koniec hry: tieňové klony miznú (aj pri výhre majiteľa) - poof po dohraní smrteľného zásahu;
@@ -2238,11 +2048,7 @@ function finishRound() {
 
   // Escanor pride: koniec kola - použil obranu ALEBO dostal zásah od súpera → −1, inak → +1 (clamp 0–3;
   // stále len ±1 za kolo, podmienky sa nesčítavajú). Prejaví sa v nasledujúcom kole.
-  for (const slot of ["p1", "p2"]) {
-    const p = game.players[slot];
-    if (p.char !== "escanor" || !(slot in escUsedDefense)) continue;
-    p.pride = Math.max(0, Math.min(3, (p.pride || 0) + ((escUsedDefense[slot] || p.prideHit) ? -1 : 1)));
-  }
+  for (const slot of ["p1", "p2"]) charHook(slot, "afterActions", roundInfo(slot));
   // flag zásahu žije len jedno kolo (nuluj bez ohľadu na char - mág sa mohol vymeniť swapom)
   game.players.p1.prideHit = false;
   game.players.p2.prideHit = false;
@@ -2314,27 +2120,10 @@ function finishRound() {
   if (!ended) {
     // Vlkolak: fáza mesiaca sa prepočíta na KONCI kola z aktuálnych HP (po tiles, golden mane aj Last Stand
     // full-heale) - nesie ju až finálny frame; klient porovná prvý/posledný frame a ukáže float s novou fázou.
-    for (const slot of ["p1", "p2"]) {
-      const p = game.players[slot];
-      if (p.char === "werewolf") p.moon = moonLevelFor(p.hp);
-    }
+    for (const slot of ["p1", "p2"]) charHook(slot, "roundEnd", slot, roundInfo(slot), tl);
 
-    // Pútnik (wanderer): pasívne +WANDERER_MANA_REGEN many na konci kola - len ak ešte žije, je aktívny
-    // a v tomto kole NEpoužil mirror (obyčajný ani golden). Čierna recharge animácia (dark:true).
-    for (const slot of ["p1", "p2"]) {
-      const p = game.players[slot];
-      if (p.char !== "wanderer" || p.hp <= 0) continue;
-      if (wandererUsedMirror[slot]) {
-        // použil mirror → žiadna pasívna mana; oznám hráčovi dôvod (float „MIRROR USED")
-        pushStateFrame(tl, [{ kind: "wanderer_no_regen", target: slot }], SMALL_DELAY_MS);
-        continue;
-      }
-      const gain = Math.min(MAX_MANA - p.mana, WANDERER_MANA_REGEN);
-      if (gain > 0) {
-        p.mana += gain;
-        pushStateFrame(tl, [{ kind: "recharge", from: slot, cells: [[p.x, p.y]], amount: gain, dark: true }], SMALL_DELAY_MS);
-      }
-    }
+    // háčik roundEndFx (môže pridať framy) - Pútnikova pasívna mana
+    for (const slot of ["p1", "p2"]) charHook(slot, "roundEndFx", slot, roundInfo(slot), tl);
 
     // prechod do ďalšieho kola: až TU dopadnú zmeny tiles - commit ohláseného preview + žreb nového
     // na ďalšie kolo. Oboje nesie až finálny mini-frame, takže klient ukáže nové tiles AJ čerstvý preview
@@ -2597,10 +2386,7 @@ function autoLock() {
       me.mana = game.mageMana[person]?.[key] ?? START_MANA;
     }
     me.char = key;
-    me.pride = 0; // Escanor: každá nová hra začína na pride 0
-    me.prideHit = false;
-    me.form = "base"; // Luffy: každá hra začína v base móde
-    me.moon = key === "werewolf" ? moonLevelFor(me.hp) : 0; // Vlkolak: fáza HNEĎ podľa (preneseného) HP
+    deployReset(slot); // pride/forma/mesiac - každá hra začína čisto (vlkolak: fáza podľa preneseného HP)
     // obaja vybrali -> začína 1. kolo, naštartuj časovač pred emitom (snapshot nesie timerMs pre refresh-sync)
     if (game.players.p1.char && game.players.p2.char) beginPlanningTimer(0);
     emitStateMasked(); // súperov pick sa odhalí až keď si vyberie aj druhý hráč (žiadna výhoda pre rozmýšľajúceho)

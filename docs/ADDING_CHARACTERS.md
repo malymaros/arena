@@ -79,6 +79,10 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
         dmg ide VÝHRADNE cez `ctx.strikeZone` / `ctx.strikeCell` (damage pipeline - obrany, klon, labyrint,
         THE WORLD sa riešia samy), frame-y cez `ctx.pushStateFrame`, pred istým zásahom `ctx.revealLabyrinths`;
       - `special.validate(ctx, a, sim)` — ak special nesie cieľ (bunka/smer), odmietnutie pri `lock_in`;
+      - pasívky cez háčiky `on: { deploy, hitTaken, roundStart, afterActions, roundEnd, roundEndFx }` (vzor:
+        Escanor pride, vlkolak moon, Pútnikov regen); vlastný stav hráča pridaj do `newPlayer`/`cloneActor`
+        a jeho reset pri nasadení do `deployReset`;
+      - iná mechanika základnej akcie = prepísanie `basic` / `recharge` / `dash` / `melee` (vzor: Luffy, Vampire).
 - [ ] **Geometriu zóny** (ak ju kreslí aj klient) daj do `shared/geometry.js` a volaj ju zo special aj
       z klientského `cellsForSpecialPreview` - nikdy ju nepíš dvakrát.
 - [ ] Ak special zavádza **nový stav** hráča (napr. `stone`, `labyrinth`, `clone`) — pridaj pole do

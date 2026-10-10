@@ -2,11 +2,17 @@
 // (klon-návnada absorbuje úder skôr než súper) alebo na okraji plochy. Zásah = WOLF_MOON_DMG[moon] bez
 // falloffu, cez obrany ako každý dmg special - vlkolak na bunke terča OSTÁVA STÁŤ aj pri bloku/odraze.
 // Bez terča je akcia len presun; charge z okrajovej bunky von sa VYKONÁ podľa wall pravidla.
-import { SPECIAL_COST, SMALL_DELAY_MS, MOVE_DELAY_MS, WOLF_DIRS, WOLF_CAST_MS, WOLF_STRIKE_MS, WOLF_MOON_DMG } from "../constants.js";
+import { SPECIAL_COST, SMALL_DELAY_MS, MOVE_DELAY_MS, WOLF_DIRS, WOLF_CAST_MS, WOLF_STRIKE_MS, WOLF_MOON_DMG, moonLevelFor } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 
 export default {
   key: "werewolf",
+  // fáza mesiaca 0-3 je odvodená z HP: hneď pri nasadení (aj prenesené HP v turnaji) a na KONCI kola
+  // (po tiles, golden mane aj Last Stand heale - nesie ju až finálny frame, klient ukáže float s novou fázou)
+  on: {
+    deploy(ctx, p) { p.moon = moonLevelFor(p.hp); },
+    roundEnd(ctx, p) { p.moon = moonLevelFor(p.hp); },
+  },
   special: {
     resolve(ctx, slot, tl, { dir }) {
       const { game } = ctx;

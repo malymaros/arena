@@ -7,6 +7,19 @@ import { SPECIAL_ZONE_DMG } from "./zone.js";
 
 export default {
   key: "escanor",
+  // Pride 0-3: koniec kola → použil obranu (shield/mirror aj golden - číta sa FRONTA, nie výsledok; obrana
+  // zmarená BLOCK tile sa ráta) ALEBO dostal zásah od súpera → −1, inak +1 (len ±1, clamp 0-3).
+  // Reset na 0 pri nasadení robí engine (spoločný reset stavu postáv).
+  on: {
+    hitTaken(ctx, p) { p.prideHit = true; }, // HP loss spôsobený súperom (aj odraz vlastného útoku); nie tiles/statusy
+    roundStart: (ctx, p) => ({
+      usedDefense: !!p.golden || !!p.goldenMirror || (p.queue || []).some(a => a && (a.type === "shield" || a.type === "mirror")),
+    }),
+    afterActions(ctx, p, info) {
+      if (!info) return; // Escanor nasadený až počas kola (swap) - pride sa v tomto kole nemení
+      p.pride = Math.max(0, Math.min(3, (p.pride || 0) + ((info.usedDefense || p.prideHit) ? -1 : 1)));
+    },
+  },
   special: {
     resolve(ctx, slot, tl, { dir }) {
       const { game } = ctx;

@@ -155,6 +155,21 @@ previews importujú `shared/geometry.js`.
 - Zostáva v engine (etapa 5 - háčiky): Escanor pride, vlkolak moon, Luffyho forma (recharge), vamp kit
   (charge, trigger pasce, mirror imunita), Jotarov THE WORLD; klientská choreografia (etapa 6).
 
+## Etapa 5 - stav
+
+- [x] **Háčiky postáv** `on: { deploy, hitTaken, roundStart, afterActions, roundEnd, roundEndFx }`: Escanor pride,
+      vlkolak moon, Pútnikova pasívna mana. Snímky `roundStart` sa ukladajú do `roundCtx.charInfo` (THE WORLD resume)
+      a dostane ich len postava, ktorá na slote ostala celé kolo (swap uprostred kola ich zahodí - ako predtým).
+- [x] **Spoločný reset pri nasadení** `deployReset` (voľba postavy aj swap) + háčik `deploy`.
+- [x] **Prepísania akcií** v postave: `basic` (Luffy Gear 3 - presunuté do luffy.js), `recharge` (Luffy forma),
+      `dash`/`melee` (Vampire/Onryō charge a úder - celý vamp kit presunutý do vampires.js), `kit.mirrorImmune`.
+- [x] Engine už nerozhoduje podľa mien postáv; ostáva len viazanie na stranu (`SIDE_CHARS`: swap, draft),
+      trigger pasce (mechanika enginu, úder cez `vampMeleeLand` z postavy) a pár detailov choreografie
+      (Vojakov granát, anim. názvy pasce, Fire na Damage dlaždici).
+- Overenie: po každom kroku difftest 2 420 zápasov = 0 rozdielov, golden 48/48, `npm test` (aj turnaj/swap).
+- [ ] Rozdelenie mechaník enginu do modulov (`labyrinth.js`, `timestop.js`, `laststand.js`, `tiles.js`) -
+      čisto organizačné, navrhnuté ako ďalší krok.
+
 ## Rozhodnutia (na schválenie)
 
 1. **„Explicitný ctx" v Etape 1 = inštancia enginu, nie parameter každej funkcie.** Engine je factory

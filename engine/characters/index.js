@@ -10,6 +10,13 @@
 //   validate(ctx, a, sim)                  - kontrola argumentov specialu pri lock_in (false = odmietnuť);
 //                                            sim = { x, y, form, worldUsed, foe } - GHOST stav v čase specialu,
 //                                            foe = viditeľný súper (null, ak je hráč v labyrinte)
+// Háčiky on: { … } (všetky voliteľné; p = hráč, info = výsledok roundStart, ak postava nebola v kole vymenená):
+//   deploy(ctx, p)                     - nasadenie (voľba postavy / swap), po spoločnom resete stavu postáv
+//   hitTaken(ctx, p)                   - súper spôsobil hráčovi stratu HP (zásah aj odraz; nie tiles/statusy)
+//   roundStart(ctx, p) → info          - snímka na začiatku kola (napr. čo je vo fronte)
+//   afterActions(ctx, p, info)         - po všetkých akciách kola, pred zánikom obrán
+//   roundEnd(ctx, p, slot, info, tl)   - koniec kola (hra pokračuje), stav bez framov - pre oboch pred roundEndFx
+//   roundEndFx(ctx, p, slot, info, tl) - koniec kola, môže pridať framy (pasívna regenerácia)
 // ctx = rozhranie enginu pre postavy (stav hry, framy, damage pipeline, labyrint…) - vytvára createEngine.
 import { fire, lightning, wanderer } from "./simple.js";
 import medusa from "./medusa.js";
