@@ -40,7 +40,9 @@ export const SOLDIER_SPECIAL_DMG = 10; // Vojakov snajperský lúč na zvolenú 
 // Vlkolak (werewolf): charge special - dmg podľa fázy mesiaca (index = moon level 0–3: nov/kosáčik/polmesiac/spln)
 export const WOLF_MOON_DMG = [2, 4, 6, 8];
 // vlkolakov special má 8 smerov (aj diagonály) - kľúče nesie akcia v `dir`
-export const WOLF_DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
+// smery a dosah diagonálnej strely: jediný zdroj je shared/geometry.js (zdieľaný s prehliadačom)
+import { DIR8 as WOLF_DIRS, DIAG_DIRS, VAMP_SHOT_RANGE } from "../shared/geometry.js";
+export { WOLF_DIRS, DIAG_DIRS, VAMP_SHOT_RANGE };
 export const WOLF_DIR_KEYS = Object.keys(WOLF_DIRS);
 // fáza mesiaca podľa AKTUÁLNYCH HP (prepočítava sa na konci kola + pri nasadení/swape):
 // 10 → 0 (nov), 9–7 → 1 (kosáčik), 6–4 → 2 (polmesiac), 3–1 → 3 (spln)
@@ -63,7 +65,6 @@ export const VAMP_CHARS = { countess: 1, onre: 1 };
 // (Väzba side-postavy na slot sa overuje priamo `SIDE_CHARS[key] === slot` - viď onChooseCharacter/onChooseTeam.)
 // ich basic attack strieľa DIAGONÁLNE (4 diagonálne smery namiesto ortogonálnych; falloff nezmenený -
 // na 3-riadkovej ploche má diagonála max 2 kroky, takže dmg je vždy 3 alebo 2)
-export const DIAG_DIRS = { up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
 export const DIAG_DIR_KEYS = Object.keys(DIAG_DIRS);
 // ich melee je úder na vlastnej bunke bez bonusu; charge v 4 smeroch nesie silnejší bonus.
 // Vampire/Onryō kit: melee = úder LEN na vlastnej bunke (bez smeru); charge nahrádza dash - pohybové
@@ -76,7 +77,6 @@ export const VAMP_TRAP_DMG     = 3;
 export const VAMP_TRAP_BONUS   = 3;
 // diagonálny basic: strela sa RAZ odrazí od ktorejkoľvek steny (biliard - od bočnej letí späť),
 // roh neodráža (strela končí), tvrdý limit letu = 3 bunky → dmg presne 3/2/1 podľa vzdialenosti
-export const VAMP_SHOT_RANGE = 3;
 // Jotaro (Star Platinum): diagonálny basic používa vamp trasu (VAMP_SHOT_RANGE, dmg 3/2/1). Special 1
 // (v mirror slote) = smerový útok na OBE diagonálne bunky zvolenej strany; Special 2 (po THE WORLD) =
 // smerový útok na jedinú susednú bunku. THE WORLD = jednorazový per-hra time-stop (WORLD_COST).

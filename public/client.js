@@ -1,4 +1,6 @@
 // public/client.js
+// herná geometria (zóny specialov, dráhy striel, ghost simulácia) - ten istý modul používa server (engine)
+import * as G from "/shared/geometry.js";
 // trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
 // (inak by sa vrátený hráč stal divákom a server by prestal brať jeho lock_in)
 let arenaId = null;
@@ -159,7 +161,7 @@ const luffyInfo = { p1: document.getElementById("luffy-info-p1"), p2: document.g
 // dmg vlkolakovho charge podľa fázy mesiaca - MUSÍ sedieť so serverovým WOLF_MOON_DMG
 const WOLF_MOON_DMG = [2, 4, 6, 8];
 // 8 smerov vlkolakovho specialu - MUSÍ sedieť so serverovým WOLF_DIRS
-const WOLF_DIRS_CLIENT = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
+const WOLF_DIRS_CLIENT = G.DIR8; // 8 smerov (vlkolakov charge, smer strely) - zo shared/geometry.js
 const WOLF_DIR_KEYS_CLIENT = Object.keys(WOLF_DIRS_CLIENT);
 const flagP1    = document.getElementById("flag-p1");
 const flagP2    = document.getElementById("flag-p2");
@@ -2999,33 +3001,20 @@ function cellsForSpecialPreview(meState, dir){
   const { x, y, char } = meState;
   const cells = [];
   if (char === "medusa"){
-    // vlastné políčko + všetko striktne zvoleným smerom v riadku ±1 - zrkadlí server (medusaCells)
-    const sgn = dir === "left" ? -1 : 1;
-    cells.push([x, y]);
-    for (let cy = y - 1; cy <= y + 1; cy++){
-      if (cy < 0 || cy >= board.h) continue;
-      for (let cx = x + sgn; cx >= 0 && cx < board.w; cx += sgn) cells.push([cx, cy]);
-    }
+    // vlastné políčko + všetko striktne zvoleným smerom v riadkoch ±1
+    return G.medusaCells(board, meState, dir);
   } else if (char === "fire"){
-    // celý riadok; ak (ghost) pozícia stojí na Damage dlaždici, rozšír o riadky ±1 (zrkadlí fireOnDmgTile na serveri)
+    // celý riadok; ak (ghost) pozícia stojí na Damage dlaždici, riadky ±1 (server: fireOnDmgTile)
     const onDmg = (state?.tiles || []).some(t => t.type === "dmg" && t.x === x && t.y === y);
-    const y0 = onDmg ? Math.max(0, y - 1) : y;
-    const y1 = onDmg ? Math.min(board.h - 1, y + 1) : y;
-    for (let cy=y0; cy<=y1; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
+    return G.fireCells(board, meState, onDmg);
   } else if (char === "lightning"){
     // všetky políčka opačnej "šachovej" farby než na ktorej stojí
-    const par = (x + y) % 2;
-    for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++){
-      if ((cx + cy) % 2 !== par) cells.push([cx, cy]);
-    }
+    return G.lightningCells(board, meState);
   } else if (char === "wanderer"){
-    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy])=>{
-      const cx=x+dx, cy=y+dy;
-      if (cx>=0 && cy>=0 && cx<board.w && cy<board.h) cells.push([cx,cy]);
-    });
+    return G.diagNeighbors(board, meState);
   } else if (char === "minotaur"){
-    // celoplošný - zrkadlí server (labyrint zasiahne súpera kdekoľvek)
-    for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
+    // celoplošný (labyrint zasiahne súpera kdekoľvek)
+    return G.allCells(board);
   } else if (char === "naruto"){
     // range self - summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
     cells.push([x, y]);
@@ -3041,129 +3030,44 @@ function cellsForSpecialPreview(meState, dir){
     // bez neho (char-select ukážka) alebo so skrytým súperom v labyrinte (x null) ide dráha až na okraj.
     const delta = WOLF_DIRS_CLIENT[dir];
     if (!delta) return cells;
-    const foe = meState.foe;
-    let cx = x + delta[0], cy = y + delta[1];
-    while (cx >= 0 && cy >= 0 && cx < board.w && cy < board.h){
-      cells.push([cx, cy]);
-      if (foe && foe.x != null && ((foe.x === cx && foe.y === cy) || (foe.clone && foe.clone.x === cx && foe.clone.y === cy))) break;
-      cx += delta[0]; cy += delta[1];
-    }
+    return G.runPath(board, x, y, delta, meState.foe).path;
   } else if (char === "jotaro"){
     // special = Special 2 (po THE WORLD, worldUsed): jediná susedná bunka (x±dir, y). THE WORLD (pred ním):
     // cast je globálny → celá doska blikne (nič konkrétne neleakuje). worldUsed nesie meState.
-    if (meState.worldUsed) {
-      const fx = x + (dir === "left" ? -1 : 1);
-      if (fx >= 0 && fx < board.w) cells.push([fx, y]);
-    } else {
-      for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
-    }
+    return meState.worldUsed ? G.jotaroS2Cells(board, meState, dir) : G.allCells(board);
   } else if (char === "escanor"){
-    // smerový (left/right) - rozsah podľa pride levelu; zrkadlí escanorCells na serveri
-    const pride = Math.max(0, Math.min(3, meState.pride ?? 0));
-    const add = (cx,cy) => { if (cx>=0 && cy>=0 && cx<board.w && cy<board.h && !cells.some(c=>c[0]===cx&&c[1]===cy)) cells.push([cx,cy]); };
-    const fx = x + (dir === "left" ? -1 : 1), fy = y;
-    // kotva F mimo plochy = slnko letí do autu - nič nezvýrazni, ANI pri pride 3 (ako basic mimo plochy)
-    if (fx < 0 || fx >= board.w) return cells;
-    if (pride >= 3){ for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) add(cx,cy); }
-    else {
-      add(fx, fy);
-      if (pride === 1){ add(fx-1,fy-1); add(fx+1,fy-1); add(fx-1,fy+1); add(fx+1,fy+1); }
-      if (pride === 2) for (let yy=fy-1; yy<=fy+1; yy++) for (let xx=fx-1; xx<=fx+1; xx++) add(xx,yy);
-    }
+    // smerový (left/right) - rozsah podľa pride levelu (kotva mimo plochy = prázdna zóna aj pri pride 3)
+    return G.escanorCells(board, meState, dir);
   }
   return cells;
 }
 // Jotarov Special 1 (mirror slot): obe diagonálne bunky zvolenej strany (x±dir, y±1) - zrkadlí jotaroS1Cells
 function cellsForJotaroS1(p, dir){
-  if (!p) return [];
-  const dx = dir === "left" ? -1 : 1;
-  const out = [];
-  for (const dy of [-1, 1]) {
-    const cx = p.x + dx, cy = p.y + dy;
-    if (cx >= 0 && cy >= 0 && cx < board.w && cy < board.h) out.push([cx, cy]);
-  }
-  return out;
+  return p ? G.jotaroS1Cells(board, p, dir) : [];
 }
 // dosah melee - vlastné políčko; Medúza navyše 1 diagonálne na všetky strany (zrkadlí doMelee na serveri)
 function cellsForMeleePreview(p, char){
-  if (!p) return [];
-  const cells = [[p.x, p.y]];
-  if (char === "medusa") [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy])=>{
-    const cx = p.x + dx, cy = p.y + dy;
-    if (cx >= 0 && cy >= 0 && cx < board.w && cy < board.h) cells.push([cx, cy]);
-  });
-  return cells;
+  return p ? G.meleeCells(board, p, char) : [];
 }
 // dráha charge Vampire/Onryō (dash slot): z pozície zvoleným smerom po prvú VIDITEĽNÚ figúru súpera
 // (aj klon) alebo okraj - zrkadlí doVampCharge na serveri (skrytý súper v labyrinte má x null → beh na okraj)
 function cellsForVampChargePreview(p, dir, foe){
-  if (!p) return [];
-  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
-  if (!delta) return [];
-  const cells = [];
-  let x = p.x + delta[0], y = p.y + delta[1];
-  while (x >= 0 && y >= 0 && x < board.w && y < board.h){
-    cells.push([x, y]);
-    if (foe && foe.x != null && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
-    x += delta[0]; y += delta[1];
-  }
-  return cells;
+  const delta = G.DIR4[dir];
+  return p && delta ? G.runPath(board, p.x, p.y, delta, foe).path : [];
 }
 // dosah démon útoku - všetky políčka okrem toho, na ktorom kaster (ghost) stojí
 function cellsForDemonPreview(p){
-  if (!p) return [];
-  const cells = [];
-  for (let y=0; y<board.h; y++) for (let x=0; x<board.w; x++) if (!(x===p.x && y===p.y)) cells.push([x,y]);
-  return cells;
+  return p ? G.allCells(board, p) : [];
 }
 /* ---------- Ghost - simulácia vlastnej pozície počas naplánovaného kola ---------- */
 // pozícia po každej akcii vo fronte; movy mimo board pozíciu nemenia (zrkadlí server)
 function simulatedPositions(){
   const mine = state?.[me];
   if (!mine) return [];
-  let x = mine.x, y = mine.y;
-  let char = mine.char; // turnajový swap vo fronte mení maga - vlkolakov charge hýbe len vlkolakom
-  const inB = (px, py) => px >= 0 && py >= 0 && px < board.w && py < board.h;
-  const out = [];
-  for (const a of myQueue){
-    if (a.type === "swap" && a.to) char = a.to;
-    const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
-    if (a.type === "move" && d){
-      const nx = x + d[0], ny = y + d[1];
-      if (inB(nx, ny)){ x = nx; y = ny; }
-    }
-    if (a.type === "dash" && d){
-      if (char === "countess" || char === "onre"){
-        // Vampire/Onryō: dash = charge - beh po prvú VIDITEĽNÚ figúru súpera alebo okraj
-        // (skrytý súper v labyrinte má x null → beh na okraj; zrkadlí server validQueue)
-        const foe = state?.[otherSlot()];
-        while (inB(x + d[0], y + d[1])){
-          x += d[0]; y += d[1];
-          if (foe && foe.x != null && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
-        }
-      } else {
-        // až 2 políčka, na okraji sa skráti (zrkadlí server)
-        for (let s = 0; s < 2; s++){
-          const nx = x + d[0], ny = y + d[1];
-          if (inB(nx, ny)){ x = nx; y = ny; }
-        }
-      }
-    }
-    // vlkolakov charge special hýbe kasterom: stop na prvej VIDITEĽNEJ figúre súpera alebo na okraji
-    // (skrytý súper v labyrinte má x null → beh na okraj; zrkadlí serverovú simuláciu vo validQueue)
-    if (a.type === "special" && char === "werewolf"){
-      const wd = WOLF_DIRS_CLIENT[a.dir];
-      if (wd){
-        const foe = state?.[otherSlot()];
-        while (inB(x + wd[0], y + wd[1])){
-          x += wd[0]; y += wd[1];
-          if (foe && foe.x != null && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
-        }
-      }
-    }
-    out.push({ x, y });
-  }
-  return out;
+  // skrytý súper v labyrinte má x null → charge beží na okraj (shared figureAt ho ignoruje)
+  const sim = G.simulateQueue(board, { x: mine.x, y: mine.y, char: mine.char, form: mine.form || "base" },
+    myQueue, state?.[otherSlot()], VAMP_CHARS);
+  return sim.slice(1).map(({ x, y }) => ({ x, y }));
 }
 // pozícia, z ktorej sa vykoná akcia s indexom idx (= po akciách 0..idx-1);
 // bez argumentu pozícia po celej fronte - odtiaľ sa vykoná novo pridávaná akcia
@@ -3175,29 +3079,12 @@ function ghostPos(idx = myQueue.length){
   if (!sims.length) return { x: mine.x, y: mine.y };
   return sims[Math.min(idx, sims.length) - 1];
 }
-// budúca pozícia VLASTNÉHO tieňového klona po fronte - kopíruje pohyb majiteľa s inverznou vertikálou
-// a vlastným clampom; klon sa hýbe, len keď je majiteľov ťah platný (zrkadlí moveCloneSteps na serveri)
+// budúca pozícia VLASTNÉHO tieňového klona po fronte - kopíruje move/dash majiteľa s inverznou vertikálou
+// a vlastným clampom; hýbe sa aj keď majiteľ narazí do steny (ako na serveri doMove/doDash)
 function simulatedClonePos(){
   const mine = state?.[me];
-  const c = mine?.clone;
-  if (!mine || !c) return null;
-  let ox = mine.x, oy = mine.y, x = c.x, y = c.y;
-  const inB = (px, py) => px >= 0 && py >= 0 && px < board.w && py < board.h;
-  for (const a of myQueue){
-    const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
-    if (!d) continue;
-    if (a.type === "move"){
-      if (!inB(ox + d[0], oy + d[1])) continue; // neplatný ťah majiteľa = klon stojí tiež
-      ox += d[0]; oy += d[1];
-      if (inB(x + d[0], y - d[1])) { x += d[0]; y -= d[1]; }
-    } else if (a.type === "dash"){
-      let steps = 0;
-      for (let s = 0; s < 2; s++) if (inB(ox + d[0], oy + d[1])) { ox += d[0]; oy += d[1]; steps++; }
-      if (!steps) continue;
-      for (let s = 0; s < 2; s++) if (inB(x + d[0], y - d[1])) { x += d[0]; y -= d[1]; }
-    }
-  }
-  return { x, y };
+  if (!mine?.clone) return null;
+  return G.simulateClone(board, mine.clone, myQueue);
 }
 // mág aktívny pred akciou s indexom idx - po prejdení swapov vo fronte 0..idx-1 (kvôli special/ghost náhľadu po výmene)
 function ghostCharAt(idx = myQueue.length) {
@@ -3265,31 +3152,9 @@ function planWarnings() {
   return out;
 }
 
-// Vampire/Onryō: lomená dráha diagonálnej strely - RAZ sa odrazí od ktorejkoľvek steny (od bočnej
-// letí späť), roh neodráža (koniec letu), tvrdý limit VAMP_SHOT_RANGE buniek. MUSÍ sedieť so
-// serverovým vampShotRoute (server.js) - preview aj skutočný let idú po rovnakých bunkách.
-const VAMP_SHOT_RANGE = 3;
+// lomená dráha diagonálnej strely (1 odraz, roh neodráža, max 3 bunky) - shared/geometry, tá istá ako server
 function vampShotRoute(x, y, dir){
-  let [dx, dy] = { up_left:[-1,-1], up_right:[1,-1], down_left:[-1,1], down_right:[1,1] }[dir] || [];
-  if (dx === undefined) return [];
-  const route = [];
-  let bounced = false;
-  const inB = (px, py) => px >= 0 && py >= 0 && px < board.w && py < board.h;
-  while (route.length < VAMP_SHOT_RANGE){
-    let nx = x + dx, ny = y + dy;
-    if (!inB(nx, ny)){
-      if (bounced) break; // druhý kontakt so stenou - koniec letu
-      const outX = nx < 0 || nx >= board.w, outY = ny < 0 || ny >= board.h;
-      if (outX && outY) break; // roh sa neodráža
-      bounced = true;
-      if (outX) dx = -dx; else dy = -dy;
-      nx = x + dx; ny = y + dy;
-      if (!inB(nx, ny)) break;
-    }
-    x = nx; y = ny;
-    route.push([x, y]);
-  }
-  return route;
+  return G.vampShotRoute(board, x, y, dir).map(c => [c.x, c.y]);
 }
 // dráha basic útoku zvoleným smerom z danej pozície (po okraj boardu); Vampire/Onryō diagonály
 // idú po lomenej bounce dráhe (char sa dodáva kvôli nej)
@@ -3304,14 +3169,7 @@ function cellsForAimPreview(meState, dir, char){
   // Luffy GEAR 3 basic = naťahovacia ruka (pull) - dráha sa ZASTAVÍ na prvej figúre súpera (nie po okraj)
   const stopAtFoe = char === "luffy" && luffyEffForm() === "gear3";
   const foe = stopAtFoe ? state?.[me === "p1" ? "p2" : "p1"] : null;
-  const cells = [];
-  let x = meState.x + delta[0], y = meState.y + delta[1];
-  while (x >= 0 && y >= 0 && x < board.w && y < board.h){
-    cells.push([x, y]);
-    if (foe && ((foe.x === x && foe.y === y) || (foe.clone && foe.clone.x === x && foe.clone.y === y))) break;
-    x += delta[0]; y += delta[1];
-  }
-  return cells;
+  return G.runPath(board, meState.x, meState.y, delta, foe).path;
 }
 function showPreviewCells(cells){
   const kids = gridEl.children;
@@ -5552,11 +5410,7 @@ meleeBtn?.addEventListener("click", () => {
 // V labyrinte má súper x=null (server rediguje) → neblokuje sa nič okrem vlastnej bunky (streľba naslepo).
 // Luffy: dosiahne special cieľovú bunku (dáma base / veža gear3) z pozície gp? Zrkadlí server luffySpecialReaches.
 function luffyReachesCell(gx, gy, x, y, form) {
-  const dx = x - gx, dy = y - gy;
-  if (dx === 0 && dy === 0) return true;            // vlastná bunka je platný cieľ
-  const rook = dx === 0 || dy === 0;
-  const diag = Math.abs(dx) === Math.abs(dy);
-  return form === "gear3" ? rook : (rook || diag);  // gear3 = veža, base = dáma
+  return G.luffySpecialReaches(board, gx, gy, x, y, form);
 }
 function buildCellPicker(freeAll = false, luffyForm = null) {
   if (!cellPicker) return;

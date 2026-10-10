@@ -115,6 +115,19 @@ previews importujú `shared/geometry.js`.
 - [x] headless: `npm run sim` (`tools/simulate.mjs`) - náhodné zápasy priamo cez engine, ~1 ms/zápas.
 - Overenie: `npm test` + golden master 48/48 bit po bite zhodné; simulátor 6 050 zápasov bez chyby.
 
+## Etapa 2 - stav
+
+- [x] `shared/geometry.js` - čisté funkcie s explicitnou doskou: zóny specialov (fire/lightning/wanderer/
+      Medúza/Escanor/Jotaro S1+S2/celá doska), melee dosah, diagonálna bounce strela, `runPath` (charge
+      vlkolaka a Vampire/Onryō, Luffyho gear3 ruka, ich náhľady), Luffyho línie, `simulateQueue` (ghost
+      + serverová validácia cieľov Vojaka/Luffyho) a `simulateClone`. Servíruje sa na `/shared/`.
+- [x] engine volá shared (wrappery s `game.board`); smery `DIR8`/`DIAG_DIRS` a `VAMP_SHOT_RANGE` majú jediný
+      zdroj (constants.js ich re-exportuje). Golden master 48/48 bez zmeny.
+- [x] klient volá shared (−178 riadkov duplicít). Overené porovnaním starých (HEAD) a nových klientských
+      funkcií na 400 000 náhodných vstupoch - zhodné okrem dvoch zámerných zmien (rozhodnutia 3 a 4).
+- Mimo rozsahu: let striel v `doBasic` (krokovaná simulácia s klonom) a choreografia ostávajú v engine -
+  nie sú duplikované na klientovi (klient len prehráva timeline).
+
 ## Rozhodnutia (na schválenie)
 
 1. **„Explicitný ctx" v Etape 1 = inštancia enginu, nie parameter každej funkcie.** Engine je factory
@@ -123,3 +136,9 @@ previews importujú `shared/geometry.js`.
    `engine/game.js` na moduly (`damage.js`, `tiles.js`, … v etapách 3-5), kde ho moduly reálne potrebujú.
 2. **Redakcia snapshotov (labyrint, pasca, slepý draft) je v enginu, nie v `server.js`** - sú to herné
    pravidlá (čo kto smie vedieť) a potrebujú plný herný stav; server len rozhoduje, komu čo poslať.
+3. **Ghost po Luffyho speciali** (Etapa 2): server už predtým pri validácii fronty presúval Luffyho na cieľovú
+   bunku specialu, klientský ghost nie - náhľady akcií PO speciali (ďalší Vojakov/Luffyho cieľ, mierenie)
+   sa kreslili zo starej pozície. Zjednotené podľa servera (ghost sa po speciali presunie).
+4. **Ghost Narutovho klona pri stene** (Etapa 2): server (`doMove`/`doDash`) pohne klonom aj keď Naruto
+   narazí do steny (každá figúra má vlastný clamp), klientský ghost klona vtedy ostal stáť. Zjednotené
+   podľa servera - ghost klona teraz ukazuje skutočnú budúcu pozíciu.

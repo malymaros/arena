@@ -22,6 +22,8 @@ import {
   QUICKDRAW_MS,
 } from "./constants.js";
 
+import * as G from "../shared/geometry.js";
+
 export function createEngine(io = {}) {
   // --- háčiky na vonkajší svet (server: sockety/časovač; headless simulácia ich môže vynechať) ---
   const roomEmit = (ev, payload) => io.emit?.(ev, payload);
@@ -374,21 +376,11 @@ function pushInvalid(tl, who, ms = SMALL_DELAY_MS, reason = null) {
 
 function other(slot) { return slot === "p1" ? "p2" : "p1"; }
 
-function isDiagAdjacent(a, b) {
-  return Math.abs(a.x - b.x) === 1 && Math.abs(a.y - b.y) === 1;
-}
+
 // Medúzin special: vlastné políčko + VŠETKY políčka striktne vo zvolenom smere (left/right)
 // v jej riadku a v riadkoch bezprostredne susedných (±1) - zo stredného radu tak pokryje všetky 3 riadky.
 // Musí sedieť s cellsForSpecialPreview v client.js (udržiavané paralelne).
-function medusaCells(me, dir) {
-  const sgn = dir === "left" ? -1 : 1;
-  const cells = [[me.x, me.y]];
-  for (let y = me.y - 1; y <= me.y + 1; y++) {
-    if (y < 0 || y >= game.board.h) continue;
-    for (let x = me.x + sgn; x >= 0 && x < game.board.w; x += sgn) cells.push([x, y]);
-  }
-  return cells;
-}
+function medusaCells(me, dir) { return G.medusaCells(game.board, me, dir); }
 // Fire Wizard stojí na Damage dlaždici? Vtedy sa jeho special rozšíri o riadky ±1
 // (dlaždice sú trvalé a vznikli v predošlých kolách, takže existujú v čase resolveTurn).
 function fireOnDmgTile(me) {
@@ -400,29 +392,13 @@ function specialDamageAndHit(players, slot) {
   const foeS = slot === "p1" ? "p2" : "p1";
   const foe  = players[foeS];
   if (!me || !foe) return { dmg:0, hit:null };
-
-  switch (me.char) {
-    case "fire":      // celý riadok; na Damage dlaždici sa rozšíri o riadky ±1 (zo stredného = celá doska)
-      { const hitZone = fireOnDmgTile(me) ? Math.abs(me.y - foe.y) <= 1 : me.y === foe.y;
-        return hitZone ? { dmg:5, hit:foeS } : { dmg:0, hit:null }; }
-    case "lightning": // všetky políčka opačnej "šachovej" farby než na ktorej stojí
-      return ((me.x + me.y) % 2) !== ((foe.x + foe.y) % 2) ? { dmg:3, hit:foeS } : { dmg:0, hit:null };
-    case "wanderer":  // len diagonála 1
-      return isDiagAdjacent(me, foe) ? { dmg:8, hit:foeS } : { dmg:0, hit:null };
-    default:
-      return { dmg:0, hit:null };
-  }
+  // zónové speciály (fire riadok/±1 na Damage dlaždici, lightning opačná farba, wanderer diagonála) - zóna zo shared/geometry
+  if (me.char !== "fire" && me.char !== "lightning" && me.char !== "wanderer") return { dmg:0, hit:null };
+  return specialZoneHas(me, foe.x, foe.y) ? { dmg: SPECIAL_ZONE_DMG[me.char], hit: foeS } : { dmg:0, hit:null };
 }
 // je pozícia [x,y] v zóne specialu daného castera? (len dmg speciály - na test zásahu KLONA;
 // musí sedieť so specialDamageAndHit aj s cellsForSpecialPreview v client.js)
-function specialZoneHas(me, x, y) {
-  switch (me.char) {
-    case "fire":      return fireOnDmgTile(me) ? Math.abs(me.y - y) <= 1 : y === me.y;
-    case "lightning": return ((me.x + me.y) % 2) !== ((x + y) % 2);
-    case "wanderer":  return Math.abs(me.x - x) === 1 && Math.abs(me.y - y) === 1;
-    default:          return false;
-  }
-}
+function specialZoneHas(me, x, y) { return G.zoneHas(game.board, me, x, y, fireOnDmgTile(me)); }
 // raw dmg zóny (kvôli odrazu pri zásahu klona); soldier = snajperský lúč na jednu zvolenú bunku
 // (jeho „zónu" nesie akcia - cell - preto nemá vetvu v specialZoneHas, klona testuje vlastná vetva doSpecial)
 const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8, escanor: 8, soldier: SOLDIER_SPECIAL_DMG };
@@ -430,36 +406,13 @@ const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8, escanor: 8, soldi
 // Escanor: zóna smerového specialu podľa pride levelu. dir = "left" | "right" (ako Medúza).
 // F = bunka pred Escanorom v danom smere; 0=F, 1=F+diagonály, 2=F+3×3 okolie, 3=celá plocha.
 // MUSÍ sedieť s cellsForSpecialPreview v client.js (paralelne udržiavané).
-function escanorCells(me, dir) {
-  const W = game.board.w, H = game.board.h;
-  const inb = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
-  const out = [];
-  const add = (x, y) => { if (inb(x, y) && !out.some(c => c[0] === x && c[1] === y)) out.push([x, y]); };
-  const pride = Math.max(0, Math.min(3, me.pride || 0));
-  const fx = me.x + (dir === "left" ? -1 : 1), fy = me.y;
-  // kotva F mimo dosky = slnko hodené DO AUTU - žiadna zóna, ANI pri pride 3 (celý hod letí von z plochy);
-  // doSpecial z prázdnej zóny robí offboard whiff (mana preč, OUT OF BOUNDS, neprečiarkuje sa - ako útok do steny)
-  if (fx < 0 || fx >= W) return out;
-  if (pride >= 3) { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) add(x, y); return out; }
-  add(fx, fy);                                                        // pride 0
-  if (pride === 1) { add(fx - 1, fy - 1); add(fx + 1, fy - 1); add(fx - 1, fy + 1); add(fx + 1, fy + 1); }
-  if (pride === 2) for (let yy = fy - 1; yy <= fy + 1; yy++) for (let xx = fx - 1; xx <= fx + 1; xx++) add(xx, yy);
-  return out;
-}
+function escanorCells(me, dir) { return G.escanorCells(game.board, me, dir); }
 
 // Jotaro Special 1 (v mirror slote): smerový (left/right) - OBE diagonálne bunky zvolenej strany
 // (x±1, y−1) a (x±1, y+1). Rovná bunka (x±1, y) NIE. Na kraji dosky len bunky v ploche (môže byť prázdna).
 // Jotaro Special 2 (po THE WORLD): jediná susedná bunka (x±1, y). Obe MUSIA sedieť s cellsForSpecialPreview.
-function jotaroS1Cells(me, dir) {
-  const dx = dir === "left" ? -1 : 1;
-  const out = [];
-  for (const dy of [-1, 1]) if (inBounds(me.x + dx, me.y + dy)) out.push([me.x + dx, me.y + dy]);
-  return out;
-}
-function jotaroS2Cells(me, dir) {
-  const dx = dir === "left" ? -1 : 1;
-  return inBounds(me.x + dx, me.y) ? [[me.x + dx, me.y]] : [];
-}
+function jotaroS1Cells(me, dir) { return G.jotaroS1Cells(game.board, me, dir); }
+function jotaroS2Cells(me, dir) { return G.jotaroS2Cells(game.board, me, dir); }
 
 /* ---- Narutov tieňový klon ---- */
 // Klon nemá HP - zmizne pri akomkoľvek zásahu od súpera (dmg aj status speciály), pri IK tile,
@@ -534,14 +487,8 @@ function applyStatusOnClone(ownerSlot, tl, statusKind, quietDefense = false) {
 function moveCloneSteps(slot, delta, maxSteps) {
   const p = game.players[slot];
   if (!p?.clone) return [];
-  const d = [delta[0], -delta[1]];
-  const path = [];
-  for (let s = 0; s < maxSteps; s++) {
-    if (inBounds(p.clone.x + d[0], p.clone.y + d[1])) {
-      p.clone.x += d[0]; p.clone.y += d[1];
-      path.push([p.clone.x, p.clone.y]);
-    }
-  }
+  const path = G.cloneSteps(game.board, p.clone, delta, maxSteps);
+  if (path.length) { p.clone.x = path[path.length - 1][0]; p.clone.y = path[path.length - 1][1]; }
   return trackCloneSteps(slot, path);
 }
 // klon lovca sa ráta do pretínania Ariadninej nite - vstup klona na niť prekliateho nastaví threadMark
@@ -668,36 +615,13 @@ function validQueue(queue, slot) {
   {
     const meP = game.players[slot];
     const foe = game.players[other(slot)];
-    let simChar = meP?.char, sx = meP?.x, sy = meP?.y, simForm2 = meP?.form;
-    for (const a of q) {
-      if (a.type === "swap" && a.to) simChar = a.to; // v turnaji môže special hádzať až swapnutý mág
-      if (a.type === "recharge" && simChar === "luffy") simForm2 = simForm2 === "gear3" ? "base" : "gear3"; // Luffy: recharge prepína mód
-      const d = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[a.dir];
-      if (a.type === "move" && d && inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
-      // Vampire/Onryō: dash = charge - beh po prvú VIDITEĽNÚ figúru súpera alebo okraj (zrkadlí
-      // klientský ghost; v labyrinte je súper skrytý → beh na okraj); ostatní dashujú max 2 bunky
-      if (a.type === "dash" && d) {
-        if (VAMP_CHARS[simChar]) {
-          while (inBounds(sx + d[0], sy + d[1])) {
-            sx += d[0]; sy += d[1];
-            if (!meP?.labyrinth && foe && ((foe.x === sx && foe.y === sy) || (foe.clone && foe.clone.x === sx && foe.clone.y === sy))) break;
-          }
-        } else {
-          for (let s = 0; s < 2; s++) if (inBounds(sx + d[0], sy + d[1])) { sx += d[0]; sy += d[1]; }
-        }
-      }
-      // Vlkolakov charge hýbe kasterom - simuluj presun (stop na prvej VIDITEĽNEJ figúre súpera alebo na
-      // okraji; v labyrinte je súper skrytý → beh na okraj, zrkadlí klientský ghost). Ovplyvňuje ghost
-      // pozíciu neskoršieho Vojakovho specialu po turnajovom swape.
-      if (a.type === "special" && simChar === "werewolf") {
-        const wd = WOLF_DIRS[a.dir];
-        if (wd) {
-          while (inBounds(sx + wd[0], sy + wd[1])) {
-            sx += wd[0]; sy += wd[1];
-            if (!meP?.labyrinth && foe && ((foe.x === sx && foe.y === sy) || (foe.clone && foe.clone.x === sx && foe.clone.y === sy))) break;
-          }
-        }
-      }
+    // ghost simulácia fronty (move/dash/charge/vlkolak/Luffy special, swap, Luffyho mód) - tá istá funkcia ako
+    // klientský ghost; v labyrinte je súper skrytý → charge beží na okraj (prekliaty ho nevidí)
+    const sim = G.simulateQueue(game.board, { x: meP?.x, y: meP?.y, char: meP?.char, form: meP?.form },
+      q, meP?.labyrinth ? null : foe, VAMP_CHARS);
+    for (let i = 0; i < q.length; i++) {
+      const a = q[i];
+      const { x: sx, y: sy, char: simChar, form: simForm2 } = sim[i]; // stav PRED akciou i
       if (a.type === "special" && simChar === "soldier") {
         const c = a.cell;
         if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !inBounds(c.x, c.y)) return false;
@@ -718,7 +642,6 @@ function validQueue(queue, slot) {
       if (a.type === "special" && simChar === "luffy") {
         const c = a.cell;
         if (!c || !Number.isInteger(c.x) || !Number.isInteger(c.y) || !luffySpecialReaches(sx, sy, c.x, c.y, simForm2)) return false;
-        sx = c.x; sy = c.y;
       }
     }
   }
@@ -755,13 +678,7 @@ function winnerNow() {
 /* -------------------- Actions -------------------- */
 // koľko políčok dokáže klon prejsť daným smerom (vertikálne inverzne) - bez mutácie stavu
 function cloneMovableSteps(a, delta, maxSteps) {
-  if (!a?.clone) return 0;
-  const d = [delta[0], -delta[1]];
-  let cx = a.clone.x, cy = a.clone.y, n = 0;
-  for (let s = 0; s < maxSteps; s++) {
-    if (inBounds(cx + d[0], cy + d[1])) { cx += d[0]; cy += d[1]; n++; } else break;
-  }
-  return n;
+  return a?.clone ? G.cloneSteps(game.board, a.clone, delta, maxSteps).length : 0;
 }
 
 // smer klona (vertikálne inverzný) - pre náraz do steny na klonovej strane (diagonály kvôli úplnosti;
@@ -868,29 +785,7 @@ function doRecharge(slot, tl) {
 // Výstrel do priľahlej steny sa odrazí OKAMŽITE (spotrebuje svoj jediný odraz); do rohu = prázdna
 // dráha → wall-rule whiff. Každý krok nesie aj dir (klient podľa neho otáča špic strely po odraze).
 // MUSÍ sedieť s klientským cellsForAttackPreview (vampShotRoute v client.js).
-const DIAG_NAME = { "-1,-1": "up_left", "1,-1": "up_right", "-1,1": "down_left", "1,1": "down_right" };
-function vampShotRoute(x, y, dir) {
-  let [dx, dy] = DIAG_DIRS[dir] || [];
-  if (dx === undefined) return [];
-  const route = [];
-  let bounced = false;
-  while (route.length < VAMP_SHOT_RANGE) {
-    let nx = x + dx, ny = y + dy;
-    if (!inBounds(nx, ny)) {
-      if (bounced) break; // druhý kontakt so stenou - koniec letu
-      const outX = nx < 0 || nx >= game.board.w;
-      const outY = ny < 0 || ny >= game.board.h;
-      if (outX && outY) break; // roh sa neodráža
-      bounced = true;
-      if (outX) dx = -dx; else dy = -dy;
-      nx = x + dx; ny = y + dy;
-      if (!inBounds(nx, ny)) break;
-    }
-    x = nx; y = ny;
-    route.push({ x, y, dir: DIAG_NAME[dx + "," + dy] });
-  }
-  return route;
-}
+function vampShotRoute(x, y, dir) { return G.vampShotRoute(game.board, x, y, dir); }
 
 function doBasic(slot, dir, tl) {
   const me  = game.players[slot];
@@ -1034,12 +929,7 @@ function doMelee(slot, tl) {
   // Zasahované bunky idú v efekte (klient ich zvýrazní a nemusí zrkadliť logiku).
   const medusa = me.char === "medusa";
   const myMeleeDmg = medusa ? MEDUSA_MELEE_DMG : (me.char === "jotaro" ? JOTARO_MELEE_DMG : MELEE_DMG);
-  const cells = [[me.x, me.y]];
-  if (medusa) {
-    for (const [dx, dy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
-      if (inBounds(me.x + dx, me.y + dy)) cells.push([me.x + dx, me.y + dy]);
-    }
-  }
+  const cells = G.meleeCells(game.board, me, me.char);
   // vlastný klon seká paralelne na SVOJEJ bunke (rovnaký dmg ako Naruto)
   const cloneCells = me.clone ? [[me.clone.x, me.clone.y]] : [];
   const atCells = (cs, px, py) => cs.some(([x, y]) => x === px && y === py);
@@ -1206,15 +1096,8 @@ function doVampCharge(slot, dir, tl) {
   const raw = VAMP_CHARGE_DMG * dealMul(slot) * labyrinthMul(slot) + pBonus;
 
   // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár)
-  let x = me.x, y = me.y, hit = false;
-  const path = [];
-  while (inBounds(x + delta[0], y + delta[1])) {
-    x += delta[0]; y += delta[1];
-    path.push([x, y]);
-    const cloneAt = op?.clone && op.clone.x === x && op.clone.y === y;
-    const foeAt   = op && op.x === x && op.y === y;
-    if (cloneAt || foeAt) { hit = true; break; }
-  }
+  const { path, target } = G.runPath(game.board, me.x, me.y, delta, op);
+  const hit = !!target;
   if (!path.length) {
     pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
     return;
@@ -1316,20 +1199,8 @@ const LUFFY_BALL_FORM_MS = Math.round(900 * ANIM_SLOW); // gear3: STREDOVÁ prem
 const LUFFY_ROLL_MS = Math.round(700 * ANIM_SLOW);   // gear3 balón roll
 const LUFFY_TRAVEL_MS = Math.round(340 * ANIM_SLOW); // base: dogúľanie k bunke (run/roll)
 const LUFFY_CHOMP_MS  = Math.round(340 * ANIM_SLOW); // base: cvaknutie NA bunke
-function luffySpecialReaches(fx, fy, tx, ty, form) {
-  if (!inBounds(tx, ty)) return false;
-  const dx = tx - fx, dy = ty - fy;
-  if (dx === 0 && dy === 0) return true;             // vlastná bunka je platný cieľ
-  const rook = dx === 0 || dy === 0;
-  const diag = Math.abs(dx) === Math.abs(dy);
-  return form === "gear3" ? rook : (rook || diag);   // gear3 = veža, base = dáma
-}
-function luffyLinePath(fx, fy, tx, ty) {
-  const dx = Math.sign(tx - fx), dy = Math.sign(ty - fy);
-  const path = []; let x = fx, y = fy;
-  while ((x !== tx || y !== ty) && path.length < 8) { x += dx; y += dy; path.push([x, y]); }
-  return path;
-}
+function luffySpecialReaches(fx, fy, tx, ty, form) { return G.luffySpecialReaches(game.board, fx, fy, tx, ty, form); }
+function luffyLinePath(fx, fy, tx, ty) { return G.luffyLinePath(fx, fy, tx, ty); }
 function doLuffySpecial(slot, tl, cell) {
   const me = game.players[slot];
   const opS = other(slot);
@@ -2029,9 +1900,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
   // Ide cez obrany ako petrify (shield blokuje, mirror odrazí - v labyrinte skončí sám Minotaur).
   if (actor.char === "minotaur") {
     actor.mana -= SPECIAL_COST;
-    const cells = [];
-    for (let y = 0; y < game.board.h; y++)
-      for (let x = 0; x < game.board.w; x++) cells.push([x, y]);
+    const cells = G.allCells(game.board);
     const foeS = other(slot);
     const foe  = game.players[foeS];
     // istý zásah - kasterov prípadný VLASTNÝ labyrint (mirror match) sa odhalí ešte pred nádychmi
@@ -2125,17 +1994,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     // dráha: krok za krokom po okraj; stop na prvej figúre (klon pred súperom - bait pravidlo ako melee).
     // Klon STACKNUTÝ na majiteľovej bunke = "stacked": pohltí len CLONE_DMG, zvyšok prejde na Naruta
     // (rovnaké pravidlo ako pri basic/melee cez stacknutý pár) - nie plný bait.
-    let x = actor.x, y = actor.y, target = null; // null | "clone" | "player" | "stacked"
-    const path = [];
-    while (inBounds(x + delta[0], y + delta[1])) {
-      x += delta[0]; y += delta[1];
-      path.push([x, y]);
-      const cloneHere  = !!(foe?.clone && foe.clone.x === x && foe.clone.y === y);
-      const playerHere = !!(foe && foe.x === x && foe.y === y);
-      if (cloneHere && playerHere) { target = "stacked"; break; }
-      if (cloneHere) { target = "clone"; break; }
-      if (playerHere) { target = "player"; break; }
-    }
+    const { path, target } = G.runPath(game.board, actor.x, actor.y, delta, foe); // target: null | "clone" | "player" | "stacked"
     // charge do steny z okrajovej bunky - akcia sa vykoná na mieste: rozbehová póza + náraz (OUT OF BOUNDS)
     if (!path.length) {
       pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: [] }], WOLF_CAST_MS);
@@ -2184,9 +2043,7 @@ function doSpecial(slot, tl, dir = null, cell = null) {
     // neprezradí (blikajúca len cieľová bunka by áno).
     // Countess: JEDEN dlhý frame - A5 (celá útočná sekvencia) sa hrá RAZ od frame 0; beaty by ju
     // reštartovali. Onre: pôvodné beaty (Scream loop reštart nevadí).
-    const castCells = [];
-    for (let y = 0; y < game.board.h; y++)
-      for (let x = 0; x < game.board.w; x++) castCells.push([x, y]);
+    const castCells = G.allCells(game.board);
     if (actor.char === "countess") {
       pushStateFrame(tl, [{ kind: "special", from: slot, cells: castCells }], VAMP_CAST_MS);
     } else {
@@ -2307,10 +2164,7 @@ function doDemon(slot, tl) {
   const pBonus = powerBoost(slot, tl);
 
   // dosah = všetky políčka okrem toho, na ktorom kaster stojí (jediná „bezpečná" bunka pre súpera)
-  const cells = [];
-  for (let y = 0; y < game.board.h; y++)
-    for (let x = 0; x < game.board.w; x++)
-      if (!(x === me.x && y === me.y)) cells.push([x, y]);
+  const cells = G.allCells(game.board, me);
 
   // zásah: súper dostane dmg, ak NESTOJÍ na kasterovej bunke; cez shield/mirror (applyHit) - bez 2× buffu (10 = istá smrť)
   const inRange = op && !(op.x === me.x && op.y === me.y);

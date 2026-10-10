@@ -34,6 +34,13 @@ app.use(express.static(path.join(__dirname, "public"), {
     }
   },
 }));
+// zdieľaná herná geometria (shared/geometry.js) - ten istý ES modul importuje engine aj client.js;
+// je to kód, takže vždy revalidácia cez ETag (po deployi sa hneď natiahne nová verzia)
+app.use("/shared", express.static(path.join(__dirname, "shared"), {
+  etag: true,
+  lastModified: true,
+  setHeaders: (res) => res.setHeader("Cache-Control", "no-cache"),
+}));
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
