@@ -3664,6 +3664,8 @@ function playNewRoundTransition(nextTurn, done) {
 /* ---------- Timeline prehrávanie ---------- */
 let playGen = 0;      // generácia prehrávania - novšia timeline zruší staršiu slučku
 let playing = false;  // počas prehrávania neaktualizuj UI zo snapshotov a drž LOCK zamknutý
+// len na čítanie pre tools/browser-smoke.mjs (boti čakajú, kým divák dohrá timeline) - na hru bez vplyvu
+Object.defineProperty(window, "__arenaPlaying", { get: () => playing });
 // Jotaro THE WORLD: tsPlanning = som Jotaro a plánujem 3 zmrazené akcie (UI odomknuté, lock → timestop_actions);
 // tsFrozen = som súper a čakám zmrazený (UI zamknuté, full-screen filter). Práve jeden je aktívny počas pauzy.
 let tsPlanning = false;

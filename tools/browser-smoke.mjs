@@ -26,7 +26,7 @@ const SPEED = Number(opt("speed", 8));
 const ONLY = opt("only", null);
 const COMPARE = args.includes("--compare");
 const NO_MATCHES = args.includes("--no-matches");
-const PROBE_VER = 2; // verzia scenára sondy - zmena zneplatní keš výsledkov HEAD
+const PROBE_VER = 4; // verzia scenára sondy - zmena zneplatní keš výsledkov HEAD
 const PASS = "smoke";
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -62,7 +62,19 @@ const WARP = `(() => {
   Date.now = () => d0 + (dn() - d0) * K;
   const raf = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = (cb) => raf(() => cb(performance.now()));
-})();`;
+})();
+// stopa choreografie: každý pridaný element (aj vnorený) → počet podľa "tag.trieda"; zapína sa pri sledovaní zápasov
+window.__fxTrace = null;
+window.__startFxTrace = () => {
+  window.__fxTrace = {};
+  const note = (n) => {
+    if (n.nodeType !== 1) return;
+    const k = n.tagName.toLowerCase() + (n.className && typeof n.className === "string" ? "." + n.className.trim().split(/\\s+/).sort().join(".") : "");
+    window.__fxTrace[k] = (window.__fxTrace[k] || 0) + 1;
+    for (const c of n.children) note(c);
+  };
+  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach(note); }).observe(document.getElementById("actors") || document.body, { childList: true, subtree: true });
+};`;
 
 async function launchBrowser(port) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "arena-smoke-"));
@@ -159,6 +171,9 @@ const tlMs = (tl) => (tl || []).reduce((s, f) => s + (f.delayMs || 0), 0);
 const lastHas = (tl, k) => (tl?.[tl.length - 1]?.effects || []).some(e => e.kind === k);
 
 // odohrá rozbehnutú hru (chars už vybrané); po každom kole počká, kým divák dohrá timeline
+// počká, kým divák dohrá timeline (client.js: window.__arenaPlaying) - inak by ďalšie kolo prerušilo
+// prehrávanie a stopa choreografie by závisela od časovania; bez háčika (staršia verzia) len pevná pauza
+let viewerIdle = async () => {};
 async function playGame(c1, c2, rngs, rosters) {
   for (let r = 0; r < MAX_ROUNDS; r++) {
     if (c1.st.phase !== "playing" || c1.result) return;
@@ -169,6 +184,7 @@ async function playGame(c1, c2, rngs, rosters) {
     let ms = tlMs(c1.timelines.at(-1));
     while (lastHas(c1.timelines.at(-1), "timestop_wait")) {
       await sleep(ms / SPEED + 400); // divák dohrá časť pred pauzou
+      await viewerIdle();
       const jo = c1.st.timestop?.slot === c1.slot ? c1 : c2;
       const k = c1.timelines.length;
       await timestop(jo, jo === c1 ? rngs.p1 : rngs.p2);
@@ -176,6 +192,7 @@ async function playGame(c1, c2, rngs, rosters) {
       ms = tlMs(c1.timelines.at(-1));
     }
     await sleep(ms / SPEED + 600);
+    await viewerIdle();
   }
 }
 
@@ -211,7 +228,10 @@ async function runAgainst(root, label) {
   await br.send("Animation.setPlaybackRate", { playbackRate: SPEED });
   await br.send("Page.addScriptToEvaluateOnNewDocument", { source: WARP });
   // nová identita (arenaId v storage by inak prevzala miesto z predošlej roomky)
+  // storage je per-origin: najprv otvor cieľový server, vyčisti ho a načítaj znova (z about:blank by clear nič nezmazal)
   const login = async (name, at = url) => {
+    await br.send("Page.navigate", { url: at });
+    await sleep(1000);
     await br.evaluate(`try { localStorage.clear(); sessionStorage.clear(); } catch {}`);
     await br.send("Page.navigate", { url: at });
     await sleep(1500);
@@ -220,7 +240,14 @@ async function runAgainst(root, label) {
     await sleep(800);
   };
   const log = (s) => console.log(`[${label}] ${s}`);
+  viewerIdle = async () => {
+    for (let i = 0; i < 200; i++) { // max ~20 s
+      if (await br.evaluate(`window.__arenaPlaying`) !== true) return;
+      await sleep(100);
+    }
+  };
 
+  let fxTrace = {}; // stopa choreografie počas sledovania zápasov
   const ui = {}; // UI sonda: obsah akčných tlačidiel per strana+postava, náhľad specialu per karta
   try {
     // 1) UI sonda ako hráč: na p2 (tento server, host = p1) aj na p1 (druhý server s FORCE_FIRST_STARTER=B).
@@ -292,6 +319,7 @@ async function runAgainst(root, label) {
     c2.sock.emit("join_room", { roomId: newest().id });
     await waitFor(() => c1.slot && c2.slot, 5000, "seats");
     await login("watcher");
+    await br.evaluate(`window.__startFxTrace()`);
     await br.evaluate(`document.querySelector(".room-btn.spectate")?.click()`);
     await sleep(800);
     let idx = 0;
@@ -335,6 +363,7 @@ async function runAgainst(root, label) {
         await sleep(8000 / SPEED + 1500);
       }
     }
+    fxTrace = JSON.parse(await br.evaluate(`JSON.stringify(window.__fxTrace || {})`) || "{}");
     c1.sock.close(); c2.sock.close();
   } catch (e) {
     if (e !== "skip") errors.push("beh testu: " + e.message);
@@ -343,7 +372,7 @@ async function runAgainst(root, label) {
     server.kill();
   }
   if (serverErr.trim()) errors.push("stderr servera: " + serverErr.trim().slice(0, 500));
-  return { errors, failed, assets, ui };
+  return { errors, failed, assets, ui, fxTrace };
 }
 
 /* ---------- hlavný beh ---------- */
@@ -401,6 +430,14 @@ if (COMPARE) {
      nové: …${b.slice(Math.max(0, i - 60), i + 140)}`);
   }
   bad += uiDiff.length;
+  // choreografia: počty vytvorených DOM elementov podľa triedy (laser, lúč, výbuch, stredové sprity, floaty…)
+  if (!NO_MATCHES) {
+    const tk = [...new Set([...Object.keys(old.fxTrace || {}), ...Object.keys(cur.fxTrace || {})])].sort();
+    const td = tk.filter(k => (old.fxTrace?.[k] || 0) !== (cur.fxTrace?.[k] || 0));
+    console.log(`stopa choreografie: ${tk.length} druhov elementov, rozdielnych ${td.length}`);
+    td.forEach(k => console.log(`  ≠ ${k}: HEAD ${old.fxTrace?.[k] || 0}, nové ${cur.fxTrace?.[k] || 0}`));
+    bad += td.length;
+  }
 }
 console.log(bad ? "\nDYMOVÝ TEST: PROBLÉMY" : "\nDYMOVÝ TEST OK");
 process.exit(bad ? 1 : 0);
