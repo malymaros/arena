@@ -128,6 +128,20 @@ previews importujú `shared/geometry.js`.
 - Mimo rozsahu: let striel v `doBasic` (krokovaná simulácia s klonom) a choreografia ostávajú v engine -
   nie sú duplikované na klientovi (klient len prehráva timeline).
 
+## Etapa 3 - stav
+
+- [x] **Damage pipeline** `resolveStrike(defSlot, figs, tl, opts)` v `engine/game.js` nahradil 5 variantov
+      (`applyHit`, `applyStackedHit`, `applyHitPairDefended`, `applyHitBoth`, `applyHitOnClone`):
+      intercept (THE WORLD) → obrana → soak → dopad → udalosti (pride, koniec labyrintu) na jednom mieste.
+- [x] **Klon = figúra v zásahu**: zásah je zoznam zasiahnutých figúr `[{ fig: "owner" | "clone", raw }]`.
+      Akcie vstupujú podľa tvaru: `strikeCell` (bunka: player/clone/stacked - nahradil 6 skopírovaných
+      dispatchov), `strikeZone` (zóna/démon - 7 miest), `strikeOwnerMulti` (stacknutý útočník).
+- [ ] Statusy (petrify/labyrint) ostávajú v `applyPetrify`/`applyLabyrinth`/`applyStatusOnClone` -
+      zjednotiť s pipeline v etape 5 (háčiky), keď sa labyrint presunie do vlastného modulu.
+- [ ] Plný model figúr na hráčovi (`player.figures`) aj pre pohyb a strely - etapa 4 (register postáv).
+- Overenie: golden 48/48 bez zmeny; rozdielový test HEAD vs nový engine na 15 300 headless zápasoch
+  (ťažisko Naruto) - jediný rozdiel je zámerná oprava z rozhodnutia 5 (8 zápasov Naruto vs Naruto).
+
 ## Rozhodnutia (na schválenie)
 
 1. **„Explicitný ctx" v Etape 1 = inštancia enginu, nie parameter každej funkcie.** Engine je factory
@@ -142,3 +156,37 @@ previews importujú `shared/geometry.js`.
 4. **Ghost Narutovho klona pri stene** (Etapa 2): server (`doMove`/`doDash`) pohne klonom aj keď Naruto
    narazí do steny (každá figúra má vlastný clamp), klientský ghost klona vtedy ostal stáť. Zjednotené
    podľa servera - ghost klona teraz ukazuje skutočnú budúcu pozíciu.
+5. **Soak mŕtveho klona (APLIKOVANÉ, Etapa 3)**: druhá strela stacknutého útočníka do stacknutého páru
+   v tom istom kroku strhla `CLONE_DMG`, aj keď klon zomrel už prvou strelou (basic); melee to malo
+   správne (`if (op.clone)`). Zjednotené - `strikeCell` soakuje len živým klonom. Dopad: Naruto vs Naruto,
+   oba páry stacknuté, horizontálna strela - obranca dostane o 1 dmg viac (rozdielový test: 8 z 15 300).
+6. **Pride len pri reálnej strate HP (APLIKOVANÉ)**: `applyHit`/`applyStackedHit` značili Escanorovi
+   „dostal zásah" aj pri 0 dmg (Last Stand ½ z 1), zóny nie. Zjednotené na `d > 0` (pravidlo hovorí
+   o strate HP). Golden bez zmeny.
+7. **Odraz páru za 0 (APLIKOVANÉ, kozmetické)**: mirror stacknutého páru pri celkovom odraze 0 posielal
+   `parts: [0, 0]`, zóna jeden hit bez parts. Zjednotené (parts len pri súčte > 0).
+
+**Nekonzistencie nájdené pri zjednotení:**
+
+8. **Melee do klona-návnady - plný dmg (SCHVÁLENÉ, APLIKOVANÉ)**: majiteľov sek na návnadu nemal maze 2×
+   (`labyrinthMul`) a sek útočníkovho KLONA do návnady počítal `CLONE_DMG × dealMul` namiesto plného
+   `MELEE_DMG`. Teraz `meleeRaw` / `cloneMeleeRaw` ako pri zásahu hráča (prejaví sa na sile odrazu).
+9. **Nekrytý stacknutý pár - 1 beat všade (SCHVÁLENÉ, APLIKOVANÉ)**: zásah bunky (strela/sek/charge/pasca/
+   Luffy) hral najprv poof klona a potom zásah majiteľa (2 framy); teraz ako zóna v jednom beate
+   (`strikeCell` "stacked" → `resolveStrike` so `soak`). Vedľajší efekt: zásah za presne `CLONE_DMG`
+   (majiteľ 0) teraz ukončí labyrint - zásah páru ho už predtým odhalil, takže to zodpovedá pravidlu.
+10. **Krytý stacknutý pár - jedna reakcia všade (SCHVÁLENÉ, APLIKOVANÉ)**: zóna/démon na stacknutý pár
+    s obranou dávali dva bloky/lúče na tej istej bunke; teraz `pair` mód ako pri strele (jeden blok,
+    jeden lúč, odraz oboch figúr ako jeden hit s parts).
+    Overenie 8-10: `test/engine-scenarios.mjs` (nové, súčasť `npm test`) - na starom engine 4 FAIL, na novom
+    všetko PASS; golden 48/48 bez zmeny (tieto situácie v jeho zápasoch nenastali).
+11. **Odraz klonovej akcie sa vracia strelcovi (SCHVÁLENÉ, APLIKOVANÉ)**: pravidlo od zadávateľa - *klon,
+    ktorý dostane akýkoľvek dmg, sa rozplynie; klon útočí aj vracia odraz zrkadlom ako normálny hráč.*
+    Keď akciu vykonal útočníkov klon a obranca ju odrazí (zrkadlo na hráčovi, na návnade aj na stacknutom
+    páre), KAŽDÝ odraz dopadne na strelca = útočníkovho klona, ten sa rozplynie, HP skutočného útočníka sa
+    nemení; lúč mieri na klonovu bunku (neprezradí, ktorý Naruto je pravý). Predtým odraz z návnady
+    a jedna časť odrazu z páru išli do HP skutočného útočníka. Overenie: R11 v `test/engine-scenarios.mjs`
+    (na starom engine 5 FAIL).
+12. **Dmg dlaždica a klon (ROZHODNUTÉ - bez zmeny)**: pravidlo z bodu 11 platí pre zásahy AKCIAMI. Damage
+    dlaždica klona zámerne nezabíja (len kozmetický `clone_hit` −1 float), aby Narutov klon nebol príliš slabý;
+    IK dlaždica ho zabíja.
