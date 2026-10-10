@@ -9,11 +9,11 @@ try {
     localStorage.setItem("arenaId", arenaId);
   }
 } catch { arenaId = null; } // localStorage zakázaný (napr. privátny režim) → bez reclaimu, len bežné pripojenie
-// autoConnect:false — najprv login (meno + heslo), potom socket.connect() s auth údajmi.
+// autoConnect:false - najprv login (meno + heslo), potom socket.connect() s auth údajmi.
 // Všetky socket.on(...) handlery sa registrujú normálne aj na nepripojený socket.
 const socket = io({ auth: { id: arenaId }, autoConnect: false });
 
-/* ---------- Prihlásenie (meno + heslo) — brána pred pripojením ---------- */
+/* ---------- Prihlásenie (meno + heslo) - brána pred pripojením ---------- */
 (function initLogin() {
   const NAME_RE = /^[A-Za-z]{1,8}$/;
   const loginEl = document.getElementById("login");
@@ -29,7 +29,7 @@ const socket = io({ auth: { id: arenaId }, autoConnect: false });
 
   const connectWith = (name, pass) => { socket.auth = { id: arenaId, name, pass }; socket.connect(); };
 
-  // tichý reconnect po refreshi (údaje z tejto session — sessionStorage, nie localStorage, kvôli heslu)
+  // tichý reconnect po refreshi (údaje z tejto session - sessionStorage, nie localStorage, kvôli heslu)
   let saved = null;
   try { saved = JSON.parse(sessionStorage.getItem("arenaLogin") || "null"); } catch {}
   if (saved && NAME_RE.test(saved.name || "")) connectWith(saved.name, saved.pass || "");
@@ -57,7 +57,7 @@ const socket = io({ auth: { id: arenaId }, autoConnect: false });
   });
 })();
 
-/* ---------- Room browser (po logine): zoznam roomiek — create / join / spectate ---------- */
+/* ---------- Room browser (po logine): zoznam roomiek - create / join / spectate ---------- */
 const roomsEl     = document.getElementById("rooms");
 const roomsListEl = document.getElementById("rooms-list");
 // admin režim (?admin=1[&key=…]) → room-browser dostane aj destruktívny „RESET ROOMS" (všetky roomky)
@@ -91,7 +91,7 @@ function renderRooms(info) {
     card.appendChild(b);
     roomsListEl.appendChild(card);
   });
-  // vytvor novú roomku (staneš sa hostom a nastavíš parametre) — ak sa ešte dá (limit)
+  // vytvor novú roomku (staneš sa hostom a nastavíš parametre) - ak sa ešte dá (limit)
   if (info?.canCreate) {
     const b = document.createElement("button");
     b.className = "room-btn create";
@@ -99,7 +99,7 @@ function renderRooms(info) {
     b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
     roomsListEl.appendChild(b);
   }
-  // admin: zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM) — len s ?admin=1
+  // admin: zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM) - len s ?admin=1
   if (IS_ADMIN && list.length > 0) {
     const rb = document.createElement("button");
     rb.className = "room-btn reset";
@@ -122,7 +122,7 @@ socket.on("rooms", (info) => {
   renderRooms(info);
   roomsEl?.classList.remove("hidden");
 });
-// miesto sa medzičasom zaplnilo — server pošle aj čerstvý „rooms", ktorý prekreslí na Spectate
+// miesto sa medzičasom zaplnilo - server pošle aj čerstvý „rooms", ktorý prekreslí na Spectate
 socket.on("join_denied", () => { /* rooms event prekreslí kartu */ });
 
 const gridEl   = document.getElementById("grid");
@@ -156,9 +156,9 @@ const moonDmg   = { p1: document.getElementById("mdmg-p1"), p2: document.getElem
 const luffyBadge = { p1: document.getElementById("luffy-p1"), p2: document.getElementById("luffy-p2") };
 // Luffy: info o basic (šípky diag/orto) + special (šípky dáma/veža + dmg) vpravo v HUD widgete
 const luffyInfo = { p1: document.getElementById("luffy-info-p1"), p2: document.getElementById("luffy-info-p2") };
-// dmg vlkolakovho charge podľa fázy mesiaca — MUSÍ sedieť so serverovým WOLF_MOON_DMG
+// dmg vlkolakovho charge podľa fázy mesiaca - MUSÍ sedieť so serverovým WOLF_MOON_DMG
 const WOLF_MOON_DMG = [2, 4, 6, 8];
-// 8 smerov vlkolakovho specialu — MUSÍ sedieť so serverovým WOLF_DIRS
+// 8 smerov vlkolakovho specialu - MUSÍ sedieť so serverovým WOLF_DIRS
 const WOLF_DIRS_CLIENT = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
 const WOLF_DIR_KEYS_CLIENT = Object.keys(WOLF_DIRS_CLIENT);
 const flagP1    = document.getElementById("flag-p1");
@@ -183,13 +183,13 @@ const TILE_W = parseInt(cs.getPropertyValue("--tile-w")) || 260;
 const TILE_H = parseInt(cs.getPropertyValue("--tile-h")) || 185;
 const GAP  = parseInt(getComputedStyle(gridEl).gap || "10") || 10;
 
-// === Last Stand „démon" sprite — strip 5024×314 = 16 štvorcových framov ===
+// === Last Stand „démon" sprite - strip 5024×314 = 16 štvorcových framov ===
 const DEATH_DIR   = "death";
 const DEATH_ANIM  = { file: "spritesheet_strip.png", fps: 10, loop: true };
 const LS_BADGE_IMG = '<img class="ls-badge" src="/assets/last_stand.png" alt="Last Stand">'; // ikona Last Standu (zmenšenina démona) do lišty/záznamu
 const DEATH_SCALE = 2.0;  // veľkosť stredového démona (násobok výšky bunky)
 
-// === Last Hope „hope" postava — strip (analógia k death sprite) ===
+// === Last Hope „hope" postava - strip (analógia k death sprite) ===
 const HOPE_DIR  = "hope";
 // 9216×512 = 12 framov po 768px (framy NIE sú štvorcové → frame inference háda zle, preto explicitné frames)
 const HOPE_ANIM = { file: "sprite_strip.png", fps: 10, loop: true, frames: 12 };
@@ -203,7 +203,7 @@ const DEATH_SEQ = {
   behindOffsetY: 80,
 };
 
-// canvasy postáv — väčšie než bunka (1.5×), v positionActors centrované na bunku
+// canvasy postáv - väčšie než bunka (1.5×), v positionActors centrované na bunku
 const ACTOR_SCALE = 1.875;
 const ACTOR_W = Math.round(TILE_W * ACTOR_SCALE);
 const ACTOR_H = Math.round(TILE_H * ACTOR_SCALE);
@@ -215,7 +215,7 @@ const JOTARO_BOARD_FILL = 0.66;
 // figúra v nižšom frame vyjde väčšia → Jotaro „narastie", keď sa hýbe. Normalizujeme fill × (fh/REF), čím sa
 // škála stane nezávislou od paddingu framu (na obraze závisí len od skutočnej výšky figúry). REF = 144.
 const JOTARO_FRAME_REF_H = 144;
-// Konštantná škála na obraze (px na obraze / px zdroja) po normalizácii fill × fh/REF — nezávislá od framu.
+// Konštantná škála na obraze (px na obraze / px zdroja) po normalizácii fill × fh/REF - nezávislá od framu.
 const JOTARO_SCALE = Math.min(ACTOR_W, ACTOR_H) / JOTARO_FRAME_REF_H * JOTARO_BOARD_FILL;
 // Luffy má rovnaký problém (figúra ~0.88 framu → pri fill 0.95 je „obrovský"). Normalizujeme rovnako
 // ako Jotara (menší board fill + fill × fh/REF). REF = výška Idle framu (128).
@@ -226,11 +226,11 @@ const LUFFY_FRAME_REF_H = 128;
 // spodkom canvasu, tak Luffyho spodok zdvihneme o toľko istého (offsetY záporné = hore).
 const LUFFY_BOARD_OFF_Y = 4;
 // Gear3 basic (Giant Pistol): telové pózy L_GiantPunch/L_RocketPull majú natiahnutú ruku + giant päsť
-// ZAPEČENÚ v sprite (vpravo). Kreslíme len Luffyho TELO (odrežeme pravú časť framu) — dosah rieši
+// ZAPEČENÚ v sprite (vpravo). Kreslíme len Luffyho TELO (odrežeme pravú časť framu) - dosah rieši
 // procedurálna gumená ruka, ktorá sa naťahuje od tela po reálnu bunku súpera a nesie giant päsť na špičke.
 // (frac = koľko šírky framu odseknúť sprava; laditeľné podľa toho, kde v pásoch končí Luffyho telo)
 const LUFFY_ARM_CROP = { luffygiantpunch: 0.56, luffyrocketpull: 0.5 };
-// Giant Pistol gumená ruka — geometria naladená v public/luffy-tune.html.
+// Giant Pistol gumená ruka - geometria naladená v public/luffy-tune.html.
 // Body v ZLOMKOCH dlaždice v „smerovom" rámci (x = dopredu k súperovi, y = výška, hore = záporné):
 //   O = napojenie gumy na Luffym (referencia = Luffyho bunka)
 //   T = koniec gumy | P = stred obrovskej päste (referencia oboch = cieľová bunka)
@@ -271,7 +271,7 @@ function standFeet(file, idx) {
   const i = Math.max(0, Math.min(t.g.length - 1, idx | 0));
   return { x: t.x[i] ?? 0, g: t.g[i] ?? 8 };
 }
-// index práve zobrazeného framu — zrkadlí logiku drawSprite (loop/loopFrom/clamp), aby feet lookup sedel
+// index práve zobrazeného framu - zrkadlí logiku drawSprite (loop/loopFrom/clamp), aby feet lookup sedel
 function spriteFrameIndex(anim, t, total) {
   if (anim.frameIndex != null) return Math.max(0, Math.min(total - 1, anim.frameIndex));
   const elapsedF = Math.floor(t / (1000 / anim.fps));
@@ -279,9 +279,9 @@ function spriteFrameIndex(anim, t, total) {
   if (anim.loop) return ((elapsedF % total) + total) % total;
   return Math.min(total - 1, Math.max(0, elapsedF));
 }
-const STAND_FLOAT_Y = -34; // stand posunutý hore (vznáša sa nad/za Jotarom) — aplikované v transforme (kvôli plynulému swapu)
-const JOTARO_CENTER_GAP = 0.13; // horizontálny rozostup Jotara a SP v stredovom páre (zlomok veľkosti overlayu) — dolaď podľa vzhľadu
-const JOTARO_CENTER_FILL = 0.62; // veľkosť figúr v stredovom páre (menšie než sólo overlay, lebo sú dve) — tunable
+const STAND_FLOAT_Y = -34; // stand posunutý hore (vznáša sa nad/za Jotarom) - aplikované v transforme (kvôli plynulému swapu)
+const JOTARO_CENTER_GAP = 0.13; // horizontálny rozostup Jotara a SP v stredovom páre (zlomok veľkosti overlayu) - dolaď podľa vzhľadu
+const JOTARO_CENTER_FILL = 0.62; // veľkosť figúr v stredovom páre (menšie než sólo overlay, lebo sú dve) - tunable
 // stredový pár: nohy OBOCH figúr zladené na spoločnú líniu = stred canvasu + INSET·výška, per-frame
 // stabilizované (kompenzácia botGap), aby SP „nelietal" nad Jotarom a nešklbal sa. INSET posúva líniu nôh NADOL.
 // 0.475 = presne úroveň nôh Fire Wizarda v jeho stredovom overlayi (Attack_2/idle majú botGap 0 → nohy na spodku
@@ -292,7 +292,7 @@ const JOTARO_CENTER_INSET = 0.475;
   c.style.width = ACTOR_W + "px"; c.style.height = ACTOR_H + "px";
 });
 
-// ghost — poloprehľadný náhľad vlastnej pozície po naplánovaných movoch vo fronte
+// ghost - poloprehľadný náhľad vlastnej pozície po naplánovaných movoch vo fronte
 const actorGhost = document.createElement("canvas");
 actorGhost.id = "actor-ghost";
 actorGhost.className = "sprite-actor sprite-ghost";
@@ -301,8 +301,8 @@ actorGhost.style.width = ACTOR_W + "px"; actorGhost.style.height = ACTOR_H + "px
 actorGhost.style.display = "none";
 actorsEl.appendChild(actorGhost);
 
-// obrys súpera na Ariadninej nití (labyrint) — čierna silueta na bunke posledného vstupu na niť.
-// Dva canvasy: [0] = breadcrumb / prvá lovcova figúra, [1] = druhá lovcova figúra — lovec a jeho tieňový
+// obrys súpera na Ariadninej nití (labyrint) - čierna silueta na bunke posledného vstupu na niť.
+// Dva canvasy: [0] = breadcrumb / prvá lovcova figúra, [1] = druhá lovcova figúra - lovec a jeho tieňový
 // klon môžu stáť na dvoch fakľových bunkách (moja + klonova) naraz (hunterHere nesie až 2 bunky)
 const actorSilhouettes = [0, 1].map(i => {
   const el = document.createElement("canvas");
@@ -310,19 +310,19 @@ const actorSilhouettes = [0, 1].map(i => {
   el.className = "sprite-actor sprite-silhouette";
   el.width = ACTOR_W; el.height = ACTOR_H;
   el.style.width = ACTOR_W + "px"; el.style.height = ACTOR_H + "px";
-  // necháme ho VŽDY display:block a riadime len opacity — inak by CSS fade (vynorenie/strata v hmle) z display:none neprešlo
+  // necháme ho VŽDY display:block a riadime len opacity - inak by CSS fade (vynorenie/strata v hmle) z display:none neprešlo
   el.style.display = "block";
   el.style.opacity = "0";
   actorsEl.appendChild(el);
   return el;
 });
 
-// transient preblik obrysu na prejdenej niťovej bunke — lovec prechádza niťou → na KAŽDEJ bunke, kde je,
+// transient preblik obrysu na prejdenej niťovej bunke - lovec prechádza niťou → na KAŽDEJ bunke, kde je,
 // krátko preblikne jeho čierny obrys (nie len na poslednej). Vlastný canvas, po flash animácii sa odstráni.
 function spawnSilhouetteFlash(cell, oppChar, oppS) {
   if (!oppChar || !Array.isArray(cell)) return;
   const el = document.createElement("canvas");
-  // preblik na cudzej bunke = VŽDY čierny obrys (brightness(0)) — žiadny alt-color, ten by paletou
+  // preblik na cudzej bunke = VŽDY čierny obrys (brightness(0)) - žiadny alt-color, ten by paletou
   // prebil čiernu (napr. pri labyrinte cez mirror, kde je lovec nenatívna postava na p2)
   el.className = "sprite-actor sprite-silhouette silh-flash-el";
   el.width = ACTOR_W; el.height = ACTOR_H;
@@ -337,8 +337,8 @@ function spawnSilhouetteFlash(cell, oppChar, oppS) {
   setTimeout(() => el.remove(), 550);
 }
 
-// tieňové klony (Narutov special) — sprite klona per strana; pozíciu rieši positionActors,
-// kreslí raf zo state[slot].clone (na bunke majiteľa sa klon nekreslí — vidno len jednu postavu)
+// tieňové klony (Narutov special) - sprite klona per strana; pozíciu rieši positionActors,
+// kreslí raf zo state[slot].clone (na bunke majiteľa sa klon nekreslí - vidno len jednu postavu)
 const cloneEls = { p1: null, p2: null };
 for (const _slot of ["p1", "p2"]) {
   const c = document.createElement("canvas");
@@ -350,7 +350,7 @@ for (const _slot of ["p1", "p2"]) {
   actorsEl.appendChild(c);
   cloneEls[_slot] = c;
 }
-// ghost klona — pri plánovaní ukáže budúcu pozíciu vlastného klona (vertikálne inverznú k mojim smerom)
+// ghost klona - pri plánovaní ukáže budúcu pozíciu vlastného klona (vertikálne inverznú k mojim smerom)
 const cloneGhost = document.createElement("canvas");
 cloneGhost.id = "actor-clone-ghost";
 cloneGhost.className = "sprite-actor sprite-ghost";
@@ -359,7 +359,7 @@ cloneGhost.style.width = ACTOR_W + "px"; cloneGhost.style.height = ACTOR_H + "px
 cloneGhost.style.display = "none";
 actorsEl.appendChild(cloneGhost);
 
-// Jotarov stand Star Platinum — druhý canvas vedľa Jotara (vzor cloneEls); kreslí `_P` pás zodpovedajúci
+// Jotarov stand Star Platinum - druhý canvas vedľa Jotara (vzor cloneEls); kreslí `_P` pás zodpovedajúci
 // aktuálnej animácii Jotara. Stály (viditeľný pri Jotarovi), summon intro pri nasadení, Dead_P pri smrti.
 const standEls = { p1: null, p2: null };
 for (const _slot of ["p1", "p2"]) {
@@ -375,23 +375,23 @@ for (const _slot of ["p1", "p2"]) {
 let standSummoned = { p1: false, p2: false }; // stand už odohral summon intro (Summon_P) pri tomto nasadení
 let standHiddenByWorld = { p1: false, p2: false }; // board-standa skryla veľká THE WORLD menace → raf ho po jej zmiznutí vráti
 let standSummonStart = { p1: 0, p2: 0 };      // čas štartu summonu (Summon_P sa kreslí relatívnym časom, RAZ)
-let standDeadStart = { p1: 0, p2: 0 };        // čas štartu smrti (Dead_P sa prehrá RAZ, potom stand zmizne — nie loop)
-const SP_DEAD_MS = Math.round(6 * 1000 / 12); // Dead_P má 6 framov @ 12 fps (≈500ms) — po dohraní stand skryjeme
+let standDeadStart = { p1: 0, p2: 0 };        // čas štartu smrti (Dead_P sa prehrá RAZ, potom stand zmizne - nie loop)
+const SP_DEAD_MS = Math.round(6 * 1000 / 12); // Dead_P má 6 framov @ 12 fps (≈500ms) - po dohraní stand skryjeme
 let standPrevChar = { p1: null, p2: null };   // detekcia (re)nasadenia Jotara → reset summonu
-const STAND_OFFSET = 64;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane) — vznáša sa ďalej
+const STAND_OFFSET = 64;                       // horizontálny posun standu za Jotarom (na jeho chrbtovej strane) - vznáša sa ďalej
 const SP_SUMMON_MS = Math.round(5 * 1000 / 6); // Summon_P má 5 framov @ 6 fps
-// Star Platinum — útočná choreografia: pri melee / Special 1 / Special 2 stand hrá svoj útočný `_P` pás
-// a s Jotarom si VYMENIA pozície — stand zíde dole na Jotarovu úroveň (zo vznášania) a dopredu, Jotaro cúvne
+// Star Platinum - útočná choreografia: pri melee / Special 1 / Special 2 stand hrá svoj útočný `_P` pás
+// a s Jotarom si VYMENIA pozície - stand zíde dole na Jotarovu úroveň (zo vznášania) a dopredu, Jotaro cúvne
 // dozadu na miesto, kde stál stand (obaja na zemi). Aktívne, kým `now < until`.
-let standAttack = { p1: null, p2: null };      // { file, until } — útočný pás standu + výmena pozícií
+let standAttack = { p1: null, p2: null };      // { file, until } - útočný pás standu + výmena pozícií
 // lokomócia standu: dash = beh za Jotarom (Run_P), move = zmizne (Dead_P) a zjaví sa (Summon_P) na novej bunke
-let standBlip = { p1: null, p2: null };        // { start, ox, oy } — prebiehajúci „zmizni→zjav sa" pri MOVE
+let standBlip = { p1: null, p2: null };        // { start, ox, oy } - prebiehajúci „zmizni→zjav sa" pri MOVE
 const SP_BLIP_DEAD_MS = 500;                   // fáza 1 (Dead_P) na starej bunke
 const SP_BLIP_SUMMON_MS = 650;                 // fáza 2 (Summon_P) na novej bunke (spolu < MOVE_DELAY_MS ≈ 1440)
-// aktuálne ohlásená akcia daného hráča (z `action` efektu) — rozlíši move/dash pri lokomócii standu
+// aktuálne ohlásená akcia daného hráča (z `action` efektu) - rozlíši move/dash pri lokomócii standu
 let curAction = { p1: null, p2: null };
 function standSwapActive(slot) { return !!(standAttack[slot] && performance.now() < standAttack[slot].until); }
-// herná animácia Jotara (animState.key) → zodpovedajúci `_P` pás standu (mimo útoku/blipu — tie rieši raf)
+// herná animácia Jotara (animState.key) → zodpovedajúci `_P` pás standu (mimo útoku/blipu - tie rieši raf)
 function standFileFor(slot) {
   const st = state?.[slot];
   if ((st?.hp ?? 1) <= 0 || st?.down) return "Dead_P.png"; // smrť → unsummon póza
@@ -404,7 +404,7 @@ function standFileFor(slot) {
   }
 }
 
-// DEATH summon — screen-space overlay (fixed, mimo stacking contextu .stage, aby bolo vidno v každej fáze).
+// DEATH summon - screen-space overlay (fixed, mimo stacking contextu .stage, aby bolo vidno v každej fáze).
 // Veľkosť medzi fázami riešime CSS transformom scale(); canvas má základnú „stredovú" veľkosť.
 const deathCenter = document.createElement("canvas");
 deathCenter.id = "death-center";
@@ -423,7 +423,7 @@ deathCenter.id = "death-center";
 }
 document.body.appendChild(deathCenter);
 
-// „za postavou" — board-space canvas v #actors so z-indexom pod sprite-om postavy (.sprite-actor = 3)
+// „za postavou" - board-space canvas v #actors so z-indexom pod sprite-om postavy (.sprite-actor = 3)
 const deathBehind = document.createElement("canvas");
 deathBehind.id = "death-behind";
 {
@@ -440,7 +440,7 @@ deathBehind.id = "death-behind";
 }
 actorsEl.appendChild(deathBehind);
 
-// hmlový oblak za sprite-om (radiálny gradient + blur) — „zaujímavý mlžný efekt" pri zjavení
+// hmlový oblak za sprite-om (radiálny gradient + blur) - „zaujímavý mlžný efekt" pri zjavení
 const deathFog = document.createElement("div");
 deathFog.id = "death-fog";
 Object.assign(deathFog.style, {
@@ -451,7 +451,7 @@ Object.assign(deathFog.style, {
 });
 document.body.appendChild(deathFog);
 
-// Last Hope — stredový „hope" overlay (analógia k deathCenter), vlastný canvas nech sa nebije s démonom
+// Last Hope - stredový „hope" overlay (analógia k deathCenter), vlastný canvas nech sa nebije s démonom
 const hopeCenter = document.createElement("canvas");
 hopeCenter.id = "hope-center";
 {
@@ -482,43 +482,43 @@ Object.assign(hopeFog.style, {
 });
 document.body.appendChild(hopeFog);
 
-// „YOU" značka — poskakujúca zlatá šípka nad vlastnou postavou (kotví sa k pozícii aktéra)
+// „YOU" značka - poskakujúca zlatá šípka nad vlastnou postavou (kotví sa k pozícii aktéra)
 const youMarker = document.createElement("div");
 youMarker.className = "you-marker";
 youMarker.innerHTML = `<div class="you-marker-bob"><span class="you-tag">YOU</span><span class="you-tip"></span></div>`;
 youMarker.style.display = "none";
 actorsEl.appendChild(youMarker);
-// horizontálny stred hlavy v rámci sprite (0..1) — postavy nie sú centrované; zmerané z Idle.png,
+// horizontálny stred hlavy v rámci sprite (0..1) - postavy nie sú centrované; zmerané z Idle.png,
 // jemne posunuté k tvári (geom. stred zahŕňa aj vlasy vzadu, takže vlajka pôsobila „za hlavou")
 const HEAD_CX = { fire: 0.43, lightning: 0.44, wanderer: 0.47, medusa: 0.47, minotaur: 0.46, naruto: 0.50, escanor: 0.50, soldier: 0.47, werewolf: 0.50, countess: 0.49, onre: 0.50, jotaro: 0.47 };
-// vrch hlavy ako zlomok výšky actor canvasu — Medúza je vztýčená vyššie než mágovia (vrch figúry
+// vrch hlavy ako zlomok výšky actor canvasu - Medúza je vztýčená vyššie než mágovia (vrch figúry
 // ~0.40 vs ~0.48 framu), fixná hodnota jej sadila šípku do vlasov; namerané z Idle.png
 // Minotaur: vrch rohov ~0.29 framu (bbox y od 36/128); Vlkolak je zhrbený nízko (vrch figúry ~0.55 framu)
 const HEAD_TOP = { fire: 0.48, lightning: 0.48, wanderer: 0.48, medusa: 0.40, minotaur: 0.29, naruto: 0.51, escanor: 0.56, soldier: 0.48, werewolf: 0.55, countess: 0.45, onre: 0.45, jotaro: 0.45 };
 
-// zelená šípka pod round-script lištou — počas animácie ukazuje na práve vykonávaný beat
+// zelená šípka pod round-script lištou - počas animácie ukazuje na práve vykonávaný beat
 const qCursor = document.createElement("div");
 qCursor.className = "q-cursor";
 
 // === Timing ===
-// celkové spomalenie animácií kola (1 = pôvodné tempo) — MUSÍ sedieť so server.js ANIM_SLOW
+// celkové spomalenie animácií kola (1 = pôvodné tempo) - MUSÍ sedieť so server.js ANIM_SLOW
 const ANIM_SLOW = 1.8;
 const MOVE_MS = Math.round(700 * ANIM_SLOW); // pohyb na boarde; CSS číta --move-ms (nastavené nižšie)
 // POZN.: neslučkové animácie (attack/attack2/hurt/dead) sa kvôli drawSprite(t=now) reálne neprehrávajú
-// frame po frame — len držia poslednú pózu. Preto ich NEdržíme fixný čas (predtým 2400 ms = vizuálny „drag“),
+// frame po frame - len držia poslednú pózu. Preto ich NEdržíme fixný čas (predtým 2400 ms = vizuálny „drag“),
 // ale presne po dobu daného timeline frame-u (frame.delayMs), aby póza zmizla keď začne ďalšia akcia.
 // special/melee tým ostávajú dlhé (ich beaty majú delayMs 1350 ms), basic/hurt sa skrátia na svoj frame.
 const POSE_TAIL_MS = 300; // o koľko dlhšie strelec „pozerá“ v smere streľby, nech otočenie vydrží po dopad
 
-// každá nevykonaná akcia povie PREČO — dôvod zo servera → [text floatu, CSS trieda]; default = všeobecné odmietnutie
+// každá nevykonaná akcia povie PREČO - dôvod zo servera → [text floatu, CSS trieda]; default = všeobecné odmietnutie
 const INVALID_MSG = {
   mana:      ["⚠️ LOW MANA",  "lowmana-float"],
   mana_full: ["✨ MANA FULL",  "golden-float"],
   hp_low:    ["🙏 LOW HP",     "lowmana-float"],
   offboard:  ["🚫 OFF-BOARD",  "lowmana-float"],
-  no_demon:  ["✗ DEMON TAKEN", "dmg-float"], // druhý Last Stand v kole — démon je len jeden
-  already_stone: ["🗿 ALREADY STONE", "lowmana-float"], // Medúzin special na už skamenenú postavu — bez efektu
-  already_lost: ["🌀 ALREADY LOST", "lowmana-float"],   // Minotaurov special na už blúdiaceho — bez efektu
+  no_demon:  ["✗ DEMON TAKEN", "dmg-float"], // druhý Last Stand v kole - démon je len jeden
+  already_stone: ["🗿 ALREADY STONE", "lowmana-float"], // Medúzin special na už skamenenú postavu - bez efektu
+  already_lost: ["🌀 ALREADY LOST", "lowmana-float"],   // Minotaurov special na už blúdiaceho - bez efektu
   not_alone: ["🚫 NOT ALONE", "lowmana-float"],         // Narutov summon vyžaduje bunku bez súpera
   blocked_shield: ["🛡️ SHIELD BLOCKED", "lowmana-float"], // BLOCK tile: obrana sa na ňom nedá castnúť (bez ceny)
   blocked_mirror: ["🪞 MIRROR BLOCKED", "lowmana-float"], // BLOCK tile: obrana sa na ňom nedá castnúť (bez ceny)
@@ -541,30 +541,30 @@ const SPECIAL_ANIMS = {
   lightning: { file: "Light_charge.png", fps: SPECIAL_FPS, loop: true },
   wanderer:  { file: "Magic_sphere.png", fps: SPECIAL_FPS, loop: true },
   medusa:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true },
-  minotaur:  { file: "Walk.png",         fps: SPECIAL_FPS, loop: true }, // bez vlastného fx spritu — cast = veľký kráčajúci Minotaur (blúdenie labyrintom)
+  minotaur:  { file: "Walk.png",         fps: SPECIAL_FPS, loop: true }, // bez vlastného fx spritu - cast = veľký kráčajúci Minotaur (blúdenie labyrintom)
   naruto:    { file: "Special.png",      fps: SPECIAL_FPS, loop: true }, // pečate rukami (summon tieňového klona)
-  escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder — plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
-  soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // loop len pre victory/preview — pri caste NECYKLÍ: mierenie (frame 0 + laser sight) → jeden výšľah → lúč (SOLDIER_AIM/FIRE)
-  werewolf:  { file: "Run+Attack.png",   fps: SPECIAL_FPS, loop: true }, // rozbeh charge — veľký stredový sprite hrá LEN Run+Attack (Attack_2 seknutie je na malej figúre pri dopade)
-  countess:  { file: "A5.png",           fps: SPECIAL_FPS, loop: true }, // kladenie pasce — celá útočná sekvencia A1–A4 (17f); pri caste sa hrá RAZ od frame 0 (server drží jeden dlhý VAMP_CAST_MS frame), loop len pre victory/preview. Cieľová bunka sa NEzvýrazňuje, pasca je tajná
-  onre:      { file: "Scream.png",       fps: SPECIAL_FPS, loop: true }, // kladenie pasce — prízračný výkrik
+  escanor:   { file: "Win.png",          fps: SPECIAL_FPS, loop: true }, // ETAPA A placeholder - plná choreografia (WinSun/CruelSunHold/SunBurst) príde v etape B
+  soldier:   { file: "Shot_2.png",       fps: SPECIAL_FPS, loop: true }, // loop len pre victory/preview - pri caste NECYKLÍ: mierenie (frame 0 + laser sight) → jeden výšľah → lúč (SOLDIER_AIM/FIRE)
+  werewolf:  { file: "Run+Attack.png",   fps: SPECIAL_FPS, loop: true }, // rozbeh charge - veľký stredový sprite hrá LEN Run+Attack (Attack_2 seknutie je na malej figúre pri dopade)
+  countess:  { file: "A5.png",           fps: SPECIAL_FPS, loop: true }, // kladenie pasce - celá útočná sekvencia A1–A4 (17f); pri caste sa hrá RAZ od frame 0 (server drží jeden dlhý VAMP_CAST_MS frame), loop len pre victory/preview. Cieľová bunka sa NEzvýrazňuje, pasca je tajná
+  onre:      { file: "Scream.png",       fps: SPECIAL_FPS, loop: true }, // kladenie pasce - prízračný výkrik
   jotaro:    { file: "Special_2_P.png",  fps: SPECIAL_FPS, loop: true }, // Star Platinum úder (stred castu; F5 doladí per special1/2 + THE WORLD)
 };
-// niektoré efektové sprity majú obsah mimo stredu framu — vodorovná korekcia (zlomok šírky canvasu) v náhľade
+// niektoré efektové sprity majú obsah mimo stredu framu - vodorovná korekcia (zlomok šírky canvasu) v náhľade
 const FX_OFFSET_X = { lightning: 0.18 };
 
 // Normalizácia veľkosti postavy v KARTÁCH výberu a HUD PORTRÉTE: mágovia vypĺňajú frame len z ~51 %
-// výšky (veľa vzduchu), Medúza 59 % a Minotaur 72 % — pri rovnakom fill preto pôsobia príliš veľkí.
+// výšky (veľa vzduchu), Medúza 59 % a Minotaur 72 % - pri rovnakom fill preto pôsobia príliš veľkí.
 // Násobič ich zmenšuje na porovnateľnú výšku postavy; na BOARDE ostávajú zámerne väčší (bez násobiča).
 // luffy/jotaro (Hidden preview): ich pásy majú figúru takmer cez celý frame (88 % / 78 % výšky),
-// kým mágovia ~52 % — normalizácia na výšku mágov v karte (66/112 ≈ .59, resp. ·(112/144) ≈ .66)
+// kým mágovia ~52 % - normalizácia na výšku mágov v karte (66/112 ≈ .59, resp. ·(112/144) ≈ .66)
 const PORTRAIT_SCALE = { medusa: 0.85, minotaur: 0.7, countess: 0.93, onre: 0.93, luffy: 0.59, jotaro: 0.66 };
 const portraitFill = (char, base) => base * (PORTRAIT_SCALE[char] ?? 1);
 
 const CHAR_META = {
   fire:      { name: "Fire Wizard",      dir: "fire", dirP2: "fire_2" },
   lightning: { name: "Lightning Mage",   dir: "lightning", dirP2: "lightning_2" },
-  // Wanderer: p2 = wanderer_2 — do pixelov zapečený bývalý alt-color filter
+  // Wanderer: p2 = wanderer_2 - do pixelov zapečený bývalý alt-color filter
   // (saturate .22 + brightness 1.4), vizuálne totožné, už bez CSS filtra (tools/sprites-wanderer)
   wanderer:  { name: "Wanderer Magician",dir: "wanderer", dirP2: "wanderer_2" },
   // Medúza: pravá strana (p2) má NATÍVNU tmavú paletu (Medusa2) namiesto CSS alt-color filtra;
@@ -572,36 +572,36 @@ const CHAR_META = {
   medusa:    { name: "Medusa",           dir: "medusa/Medusa", dirP2: "medusa/Medusa2" },
   // Minotaur: natívna p2 paleta (Minotaur_2, hnedý so sekerou); Charge.png = prefarbený fire fireball per paleta
   minotaur:  { name: "Minotaur",         dir: "minotaur/Minotaur_1", dirP2: "minotaur/Minotaur_2" },
-  // Naruto: natívna p2 paleta (žltý kostým + zlatá čakra — paletový swap z kostýmov v sheete)
+  // Naruto: natívna p2 paleta (žltý kostým + zlatá čakra - paletový swap z kostýmov v sheete)
   naruto:    { name: "Naruto",           dir: "naruto/Naruto_1", dirP2: "naruto/Naruto_2" },
   // Escanor: zatiaľ LEN ukážka vo výbere (nová stránka vľavo), nedá sa zvoliť ani hrať.
   // Natívna paleta; p2 = escanor_2 (zelené oblečenie prefarbené na červené). V karte: WeakIdle, hover IntroStand.
   escanor:   { name: "Escanor",          dir: "escanor", dirP2: "escanor_2" },
-  // Vojak: p2 = soldier_2 (uniforma prefarbená na čiernu — tools/sprites-soldier); Charge.png = kotúľajúci sa granát
+  // Vojak: p2 = soldier_2 (uniforma prefarbená na čiernu - tools/sprites-soldier); Charge.png = kotúľajúci sa granát
   soldier:   { name: "Soldier",          dir: "soldier", dirP2: "soldier_2" },
   // Vlkolak: natívna p2 paleta (Werewolf_2, teplejší odtieň); Charge.png = prefarbený fire fireball per paleta
-  // (P1 mesačná modrá, P2 krvavá červená) — tools/sprites-werewolf
+  // (P1 mesačná modrá, P2 krvavá červená) - tools/sprites-werewolf
   werewolf:  { name: "Werewolf",         dir: "Werewolf_1", dirP2: "Werewolf_2" },
-  // Hidden stránka (easter egg): postavy viazané na stranu — Vampire VÝHRADNE P1, Onryō VÝHRADNE P2
+  // Hidden stránka (easter egg): postavy viazané na stranu - Vampire VÝHRADNE P1, Onryō VÝHRADNE P2
   // (karty per strana skrýva CSS cez data-side; hrateľné len v single/bo3, turnaj Hidden stránku nepustí).
   // Onre hrá vždy vpravo vo svojej natívnej palete → dirP2 = ten istý priečinok (žiadny albino filter).
   countess:  { name: "Vampire", dir: "Countess_Vampire" },
   onre:      { name: "Onryō",   dir: "Onre", dirP2: "Onre" },
-  // Hidden preview postavy (zatiaľ NEHRATEĽNÉ — karta bez data-char, klik/draft ju ignorujú):
+  // Hidden preview postavy (zatiaľ NEHRATEĽNÉ - karta bez data-char, klik/draft ju ignorujú):
   // Luffy len P1, Jotaro len P2; Jotaro vpravo v natívnej palete (dirP2 = ten istý priečinok).
   luffy:     { name: "Luffy",   dir: "luffy" },
   jotaro:    { name: "Jotaro",  dir: "jotaro", dirP2: "jotaro" }
 };
 // side-postavy viazané na slot (zrkadlo serverového SIDE_CHARS); v turnaji sa dajú draftnúť, ale
-// swap DO/Z nich je zakázaný — v HUD hlavách to reprezentuje glitch (viď renderMageHeads).
+// swap DO/Z nich je zakázaný - v HUD hlavách to reprezentuje glitch (viď renderMageHeads).
 // Jotaro (stand Star Platinum) je side-bound na p2 ako Onryō.
 const SIDE_CHARS = { countess: "p1", onre: "p2", jotaro: "p2", luffy: "p1" };
-// vamp kit (charge/trap/vamp melee/mirror-imunita) — PODMNOŽINA side-bound; Jotaro NIE
+// vamp kit (charge/trap/vamp melee/mirror-imunita) - PODMNOŽINA side-bound; Jotaro NIE
 // (dashuje/melee normálne, special nie je pasca, nie je mirror-imúnny, dash bez ❔ skinu)
 const VAMP_CHARS = { countess: 1, onre: 1 };
 // je `key` side-postava viazaná na `slot`? (p2 má viac: onre, jotaro)
 function sideCharBoundTo(key, slot) { return SIDE_CHARS[key] === slot; }
-// sprite priečinok postavy pre daný slot — postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
+// sprite priečinok postavy pre daný slot - postava s natívnou p2 paletou (dirP2) nepoužíva alt-color filter
 function charDirFor(char, slot) {
   const m = CHAR_META[char];
   return (slot === "p2" && m?.dirP2) ? m.dirP2 : m?.dir;
@@ -612,27 +612,27 @@ const ANIM_DEF = {
   run:     { file: "Run.png",      fps: 12, loop: true  },
   attack:  { file: "Attack_1.png", fps: 10, loop: false },
   attack2: { file: "Attack_2.png", fps: 10, loop: false },
-  // looping variant pre melee — malá postava sa seká súbežne s veľkým sprite-om (inak by zamrzla na poslednom frame).
+  // looping variant pre melee - malá postava sa seká súbežne s veľkým sprite-om (inak by zamrzla na poslednom frame).
   // special nemá vlastný key: malá postava kreslí svoj efektový sprite (SPECIAL_ANIMS) cez key "casting" priamo v raf.
   attack2_loop: { file: "Attack_2.png", fps: 10, loop: true },
-  attack1_loop: { file: "Attack_1.png", fps: 10, loop: true }, // melee Medúzy — šľah celým telom (Attack_1)
+  attack1_loop: { file: "Attack_1.png", fps: 10, loop: true }, // melee Medúzy - šľah celým telom (Attack_1)
   hurt:    { file: "Hurt.png",     fps: 10, loop: false },
   // flinch = to isté PNG ako hurt, ale klon ho ZRKADLÍ (hurt/dead klon potláča na idle, aby zásah naň nič neprezradil).
   // Používa sa pri neplatnej akcii (žiadny dmg) → aj Naruto aj klon trhnú rovnako a nedá sa rozoznať pravý.
   flinch:  { file: "Hurt.png",     fps: 10, loop: false },
   dead:    { file: "Dead.png",     fps: 7,  loop: false },
-  // Naruto: summon klona — po pečatiach hrá postava (aj kópie po bokoch) Special_2 (dýchanie)
+  // Naruto: summon klona - po pečatiach hrá postava (aj kópie po bokoch) Special_2 (dýchanie)
   special2:{ file: "Special_2.png", fps: 6, loop: true },
-  victory: { file: "Idle.png", fps: 6, loop: true }, // placeholder — raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
+  victory: { file: "Idle.png", fps: 6, loop: true }, // placeholder - raf pre victory kreslí special sprite mága (SPECIAL_ANIMS)
   // Escanor: WeakIdle = slabá „denná" forma (pred premenou); Transform = premena → chytí sekeru (hrá sa RAZ pri nasadení)
   weakidle:  { file: "WeakIdle.png", fps: 5,  loop: true },
-  transform: { file: "Transform.png", fps: 5, loop: false }, // slow-mo premena — nech si ju hráči všimnú
+  transform: { file: "Transform.png", fps: 5, loop: false }, // slow-mo premena - nech si ju hráči všimnú
   cruelhold: { file: "CruelSunHold.png", fps: 11, loop: true }, // special fáza 2: malá postava nesie veľké slnko
   // Escanor special fáza 1: zdvih ruky so slnkom RAZ, potom už len ústa + preblikávajúce slnko (posledné 4 framy);
   // loopFrom potrebuje čas od štartu animácie (raf: drawT = now - animState.start)
   winsun:  { file: "WinSunBoard.png", fps: 7, loopFrom: 4 },
   wintalk: { file: "WinTalk.png",     fps: 5, loop: true }, // special fáza 3 (slnko letí na cieľ): len otvára/zatvára ústa, bez slnka a bez zdvihu
-  // Vojak: vlastná póza pri recharge (ostatné postavy hrajú len auru v idle); loop — neslučkové anims
+  // Vojak: vlastná póza pri recharge (ostatné postavy hrajú len auru v idle); loop - neslučkové anims
   // sa kreslia absolútnym časom (držali by len posledný frame), slučka sa pri frameHold ~1s prehrá raz
   recharge: { file: "Recharge.png", fps: 12, loop: true },
   // Luffy: pumpovanie pästí (Recharge2, 7f) = prepnutie base→gear3 + windup gear3 basicu; Special_3 (12f) = splasknutie
@@ -640,10 +640,10 @@ const ANIM_DEF = {
   luffypump:    { file: "Recharge2.png", fps: 10, loop: false, maxFrame: 4 },
   luffydeflate: { file: "Special_3.png", fps: 10, loop: false, maxFrame: 9 },
   // Gear3 basic (Giant Pistol) telové pózy: windup (päsť vzad) → úder (natiahnutá ruka) → priťiahnutie (reeluje) / minutie (stiahne)
-  luffygiantrocket:  { file: "L_GiantRocket.png",  fps: 8,  loop: false }, // 2f — nabratie, giant päsť vzad
-  luffygiantpunch:   { file: "L_GiantPunch.png",   fps: 10, loop: false }, // 3f — vystrelenie päste vpred
-  luffyrocketpull:   { file: "L_RocketPull.png",   fps: 12, loop: false }, // 5f — ruka sa sťahuje, ťahá súpera
-  luffygiantretract: { file: "L_GiantRetract.png", fps: 12, loop: false }, // 4f — minutie: stiahnutie naprázdno
+  luffygiantrocket:  { file: "L_GiantRocket.png",  fps: 8,  loop: false }, // 2f - nabratie, giant päsť vzad
+  luffygiantpunch:   { file: "L_GiantPunch.png",   fps: 10, loop: false }, // 3f - vystrelenie päste vpred
+  luffyrocketpull:   { file: "L_RocketPull.png",   fps: 12, loop: false }, // 5f - ruka sa sťahuje, ťahá súpera
+  luffygiantretract: { file: "L_GiantRetract.png", fps: 12, loop: false }, // 4f - minutie: stiahnutie naprázdno
   // Luffy special roll: base = Special_7 (rozbeh→kotúľ→puf-hlava bounce); gear3 = balón (Recharge round frame)
   // + Special_2 impact (radiálne päste) na cieľovej bunke
   // base special 2 fázy: dogúľanie (run/roll f0–6) počas cesty, potom cvaknutie na cieľovej bunke (f7+).
@@ -651,7 +651,7 @@ const ANIM_DEF = {
   luffychomp:      { file: "Special_7.png", fps: 10, loop: false, startFrame: 7 },            // cvaknutie + zotavenie (minutie)
   luffychomphit:   { file: "Special_7.png", fps: 10, loop: false, startFrame: 7, maxFrame: 9 }, // cvaknutie, zastaví (zásah)
   luffyball:     { file: "Special_1.png", fps: 8, loopFrom: 7 },                       // gear3: premena na guľu (transform + spin) NA štartovacej bunke
-  luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7, loop: true },        // gear3: gúľajúca sa guľa počas presunu k cieľu — LOOPuje guľové framy 7–8 (nie statický frame)
+  luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7, loop: true },        // gear3: gúľajúca sa guľa počas presunu k cieľu - LOOPuje guľové framy 7–8 (nie statický frame)
   luffyimpact:   { file: "Special_2.png", fps: 8,  loop: false },
   // Vlkolak: beh charge specialu (Run+Attack) + seknutie na bunke terča (WolfStrike.png → alias Attack_2.png);
   // neloopové → raf ho kreslí relatívnym časom od setAnim (drawT), inak by viselo na poslednom frame
@@ -662,7 +662,7 @@ const ANIM_DEF = {
   vamprun:    { file: "Run.png", fps: 12, loop: true },
   vampstrike: { file: "VampStrike.png", fps: 8, loop: false },
   // Countess melee/pasca (podľa vampire_attack_guide): úder = A1 (krvavý bolt zapečený vo framoch),
-  // po dopadnutom dmg liečivé beaty A2→A3→A4 a až po nich +HP — jednotné pre charge melee, center
+  // po dopadnutom dmg liečivé beaty A2→A3→A4 a až po nich +HP - jednotné pre charge melee, center
   // melee aj trigger pasce. Onreho trigger úder ostáva Attack_1; na bunke pasce sa zjavuje s výkrikom
   // (Scream). Všetko neloopové → kreslené relatívnym časom (VAMP_ONESHOT_KEYS), inak by viseli na
   // poslednom frame. fps ladené tak, aby sa švih prehral CELÝ v rámci svojho beatu
@@ -677,16 +677,16 @@ const ANIM_DEF = {
 // neloopové one-shot animácie kreslené relatívnym časom od setAnim (hrajú RAZ od frame 0, potom držia pózu)
 const VAMP_ONESHOT_KEYS = new Set(["wolfstrike", "vampstrike", "vattack1", "va1", "va2", "va3", "va4", "scream"]);
 const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
-const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s — dramatická premena pred prvým rozohraním
+const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s - dramatická premena pred prvým rozohraním
 
 let me = null;
 let isHost = false;               // prvý pripojený hráč nastavuje zápas v lobby
-let serverGameResult = null;      // výsledok poslednej dohranej hry (séria) — vyhodnotí sa na konci timeline
+let serverGameResult = null;      // výsledok poslednej dohranej hry (séria) - vyhodnotí sa na konci timeline
 let board = { w: 4, h: 3 };
 let state = { p1:null, p2:null, arena:null, turn:1, starter:"p1", phase:"lobby" };
 let myQueue = [];
 let goldenArmed = false;       // objednaný golden shield (extra predťah pred kolom, len keď som druhý)
-let goldenMirrorArmed = false; // objednaný golden mirror — ten istý predťah, len odraz (vzájomne výlučný s golden shieldom)
+let goldenMirrorArmed = false; // objednaný golden mirror - ten istý predťah, len odraz (vzájomne výlučný s golden shieldom)
 let goldenManaArmed = false;   // objednaný golden mana refill (extra akcia po konci kola)
 let lastStandArmed = false;    // objednaný Last Stand (duálny s golden mana, výlučný)
 let lastHopeArmed = false;     // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
@@ -699,7 +699,7 @@ let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyk
 
 // počas special castu skryjeme bežný actor sprite
 let castingNow = { p1:false, p2:false };
-// teleport (výmena maga): postava fade-uje plynulo (WAAPI, inšpirované démonom) — ref na bežiacu fade animáciu
+// teleport (výmena maga): postava fade-uje plynulo (WAAPI, inšpirované démonom) - ref na bežiacu fade animáciu
 let _teleAnim = { p1:null, p2:null };
 function fadeActor(slot, from, to, dur) {
   const el = slot === "p1" ? actorP1 : actorP2;
@@ -721,11 +721,11 @@ let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
 // odvtedy je idle Stand. escTransformed drží, či daný slot už premenu odohral; escPrevChar deteguje (re)nasadenie.
 let escTransformed = { p1: false, p2: false };
 let escPrevChar = { p1: null, p2: null };
-let escTransformStart = { p1: 0, p2: 0 }; // čas štartu premeny — Transform (loop:false) sa musí kresliť RELATÍVNYM časom
-// klonový flinch (tile zásah na klonovi) — čas štartu; klon sa strhne rovnako ako pravý Naruto pri zásahu,
+let escTransformStart = { p1: 0, p2: 0 }; // čas štartu premeny - Transform (loop:false) sa musí kresliť RELATÍVNYM časom
+// klonový flinch (tile zásah na klonovi) - čas štartu; klon sa strhne rovnako ako pravý Naruto pri zásahu,
 // aby „nezraniteľne" nestál a neprezradil sa. Nezávislé od animState (to zdieľa s majiteľom).
 let cloneFlinch = { p1: 0, p2: 0 };
-// klon je „mŕtvy" (puffol) — positionActors ho drží skrytého, aby po puffe už nepreblikol späť.
+// klon je „mŕtvy" (puffol) - positionActors ho drží skrytého, aby po puffe už nepreblikol späť.
 // Reset pri novom summone (clone_born) a v clearActors.
 let cloneDead = { p1: false, p2: false };
 const SPRITES = {};
@@ -746,11 +746,11 @@ let charSelectMana = null; // tournament: prenesená mana magov (per vlastný t�
 let teamPick = [];
 const TEAM_SIZE = 3; // musí sedieť so serverovým TEAM_SIZE
 
-// od kedy je postava v HUD widgete mŕtva — Dead anim sa prehrá raz od tohto času
+// od kedy je postava v HUD widgete mŕtva - Dead anim sa prehrá raz od tohto času
 let hudDeadSince = { p1: 0, p2: 0 };
 
 /* ---------- sprite helpers ---------- */
-// Minotaur nemá Run/Attack_1/Attack_2 súbory — jeho sheet používa Walk/Attack; alias per priečinok,
+// Minotaur nemá Run/Attack_1/Attack_2 súbory - jeho sheet používa Walk/Attack; alias per priečinok,
 // nech všetky ANIM_DEF/SPECIAL cesty fungujú bez per-char výnimiek v kóde
 const SPRITE_FILE_ALIAS = {
   "minotaur/": { "Run.png": "Walk.png", "Attack_1.png": "Attack.png", "Attack_2.png": "Attack.png" },
@@ -793,7 +793,7 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
   const total = anim.frames || meta.frames;
   const fw = anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
   // anim.frameIndex: explicitný frame (vlastná časová logika, napr. Escanor IntroStand s loopFrom)
-  // anim.loopFrom: prehraj RAZ celé (0..N-1), potom cykli len chvost od loopFrom (napr. Escanorov WinSunBoard —
+  // anim.loopFrom: prehraj RAZ celé (0..N-1), potom cykli len chvost od loopFrom (napr. Escanorov WinSunBoard -
   // zdvih ruky raz, ďalej len ústa + preblikávajúce slnko). Vyžaduje t relatívny od štartu animácie.
   const elapsedF = Math.floor(t / (1000 / anim.fps));
   // maxFrame: neloopová animácia sa zastaví (drží) na tomto frame; startFrame: začne od tohto framu (napr.
@@ -804,8 +804,8 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
             : anim.loopFrom != null ? (elapsedF < total ? elapsedF : anim.loopFrom + ((elapsedF - anim.loopFrom) % (total - anim.loopFrom)))
             : anim.loop ? startF + (elapsedF % (lastIdx - startF + 1)) // loop RESPEKTUJE startFrame/maxFrame (startFrame 0 → identické s pôvodným elapsedF % total)
                         : Math.min(lastIdx, startF + elapsedF);
-  // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu — kreslí sa len stredový pás postavy
-  // cropRightFrac: NAVYŠE odreže časť SPRAVA v sprite-priestore (sprite mieri doprava, flip rieši CSS) —
+  // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu - kreslí sa len stredový pás postavy
+  // cropRightFrac: NAVYŠE odreže časť SPRAVA v sprite-priestore (sprite mieri doprava, flip rieši CSS) -
   //   napr. Luffyho zapečená natiahnutá ruka+päsť: necháme len telo, dosah kreslí procedurálna guma
   const cropPx  = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
   const cropRPx = Math.round(fw * Math.max(0, Math.min(0.9, cropRightFrac)));
@@ -820,7 +820,7 @@ function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anc
   ctx.drawImage(meta.img, sx, 0, sw, meta.fh, dx, dy, dw, dh);
 }
 
-/* ---------- Teleport (výmena maga v turnaji) — dvojfázová explózia ---------- */
+/* ---------- Teleport (výmena maga v turnaji) - dvojfázová explózia ---------- */
 // framy sú JEDNOTLIVÉ číslované PNG (nie horizontálny strip ako ostatné sprity) → vlastný loader/prehrávač
 const TELEPORT_DIR   = { fire: "Fire", lightning: "Lightning", wanderer: "Wanderer" };
 const TELEPORT_COUNT = { fire: 6, lightning: 10, wanderer: 10 };
@@ -840,7 +840,7 @@ function ensureTeleportFrames(char) {
 }
 // per-mág: veľkosť explózie (× rozmer políčka) + kotvenie ("feet" = od nôh nahor, "torso" = na stred torza)
 // bottomTrim = zlomok výšky PNG, ktorý je pod viditeľným obsahom priehľadný (obsah vo frame nesiaha po spodok)
-// dy = dodatočný posun celej explózie NADOL (× výška políčka) — ručné doladenie per mág
+// dy = dodatočný posun celej explózie NADOL (× výška políčka) - ručné doladenie per mág
 const TELEPORT_FX = {
   fire:      { scale: 1.0, anchor: "feet" },   // oheň horí od zeme, zmestí sa do políčka
   lightning: { scale: 1.6, anchor: "feet", bottomTrim: 0.17, dy: 0.20 }, // blesk šľahá od nôh nahor
@@ -863,7 +863,7 @@ function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
     cvs.width = boxW; cvs.height = boxH;
     cvs.className = "teleport-fx";
     cvs.style.opacity = String(opacity ?? 1);
-    // horizontálne = stred TELA postavy (sprite je vo frame mimo stredu — rovnaký HEAD_CX + flip vzor
+    // horizontálne = stred TELA postavy (sprite je vo frame mimo stredu - rovnaký HEAD_CX + flip vzor
     // ako „YOU" vlajka a anjel); vertikálne = kotvenie feet/torso + per-mág dy posun nadol
     const { left, top } = cellToPx(x, y);
     const px = left - (ACTOR_W - TILE_W) / 2;
@@ -905,7 +905,7 @@ function playTeleportExplosion(slot, char, durationMs, opacity, onDone) {
   }).catch(() => onDone && onDone());
 }
 
-/* ---------- Mage head ikona (HUD hlavy + swap badge) — ANIMOVANÝ výrez hlavy z Idle sprite ---------- */
+/* ---------- Mage head ikona (HUD hlavy + swap badge) - ANIMOVANÝ výrez hlavy z Idle sprite ---------- */
 // per-mág výrez hlavy z framu (cx,cy = stred výrezu ako zlomok šírky/výšky framu; size = strana štvorca ako zlomok výšky).
 // Hodnoty vylaď cez /head-cropper.html a nahraď ich sem. cxP2 = korekcia pre natívny p2 sheet (dirP2),
 // keď v ňom figúra sedí inde než v p1 sheete (Minotaur_2 je o ~0.05 šírky framu vpravo oproti Minotaur_1).
@@ -915,11 +915,11 @@ const HEAD_CROP = {
   wanderer:  { cx: 0.47, cy: 0.56, size: 0.27 },
   medusa:    { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
   minotaur:  { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51, cyP2: 0.43 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2/cyP2 = korekcia na posunutú figúru v Minotaur_2
-  naruto:    { cx: 0.50, cy: 0.58, size: 0.26 }, // bojový postoj (Stance) — figúra centrovaná, bottom-anchor
-  escanor:   { cx: 0.52, cy: 0.755, size: 0.11 }, // hlava zo slabej formy (WeakIdle) — figúra je DROBNÁ (~22×63 px pri spodku 226px framu), preto malý výrez nízko; cx mierne vpravo od stredu figúry = hlava v okienku mierne vľavo
-  soldier:   { cx: 0.46, cy: 0.555, size: 0.22 }, // hlava namerané z Idle.png riadky 62–82 (stred x ≈ 0.46) — telo sa nakláňa doprava, hlava je nad ľavou nohou
-  werewolf:  { cx: 0.73, cy: 0.62, size: 0.24, cxP2: 0.72 }, // zhrbený vlk hľadí doprava — hlava vpredu vpravo (bbox po recentrovaní x27–102, y71–127)
-  countess:  { cx: 0.49, cy: 0.52, size: 0.19 }, // blond drdol (bbox y od 58/128) — hlava nad širokou sukňou
+  naruto:    { cx: 0.50, cy: 0.58, size: 0.26 }, // bojový postoj (Stance) - figúra centrovaná, bottom-anchor
+  escanor:   { cx: 0.52, cy: 0.755, size: 0.11 }, // hlava zo slabej formy (WeakIdle) - figúra je DROBNÁ (~22×63 px pri spodku 226px framu), preto malý výrez nízko; cx mierne vpravo od stredu figúry = hlava v okienku mierne vľavo
+  soldier:   { cx: 0.46, cy: 0.555, size: 0.22 }, // hlava namerané z Idle.png riadky 62–82 (stred x ≈ 0.46) - telo sa nakláňa doprava, hlava je nad ľavou nohou
+  werewolf:  { cx: 0.73, cy: 0.62, size: 0.24, cxP2: 0.72 }, // zhrbený vlk hľadí doprava - hlava vpredu vpravo (bbox po recentrovaní x27–102, y71–127)
+  countess:  { cx: 0.49, cy: 0.52, size: 0.19 }, // blond drdol (bbox y od 58/128) - hlava nad širokou sukňou
   onre:      { cx: 0.50, cy: 0.52, size: 0.19 }, // úzka prízračná figúra s rohom (bbox y od 58/128)
   jotaro:    { cx: 0.51, cy: 0.30, size: 0.31 }, // namerané z Idle.png (144² frame): figúra x38–105 y24–135, hlava pás y24–57 x52–95 → stred hlavy vysoko vo frame
   luffy:     { cx: 0.49, cy: 0.21, size: 0.33 }, // slamák + tvár z Idle.png (128² frame): figúra x38–89 y8–119, hlava/klobúk r8–44 (strieška x42–83) → stred (x62,y26)
@@ -930,7 +930,7 @@ function drawMageHeadAnim(cvs, char, now) {
   const dir = charDirFor(char, cvs.dataset.slot || null); // p2 hlava Medúzy = natívna tmavá paleta
   const c = HEAD_CROP[char];
   if (!dir || !c) return;
-  // natívny p2 sheet môže mať figúru posunutú inde — použi jeho vlastný stred výrezu
+  // natívny p2 sheet môže mať figúru posunutú inde - použi jeho vlastný stred výrezu
   const isP2Sheet = dir === CHAR_META[char]?.dirP2;
   const cx = (isP2Sheet && c.cxP2 != null) ? c.cxP2 : c.cx;
   const cy = (isP2Sheet && c.cyP2 != null) ? c.cyP2 : c.cy;
@@ -978,7 +978,7 @@ function currentAnim(slot) {
 }
 
 /* ---------- specials/melee v strede boardu ---------- */
-// Escanorove stredové overlaye (special WinSun aj melee postava) rastú s Pridom — ukotvené za NOHY:
+// Escanorove stredové overlaye (special WinSun aj melee postava) rastú s Pridom - ukotvené za NOHY:
 // drawSprite kreslí frame na 95 % canvasu centrovane, takže nohy sedia ~0.95 výšky canvasu. Nohy držíme
 // na mieste, kde by boli pri pride0 (centrovaný basePx canvas), rast ide len nahor a do šírky.
 // top = pevný bod nôh (nezávislý od px), translateY(-95 %) je relatívny k výške elementu → nohy vždy na top.
@@ -990,7 +990,7 @@ function escCenterAnchor(el, flip) {
   el.style.top  = `calc(50% + ${Math.round(basePx * (ESC_CENTER_FEET - 0.5))}px)`;
   el.style.transform = `translate(-50%, -${ESC_CENTER_FEET * 100}%) scaleX(${flip})`;
 }
-// veľký centrálny overlay — pre special efektový sprite mága, pre melee zväčšená postava so sekaním
+// veľký centrálny overlay - pre special efektový sprite mága, pre melee zväčšená postava so sekaním
 function updateSpecialCenter(casts) {
   actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
   if (!Array.isArray(casts) || casts.length === 0) return;
@@ -1040,14 +1040,14 @@ function updateSpecialCenter(casts) {
     cvs.dataset.dir  = dirKey;
     cvs.dataset.file = file;
     if (sp.fps) cvs.dataset.fps = sp.fps;
-    // vojakov special (melee sem chodí s sp.file): NECYKLÍ — raf drží mieriacu pózu a výšľah prehrá
+    // vojakov special (melee sem chodí s sp.file): NECYKLÍ - raf drží mieriacu pózu a výšľah prehrá
     // raz na konci mierenia (čas od vzniku canvasu = od začiatku cast framu)
     if (caster.char === "soldier" && !sp.file) {
       cvs.dataset.soldierAim = "1";
       cvs.dataset.born = String(performance.now());
     }
     // one-shot stredový sprite (Countess A-sheety): hrá RAZ od vzniku canvasu (= od začiatku svojho
-    // frame-u) a drží posledný frame — absolútny loop by naratívnu sekvenciu začal v strede.
+    // frame-u) a drží posledný frame - absolútny loop by naratívnu sekvenciu začal v strede.
     // Platí pre melee/heal casty (sp.once) aj pre jej trap cast (special bez sp.file → A5)
     if (sp.once || (caster.char === "countess" && !sp.file)) {
       cvs.dataset.once = "1";
@@ -1067,12 +1067,12 @@ function updateSpecialCenter(casts) {
   }
 }
 
-// Escanor special — vlastná riadená choreografia (NECYKLÍ). Musí časovo sedieť s ESC_SPECIAL_MS na serveri
+// Escanor special - vlastná riadená choreografia (NECYKLÍ). Musí časovo sedieť s ESC_SPECIAL_MS na serveri
 // (server podrží zásah presne o dĺžku choreografie, aby dmg dopadol AŽ po dokončení výbuchu):
 //   WinSun (raz, visí dlhšie) → CruelSunHold (raz, dohrá celá) → slnko odletí z držanej pozície na cieľ
 //   → slow-mo SunBurst (počas neho blikajú všetky aktívne políčka) → [server: dmg] → SunFade.
 const WINSUN_FPS = 7, WINSUN_HOLD_MS = 700;                 // fáza 1: WinSun visí dlhšie
-const CRUELHOLD_ONCE_MS = Math.round(13 * 1000 / 11);       // CruelSunHold raz (13f @ 11fps) — musí dohrať pred letom
+const CRUELHOLD_ONCE_MS = Math.round(13 * 1000 / 11);       // CruelSunHold raz (13f @ 11fps) - musí dohrať pred letom
 const ESC_TRAVEL_MS = 600;                                  // let slnka na cieľ
 const ESC_BURST_FPS = 6, ESC_FADE_FPS = 6;                  // slow-mo výbuch
 
@@ -1106,7 +1106,7 @@ function spawnBigOnce(file, slot, onDone) {
   const dir = charDirFor("escanor", slot);
   const px = Math.round(TILE_H * SPECIAL_SCALE * escFxMul(slot)); // WinSun škáluje s Pridom (pride3 = súčasná veľkosť)
   const cvs = document.createElement("canvas");
-  cvs.width = px; cvs.height = px; cvs.className = "esc-big"; // VLASTNÁ trieda — NIE .special-center (updateSpecialCenter ju maže každý frame)
+  cvs.width = px; cvs.height = px; cvs.className = "esc-big"; // VLASTNÁ trieda - NIE .special-center (updateSpecialCenter ju maže každý frame)
   if (usesAltColor("escanor", slot)) cvs.classList.add("alt-color");
   const flip = computeFacing(state?.p1, state?.p2)[slot] || 1;
   Object.assign(cvs.style, { position: "absolute", zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
@@ -1126,7 +1126,7 @@ function spawnBigOnce(file, slot, onDone) {
   }).catch(() => { cvs.remove(); onDone && onDone(); });
 }
 // slnko odletí Z DRŽANEJ POZÍCIE (nad postavou) do stredu cieľovej bunky, potom slow-mo SunBurst→SunFade;
-// offboard hod: cieľ je bunka MIMO plochy — slnko počas letu vyhasína, žiadny burst, nad casterom OUT OF BOUNDS
+// offboard hod: cieľ je bunka MIMO plochy - slnko počas letu vyhasína, žiadny burst, nad casterom OUT OF BOUNDS
 function travelSunThenBurst(slot, target, zoneCells, offboard = false) {
   const c = state?.[slot]; if (!c) { if (!offboard) spawnSunFxAt(target, slot, zoneCells); return; }
   const dir = charDirFor("escanor", slot);
@@ -1153,16 +1153,16 @@ function travelSunThenBurst(slot, target, zoneCells, offboard = false) {
 function runEscanorSpecial(slot, dir, zoneCells, offboard = false) {
   const c = state?.[slot]; if (!c) return;
   const dx = dir === "left" ? -1 : 1;
-  // offboard: cieľ NEclampovať — slnko letí na bunku za okrajom (do autu); inak clamp na plochu
+  // offboard: cieľ NEclampovať - slnko letí na bunku za okrajom (do autu); inak clamp na plochu
   const target = offboard ? [c.x + dx, c.y] : [Math.max(0, Math.min(board.w - 1, c.x + dx)), c.y];
-  // fáza 1: malá postava WinSunBoard (zdvih so slnkom RAZ, potom len ústa + preblikávajúce slnko — loopFrom 4)
+  // fáza 1: malá postava WinSunBoard (zdvih so slnkom RAZ, potom len ústa + preblikávajúce slnko - loopFrom 4)
   // + veľký WinSun raz (visí dlhšie)
   setAnim(slot, "winsun", 60000);
   spawnBigOnce("WinSun.png", slot, () => {
-    // fáza 2: malá postava CruelSunHold — nech DOHRÁ CELÁ (raz) pred letom slnka (nech nie sú dve slnká naraz)
+    // fáza 2: malá postava CruelSunHold - nech DOHRÁ CELÁ (raz) pred letom slnka (nech nie sú dve slnká naraz)
     setAnim(slot, "cruelhold", CRUELHOLD_ONCE_MS);
     setTimeout(() => {
-      setAnim(slot, "wintalk", ESC_TRAVEL_MS + 2000); // ústa bez slnka (žiadny nový zdvih) — slnko už letí samo
+      setAnim(slot, "wintalk", ESC_TRAVEL_MS + 2000); // ústa bez slnka (žiadny nový zdvih) - slnko už letí samo
       travelSunThenBurst(slot, target, zoneCells, offboard);
     }, CRUELHOLD_ONCE_MS);
   });
@@ -1182,7 +1182,7 @@ function spawnPrideFloat(slot, up) {
   setTimeout(() => el.remove(), 1700);
 }
 
-// Vlkolak: po kole sa zmenila fáza mesiaca → float s NOVOU fázou nad ním (bez farieb/šípok — hráč vidí
+// Vlkolak: po kole sa zmenila fáza mesiaca → float s NOVOU fázou nad ním (bez farieb/šípok - hráč vidí
 // len mesiac, čísla 0–3 sú čisto interné; aj pri preskoku o viac levelov sa ukáže len výsledná fáza)
 function spawnMoonFloat(slot, level) {
   const p = state?.[slot]; if (!p || p.x == null) return;
@@ -1211,7 +1211,7 @@ function spawnLuffyModeFloat(slot, form) {
 }
 
 /* ---------- Vojak: snajperský lúč + výbuch ---------- */
-// výbuch (Explosion.png, prehrá sa raz) na bunke — dopad specialového lúča aj koniec letu granátu
+// výbuch (Explosion.png, prehrá sa raz) na bunke - dopad specialového lúča aj koniec letu granátu
 function spawnExplosionAt(cell, slot, sizeMul = 1.4, fps = 12) {
   if (!Array.isArray(cell)) return;
   const dir = charDirFor("soldier", slot);
@@ -1238,11 +1238,11 @@ function spawnExplosionAt(cell, slot, sizeMul = 1.4, fps = 12) {
 // tenký červený lúč zo zbrane vojaka na zvolenú bunku (štýl mirror beamu) + výbuch na cieli po dolete.
 // MUSÍ časovo sedieť so serverovým SOLDIER_BEAM_MS (frame drží let lúča, zásah padne po ňom).
 const SOLDIER_BEAM_HIT_MS = 350; // kedy počas lúča štartuje výbuch na cieli
-// špička hlavne pušky — zmerané z Shot_2.png (štvorcový 128px frame; vo výstrelovom frame hlaveň končí
+// špička hlavne pušky - zmerané z Shot_2.png (štvorcový 128px frame; vo výstrelovom frame hlaveň končí
 // na sprite pixeli ~(100,78), stred framu x=64). Prepočet kopíruje geometriu positionActors + drawSprite
 // (fill .95, anchorY .5, canvas centrovaný na bunku, spodok canvasu na spodku bunky), takže laser aj lúč
 // vychádzajú presne zo špičky hlavne. Horizontálny offset ide v smere streľby (sprite je otočený na cieľ
-// cez facingOverride); pri čisto vertikálnom cieli je 0 — hlaveň mieri hore/dole, strieľa sa z osi tela.
+// cez facingOverride); pri čisto vertikálnom cieli je 0 - hlaveň mieri hore/dole, strieľa sa z osi tela.
 const SOLDIER_MUZZLE = { x: 100, y: 78, frame: 128 };
 function soldierGunOrigin(fromSlot, tx) {
   const p = state?.[fromSlot];
@@ -1263,7 +1263,7 @@ const SOLDIER_FIRE_FPS = 10;
 // + pulzujúci zameriavací terčík na cieli; zhasne v momente výstrelu (nahradí ho plný lúč soldier_beam)
 function spawnSoldierAim(fromSlot, cell, holdMs) {
   const p = state?.[fromSlot];
-  if (!Array.isArray(cell) || !p || p.x == null) return; // skrytý strelec (labyrint) — bez laseru
+  if (!Array.isArray(cell) || !p || p.x == null) return; // skrytý strelec (labyrint) - bez laseru
   const t = cellToPx(cell[0], cell[1]);
   const tx = t.left + TILE_W / 2, ty = t.top + TILE_H / 2;
   const { sx, sy } = soldierGunOrigin(fromSlot, tx); // špička hlavne
@@ -1284,10 +1284,10 @@ function spawnSoldierAim(fromSlot, cell, holdMs) {
 function spawnSoldierBeam(fromSlot, cell, holdMs) {
   const p = state?.[fromSlot];
   if (!Array.isArray(cell)) return;
-  if (!p || p.x == null) { spawnExplosionAt(cell, fromSlot); return; } // skrytý strelec (labyrint) — aspoň dopad
+  if (!p || p.x == null) { spawnExplosionAt(cell, fromSlot); return; } // skrytý strelec (labyrint) - aspoň dopad
   const t = cellToPx(cell[0], cell[1]);
   const tx = t.left + TILE_W / 2, ty = t.top + TILE_H / 2;
-  const { sx, sy } = soldierGunOrigin(fromSlot, tx); // špička hlavne — identický origin ako laser sight
+  const { sx, sy } = soldierGunOrigin(fromSlot, tx); // špička hlavne - identický origin ako laser sight
   const dist = Math.hypot(tx - sx, ty - sy), ang = Math.atan2(ty - sy, tx - sx) * 180 / Math.PI;
   const wrap = document.createElement("div");
   wrap.className = "soldier-beam-wrap";
@@ -1303,7 +1303,7 @@ function spawnSoldierBeam(fromSlot, cell, holdMs) {
 /* ---------- bubliny -X HP / +Y MANA ---------- */
 function cellToPx(x, y) { return { left: x * (TILE_W + GAP), top: y * (TILE_H + GAP) }; }
 
-// Luffy GEAR 3 Giant Pistol — JEDNA súvislá naťahovacia ruka cez celú choreografiu (nie viac krátkodobých
+// Luffy GEAR 3 Giant Pistol - JEDNA súvislá naťahovacia ruka cez celú choreografiu (nie viac krátkodobých
 // canvasov). Fázy: "stretch" (giant päsť sa naťahuje origin→cieľ) → "hold" (úchop + záblesk, ruka drží
 // natiahnutá) → "pull" (grip päsť L_Fist ťahá súpera, špička sleduje jeho sklz) alebo "retract" (giant
 // päsť sa stiahne pri minutí/obrane). Prepínajú ich timeline handlery (reach/pull/retract). Perzistentný
@@ -1335,7 +1335,7 @@ function luffyGiantReach(originCell, targetCell, dir, dur) {
   requestAnimationFrame(luffyArmFrame);
 }
 // priťiahnutie: giant päsť sa prehodí na úchop (L_Fist) a špička sleduje súpera z jeho pôvodnej bunky na
-// cieľovú (LINEÁRNE — sync s CSS sklzom súpera cez --move-ms)
+// cieľovú (LINEÁRNE - sync s CSS sklzom súpera cez --move-ms)
 function luffyGiantPull(fromCell, toCell, dir, dur) {
   const arm = luffyArm;
   if (!arm || !Array.isArray(fromCell) || !Array.isArray(toCell)) return;
@@ -1437,7 +1437,7 @@ function spawnLuffyImpact(cell) {
 //   gear3 = premena na guľu + rotácia (Special_1: f0–6 premena, potom loop od f7 = „gúľajúca sa guľa",
 //           presne ako v náhľade výberu postavy). Zmizne, keď sa guľa na doske rozgúľa (luffy_roll ju odstráni),
 //           až potom sa guľa presunie na cieľ a vybuchne.
-//   base  = Special_7 (rozbeh→kotúľ→cvaknutie) — hero-shot sprevádzajúci dogúľanie k bunke.
+//   base  = Special_7 (rozbeh→kotúľ→cvaknutie) - hero-shot sprevádzajúci dogúľanie k bunke.
 let luffyCenterEl = null;
 function luffyCenterRemove() {
   if (luffyCenterEl) { luffyCenterEl.dead = true; luffyCenterEl.remove(); luffyCenterEl = null; }
@@ -1450,7 +1450,7 @@ function spawnLuffyCenter(slot, form) {
   const px = Math.round(TILE_H * SPECIAL_SCALE);
   const cvs = document.createElement("canvas");
   cvs.width = px; cvs.height = px;
-  cvs.className = "luffy-center"; // VLASTNÁ trieda — NIE .special-center (updateSpecialCenter ju maže každý frame)
+  cvs.className = "luffy-center"; // VLASTNÁ trieda - NIE .special-center (updateSpecialCenter ju maže každý frame)
   if (usesAltColor("luffy", slot)) cvs.classList.add("alt-color");
   const flip = computeFacing(state?.p1, state?.p2)[slot] || 1;
   Object.assign(cvs.style, { position: "absolute", left: "50%", top: "50%", transform: `translate(-50%, -50%) scaleX(${flip})`, zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
@@ -1518,7 +1518,7 @@ function spawnManaFloat(slot, amount = 4, gold = false, dark = false) {
   setTimeout(() => el.remove(), 1000);
 }
 
-// Fire Wizard skonzumoval Damage dlaždicu specialom — krátky flare na bunke (dlaždica už zmizla zo state)
+// Fire Wizard skonzumoval Damage dlaždicu specialom - krátky flare na bunke (dlaždica už zmizla zo state)
 function spawnTileConsumeFx(cell, tile) {
   if (!Array.isArray(cell)) return;
   const { left, top } = cellToPx(cell[0], cell[1]);
@@ -1531,7 +1531,7 @@ function spawnTileConsumeFx(cell, tile) {
   setTimeout(() => el.remove(), 600);
 }
 
-// float na konkrétnej bunke (bez väzby na hráča) — napr. stopa na Ariadninej nití
+// float na konkrétnej bunke (bez väzby na hráča) - napr. stopa na Ariadninej nití
 function spawnCellFloat(cell, text, className) {
   const { left, top } = cellToPx(cell[0], cell[1]);
   const el = document.createElement("div");
@@ -1543,9 +1543,9 @@ function spawnCellFloat(cell, text, className) {
   setTimeout(() => el.remove(), 1000);
 }
 
-// zánik klona — poriadny oblak dymu (kage bunshin puff): niekoľko dymových gúľ vyletí do strán a nahor,
-// stredové jadro sa roztiahne. Čisto kozmetické, self-remove; puffne raz (späť už nepreblikne — cloneDead).
-// blood=true prefarbí dym do krvavočervenej — teleport pasce Vampire/Onryō (sýtejšia než ružový trap_break)
+// zánik klona - poriadny oblak dymu (kage bunshin puff): niekoľko dymových gúľ vyletí do strán a nahor,
+// stredové jadro sa roztiahne. Čisto kozmetické, self-remove; puffne raz (späť už nepreblikne - cloneDead).
+// blood=true prefarbí dym do krvavočervenej - teleport pasce Vampire/Onryō (sýtejšia než ružový trap_break)
 function spawnClonePuff(cell, blood = false) {
   if (!Array.isArray(cell)) return;
   const { left, top } = cellToPx(cell[0], cell[1]);
@@ -1566,7 +1566,7 @@ function spawnClonePuff(cell, blood = false) {
     actorsEl.appendChild(el);
     return el;
   };
-  // stredové jadro — rýchly veľký záblesk dymu
+  // stredové jadro - rýchly veľký záblesk dymu
   const core = mk(Math.round(TILE_W * 1.15), 6);
   core.animate(
     [{ transform: "scale(.35)", opacity: .9 }, { transform: "scale(1.5)", opacity: 0 }],
@@ -1592,11 +1592,11 @@ function spawnClonePuff(cell, blood = false) {
   }
 }
 
-// (Pozn.: krvavé Blood_Charge efekty k útokom už NIE sú samostatné overlay FX — sú zapečené priamo
+// (Pozn.: krvavé Blood_Charge efekty k útokom už NIE sú samostatné overlay FX - sú zapečené priamo
 // vo framoch A-sheetov A1–A5, generovaných v tools/sprites-countess-onre/build.cjs podľa attack guide.)
 
-// zničenie pasce (Countess/Onre) — krvavo-fialový oblak: značka praskne a rozplynie sa.
-// Vidia ho OBAJA hráči (zámer — súper sa dozvie, že riziko pasce pominulo). Čisto kozmetické, self-remove.
+// zničenie pasce (Countess/Onre) - krvavo-fialový oblak: značka praskne a rozplynie sa.
+// Vidia ho OBAJA hráči (zámer - súper sa dozvie, že riziko pasce pominulo). Čisto kozmetické, self-remove.
 function spawnTrapBreak(cell) {
   if (!Array.isArray(cell)) return;
   const { left, top } = cellToPx(cell[0], cell[1]);
@@ -1631,7 +1631,7 @@ function spawnTrapBreak(cell) {
   spawnCellFloat(cell, "🩸 TRAP DESTROYED", "trap-float");
 }
 
-// roztrieštenie sochy — odkamenenie (Medúzin kameň dohral): kamenné úlomky vyletia do strán a padajú
+// roztrieštenie sochy - odkamenenie (Medúzin kameň dohral): kamenné úlomky vyletia do strán a padajú
 // (gravitácia) + krátky prachový záblesk v strede. Čisto kozmetické, self-remove; deterministické (bez random).
 function spawnStoneShatter(slot) {
   const st = state?.[slot];
@@ -1650,7 +1650,7 @@ function spawnStoneShatter(slot) {
   dust.animate([{ transform: "scale(.4)", opacity: .8 }, { transform: "scale(1.5)", opacity: 0 }],
     { duration: 520, easing: "ease-out", fill: "forwards" });
   setTimeout(() => dust.remove(), 580);
-  // kamenné úlomky — hranaté sivé kúsky, vyletia do strán a padajú s rotáciou
+  // kamenné úlomky - hranaté sivé kúsky, vyletia do strán a padajú s rotáciou
   const N = 14;
   for (let i = 0; i < N; i++) {
     const w = Math.round(TILE_W * (0.10 + (i % 3) * 0.06));
@@ -1678,7 +1678,7 @@ function spawnStoneShatter(slot) {
   }
 }
 
-// float aj nad VIDITEĽNÝM tieňovým klonom — obranné/mana hlášky nesmú prezradiť, ktorá postava je pravá
+// float aj nad VIDITEĽNÝM tieňovým klonom - obranné/mana hlášky nesmú prezradiť, ktorá postava je pravá
 function cloneFloat(slot, text, className) {
   const o = state?.[slot];
   const c = o?.clone;
@@ -1686,7 +1686,7 @@ function cloneFloat(slot, text, className) {
   spawnCellFloat([c.x, c.y], text, className);
 }
 
-// Naruto summon: jedna kópia na TEJ ISTEJ bunke, otočená proti Narutovi (kage bunshin moment —
+// Naruto summon: jedna kópia na TEJ ISTEJ bunke, otočená proti Narutovi (kage bunshin moment -
 // dvaja Naruti na jednom políčku tvárou v tvár); docasný canvas kreslí raf (cloneSummonFx), po dohraní framu sa odstráni
 let cloneSummonFx = [];
 let cloneSummonPose = { p1: null, p2: null }; // póza skutočného Naruta počas Special_2 (drží ju positionActors)
@@ -1695,7 +1695,7 @@ function spawnCloneSummonFx(slot, cell, durMs) {
   const st = state?.[slot];
   if (!st || !st.char || !Array.isArray(cell)) return;
   const facing = computeFacing(state?.p1, state?.p2)[slot] || 1;
-  // NORMÁLNA výška (bez zmenšenia) — aby sa dvaja Naruti vošli vedľa seba, orežeme prázdny bočný okraj spritu
+  // NORMÁLNA výška (bez zmenšenia) - aby sa dvaja Naruti vošli vedľa seba, orežeme prázdny bočný okraj spritu
   // (SUMMON_CROP) a posunieme ich o štvrtinu bunky na opačné strany; kotva dole (feet), nech stoja na zemi
   const OFFSET = Math.round(TILE_W * 0.24);
   const { left, top } = cellToPx(cell[0], cell[1]);
@@ -1738,16 +1738,16 @@ function pulseGlow(color, now) {
   return `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 ${b1}px ${c}) drop-shadow(0 0 ${b2}px ${c}) drop-shadow(0 0 ${b3}px ${c})`;
 }
 // filter postavy: alt-color (pravá strana p2, ak nemá natívnu paletu) + kameň (sivá socha) + glow
-// isClone = true: klon NEZRKADLÍ Last Stand vizuály (zlatý death-glow) — ostáva neutrálny (rozhodnutie hráča)
+// isClone = true: klon NEZRKADLÍ Last Stand vizuály (zlatý death-glow) - ostáva neutrálny (rozhodnutie hráča)
 function actorFilter(slot, now, isClone = false) {
   const st = state?.[slot];
-  // golden recharge stav (death summon) — žiarivý zlatý pulz postavy, má prednosť pred ostatným (klon ho nemá)
+  // golden recharge stav (death summon) - žiarivý zlatý pulz postavy, má prednosť pred ostatným (klon ho nemá)
   if (_deathGoldenSlot === slot && !isClone) {
     const t = 0.5 + 0.5 * Math.sin(now / 110);
     return `brightness(${(1.15 + 0.45 * t).toFixed(2)}) saturate(1.5) ` + pulseGlow("#ffd24a", now);
   }
   const alt = usesAltColor(st?.char, slot) ? "saturate(.22) brightness(1.4) " : "";
-  // skamenená postava — kamenná sivá (prekryje aj alt filter, socha je socha)
+  // skamenená postava - kamenná sivá (prekryje aj alt filter, socha je socha)
   const stone = (st?.stone || 0) > 0 && (st?.hp ?? 1) > 0 ? "grayscale(.92) brightness(.82) contrast(1.12) " : "";
   let glow = "";
   if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
@@ -1764,7 +1764,7 @@ function placeChargeAura(cont, slot) {
   const onClone = cont.dataset.anchor === "clone"; // aura klona sleduje klonov canvas
   if (onClone && (!p.clone || cloneEls[slot].style.display === "none")) { cont.remove(); return; }
   const shift = onClone ? 0 : pairShift(slot);
-  // postava nie je v strede bunky — rovnaký horizontálny offset tela ako „YOU" vlajka (HEAD_CX + flip)
+  // postava nie je v strede bunky - rovnaký horizontálny offset tela ako „YOU" vlajka (HEAD_CX + flip)
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
   const actorEl = onClone ? cloneEls[slot] : (slot === "p1" ? actorP1 : actorP2);
@@ -1778,7 +1778,7 @@ function placeChargeAura(cont, slot) {
 
 // ---- Plynulý projektil basic útoku ----
 // Perzistentné canvasy žijú v #actors (nie v bunke, ktorú renderGrid každý frame maže cez innerHTML=""),
-// takže projektil KĹŽE po bunkách cez CSS transition (left/top var(--charge-ms) linear) — rovnako ako
+// takže projektil KĹŽE po bunkách cez CSS transition (left/top var(--charge-ms) linear) - rovnako ako
 // pohyb postavy, bez poskakovania a bez miznutia uprostred letu. Kľúč rozlišuje strelca a jeho klonovu
 // strelu (Naruto + klon = dve súbežné strely, klonova s invertovanou vertikálou).
 const projectiles = new Map(); // `${from}-${clone?1:0}` -> { el, retire }
@@ -1789,7 +1789,7 @@ function projCenter(x, y) {
 function projectileOrient(charKey, dir) {
   // Countess/Onre/Jotaro majú úzky diagonálny projektil (Jotaro = letiaca päsť Star Platinum).
   // Nepoužívaj scaleX+rotate kombináciu: pri ľavých diagonálach zrkadlenie mení aj znamienko
-  // rotácie a špic (päsť) môže mieriť zle — preto čistá rotácia (base = doprava).
+  // rotácie a špic (päsť) môže mieriť zle - preto čistá rotácia (base = doprava).
   if (charKey === "countess" || charKey === "onre" || charKey === "jotaro") {
     return {
       right: "rotate(0deg)", down_right: "rotate(45deg)", down: "rotate(90deg)", down_left: "rotate(135deg)",
@@ -1840,7 +1840,7 @@ function spawnOrMoveProjectile(c, s) {
   entry.charKey = charKey;    // Vojak: na konci letu granát vybuchne (retireProjectile)
   entry.from = c.from;
   entry.lastCell = c.cell;    // posledná bunka letu = miesto výbuchu (zásah súpera/klona alebo okraj plochy)
-  // sprite mieri doprava — ostatné smery flip/rotácia; nastavuje sa KAŽDÝ krok, lebo strela
+  // sprite mieri doprava - ostatné smery flip/rotácia; nastavuje sa KAŽDÝ krok, lebo strela
   // Vampire/Onryō mení smer po odraze od steny (transform sa netranzicuje → okamžitý flip špicu);
   // diagonály = rotácia o 45° od horizontály.
   const orient = projectileOrient(charKey, c.dir);
@@ -1854,7 +1854,7 @@ function retireProjectile(key) {
   // nechaj dobehnúť posledný sklz na cieľovú bunku, až potom zmizni (nikdy nie uprostred letu)
   entry.retire = setTimeout(() => {
     entry.el.remove(); projectiles.delete(key);
-    // Vojakov granát: výbuch na poslednej bunke letu — na súperovi/klonovi, alebo na okraji plochy v smere hodu
+    // Vojakov granát: výbuch na poslednej bunke letu - na súperovi/klonovi, alebo na okraji plochy v smere hodu
     if (entry.charKey === "soldier" && Array.isArray(entry.lastCell)) spawnExplosionAt(entry.lastCell, entry.from, 1.2);
   }, CHARGE_STEP_MS);
 }
@@ -1879,12 +1879,12 @@ function clearProjectiles() {
   projectiles.clear();
 }
 
-// „Goku" nabíjacia aura pri recharge — naviazaná na postavu (sleduje ju per-frame v rafe);
+// „Goku" nabíjacia aura pri recharge - naviazaná na postavu (sleduje ju per-frame v rafe);
 // anchor "clone" ju ukotví na viditeľný tieňový klon (recharge nesmie prezradiť pravého Naruta)
 function spawnChargeAura(slot, gold = false, red = false, anchor = "actor", dark = false) {
   const p = state?.[slot];
   if (anchor === "clone" && (!p?.clone || cloneEls[slot].style.display === "none")) return;
-  // labyrint: skrytý súper (x null) auru vôbec nedostane — placeChargeAura by ju nemal kam ukotviť
+  // labyrint: skrytý súper (x null) auru vôbec nedostane - placeChargeAura by ju nemal kam ukotviť
   // a neumiestnená by svietila v rohu boardu (napr. červená Last Hope aura skrytého Minotaura)
   if (!p || p.x == null) return;
   const cont = document.createElement("div");
@@ -1906,7 +1906,7 @@ function spawnChargeAura(slot, gold = false, red = false, anchor = "actor", dark
   setTimeout(() => cont.remove(), 1100);
 }
 
-/* ---------- Last Stand — vizuál (démon v strede + za postavou, golden stav); riadené serverom cez timeline ---------- */
+/* ---------- Last Stand - vizuál (démon v strede + za postavou, golden stav); riadené serverom cez timeline ---------- */
 let _deathGoldenSlot = null;   // slot v golden stave (číta actorFilter pre žiaru postavy)
 
 // základná pozícia anjela „za postavou" pre daný SLOT: stred anjela = stred TELA postavy (headDx + flip
@@ -1935,13 +1935,13 @@ function _deathFogPuff(ms, dir) {
   deathFog.animate(a, { duration: ms, easing: dir === "in" ? "ease-out" : "ease-in" });
 }
 
-/* ---------- Last Stand — napojenie na server timeline ---------- */
+/* ---------- Last Stand - napojenie na server timeline ---------- */
 // Stredový démon (hmlový nábeh/zmiznutie) ako flourish summon/banish; HP/manu riadi server cez frames.
 // Trvalý golden stav (žiara + aura + démon za postavou) riadi raf podľa state[slot].lastStandBuff.
 // WAAPI hygiena stredových overlayov (deathCenter/hopeCenter): fill-forwards animácia po dobehnutí
-// NESMIE ostať na elemente visieť — neskorší cancel (hideDeathCenter na konci hry / ďalšia choreografia)
+// NESMIE ostať na elemente visieť - neskorší cancel (hideDeathCenter na konci hry / ďalšia choreografia)
 // by mohol odkryť staršiu fill animáciu držiacu opacity 1 a démon by sa VRÁTIL na plochu (reprodukované:
-// banish smrť po démon útoku — na obrazovke porazeného ostal démon visieť v strede cez GAME OVER).
+// banish smrť po démon útoku - na obrazovke porazeného ostal démon visieť v strede cez GAME OVER).
 // Preto sa koncový stav po dobehnutí zapíše do inline štýlu a animácia sa hneď zruší.
 function pinOnFinish(el, anim, styles) {
   anim.onfinish = () => { Object.assign(el.style, styles); anim.cancel(); };
@@ -1973,7 +1973,7 @@ function lsCenterDisappear() {
   pinOnFinish(deathCenter, a, { opacity: "0" });
 }
 
-// Démon útok — veľký démon v strede (100 % väčší než summon = scale 2); zvyšok kreslí raf do deathCenter
+// Démon útok - veľký démon v strede (100 % väčší než summon = scale 2); zvyšok kreslí raf do deathCenter
 function demonCenterAppear() {
   const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
   deathCenter.getAnimations().forEach(a => a.cancel());
@@ -1995,7 +1995,7 @@ function demonCenterDisappear() {
   pinOnFinish(deathCenter, a, { opacity: "0" });
 }
 
-// Last Hope — červená „hope" postava v strede (analógia k lsCenterAppear, len červená hmla a hope sprite)
+// Last Hope - červená „hope" postava v strede (analógia k lsCenterAppear, len červená hmla a hope sprite)
 function _hopeFogPuff(ms, dir) {
   hopeFog.style.display = "block";
   const a = dir === "in"
@@ -2035,8 +2035,8 @@ function hideHopeCenter() {
   hopeFog.style.display = "none";
 }
 
-// (dev demo klávesy R/T odstránené — Last Stand sa hrá cez tlačidlo a riadi server)
-// tvrdo schovaj stredového démona (koniec hry / nová hra / char-select — nech nevisí na ploche)
+// (dev demo klávesy R/T odstránené - Last Stand sa hrá cez tlačidlo a riadi server)
+// tvrdo schovaj stredového démona (koniec hry / nová hra / char-select - nech nevisí na ploche)
 function hideDeathCenter() {
   deathCenter.getAnimations().forEach(a => a.cancel());
   deathFog.getAnimations().forEach(a => a.cancel());
@@ -2044,9 +2044,9 @@ function hideDeathCenter() {
   deathFog.style.opacity = "0";
   deathFog.style.display = "none";
 }
-// tvrdo schovaj démona ZA postavou (koniec hry / nová hra) — bežne ho uprace fill-forwards animácia
+// tvrdo schovaj démona ZA postavou (koniec hry / nová hra) - bežne ho uprace fill-forwards animácia
 // banishu (onfinish) a raf cleanup pri prvom stave bez buffu, ale tie majú okná (race s koncom hry);
-// POZOR: nevolať počas plánovania final kola — tam démon za buffnutou postavou MÁ visieť (0.25)
+// POZOR: nevolať počas plánovania final kola - tam démon za buffnutou postavou MÁ visieť (0.25)
 function hideDeathBehind() {
   deathBehind.getAnimations().forEach(a => a.cancel());
   deathBehind.style.opacity = "0";
@@ -2061,8 +2061,8 @@ function placeDeathBehind(slot) {
   deathBehind.style.transform = `scale(${DEATH_SEQ.behindRatio})`;
 }
 
-// efektný náraz do štítu pri úspešnom bloku — hexagonálna bariéra flashne, rázové prstence + iskry
-// originCell (voliteľné): štít sa rozbije na inej bunke než na Narutovi — napr. zásah na KLONOVI cez zdieľaný
+// efektný náraz do štítu pri úspešnom bloku - hexagonálna bariéra flashne, rázové prstence + iskry
+// originCell (voliteľné): štít sa rozbije na inej bunke než na Narutovi - napr. zásah na KLONOVI cez zdieľaný
 // štít, aby sa block ukázal aj na klonovej figúre (nielen na pravom Narutovi)
 function spawnShieldBlock(slot, gold, originCell = null) {
   const p = state?.[slot];
@@ -2088,7 +2088,7 @@ function spawnShieldBlock(slot, gold, originCell = null) {
   add("sb-barrier", { width: Math.round(TILE_W * 0.7) + "px", height: Math.round(TILE_H * 0.95) + "px" });
   add("sb-flash", {});
   add("sb-ring", {});
-  // štít sa roztriešti — veľa veľkých úlomkov letí ďaleko na všetky strany so spinom
+  // štít sa roztriešti - veľa veľkých úlomkov letí ďaleko na všetky strany so spinom
   const N = 24;
   for (let i = 0; i < N; i++) {
     const ang = (Math.PI * 2 * i / N) + i * 0.17;
@@ -2114,7 +2114,7 @@ function centerOf(slot) {
 
 // efektná animácia odrazu: zrkadlová tabuľa flashne a praskne pri obrancovi,
 // rázová vlna + sklenené úlomky, lúč vystrelí späť do útočníka, board sa otrasie
-// originCell (voliteľné): odraz vychádza z inej bunky než z obrancu — napr. zásah na KLONOVI cez zdieľaný
+// originCell (voliteľné): odraz vychádza z inej bunky než z obrancu - napr. zásah na KLONOVI cez zdieľaný
 // mirror, aby lúč nešiel z pravého Naruta (to by prezradilo, ktorý je skutočný)
 function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = false, originCell = null, destCell = null) {
   const d = Array.isArray(originCell)
@@ -2142,7 +2142,7 @@ function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = fal
     height: Math.round(TILE_H * 0.92) + "px",
   });
 
-  // 1b) samotné 🪞 emoji ako zdroj lúča — pixelizované ako zvyšok UI
+  // 1b) samotné 🪞 emoji ako zdroj lúča - pixelizované ako zvyšok UI
   const emoSize = Math.round(TILE_H * 0.6);
   const emo = add("mirror-emoji pix-ico", {
     left: d.x + "px", top: d.y + "px",
@@ -2165,7 +2165,7 @@ function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = fal
     el.style.setProperty("--rot", Math.round(ang * 180 / Math.PI * 2) + "deg");
   }
 
-  // 4) odraz: melee — alebo special na rovnakom políčku — = hrubý drsný burst (beam nemá kam letieť);
+  // 4) odraz: melee - alebo special na rovnakom políčku - = hrubý drsný burst (beam nemá kam letieť);
   //    inak smerový lúč k útočníkovi
   const foeSlot = defenderSlot === "p1" ? "p2" : "p1";
   const dp = state?.[defenderSlot], ap = state?.[foeSlot];
@@ -2193,7 +2193,7 @@ function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = fal
     wrap.appendChild(beam);
   }
 
-  // 5) otras boardu — pri burste (melee/special-na-políčku) silnejší (drsnejší dojem)
+  // 5) otras boardu - pri burste (melee/special-na-políčku) silnejší (drsnejší dojem)
   const boardEl = gridEl.parentElement;
   if (boardEl) {
     boardEl.classList.remove("fx-shake");
@@ -2204,7 +2204,7 @@ function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = fal
 }
 
 /* ---------- arena ---------- */
-// interné rozlíšenie pozadia — vrstvy sa zmenšia sem a CSS ich roztiahne s pixelated,
+// interné rozlíšenie pozadia - vrstvy sa zmenšia sem a CSS ich roztiahne s pixelated,
 // čím vzniknú skutočné veľké pixely (menšie čísla = hrubší pixel art)
 const ARENA_RES = { w: 320, h: 180 };
 function renderArenaLayers(arenaKey, layerFiles) {
@@ -2218,7 +2218,7 @@ function renderArenaLayers(arenaKey, layerFiles) {
     const img = new Image();
     img.onload = () => {
       const ctx = cvs.getContext("2d");
-      // cover: vyplň celý canvas, prebytok orež — rovnaká logika ako object-fit: cover
+      // cover: vyplň celý canvas, prebytok orež - rovnaká logika ako object-fit: cover
       const s  = Math.max(ARENA_RES.w / img.width, ARENA_RES.h / img.height);
       const dw = img.width * s, dh = img.height * s;
       ctx.drawImage(img, (ARENA_RES.w - dw) / 2, (ARENA_RES.h - dh) / 2, dw, dh);
@@ -2271,7 +2271,7 @@ const PIX = {
     "..aaaa..",
     "..a..a..",
   ]},
-  // POWER tile — zlatý meč (útok z tejto bunky dostane +2 dmg, tile sa spotrebuje)
+  // POWER tile - zlatý meč (útok z tejto bunky dostane +2 dmg, tile sa spotrebuje)
   sword: { pal: { a: "#ffd54f", b: "#b26a00" }, rows: [
     "...aa...",
     "...aa...",
@@ -2282,7 +2282,7 @@ const PIX = {
     "...bb...",
     "........",
   ]},
-  // BLOCK tile — sivý štít s červeným ✕ (na tejto bunke sa nedá castnúť shield/mirror)
+  // BLOCK tile - sivý štít s červeným ✕ (na tejto bunke sa nedá castnúť shield/mirror)
   shieldx: { pal: { a: "#9aa0a8", b: "#e53935" }, rows: [
     ".aaaaaa.",
     ".abaaba.",
@@ -2373,7 +2373,7 @@ const PIX = {
     "...aa...",
     "........",
   ]},
-  // séria — vyhratá hra: plná zlatá koruna s gemmami
+  // séria - vyhratá hra: plná zlatá koruna s gemmami
   crown: { pal: { a: "#ffcf3f", b: "#c98a17", c: "#ff5a5a" }, rows: [
     ".a.aa.a.",
     ".a.aa.a.",
@@ -2384,7 +2384,7 @@ const PIX = {
     "........",
     "........",
   ]},
-  // séria — nezískaná hra: len obrys koruny (tlmená zlatá)
+  // séria - nezískaná hra: len obrys koruny (tlmená zlatá)
   crown_outline: { pal: { o: "#7d6526" }, rows: [
     ".o.oo.o.",
     ".o.oo.o.",
@@ -2395,7 +2395,7 @@ const PIX = {
     "........",
     "........",
   ]},
-  // tournament — ešte neprehraná hra: len tlmený obrys lebky
+  // tournament - ešte neprehraná hra: len tlmený obrys lebky
   skull_outline: { pal: { o: "#5a5a5a" }, rows: [
     "..oooo..",
     ".o....o.",
@@ -2419,7 +2419,7 @@ function pixSvg(name) {
   });
   return `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
 }
-// malá inline ikonka do cost riadkov — pixelizované emoji, hydratuje hydratePix()
+// malá inline ikonka do cost riadkov - pixelizované emoji, hydratuje hydratePix()
 const miniPix = (emoji) => `<span class="pix-ico mini" data-emoji="${emoji}"></span>`;
 // špeciálne políčka mapujú na ikony knižnice
 const TILE_TO_PIX = { dmg: "flame", heal: "heart", mana: "drop", ik: "skull", power: "sword", block: "shieldx" };
@@ -2461,7 +2461,7 @@ function renderBar(el, value) {
   const fill  = el.querySelector(".fill");
   const trail = el.querySelector(".fill-trail");
   fill.style.height  = (v * 10) + "%";
-  trail.style.height = (v * 10) + "%"; // trail má oneskorený transition — pri strate sa stiahne neskôr
+  trail.style.height = (v * 10) + "%"; // trail má oneskorený transition - pri strate sa stiahne neskôr
 
   // pri zisku výplň blikne do jasu
   if (v > prev) {
@@ -2471,7 +2471,7 @@ function renderBar(el, value) {
     fill.addEventListener("animationend", () => fill.classList.remove("gain"), { once: true });
   }
 
-  // presná hodnota pod barom — bez počítania dielikov; skrytá hodnota (labyrint) = "?"
+  // presná hodnota pod barom - bez počítania dielikov; skrytá hodnota (labyrint) = "?"
   const num = el.closest(".hud-stat")?.querySelector(".bar-num");
   if (num) num.textContent = hidden ? "?" : String(v);
 }
@@ -2488,10 +2488,10 @@ function updateTurnStatus() {
   let txt = null, cls = null;
   if (!playing && !gameOverShown && mine?.char && opp?.char) {
     if (mine.locked && !opp.locked) {
-      // „locked - waiting" — vo fixnom časovom režime skry; v quickdraw a bezčasovom nechaj
+      // „locked - waiting" - vo fixnom časovom režime skry; v quickdraw a bezčasovom nechaj
       if (!timerMode || state.config.timer === "quickdraw") { txt = "✔ LOCKED - WAITING FOR OPPONENT…"; cls = "waiting"; }
     } else if (!mine.locked && opp.locked) {
-      // „your move" — nechaj v quickdraw (spúšťa časovač) a v bezčasovom režime; vo fixnom časovom skry
+      // „your move" - nechaj v quickdraw (spúšťa časovač) a v bezčasovom režime; vo fixnom časovom skry
       if (!timerMode || state.config.timer === "quickdraw") { txt = "⚠️ OPPONENT IS READY - YOUR MOVE! ⚠️"; cls = "your-move"; }
     }
   }
@@ -2532,7 +2532,7 @@ function renderHUD() {
   hudBoxP2.dataset.name = tagName("p2");
 
 
-  // tournament × labyrint: hlavy magov skryté u oboch, kým kliatba beží — renderHUD beží per frame,
+  // tournament × labyrint: hlavy magov skryté u oboch, kým kliatba beží - renderHUD beží per frame,
   // takže skrytie/odkrytie sadne aj na labyrint začatý či ukončený uprostred prehrávania kola
   if (state?.series?.format === "tournament") {
     const labActive = !!(state?.p1?.labyrinth || state?.p2?.labyrinth);
@@ -2541,7 +2541,7 @@ function renderHUD() {
   }
 
   // pravá strana (p2) má VŽDY alternatívne vykreslenie (postava na boarde, portrét aj ghost);
-  // výnimka: postava s natívnou p2 paletou (Medúza) — triedy priebežne prepína raf podľa aktuálneho chara
+  // výnimka: postava s natívnou p2 paletou (Medúza) - triedy priebežne prepína raf podľa aktuálneho chara
   actorP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   hudCharP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
@@ -2576,7 +2576,7 @@ function renderLuffyHud(slot) {
   }
 }
 
-// Vlkolak: fáza mesiaca (ikona BEZ čísla — level 0–3 je interný, hráč vidí len mesiac) vľavo,
+// Vlkolak: fáza mesiaca (ikona BEZ čísla - level 0–3 je interný, hráč vidí len mesiac) vľavo,
 // dmg specialu pri aktuálnej fáze vpravo v HUD widgete. Pri inej postave sa oba prvky skryjú.
 function renderMoonHud(slot) {
   const p = state?.[slot];
@@ -2597,7 +2597,7 @@ function renderMoonHud(slot) {
 }
 
 // Vlkolak: dmg na SPECIAL tlačidle musí sedieť so zobrazenou fázou mesiaca (HUD ikonou). Prepočítava sa preto
-// pri každom renderHUD (aj per-frame počas prehrávania) — nie len raz pri príchode state eventu: vtedy s[me]
+// pri každom renderHUD (aj per-frame počas prehrávania) - nie len raz pri príchode state eventu: vtedy s[me]
 // nesie počiatočný frame kola (schedulePlayTimeline ho premutuje späť), takže po zmene fázy ostávalo tlačidlo
 // celé plánovanie na starom dmg. Zdroj = state[me].moon, rovnaký ako HUD ikona → obe sa preklopia naraz.
 function syncWolfSpecialBtn() {
@@ -2606,7 +2606,7 @@ function syncWolfSpecialBtn() {
   if (specialBtn.dataset.wolfMoon === String(lvl)) return;
   specialBtn.dataset.wolfMoon = String(lvl);
   const dmg = WOLF_MOON_DMG[lvl];
-  specialBtn.title = `Special (−5 mana, ${dmg} dmg by moon phase) — charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`;
+  specialBtn.title = `Special (−5 mana, ${dmg} dmg by moon phase) - charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`;
   const cost = specialBtn.querySelector(".cost");
   if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
 }
@@ -2645,14 +2645,14 @@ function renderPrideHud(slot) {
 /* ---------- záznam akcií kola pod widgetom ---------- */
 // Narutov vertikálny pohyb je verejne zrkadlený klonom (klon ide opačne) → smer up/down by SÚPEROVI prezradil,
 // ktorá z dvoch figúr je pravý Naruto. V zázname/lište ho preto súperovi anonymizujeme na neutrálne „↕"
-// (vlastný hráč vidí svoj skutočný smer). Horizontálny smer je bezpečný — klon ho kopíruje 1:1 (figúry sa nerozídu).
+// (vlastný hráč vidí svoj skutočný smer). Horizontálny smer je bezpečný - klon ho kopíruje 1:1 (figúry sa nerozídu).
 const ARROW_DIR = { up: "↑", down: "↓", left: "←", right: "→", vert: "↕", up_left: "↖", up_right: "↗", down_left: "↙", down_right: "↘", center: "◎" };
 function displayDir(action, ownerSlot) {
   const dir = action?.dir;
   // Narutov klon zrkadlí vertikálu pri pohybe (move/dash) AJ pri basic útoku → smer up/down by súperovi prezradil,
   // ktorá figúra je pravá. Súperovi ho anonymizujeme na „↕" (vlastný hráč vidí skutočný smer).
   const vertMirrored = action?.type === "move" || action?.type === "dash" || action?.type === "attack";
-  // anonymizuj len keď Naruto SKUTOČNE má klona — bez klona sa vertikála nerozdvojuje a smer nič neprezrádza
+  // anonymizuj len keď Naruto SKUTOČNE má klona - bez klona sa vertikála nerozdvojuje a smer nič neprezrádza
   if (vertMirrored && (dir === "up" || dir === "down") &&
       ownerSlot && ownerSlot !== me && state?.[ownerSlot]?.char === "naruto" && state?.[ownerSlot]?.clone) {
     return "vert";
@@ -2673,17 +2673,17 @@ function actionIcon(action, ownerSlot) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje — len čistý badge
-    // Jotarov útok v mirror slote sa v zápise kola tvári ako obyčajný mirror (🪞, bez smeru) —
+    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje - len čistý badge
+    // Jotarov útok v mirror slote sa v zápise kola tvári ako obyčajný mirror (🪞, bez smeru) -
     // analógia k Vampire/Onryō, ktorých charge v dash slote sa ukazuje ako obyčajný dash (nemaskuje smer útoku)
     case "special1": return "🪞";
     case "stoned":   return "🗿";
     case "swap":     return "🌀";
-    case "unknown":  return "❓"; // labyrint — akcia súpera je pre prekliateho redigovaná
+    case "unknown":  return "❓"; // labyrint - akcia súpera je pre prekliateho redigovaná
     default:         return "?";
   }
 }
-// skeleton záznamu kola — rovnaká fixná štruktúra ako fronta: [🛡️] | [1][2][3] | [🙏]
+// skeleton záznamu kola - rovnaká fixná štruktúra ako fronta: [🛡️] | [1][2][3] | [🙏]
 function buildActionLogSkeleton(log) {
   log.innerHTML = "";
   const mkSlot = (cls, inner) => {
@@ -2710,7 +2710,7 @@ function appendActionLog(slot, action) {
   if (!log) return null;
   if (!log.children.length) buildActionLogSkeleton(log);
 
-  const maskedBeat = action?.type === "unknown" ? (action.beat || "act") : null; // labyrint — redigovaná akcia
+  const maskedBeat = action?.type === "unknown" ? (action.beat || "act") : null; // labyrint - redigovaná akcia
   if (action?.type === "golden_shield" || action?.type === "golden_mirror" || maskedBeat === "gpre") {
     const el = log.querySelector(".a-slot.slot-pre");
     if (el) {
@@ -2750,12 +2750,12 @@ function renderGrid(s, effects = []) {
   gridEl.innerHTML = "";
 
   // labyrint (Minotaurov special): prekliaty hráč vidí len vlastnú bunku, svoju niť, obrys na nití
-  // a špeciálne tiles; dáta o súperovi už rediguje server — hmla je len vizuál nad tým.
+  // a špeciálne tiles; dáta o súperovi už rediguje server - hmla je len vizuál nad tým.
   // Aréna sa stmaví OBOM hráčom (aj Minotaurovi), nech je očividné, že hra beží v labyrinte.
   const anyLab = !!(s?.p1?.labyrinth || s?.p2?.labyrinth);
-  document.body.classList.toggle("labyrinth-mode", anyLab); // stmavenie arény za boardom — obaja hráči
+  document.body.classList.toggle("labyrinth-mode", anyLab); // stmavenie arény za boardom - obaja hráči
   const mineLab = me ? s?.[me] : null;
-  // labReveal: istý zásah v tomto ťahu — hmla padá už PRED animáciou akcie (aréna ostáva stmavená do labyrinth_end)
+  // labReveal: istý zásah v tomto ťahu - hmla padá už PRED animáciou akcie (aréna ostáva stmavená do labyrinth_end)
   const fogged = !!(mineLab && mineLab.labyrinth && !mineLab.labReveal);
   boardEl.classList.toggle("labyrinth", fogged);
   const fogVisible = new Set();
@@ -2767,14 +2767,14 @@ function renderGrid(s, effects = []) {
     torchCells.forEach(k => fogVisible.add(k));
     (mineLab.thread || []).forEach(([x, y]) => fogVisible.add(`${x},${y}`));
     if (mineLab.threadMark) fogVisible.add(`${mineLab.threadMark[0]},${mineLab.threadMark[1]}`);
-    // špeciálne tiles svietia cez tmu — slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
+    // špeciálne tiles svietia cez tmu - slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
     (s?.tiles || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
     (s?.iks || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
     // preview na ďalšie kolo svieti cez tmu rovnako (server heal/mana spawny mimo fakľových buniek už zredigoval)
     (s?.pending?.spawns || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
     (s?.pending?.ikMoves || []).forEach(c => fogVisible.add(`${c.x},${c.y}`));
   }
-  // Ariadnina niť — bunky s niťou (vlastná niť prekliateho; lovec vidí súperovu, server mu ju posiela)
+  // Ariadnina niť - bunky s niťou (vlastná niť prekliateho; lovec vidí súperovu, server mu ju posiela)
   const threadSet = new Set();
   for (const sl of ["p1", "p2"]) (s?.[sl]?.thread || []).forEach(([x, y]) => threadSet.add(`${x},${y}`));
 
@@ -2787,15 +2787,15 @@ function renderGrid(s, effects = []) {
   const jotaroCenter = []; // Jotarov stredový overlay = PÁR (jeho telo Attack_2 + stand Star Platinum), ako na doske
   const procs    = [];
   const cloneHitCells = []; // klon zasiahnutý tile-om → blik jeho bunky (ako hit-blink u hráča)
-  const trapFlashCells = []; // trigger pasce (Countess/Onre) — rozžiarenie bunky pre oboch
+  const trapFlashCells = []; // trigger pasce (Countess/Onre) - rozžiarenie bunky pre oboch
   let hitTarget  = null;
 
   // špeciálne políčka (dmg/heal/mana + IK overlay)
   const tileMap = new Map();
   (s?.tiles || []).forEach(t => tileMap.set(`${t.x},${t.y}`, t.type));
 
-  // preview na začiatok ďalšieho kola (config.tilePreview): nové spawny + cieľové bunky presunu IK —
-  // kreslí sa ako malý polopriehľadný ghost v rohu bunky (žiadny blik, žiadne podfarbenie — len jemný náznak)
+  // preview na začiatok ďalšieho kola (config.tilePreview): nové spawny + cieľové bunky presunu IK -
+  // kreslí sa ako malý polopriehľadný ghost v rohu bunky (žiadny blik, žiadne podfarbenie - len jemný náznak)
   const pendingMap = new Map();
   (s?.pending?.spawns || []).forEach(t => pendingMap.set(`${t.x},${t.y}`, t.type));
   (s?.pending?.ikMoves || []).forEach(c => pendingMap.set(`${c.x},${c.y}`, "ik"));
@@ -2805,12 +2805,12 @@ function renderGrid(s, effects = []) {
   for (const e of effects) {
     if (e?.kind === "charge")    charges.push(e);
     if (e?.kind === "special")   specials.push(e);
-    if (e?.kind === "special1")  specials.push(e); // Jotarov útok v mirror slote — rovnaké zvýraznenie zóny + center cast
-    if (e?.kind === "timestop_start" && Array.isArray(e.cells)) e.cells.forEach(([x, y]) => previewSet.add(`${x},${y}`)); // THE WORLD cast — celoplošný blik
+    if (e?.kind === "special1")  specials.push(e); // Jotarov útok v mirror slote - rovnaké zvýraznenie zóny + center cast
+    if (e?.kind === "timestop_start" && Array.isArray(e.cells)) e.cells.forEach(([x, y]) => previewSet.add(`${x},${y}`)); // THE WORLD cast - celoplošný blik
     if (e?.kind === "hit")       hitTarget = e.target;
     if (e?.kind === "tile_proc") procs.push(e);
     if (e?.kind === "clone_hit" && Array.isArray(e.cell)) cloneHitCells.push(e.cell);
-    // melee úder — zvýrazni zasahované bunky (server ich posiela v efekte; Medúza má aj diagonály)
+    // melee úder - zvýrazni zasahované bunky (server ich posiela v efekte; Medúza má aj diagonály)
     // + zväčšená postava v strede so sekacou animáciou (analógia special overlay)
     if (e?.kind === "melee") {
       const caster = s?.[e.from];
@@ -2824,17 +2824,17 @@ function renderGrid(s, effects = []) {
         meleeCasts.push({ from: e.from, file: atk.file, fps: atk.fps });
       }
     }
-    // démon útok — blikajú zasahované bunky (všetky okrem kasterovej)
+    // démon útok - blikajú zasahované bunky (všetky okrem kasterovej)
     if (e?.kind === "demon_attack" && Array.isArray(e.cells)) {
       e.cells.forEach(([x, y]) => previewSet.add(`${x},${y}`));
     }
-    // vlkolakovo seknutie — zvýrazni bunku terča (ako melee)
+    // vlkolakovo seknutie - zvýrazni bunku terča (ako melee)
     if (e?.kind === "wolf_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
     // Luffy special: cieľová bunka bliká, kam sa guľa/Luffy dogúľa a vybuchne (počas roll → explode/chomp)
     if ((e?.kind === "luffy_roll" || e?.kind === "luffy_explode" || e?.kind === "luffy_chomp") && Array.isArray(e.target)) previewSet.add(`${e.target[0]},${e.target[1]}`);
-    // Countess/Onre: seknutie po charge/teleporte — zvýrazni bunku terča; trigger pasce — bunka sa rozžiari
+    // Countess/Onre: seknutie po charge/teleporte - zvýrazni bunku terča; trigger pasce - bunka sa rozžiari
     if (e?.kind === "vamp_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
-    // Countess: úder (A1) aj liečivé beaty (A2/A3/A4) sa zrkadlia do veľkého stredového spritu —
+    // Countess: úder (A1) aj liečivé beaty (A2/A3/A4) sa zrkadlia do veľkého stredového spritu -
     // one-shot od začiatku svojho beatu (once), nie absolútny loop; Onre stredový overlay nemá
     if ((e?.kind === "vamp_strike" || e?.kind === "vamp_heal_cast") && s?.[e.from]?.char === "countess") {
       const def = ANIM_DEF[e.anim] ?? ANIM_DEF.va1;
@@ -2880,7 +2880,7 @@ function renderGrid(s, effects = []) {
         cell.appendChild(m);
       }
 
-      // preview budúceho tile — malý ghost v rohu (plná centrovaná ikona = tile ktoré UŽ platí);
+      // preview budúceho tile - malý ghost v rohu (plná centrovaná ikona = tile ktoré UŽ platí);
       // môže sa krížiť s existujúcim tile len pri cieli presunu IK (IK smie prekryť iné tiles)
       const pendType = pendingMap.get(key);
       if (pendType) {
@@ -2890,11 +2890,11 @@ function renderGrid(s, effects = []) {
         cell.appendChild(pm);
       }
 
-      // práve vyhodnocované tile — výrazný blik
+      // práve vyhodnocované tile - výrazný blik
       if (procs.some(pc => pc.cell?.[0] === x && pc.cell?.[1] === y)) {
         cell.classList.add("tile-proc");
       }
-      // trigger pasce — rozžiarenie bunky (od tohto momentu ju vidia obaja hráči)
+      // trigger pasce - rozžiarenie bunky (od tohto momentu ju vidia obaja hráči)
       if (trapFlashCells.some(c => c[0] === x && c[1] === y)) cell.classList.add("trap-flash");
 
       // projektil basic útoku sa NEkreslí do bunky (renderGrid maže grid každý frame → poskakoval by);
@@ -2905,20 +2905,20 @@ function renderGrid(s, effects = []) {
       const isP2 = s?.p2 && s.p2.x === x && s.p2.y === y;
       if (hitTarget === "p1" && isP1) cell.classList.add("hit-blink");
       if (hitTarget === "p2" && isP2) cell.classList.add("hit-blink");
-      if (cloneHitCells.some(c => c[0] === x && c[1] === y)) cell.classList.add("hit-blink"); // klon na dmg dlaždici — blik bunky
-      // aktívne obrany (shield/mirror) sa už nekreslia na bunku — pulzujúci glow je per-postavu (actorFilter)
+      if (cloneHitCells.some(c => c[0] === x && c[1] === y)) cell.classList.add("hit-blink"); // klon na dmg dlaždici - blik bunky
+      // aktívne obrany (shield/mirror) sa už nekreslia na bunku - pulzujúci glow je per-postavu (actorFilter)
 
       gridEl.appendChild(cell);
     }
   }
 
-  renderTrapMarkers(s); // pasca Countess/Onre — statická hlava castera v bunke (vidí ju len on)
+  renderTrapMarkers(s); // pasca Countess/Onre - statická hlava castera v bunke (vidí ju len on)
 
   reconcileProjectiles(charges, s); // plynulé projektily kĺžu v #actors (mimo mazaného gridu)
 
   renderThreadLines(s);
   // Escanor: veľký centrálny sprite pri caste = WinSun (Escanor drží rastúce slnko); malá postava ostáva Win
-  // Escanor má vlastnú necyklenú choreografiu (runEscanorSpecial) — z generického looping centra ho vynechaj
+  // Escanor má vlastnú necyklenú choreografiu (runEscanorSpecial) - z generického looping centra ho vynechaj
   // Jotarov Special 2 (po THE WORLD) → stredový PÁR (telo Attack_2 + SP Special_2_P). Special 1 (mirror útok)
   // ZÁMERNE bez stredového spritu. THE WORLD má vlastný menace (spawnWorldCenter).
   for (const sp of specials) {
@@ -2931,7 +2931,7 @@ function renderGrid(s, effects = []) {
   );
 }
 
-/* ---------- Pasca (Countess/Onre) — statická hlava castera v strede bunky ---------- */
+/* ---------- Pasca (Countess/Onre) - statická hlava castera v strede bunky ---------- */
 // kreslí sa len tomu, komu server player.trap NEredigoval (caster; divák vidí oboch);
 // grid sa maže každý render, marker sa preto vkladá nanovo (výrez hlavy je cachovaný cez SPRITES)
 function renderTrapMarkers(s) {
@@ -2968,7 +2968,7 @@ function drawTrapHead(cvs, char, slot) {
 }
 
 // Ariadnina niť ako súvislá čiara cez stredy navštívených buniek (+ uzlík na začiatku);
-// kreslí sa pre oboch hráčov — komu ju server neredigoval, ten ju vidí
+// kreslí sa pre oboch hráčov - komu ju server neredigoval, ten ju vidí
 function renderThreadLines(s) {
   actorsEl.querySelectorAll(".thread-svg").forEach(n => n.remove());
   const W = board.w * TILE_W + (board.w - 1) * GAP;
@@ -2993,13 +2993,13 @@ function renderThreadLines(s) {
 }
 
 /* ---------- Special preview (hover) ---------- */
-// dir sa týka len Medúzy (left/right) — ostatné speciály smer nemajú
+// dir sa týka len Medúzy (left/right) - ostatné speciály smer nemajú
 function cellsForSpecialPreview(meState, dir){
   if (!meState || !meState.char) return [];
   const { x, y, char } = meState;
   const cells = [];
   if (char === "medusa"){
-    // vlastné políčko + všetko striktne zvoleným smerom v riadku ±1 — zrkadlí server (medusaCells)
+    // vlastné políčko + všetko striktne zvoleným smerom v riadku ±1 - zrkadlí server (medusaCells)
     const sgn = dir === "left" ? -1 : 1;
     cells.push([x, y]);
     for (let cy = y - 1; cy <= y + 1; cy++){
@@ -3024,19 +3024,19 @@ function cellsForSpecialPreview(meState, dir){
       if (cx>=0 && cy>=0 && cx<board.w && cy<board.h) cells.push([cx,cy]);
     });
   } else if (char === "minotaur"){
-    // celoplošný — zrkadlí server (labyrint zasiahne súpera kdekoľvek)
+    // celoplošný - zrkadlí server (labyrint zasiahne súpera kdekoľvek)
     for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
   } else if (char === "naruto"){
-    // range self — summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
+    // range self - summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
     cells.push([x, y]);
   } else if (char === "soldier" || char === "countess" || char === "onre"){
-    // cieľová bunka je súčasť AKCIE (cell), nie odvoditeľná z pozície — hover fronty ju rieši
+    // cieľová bunka je súčasť AKCIE (cell), nie odvoditeľná z pozície - hover fronty ju rieši
     // attachQueueHover, prehrávanie číta sp.cells zo servera, char-select ABILITY_PREVIEW.target
-    // (Countess/Onre: pasca — cast bliká CELOU plochou ako Minotaurov, server posiela plné cells;
+    // (Countess/Onre: pasca - cast bliká CELOU plochou ako Minotaurov, server posiela plné cells;
     // cieľová bunka samotná sa nikdy nezvýrazní, pasca je tajná)
     return cells;
   } else if (char === "werewolf"){
-    // dráha charge: z pozície zvoleným z 8 smerov po PRVÚ figúru súpera (aj jeho klon) alebo okraj —
+    // dráha charge: z pozície zvoleným z 8 smerov po PRVÚ figúru súpera (aj jeho klon) alebo okraj -
     // zrkadlí doSpecial na serveri. Súpera dodáva volajúci cez meState.foe (hover fronty/pickera);
     // bez neho (char-select ukážka) alebo so skrytým súperom v labyrinte (x null) ide dráha až na okraj.
     const delta = WOLF_DIRS_CLIENT[dir];
@@ -3058,11 +3058,11 @@ function cellsForSpecialPreview(meState, dir){
       for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) cells.push([cx, cy]);
     }
   } else if (char === "escanor"){
-    // smerový (left/right) — rozsah podľa pride levelu; zrkadlí escanorCells na serveri
+    // smerový (left/right) - rozsah podľa pride levelu; zrkadlí escanorCells na serveri
     const pride = Math.max(0, Math.min(3, meState.pride ?? 0));
     const add = (cx,cy) => { if (cx>=0 && cy>=0 && cx<board.w && cy<board.h && !cells.some(c=>c[0]===cx&&c[1]===cy)) cells.push([cx,cy]); };
     const fx = x + (dir === "left" ? -1 : 1), fy = y;
-    // kotva F mimo plochy = slnko letí do autu — nič nezvýrazni, ANI pri pride 3 (ako basic mimo plochy)
+    // kotva F mimo plochy = slnko letí do autu - nič nezvýrazni, ANI pri pride 3 (ako basic mimo plochy)
     if (fx < 0 || fx >= board.w) return cells;
     if (pride >= 3){ for (let cy=0; cy<board.h; cy++) for (let cx=0; cx<board.w; cx++) add(cx,cy); }
     else {
@@ -3073,7 +3073,7 @@ function cellsForSpecialPreview(meState, dir){
   }
   return cells;
 }
-// Jotarov Special 1 (mirror slot): obe diagonálne bunky zvolenej strany (x±dir, y±1) — zrkadlí jotaroS1Cells
+// Jotarov Special 1 (mirror slot): obe diagonálne bunky zvolenej strany (x±dir, y±1) - zrkadlí jotaroS1Cells
 function cellsForJotaroS1(p, dir){
   if (!p) return [];
   const dx = dir === "left" ? -1 : 1;
@@ -3084,7 +3084,7 @@ function cellsForJotaroS1(p, dir){
   }
   return out;
 }
-// dosah melee — vlastné políčko; Medúza navyše 1 diagonálne na všetky strany (zrkadlí doMelee na serveri)
+// dosah melee - vlastné políčko; Medúza navyše 1 diagonálne na všetky strany (zrkadlí doMelee na serveri)
 function cellsForMeleePreview(p, char){
   if (!p) return [];
   const cells = [[p.x, p.y]];
@@ -3095,7 +3095,7 @@ function cellsForMeleePreview(p, char){
   return cells;
 }
 // dráha charge Vampire/Onryō (dash slot): z pozície zvoleným smerom po prvú VIDITEĽNÚ figúru súpera
-// (aj klon) alebo okraj — zrkadlí doVampCharge na serveri (skrytý súper v labyrinte má x null → beh na okraj)
+// (aj klon) alebo okraj - zrkadlí doVampCharge na serveri (skrytý súper v labyrinte má x null → beh na okraj)
 function cellsForVampChargePreview(p, dir, foe){
   if (!p) return [];
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
@@ -3109,20 +3109,20 @@ function cellsForVampChargePreview(p, dir, foe){
   }
   return cells;
 }
-// dosah démon útoku — všetky políčka okrem toho, na ktorom kaster (ghost) stojí
+// dosah démon útoku - všetky políčka okrem toho, na ktorom kaster (ghost) stojí
 function cellsForDemonPreview(p){
   if (!p) return [];
   const cells = [];
   for (let y=0; y<board.h; y++) for (let x=0; x<board.w; x++) if (!(x===p.x && y===p.y)) cells.push([x,y]);
   return cells;
 }
-/* ---------- Ghost — simulácia vlastnej pozície počas naplánovaného kola ---------- */
+/* ---------- Ghost - simulácia vlastnej pozície počas naplánovaného kola ---------- */
 // pozícia po každej akcii vo fronte; movy mimo board pozíciu nemenia (zrkadlí server)
 function simulatedPositions(){
   const mine = state?.[me];
   if (!mine) return [];
   let x = mine.x, y = mine.y;
-  let char = mine.char; // turnajový swap vo fronte mení maga — vlkolakov charge hýbe len vlkolakom
+  let char = mine.char; // turnajový swap vo fronte mení maga - vlkolakov charge hýbe len vlkolakom
   const inB = (px, py) => px >= 0 && py >= 0 && px < board.w && py < board.h;
   const out = [];
   for (const a of myQueue){
@@ -3134,7 +3134,7 @@ function simulatedPositions(){
     }
     if (a.type === "dash" && d){
       if (char === "countess" || char === "onre"){
-        // Vampire/Onryō: dash = charge — beh po prvú VIDITEĽNÚ figúru súpera alebo okraj
+        // Vampire/Onryō: dash = charge - beh po prvú VIDITEĽNÚ figúru súpera alebo okraj
         // (skrytý súper v labyrinte má x null → beh na okraj; zrkadlí server validQueue)
         const foe = state?.[otherSlot()];
         while (inB(x + d[0], y + d[1])){
@@ -3166,7 +3166,7 @@ function simulatedPositions(){
   return out;
 }
 // pozícia, z ktorej sa vykoná akcia s indexom idx (= po akciách 0..idx-1);
-// bez argumentu pozícia po celej fronte — odtiaľ sa vykoná novo pridávaná akcia
+// bez argumentu pozícia po celej fronte - odtiaľ sa vykoná novo pridávaná akcia
 function ghostPos(idx = myQueue.length){
   const mine = state?.[me];
   if (!mine) return null;
@@ -3175,7 +3175,7 @@ function ghostPos(idx = myQueue.length){
   if (!sims.length) return { x: mine.x, y: mine.y };
   return sims[Math.min(idx, sims.length) - 1];
 }
-// budúca pozícia VLASTNÉHO tieňového klona po fronte — kopíruje pohyb majiteľa s inverznou vertikálou
+// budúca pozícia VLASTNÉHO tieňového klona po fronte - kopíruje pohyb majiteľa s inverznou vertikálou
 // a vlastným clampom; klon sa hýbe, len keď je majiteľov ťah platný (zrkadlí moveCloneSteps na serveri)
 function simulatedClonePos(){
   const mine = state?.[me];
@@ -3199,7 +3199,7 @@ function simulatedClonePos(){
   }
   return { x, y };
 }
-// mág aktívny pred akciou s indexom idx — po prejdení swapov vo fronte 0..idx-1 (kvôli special/ghost náhľadu po výmene)
+// mág aktívny pred akciou s indexom idx - po prejdení swapov vo fronte 0..idx-1 (kvôli special/ghost náhľadu po výmene)
 function ghostCharAt(idx = myQueue.length) {
   let char = state?.[me]?.char || null;
   for (let i = 0; i < Math.min(idx, myQueue.length); i++) {
@@ -3208,9 +3208,66 @@ function ghostCharAt(idx = myQueue.length) {
   return char;
 }
 
-// Vampire/Onryō: lomená dráha diagonálnej strely — RAZ sa odrazí od ktorejkoľvek steny (od bočnej
+// upozornenie „táto akcia nebude mať efekt" pre vlastnú frontu (žltý ⚠ v lište). Simuluje LEN vlastný
+// stav a vlastné naplánované akcie - súperove akcie (drain many Onryō, presun, zásah…) sa NEzarátavajú.
+// Ceny a wall pravidlo MUSIA sedieť so serverovými do* funkciami. Vracia pole dôvodov (null = ok) podľa myQueue.
+const PLAN_MAX_MANA = 10;
+const PLAN_RECHARGE = 4;
+const PLAN_COST = { attack: 1, melee: 4, dash: 4, special: 5, special1: 4, shield: 2, mirror: 4, demon: 10 };
+function planWarnings() {
+  const out = myQueue.map(() => null);
+  const mine = state?.[me];
+  if (!mine) return out;
+  const foe = state?.[me === "p1" ? "p2" : "p1"];
+  const inB = (x, y) => x >= 0 && y >= 0 && x < board.w && y < board.h;
+  const D4 = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  let mana = mine.mana ?? 0;
+  // golden predťah (len nestartér) sa platí pred prvou akciou startera
+  if (goldenArmed && mana >= 3) mana -= 3;
+  else if (goldenMirrorArmed && mana >= 5) mana -= 5;
+  let form = mine.form || "base";   // Luffy: recharge prepína base↔gear3
+  let hasClone = !!mine.clone;      // Naruto: klon sa môže pohnúť/strieľať aj keď Naruto narazí do steny
+  for (let i = 0; i < myQueue.length; i++) {
+    const a = myQueue[i];
+    if (!a || a.type === "stoned" || a.type === "swap") continue;
+    const char = ghostCharAt(i);
+    const p = ghostPos(i);
+    const cost = PLAN_COST[a.type] || 0;
+    if (cost > mana) { out[i] = `Not enough mana (planned ${mana}, needs ${cost}) - this action will fail`; continue; }
+    mana -= cost;
+    if (a.type === "recharge") {
+      if (char !== "luffy" && mana >= PLAN_MAX_MANA) out[i] = "Mana will already be full - recharge has no effect";
+      mana = Math.min(PLAN_MAX_MANA, mana + PLAN_RECHARGE);
+      if (char === "luffy") form = form === "gear3" ? "base" : "gear3";
+      continue;
+    }
+    if (a.type === "special" && char === "naruto") { hasClone = true; continue; }
+    if (!p) continue;
+    const wallSafe = char === "naruto" && hasClone; // klonova figúra môže akciu vykonať aj tak
+    const d = D4[a.dir];
+    if (!wallSafe && (a.type === "move" || a.type === "dash") && d && !inB(p.x + d[0], p.y + d[1])) {
+      out[i] = "Off the board - this action has no effect";
+    } else if (!wallSafe && a.type === "attack" && !cellsForAimPreview(p, a.dir, char).length) {
+      out[i] = "Attack off the board - mana is spent, no effect";
+    } else if (a.type === "special") {
+      const dx = a.dir === "left" ? -1 : a.dir === "right" ? 1 : 0;
+      if (char === "medusa" && (foe?.stone || 0) > i) {
+        // súper je pri tejto akcii ešte socha (kameň ubúda až na konci kroku jeho posledného skameneného ťahu)
+        out[i] = "Opponent is still petrified at this point - petrify has no effect";
+      } else if ((char === "escanor" || (char === "jotaro" && mine.worldUsed)) && dx && !inB(p.x + dx, p.y)) {
+        out[i] = "Special off the board - mana is spent, no effect";
+      } else if (char === "werewolf") {
+        const wd = WOLF_DIRS_CLIENT[a.dir];
+        if (wd && !inB(p.x + wd[0], p.y + wd[1])) out[i] = "Charge off the board - mana is spent, no effect";
+      }
+    }
+  }
+  return out;
+}
+
+// Vampire/Onryō: lomená dráha diagonálnej strely - RAZ sa odrazí od ktorejkoľvek steny (od bočnej
 // letí späť), roh neodráža (koniec letu), tvrdý limit VAMP_SHOT_RANGE buniek. MUSÍ sedieť so
-// serverovým vampShotRoute (server.js) — preview aj skutočný let idú po rovnakých bunkách.
+// serverovým vampShotRoute (server.js) - preview aj skutočný let idú po rovnakých bunkách.
 const VAMP_SHOT_RANGE = 3;
 function vampShotRoute(x, y, dir){
   let [dx, dy] = { up_left:[-1,-1], up_right:[1,-1], down_left:[-1,1], down_right:[1,1] }[dir] || [];
@@ -3221,7 +3278,7 @@ function vampShotRoute(x, y, dir){
   while (route.length < VAMP_SHOT_RANGE){
     let nx = x + dx, ny = y + dy;
     if (!inB(nx, ny)){
-      if (bounced) break; // druhý kontakt so stenou — koniec letu
+      if (bounced) break; // druhý kontakt so stenou - koniec letu
       const outX = nx < 0 || nx >= board.w, outY = ny < 0 || ny >= board.h;
       if (outX && outY) break; // roh sa neodráža
       bounced = true;
@@ -3241,10 +3298,10 @@ function cellsForAimPreview(meState, dir, char){
   const delta = WOLF_DIRS_CLIENT[dir];
   if (!delta) return [];
   // diagonálny smer u side-postavy → lomená bounce dráha; ortogonálny (Luffy gear3) → priama strela.
-  // (Riadime sa smerom, nie formou — picker ponúka diag v base, ortogonálne v gear3.)
+  // (Riadime sa smerom, nie formou - picker ponúka diag v base, ortogonálne v gear3.)
   const isDiag = delta[0] !== 0 && delta[1] !== 0;
   if (SIDE_CHARS[char] && isDiag) return vampShotRoute(meState.x, meState.y, dir);
-  // Luffy GEAR 3 basic = naťahovacia ruka (pull) — dráha sa ZASTAVÍ na prvej figúre súpera (nie po okraj)
+  // Luffy GEAR 3 basic = naťahovacia ruka (pull) - dráha sa ZASTAVÍ na prvej figúre súpera (nie po okraj)
   const stopAtFoe = char === "luffy" && luffyEffForm() === "gear3";
   const foe = stopAtFoe ? state?.[me === "p1" ? "p2" : "p1"] : null;
   const cells = [];
@@ -3275,21 +3332,21 @@ function computeFacing(p1, p2) {
   if (p1.x <= p2.x) return { p1: 1, p2: -1 };
   return { p1: -1, p2: 1 };
 }
-// horizontálny rozostup postáv na ZDIEĽANOM políčku (p1 doľava, p2 doprava) — veľké postavy (Medúza)
+// horizontálny rozostup postáv na ZDIEĽANOM políčku (p1 doľava, p2 doprava) - veľké postavy (Medúza)
 // potrebujú väčší, pokojne aj s presahom do susedných políčok, inak sa sprity škaredo prekrývajú
 // Escanor: veľkosť rastie o 20 % za pride level; škáluje sa od nôh. FEET_FRAC = kde nohy sedia v ACTOR canvase
-// (feet-anchor spritov ~0.97 výšky) — origin škálovania, aby postava ostala na zemi a nedvíhala sa medzera pod ňou.
+// (feet-anchor spritov ~0.97 výšky) - origin škálovania, aby postava ostala na zemi a nedvíhala sa medzera pod ňou.
 const ESC_FEET_FRAC = 0.973;
-// escPrideDisplay: dočasné podržanie STAREJ veľkosti po kole — lev sa ukáže PRED zmenou, potom sa aplikuje nové pride
+// escPrideDisplay: dočasné podržanie STAREJ veľkosti po kole - lev sa ukáže PRED zmenou, potom sa aplikuje nové pride
 let escPrideDisplay = { p1: null, p2: null };
-// postava, pre ktorú je escPrideDisplay zachytené — pri SWAPE (turnaj) sa char v strede kola zmení, takže
+// postava, pre ktorú je escPrideDisplay zachytené - pri SWAPE (turnaj) sa char v strede kola zmení, takže
 // držaná veľkosť starej postavy (napr. vlkolakov mesiac) sa NESMIE aplikovať na novú (Escanor pride 0)
 let escPrideDisplayChar = { p1: null, p2: null };
 // levelová veľkosť postavy: Escanor = pride, Vlkolak = fáza mesiaca (rast 1.2^level od nôh);
 // vlkolakova ZÁKLADNÁ forma (nov) je zmenšená na 0.7× a rastie z nej (spln ≈ 1.21×), Escanor od 1×.
 // escPrideDisplay drží počas prehrávania kola STARÝ level pre oba prípady (nová veľkosť až po floate)
 const escPrideMul = a => {
-  // Luffy: veľkosť sa medzi módmi NEMENÍ (žiadny size tell) — normalizuje ju LUFFY_BOARD_FILL.
+  // Luffy: veľkosť sa medzi módmi NEMENÍ (žiadny size tell) - normalizuje ju LUFFY_BOARD_FILL.
   const lvl = a?.char === "escanor" ? (a.pride || 0) : a?.char === "werewolf" ? (a.moon || 0) : null;
   if (lvl === null) return 1;
   const base = a.char === "werewolf" ? 0.7 : 1;
@@ -3300,10 +3357,10 @@ const escPrideMul = a => {
   return base * Math.pow(1.2, Math.max(0, Math.min(3, pr)));
 };
 // Escanorove FX (WinSun, melee center, letiace slnko, výbuch, charge strela) škálujú s Pridom rovnako ako telo:
-// pride0 = súčasná (autorská) veľkosť ako u ostatných post­áv, rast NAD ňu (1.2^pride, pride3 ≈ 1.73×) — nikdy menšie.
+// pride0 = súčasná (autorská) veľkosť ako u ostatných post­áv, rast NAD ňu (1.2^pride, pride3 ≈ 1.73×) - nikdy menšie.
 // Číta ten istý zdroj Pride ako telo (escPrideDisplay počas prehrávania kola, inak state[slot].pride).
 function escFxMul(slot) {
-  // držaný level ber len keď patrí Escanorovi (po swape z inej postavy drží char jej level — ignoruj)
+  // držaný level ber len keď patrí Escanorovi (po swape z inej postavy drží char jej level - ignoruj)
   const held = (escPrideDisplay[slot] != null && escPrideDisplayChar[slot] === "escanor") ? escPrideDisplay[slot] : null;
   const pr = held != null ? held : (state?.[slot]?.pride || 0);
   return Math.pow(1.2, Math.max(0, Math.min(3, pr)));
@@ -3313,9 +3370,9 @@ function escFxMul(slot) {
 function escChargeMul(slot) { return escFxMul(slot) * Math.pow(1.2, -3); }
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho vráti 0.
-// Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere — bunka je aj tak
+// Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere - bunka je aj tak
 // prezradená), vlastný sprite odstúpi presne ako pri normálnej zdieľanej bunke mimo labyrintu.
-const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60, jotaro: 78, luffy: 78 }; // vlk je široký (zhrbený) — väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu; Jotaro je zavalitý + má za sebou stand
+const PAIR_SHIFT = { medusa: 80, minotaur: 70, naruto: 80, escanor: 80, werewolf: 110, soldier: 70, countess: 80, onre: 60, jotaro: 78, luffy: 78 }; // vlk je široký (zhrbený) - väčší odsun na zdieľanej bunke; vojak má pušku (širší než mági); Countess má širokú sukňu; Jotaro je zavalitý + má za sebou stand
 function pairShift(slot, s = state) {
   const p1 = s?.p1, p2 = s?.p2;
   if (!p1 || !p2) return 0;
@@ -3344,11 +3401,11 @@ function positionActors(s, immediate = false) {
     const wasHidden = el.style.display === "none";
     el.style.display = "block";
     const { left, top } = cellToPx(data.x, data.y);
-    // canvas je väčší než bunka — horizontálne centrovať, vertikálne ukotviť na spodok bunky
+    // canvas je väčší než bunka - horizontálne centrovať, vertikálne ukotviť na spodok bunky
     const px = left - (ACTOR_W - TILE_W) / 2;
     const py = top  - (ACTOR_H - TILE_H);
 
-    // wasHidden: odhalenie po labyrinte nesmie doslidovať zo starej pozície — umiestni sa okamžite
+    // wasHidden: odhalenie po labyrinte nesmie doslidovať zo starej pozície - umiestni sa okamžite
     if (immediate || !actorsInitialized || wasHidden) {
       el.style.transition = "none";
       el.style.left = px + "px";
@@ -3385,12 +3442,12 @@ function positionActors(s, immediate = false) {
     if (same) el.dataset.pair = "1"; else el.removeAttribute("data-pair");
   });
 
-  // tieňové klony — pozícia/facing ako majiteľ; klon je VŽDY viditeľný a PLNE KRYCÍ (identická figúra ako Naruto),
+  // tieňové klony - pozícia/facing ako majiteľ; klon je VŽDY viditeľný a PLNE KRYCÍ (identická figúra ako Naruto),
   // aby bolo vidno, že Naruto má klona. Na majiteľovej bunke stojí len jemne posunutý (STACK_OFFSET px);
-  // pri rozdelení sa obe figúry rozbehnú SÚBEŽNE zo spoločnej bunky (klon vždy KĹŽE — nikdy nezmizne na mieste).
+  // pri rozdelení sa obe figúry rozbehnú SÚBEŽNE zo spoločnej bunky (klon vždy KĹŽE - nikdy nezmizne na mieste).
   [["p1", cloneEls.p1, p1, p2], ["p2", cloneEls.p2, p2, p1]].forEach(([slot, el, data, opp]) => {
     const c = data?.clone;
-    // klon už puffol (clone_die) — drž ho skrytého, aj keď ho snapshot toho istého framu ešte nesie (žiadny problik)
+    // klon už puffol (clone_die) - drž ho skrytého, aj keď ho snapshot toho istého framu ešte nesie (žiadny problik)
     if (cloneDead[slot] || !data || !data.char || data.x == null || !c) {
       el.style.display = "none";
       el._logCell = null;
@@ -3414,26 +3471,26 @@ function positionActors(s, immediate = false) {
     el.style.display = "block";
     el.style.opacity = "1"; // klon nie je priehľadný ani na Narutovej bunke
     if (immediate || !actorsInitialized || wasHidden) {
-      // prvé zjavenie (summon) / immediate — umiestni bez slideu (nie z rohu)
+      // prvé zjavenie (summon) / immediate - umiestni bez slideu (nie z rohu)
       el.style.transition = "none";
       el.style.left = px + "px"; el.style.top = py + "px";
       void el.offsetHeight;
       el.style.transition = "";
     } else {
-      // bežný frame — CSS transition dá súbežný slide s majiteľom (rozdelenie aj zliatie plynulo)
+      // bežný frame - CSS transition dá súbežný slide s majiteľom (rozdelenie aj zliatie plynulo)
       el.style.left = px + "px"; el.style.top = py + "px";
     }
     el.style.transform = `translateX(${shift}px) scaleX(${currentFacing(slot, facing)})`;
     el._logCell = { x: c.x, y: c.y };
   });
 
-  // Jotarov stand — vždy vedľa Jotara (na jeho chrbtovej strane, o STAND_OFFSET), zrkadlený podľa facingu;
+  // Jotarov stand - vždy vedľa Jotara (na jeho chrbtovej strane, o STAND_OFFSET), zrkadlený podľa facingu;
   // pozíciu drží so slideom ako actor. Kreslenie (aktuálny `_P` pás / summon / dead) rieši raf.
   [["p1", standEls.p1, p1], ["p2", standEls.p2, p2]].forEach(([slot, el, data]) => {
     if (!data || data.char !== "jotaro" || data.x == null) { el.style.display = "none"; return; }
     const wasHidden = el.style.display === "none";
     el.style.display = "block";
-    // MOVE-blip: pozíciu aj pás standu (snap starú→novú bunku + Dead_P→Summon_P) plne riadi raf — sem nezasahuj
+    // MOVE-blip: pozíciu aj pás standu (snap starú→novú bunku + Dead_P→Summon_P) plne riadi raf - sem nezasahuj
     if (standBlip[slot]) return;
     const { left, top } = cellToPx(data.x, data.y);
     const px = left - (ACTOR_W - TILE_W) / 2;
@@ -3453,7 +3510,7 @@ function positionActors(s, immediate = false) {
     el.style.transform = `translateX(${shift}px) translateY(${floatY}px) scaleX(${fc})`;
   });
 
-  // „YOU" značka nad vlastnou postavou — sleduje aktéra (rovnaké transition ako pohyb)
+  // „YOU" značka nad vlastnou postavou - sleduje aktéra (rovnaké transition ako pohyb)
   const meData = me ? s[me] : null;
   if (meData && meData.char) {
     const { left, top } = cellToPx(meData.x, meData.y);
@@ -3462,7 +3519,7 @@ function positionActors(s, immediate = false) {
     const shift = pairShift(me, s);
     // Escanor: sprite je zväčšený podľa pride (rast od pät, origin ESC_FEET_FRAC) → hlava je vyššie a bočný offset väčší
     const prideMul = escPrideMul(meData);
-    // vertikálne: vrch hlavy per-mág (HEAD_TOP) — pri pride sa škáluje okolo pät (FEET_FRAC), nie okolo spodku canvasu;
+    // vertikálne: vrch hlavy per-mág (HEAD_TOP) - pri pride sa škáluje okolo pät (FEET_FRAC), nie okolo spodku canvasu;
     // značku kotvíme jej spodkom (chevron) tesne nad hlavu cez translateY(-100%)
     const headTop = HEAD_TOP[meData.char] ?? 0.48;
     const headTopScaled = ESC_FEET_FRAC + (headTop - ESC_FEET_FRAC) * prideMul; // prideMul=1 → headTop
@@ -3501,7 +3558,7 @@ function actionBadgeView(a, ownerSlot) {
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
-    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje — bunku ukáže hover
+    case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje - bunku ukáže hover
     case "special1":      return { cls: "mirror",  text: "🪞" }; // Jotarov útok v mirror slote sa tvári ako mirror (analógia k charge=dash u Vampire/Onryō)
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
@@ -3513,7 +3570,7 @@ function actionBadgeView(a, ownerSlot) {
     case "stoned":        return { cls: "stoned",   text: "🗿" };
     case "swap":          return { cls: "swap",     html: mageHeadHtml(a.to || "", usesAltColor(a.to, ownerSlot) ? "alt-color" : "", ownerSlot) };
     case "last_hope":     return { cls: "lasthope", html: LH_BADGE_IMG };
-    case "unknown":       return { cls: "unknown",  text: "❓" }; // labyrint — redigovaná akcia súpera
+    case "unknown":       return { cls: "unknown",  text: "❓" }; // labyrint - redigovaná akcia súpera
     default:              return { cls: "",        text: a?.type || "" };
   }
 }
@@ -3524,16 +3581,16 @@ function attachQueueHover(el, a, idx) {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForAimPreview(p, a.dir, ghostCharAt(idx))); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "dash") {
-    // Vampire/Onryō: dash = charge — hover ukáže dráhu behu (stop na viditeľnej figúre súpera)
+    // Vampire/Onryō: dash = charge - hover ukáže dráhu behu (stop na viditeľnej figúre súpera)
     el.addEventListener("mouseenter", () => {
       const p = ghostPos(idx); const char = ghostCharAt(idx);
       if (p && (char === "countess" || char === "onre")) showPreviewCells(cellsForVampChargePreview(p, a.dir, state?.[otherSlot()]));
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special") {
-    // pride: Escanorova zóna závisí od AKTUÁLNEHO pride levelu (rovnako ako hover na šípkach pickeru) —
+    // pride: Escanorova zóna závisí od AKTUÁLNEHO pride levelu (rovnako ako hover na šípkach pickeru) -
     // bez neho by náhľad ukazoval vždy pride 0; pride sa mení až na konci kola, takže current je správny
-    // Vojak: akcia nesie cieľovú bunku — zvýrazni presne ju (zóna sa nedá odvodiť z pozície)
+    // Vojak: akcia nesie cieľovú bunku - zvýrazni presne ju (zóna sa nedá odvodiť z pozície)
     // Vlkolak: dráha charge sa zastaví na viditeľnej figúre súpera → preview potrebuje foe
     el.addEventListener("mouseenter", () => {
       if (a.cell) { showPreviewCells([[a.cell.x, a.cell.y]]); return; }
@@ -3542,7 +3599,7 @@ function attachQueueHover(el, a, idx) {
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special1") {
-    // Jotarov Special 1 — obe diagonálne bunky zvolenej strany z ghost pozície
+    // Jotarov Special 1 - obe diagonálne bunky zvolenej strany z ghost pozície
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForJotaroS1(p, a.dir)); });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
@@ -3562,7 +3619,7 @@ function attachQueueHover(el, a, idx) {
 // moje sloty vypĺňam (zlatý lining), súperove sú "?" placeholdery (odhalia sa počas animácie)
 let qBeatEls = []; // sloty podľa pozície 0..8 (pre kurzor + odhalenie súpera počas animácie)
 
-// skamenené ťahy nového kola sú vopred zamknuté ako pass (🗿) — predvyplnia sa na začiatok fronty
+// skamenené ťahy nového kola sú vopred zamknuté ako pass (🗿) - predvyplnia sa na začiatok fronty
 // a nedajú sa odobrať (undo poistka); hráč plánuje len zvyšné sloty
 function ensureStonePrefix() {
   if (!me || isSpectator || playing || lockedIn) return;
@@ -3575,7 +3632,7 @@ function ensureStonePrefix() {
   myQueue = [...Array.from({ length: need }, () => ({ type: "stoned" })), ...rest].slice(0, 3);
 }
 
-// Jotaro THE WORLD: samostatný placeholder pre 3 zmrazené akcie — pôvodná lišta kola (queueEl) ostáva
+// Jotaro THE WORLD: samostatný placeholder pre 3 zmrazené akcie - pôvodná lišta kola (queueEl) ostáva
 // viditeľná ako „vykonáva sa THE WORLD", tu sa zadávajú nové akcie.
 const tsQueueEl = document.createElement("div");
 tsQueueEl.id = "ts-queue";
@@ -3617,9 +3674,9 @@ function renderQueue() {
 
   const starterSlot = state?.starter || "p1";
   const otherS = starterSlot === "p1" ? "p2" : "p1";
-  const lastRound = !!state?.goldLocked; // buffnuté posledné kolo — namiesto 2 gold-mana placeholderov jedna démon „end" bunka
+  const lastRound = !!state?.goldLocked; // buffnuté posledné kolo - namiesto 2 gold-mana placeholderov jedna démon „end" bunka
   const buffSlot = state?.p1?.lastStandBuff ? "p1" : state?.p2?.lastStandBuff ? "p2" : null;
-  const hopeSlot = buffSlot ? (buffSlot === "p1" ? "p2" : "p1") : null; // nebuffnutý hráč — vlastník Last Hope bunky
+  const hopeSlot = buffSlot ? (buffSlot === "p1" ? "p2" : "p1") : null; // nebuffnutý hráč - vlastník Last Hope bunky
   // beaty v reálnom poradí; owner = komu beat patrí (golden shield iba nestartérovi)
   const layout = [];
   if (lastRound && hopeSlot) layout.push({ pos: 9, kind: "lasthope", owner: hopeSlot }); // úplne vľavo, len vo final kole
@@ -3634,6 +3691,7 @@ function renderQueue() {
   );
   if (lastRound) layout.push({ pos: 7, kind: "demon" }); // jedna zvýraznená démon bunka pre oboch (hra tu končí)
   else layout.push({ pos: 7, kind: "gmana", owner: starterSlot }, { pos: 8, kind: "gmana", owner: otherS });
+  const warnings = planWarnings();
 
   layout.forEach((b) => {
     // predely: [last_hope] | golden shield | akcie | golden mana / démon
@@ -3647,7 +3705,7 @@ function renderQueue() {
       el.dataset.pos = "7";
       el.className = "q-badge demon";
       el.innerHTML = LS_BADGE_IMG;
-      el.title = "Last Stand — hra tu končí (banishment)";
+      el.title = "Last Stand - hra tu končí (banishment)";
       queueEl.appendChild(el);
       qBeatEls[7] = el;
       return;
@@ -3687,9 +3745,19 @@ function renderQueue() {
       if (v.cls) el.classList.add(v.cls);
       if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
+      // akcia podľa plánu nebude mať efekt → žltý ⚠ v rohu + dôvod v tooltipe
+      const warn = b.kind === "act" ? warnings[b.idx] : null;
+      if (warn) {
+        el.classList.add("q-warn");
+        el.title = "⚠ " + warn;
+        const w = document.createElement("span");
+        w.className = "q-warn-ico";
+        w.textContent = "⚠️";
+        el.appendChild(w);
+      }
     } else {
       el.classList.add("q-slot");
-      // súperov skamenený ťah je DETERMINISTICKÝ (stun prenesený z minulého kola) — namiesto skrytého „?"
+      // súperov skamenený ťah je DETERMINISTICKÝ (stun prenesený z minulého kola) - namiesto skrytého „?"
       // ukáž 🗿 na presných akciách, ktoré súper vynechá, nech kaster Medúzy vidí dokedy súper stojí
       const oppStone = (!mine && b.kind === "act") ? Math.min(3, state?.[b.owner]?.stone || 0) : 0;
       const oppStoned = oppStone > 0 && b.idx < oppStone;
@@ -3697,7 +3765,7 @@ function renderQueue() {
       else if (b.kind === "gmana") el.innerHTML = '<span class="g-ico dim">🙏</span>';
       else if (oppStoned) { el.classList.add("stoned"); el.textContent = "🗿"; }
       else el.textContent = mine ? ["①", "②", "③"][b.idx] : String(b.idx + 1); // ja kružok, súper holé cifry
-      el.title = oppStoned ? "Opponent is petrified — this action is skipped (carry-over stun)"
+      el.title = oppStoned ? "Opponent is petrified - this action is skipped (carry-over stun)"
         : mine ? "Your action (required)" : "Opponent (hidden until it resolves)";
     }
 
@@ -3761,7 +3829,7 @@ function updateActionButtons() {
     const effType = isJotaroMirror ? "special1" : type;
     const used = myQueue.some(a => a.type === effType);
     btn.disabled = used; // skutočne navolené v kole = sivé „použité"
-    // golden predťah blokuje bežnú akciu rovnakého druhu ZÁMKOM (nie ako „použité") — klik shake-ne cez poistku v handleri
+    // golden predťah blokuje bežnú akciu rovnakého druhu ZÁMKOM (nie ako „použité") - klik shake-ne cez poistku v handleri
     const goldenLock = ((type === "shield" && goldenArmed) || (type === "mirror" && goldenMirrorArmed)) && !isJotaroMirror;
     btn.classList.toggle("locked-golden", goldenLock && !used);
   });
@@ -3777,14 +3845,14 @@ function updateActionButtons() {
   if (attackUsed) aimPickerDiag?.classList.add("hidden"); // diagonálny aim picker (Countess/Onre)
   const meleeUsed = myQueue.some(a => a.type === "melee");
   if (meleeBtn) meleeBtn.disabled = meleeUsed;
-  // special už nemá data-act (kvôli Medúzinmu pickeru) — zneaktívni ho rovnako ako move/attack/dash
+  // special už nemá data-act (kvôli Medúzinmu pickeru) - zneaktívni ho rovnako ako move/attack/dash
   const specialUsed = myQueue.some(a => a.type === "special");
   specialBtn.disabled = specialUsed;
   if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); wolfPicker?.classList.add("hidden"); }
 }
 function updateLockButton() {
   // Jotaro THE WORLD: počas plánovania zmrazenej trojice je button „EXECUTE" (ignoruj stale state[me].locked
-  // z pôvodného locku kola — inak by ho renderQueue po prvej akcii zamkol a hráč by nemohol odoslať)
+  // z pôvodného locku kola - inak by ho renderQueue po prvej akcii zamkol a hráč by nemohol odoslať)
   if (tsPlanning) {
     lockBtn.classList.remove("locked");
     lockBtn.textContent = "EXECUTE";
@@ -3842,7 +3910,7 @@ function showGameOverSequence(winner) {
     }
 
     setTimeout(() => {
-      // verdikt namiesto ROUND n v hud-turn — hlavné okno nič neprekrýva
+      // verdikt namiesto ROUND n v hud-turn - hlavné okno nič neprekrýva
       let verdict, cls;
       if (winner === "draw")        { verdict = "TIE"; cls = "tie"; }
       else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
@@ -3852,12 +3920,12 @@ function showGameOverSequence(winner) {
       const ser = serverGameResult?.series || state?.series;
       let scoreLine = "";
       if (ser && ser.format && ser.format !== "single") {
-        // skóre drží strany (ľavá : pravá), rovnako ako koruny v HUD — nie „ja : oponent"
+        // skóre drží strany (ľavá : pravá), rovnako ako koruny v HUD - nie „ja : oponent"
         scoreLine = `<span class="go-verdict tie">${ser.winsP1 ?? 0} : ${ser.winsP2 ?? 0}</span>`;
         renderSeriesCrowns(ser); // dokresli finálne koruny (server po match_over už neposiela state)
       }
       if (hudTurn) hudTurn.innerHTML = `GAME OVER<span class="go-verdict ${cls}">${verdict}</span>${scoreLine}`;
-      // uprac overlay z poslednej akcie (special/melee cast) — po game over ho už renderGrid neuprace
+      // uprac overlay z poslednej akcie (special/melee cast) - po game over ho už renderGrid neuprace
       actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
       luffyCenterRemove();
       // víťazova postavička spamuje cast animáciu priamo na svojom políčku (žiadny extra sprite)
@@ -3867,7 +3935,7 @@ function showGameOverSequence(winner) {
   }, waitAttack);
 }
 
-// animácia konca hry (smrť porazeného + víťazstvo) bez finálneho overlayu — pre medzihru série
+// animácia konca hry (smrť porazeného + víťazstvo) bez finálneho overlayu - pre medzihru série
 function playGameEndAnim(winner, after) {
   const loser = winner === "p1" ? "p2" : (winner === "p2" ? "p1" : null);
   const now = performance.now();
@@ -3883,7 +3951,7 @@ function playGameEndAnim(winner, after) {
   }, waitAttack);
 }
 
-// medzikolová „ROUND N" animácia — round-script zostane vidieť, kým dobehne; potom callback resetuje lištu
+// medzikolová „ROUND N" animácia - round-script zostane vidieť, kým dobehne; potom callback resetuje lištu
 function playNewRoundTransition(nextTurn, done) {
   if (!roundBannerEl) { setTimeout(done, NEW_ROUND_MS); return; }
   // ak ďalšie kolo je buffnuté (Last Stand) → „FINAL ROUND" + veľký démon tile (červený okraj) pod nápisom
@@ -3905,18 +3973,18 @@ function playNewRoundTransition(nextTurn, done) {
 }
 
 /* ---------- Timeline prehrávanie ---------- */
-let playGen = 0;      // generácia prehrávania — novšia timeline zruší staršiu slučku
+let playGen = 0;      // generácia prehrávania - novšia timeline zruší staršiu slučku
 let playing = false;  // počas prehrávania neaktualizuj UI zo snapshotov a drž LOCK zamknutý
 // Jotaro THE WORLD: tsPlanning = som Jotaro a plánujem 3 zmrazené akcie (UI odomknuté, lock → timestop_actions);
 // tsFrozen = som súper a čakám zmrazený (UI zamknuté, full-screen filter). Práve jeden je aktívny počas pauzy.
 let tsPlanning = false;
 let tsFrozen = false;
-// tsActive = beží time-stop (od timestop_start po timestop_end) — počas neho zmrazíme animácie VŠETKÝCH
+// tsActive = beží time-stop (od timestop_start po timestop_end) - počas neho zmrazíme animácie VŠETKÝCH
 // okrem Jotara (tsJotaroSlot); tsFreezeAt = čas zmrazenia (statický drawT pre zmrazené figúry)
 let tsActive = false;
 let tsJotaroSlot = null;
 let tsFreezeAt = 0;
-// round-script beat counts — MODULOVÉ, aby prežili pauzu THE WORLD: pokračovacia timeline pokračuje
+// round-script beat counts - MODULOVÉ, aby prežili pauzu THE WORLD: pokračovacia timeline pokračuje
 // v číslovaní beatov (kurzor tak po obnovení času skočí na správnu ĎALŠIU akciu, nie na začiatok lišty)
 let roundBeatCounts = { p1: 0, p2: 0 };
 let tsResumePending = false; // ďalšia timeline je pokračovanie po THE WORLD → NEresetuj beat counts
@@ -3928,10 +3996,10 @@ function schedulePlayTimeline(timeline) {
   playing = true;
   // Jotaro THE WORLD: nová timeline (vrátane pokračovacej po zmrazení) = pauza sa skončila; overlay + ts-queue
   // + stredový Special_3_P skry (u súpera to je moment „Jotaro klikol EXECUTE"); filter body.timestop-mode
-  // nechaj — pokračovacia timeline ho zhasne až efektom timestop_end
+  // nechaj - pokračovacia timeline ho zhasne až efektom timestop_end
   tsPlanning = false; tsFrozen = false; tsOverlaySet(false); hideTsQueue(); hideWorldCenter();
   hideConnError();  // kolo sa vyhodnotilo → prípadná hláška o chybe spojenia je už neaktuálna
-  stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) — zhasni prípadný stale časovač
+  stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) - zhasni prípadný stale časovač
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
 
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
@@ -3942,13 +4010,13 @@ function schedulePlayTimeline(timeline) {
   actorsEl.querySelectorAll(".sun-fx, .esc-big").forEach(n => n.remove());
 
   const first = timeline[0];
-  // levelová veľkosť (Escanor pride / Vlkolakova fáza mesiaca) pred kolom — na konci prehrávania porovnáme
+  // levelová veľkosť (Escanor pride / Vlkolakova fáza mesiaca) pred kolom - na konci prehrávania porovnáme
   // s novou hodnotou → float (lev ▲▼ / nová fáza mesiaca)
   const lvlOf = (a) => a?.char === "escanor" ? (a.pride ?? 0) : a?.char === "werewolf" ? (a.moon ?? 0) : null;
   const preLvl = { p1: lvlOf(first.p1), p2: lvlOf(first.p2) };
   const preChar = { p1: first.p1?.char || null, p2: first.p2?.char || null }; // char na začiatku kola (swap ho zmení)
   // drž veľkosť podľa levelu NA ZAČIATKU kola cez celé kolo (nová veľkosť sa aplikuje až po kole, keď sa
-  // ukáže float) — inak by posledný frame (s novým levelom) zmenil veľkosť ešte pred floatom
+  // ukáže float) - inak by posledný frame (s novým levelom) zmenil veľkosť ešte pred floatom
   for (const slot of ["p1", "p2"]) if (preLvl[slot] != null) { escPrideDisplay[slot] = preLvl[slot]; escPrideDisplayChar[slot] = preChar[slot]; }
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
   const playStarter = first.starter ?? state?.starter ?? "p1";
@@ -3957,7 +4025,7 @@ function schedulePlayTimeline(timeline) {
   if (!tsResumePending) roundBeatCounts = { p1: 0, p2: 0 };
   tsResumePending = false;
   const beatCounts = roundBeatCounts;
-  // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) — keď príde "invalid", prečiarkneme ju
+  // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) - keď príde "invalid", prečiarkneme ju
   const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
   state.tiles = first.tiles; state.iks = first.iks; state.pending = first.pending;
@@ -3984,7 +4052,7 @@ function schedulePlayTimeline(timeline) {
   let prev = first;
 
   const step = () => {
-    if (gen !== playGen) return; // medzitým začala novšia timeline — túto slučku ukonči
+    if (gen !== playGen) return; // medzitým začala novšia timeline - túto slučku ukonči
 
     if (i >= timeline.length) {
       playing = false;
@@ -4003,7 +4071,7 @@ function schedulePlayTimeline(timeline) {
           const sl = slot;
           setTimeout(() => { escPrideDisplay[sl] = null; positionActors(state); }, 650); // potom plynulé zväčšenie/zmenšenie
         } else {
-          escPrideDisplay[slot] = null; // bez zmeny levelu — pusti hold
+          escPrideDisplay[slot] = null; // bez zmeny levelu - pusti hold
         }
       }
 
@@ -4011,7 +4079,7 @@ function schedulePlayTimeline(timeline) {
       const winner = serverWinner || serverGameResult?.gameWinner || computeWinnerFromState(state);
       if (winner) {
         clearRoundCursor();
-        // banish/summon: démon ešte chvíľu drží, potom zmizne — stredový AJ ten za postavou
+        // banish/summon: démon ešte chvíľu drží, potom zmizne - stredový AJ ten za postavou
         // (koniec hry = žiadny démon na ploche, nech už jeho animácie dopadli akokoľvek)
         setTimeout(() => { hideDeathCenter(); hideDeathBehind(); }, 700);
         if (serverGameResult && !serverGameResult.matchOver) {
@@ -4026,7 +4094,7 @@ function schedulePlayTimeline(timeline) {
       // „ROUND N" animáciu a až po nej resetuj lištu na ďalšie kolo
       const doneGen = gen;
       playNewRoundTransition(NEXT_TURN, () => {
-        if (doneGen !== playGen) return; // medzitým začalo nové prehrávanie — neresetuj
+        if (doneGen !== playGen) return; // medzitým začalo nové prehrávanie - neresetuj
         state.turn = NEXT_TURN;
         state.starter = NEXT_STARTER;
         renderHUD();
@@ -4039,7 +4107,7 @@ function schedulePlayTimeline(timeline) {
         goldenManaArmed = false;
         lastStandArmed = false;
         lastHopeArmed = false;
-        lockedIn = false; // kolo dobehlo — odomkni ovládanie
+        lockedIn = false; // kolo dobehlo - odomkni ovládanie
         resetActorFade(); // po teleporte vráť plnú viditeľnosť postáv pre ďalšie kolo
         syncGoldenHalves();
         syncGoldDualHalves();
@@ -4065,7 +4133,7 @@ function schedulePlayTimeline(timeline) {
     }
     renderHUD();
 
-    // run aj pri pohybe KLONA (animState je zdieľaný — klon zrkadlí majiteľovu animáciu)
+    // run aj pri pohybe KLONA (animState je zdieľaný - klon zrkadlí majiteľovu animáciu)
     const cloneMoved = (b, f) => !!(b?.clone && f?.clone && (b.clone.x !== f.clone.x || b.clone.y !== f.clone.y));
     // Jotarov stand pri pohybe: dash = beh za Jotarom (Run_P), MOVE = zmizne (Dead_P) na starej bunke a
     // zjaví sa (Summon_P) na novej. Blip spustíme len pri skutočnom posune (nie klon) a len pre Jotara.
@@ -4074,29 +4142,29 @@ function schedulePlayTimeline(timeline) {
       if (curAction[slot] === "dash") { standBlip[slot] = null; return; } // dash → Run_P (rieši standFileFor)
       if (before.x !== frm.x || before.y !== frm.y) standBlip[slot] = { start: performance.now(), ox: before.x, oy: before.y };
     };
-    // Luffy priťiahnutie: ťahaný súper sa NEmá rozbehnúť (nech to nevyzerá, že tam sám beží) — drž ho
+    // Luffy priťiahnutie: ťahaný súper sa NEmá rozbehnúť (nech to nevyzerá, že tam sám beží) - drž ho
     // v idle, len sa sklzne k Luffymu. Ťahaný = súper toho, kto pull vyvolal (e.from).
     const pullEff = (frame.effects || []).find(e => e.kind === "luffy_pull" && (e.from === "p1" || e.from === "p2"));
     const pulledSlot = pullEff ? (pullEff.from === "p1" ? "p2" : "p1") : null;
     if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", pulledSlot === "p1" ? "idle" : "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
     if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", pulledSlot === "p2" ? "idle" : "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
 
-    const shooters = new Set(); // basic strela — jednorazová póza
-    const casters  = new Set(); // special — looping, malá postava sa animuje súbežne s veľkým sprite-om
+    const shooters = new Set(); // basic strela - jednorazová póza
+    const casters  = new Set(); // special - looping, malá postava sa animuje súbežne s veľkým sprite-om
     let tsWait = false;         // Jotaro THE WORLD: tento frame je koniec čiastočnej timeline → pauza
     for (const e of frame.effects || []) {
-      // poistka: výnimka v JEDNOM efekte nesmie zaseknúť prehrávanie celého kola (step() beží cez setTimeout —
+      // poistka: výnimka v JEDNOM efekte nesmie zaseknúť prehrávanie celého kola (step() beží cez setTimeout -
       // neodchytený throw by reťaz natrvalo prerušil a UI by ostalo zamknuté uprostred kola)
       try {
       if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
-      // útok do steny (strela nemá kam letieť) — útočná póza sa zahrá cez `shooters`, sem len whiff float;
+      // útok do steny (strela nemá kam letieť) - útočná póza sa zahrá cez `shooters`, sem len whiff float;
       // akcia sa NEprečiarkne (minula manu a „vykonala sa"), na rozdiel od starého OFF-BOARD invalidu
       if (e.kind === "attack_swing" && e.offboard && (e.from === "p1" || e.from === "p2")) {
         const [msg, cls] = INVALID_MSG.offboard;
         spawnFloat(e.from, msg, cls);
         cloneFloat(e.from, msg, cls);
       }
-      // Escanor rieši vlastná choreografia; Jotaro NIE je center-cast — jeho figúra hrá Attack_2 a útok
+      // Escanor rieši vlastná choreografia; Jotaro NIE je center-cast - jeho figúra hrá Attack_2 a útok
       // vizuálne vedie stand (nižšie), preto sem nepridávaj ani jeho `special` (Special 2 po THE WORLD)
       if (e.kind === "special" && e.from && state?.[e.from]?.char !== "escanor" && state?.[e.from]?.char !== "jotaro") casters.add(e.from);
       // Jotarov Special 2 (po THE WORLD): figúra hrá Attack_2, stand Special_2_P, VYMENIA si pozície (swap)
@@ -4113,100 +4181,100 @@ function schedulePlayTimeline(timeline) {
         if (e.dir === "left" || e.dir === "right") facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
       // Jotaro THE WORLD: cast → menace (Special_3_P) hrá v NORMÁLNYCH farbách; čas sa zamrazí (filter +
-      // zmrazenie animácií) AŽ po dohraní menace — pri timestop_wait v enterTimestopMode. wait → pauza;
+      // zmrazenie animácií) AŽ po dohraní menace - pri timestop_wait v enterTimestopMode. wait → pauza;
       // ts_hit/ts_mirror → announce float nad zmrazeným súperom (bez zmeny HP); end → vypni filter
       if (e.kind === "timestop_start" && (e.from === "p1" || e.from === "p2")) {
-        spawnWorldCenter(e.from); // veľký stredový „menace" sprite (Special_3_P) — hrá až kým nezastane
+        spawnWorldCenter(e.from); // veľký stredový „menace" sprite (Special_3_P) - hrá až kým nezastane
       }
       if (e.kind === "timestop_wait") tsWait = true;
       if (e.kind === "ts_hit" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, `-${e.dmg} HP`, "ts-float");
       if (e.kind === "ts_mirror" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, "MIRRORED", "ts-float");
       if (e.kind === "timestop_end") {
         document.body.classList.remove("timestop-mode");
-        tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // čas sa rozbehol — animácie zas bežia
+        tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // čas sa rozbehol - animácie zas bežia
       }
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení; diagonály podľa
-      // horizontálnej zložky — Countess/Onre strieľajú šikmo)
+      // horizontálnej zložky - Countess/Onre strieľajú šikmo)
       if (e.kind === "charge" && typeof e.dir === "string" && (e.from === "p1" || e.from === "p2")) {
         const sx = e.dir.includes("left") ? -1 : e.dir.includes("right") ? 1 : 0;
         if (sx) facingOverride[e.from] = { sx, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Medúzin/Escanorov special má smer — počas castu je otočená v smere pohľadu, nie na súpera
+      // Medúzin/Escanorov special má smer - počas castu je otočená v smere pohľadu, nie na súpera
       if (e.kind === "special" && (e.dir === "left" || e.dir === "right") && (e.from === "p1" || e.from === "p2")) {
         facingOverride[e.from] = { sx: e.dir === "left" ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Vlkolak: rozbehový cast aj beh charge — otočený v horizontálnom smere behu (diagonály vrátane)
+      // Vlkolak: rozbehový cast aj beh charge - otočený v horizontálnom smere behu (diagonály vrátane)
       if ((e.kind === "special" || e.kind === "wolf_charge") && (e.from === "p1" || e.from === "p2")
           && state?.[e.from]?.char === "werewolf" && typeof e.dir === "string") {
         const sx = e.dir.includes("left") ? -1 : e.dir.includes("right") ? 1 : 0;
         if (sx) facingOverride[e.from] = { sx, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Vlkolakov beh po doske (charge special) — Run+Attack namiesto bežného Run (auto-run z posunu
+      // Vlkolakov beh po doske (charge special) - Run+Attack namiesto bežného Run (auto-run z posunu
       // pozície beží pred efektmi, tu ho prepíšeme)
       if (e.kind === "wolf_charge" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "wolfrun", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
-      // Vlkolakovo seknutie na bunke terča (Attack_2) — dmg/block/odraz padne až po tomto frame
+      // Vlkolakovo seknutie na bunke terča (Attack_2) - dmg/block/odraz padne až po tomto frame
       if (e.kind === "wolf_strike" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "wolfstrike", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
-      // Countess/Onre: beh melee-charge (Run) — otočenie podľa horizontálnej zložky smeru
+      // Countess/Onre: beh melee-charge (Run) - otočenie podľa horizontálnej zložky smeru
       if (e.kind === "vamp_charge" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "vamprun", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
         const sx = e.dir === "left" ? -1 : e.dir === "right" ? 1 : 0;
         if (sx) facingOverride[e.from] = { sx, until: performance.now() + frameHold + POSE_TAIL_MS };
       }
-      // Countess/Onre: seknutie na bunke terča — po dobehnutí charge alebo po teleporte pasce.
-      // Anim hint zo servera: Countess = va1 (A1 — krvavý bolt zapečený vo framoch, žiadne extra FX),
+      // Countess/Onre: seknutie na bunke terča - po dobehnutí charge alebo po teleporte pasce.
+      // Anim hint zo servera: Countess = va1 (A1 - krvavý bolt zapečený vo framoch, žiadne extra FX),
       // Onre trap = vattack1 (Attack_1), Onre charge = default vampstrike (alias Attack_3)
       if (e.kind === "vamp_strike" && (e.from === "p1" || e.from === "p2")) {
         const key = e.anim && ANIM_DEF[e.anim] ? e.anim : "vampstrike";
         setAnim(e.from, key, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
-      // Countess: liečivé beaty po dopadnutom melee/trap dmg (A2 → A3 → A4, krvavé efekty vo framoch) —
+      // Countess: liečivé beaty po dopadnutom melee/trap dmg (A2 → A3 → A4, krvavé efekty vo framoch) -
       // HP sa doplnia až po nich
       if (e.kind === "vamp_heal_cast" && (e.from === "p1" || e.from === "p2")) {
         const key = e.anim && ANIM_DEF[e.anim] ? e.anim : "va2";
         setAnim(e.from, key, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
       }
-      // pasca položená — značku kreslí renderGrid zo state[slot].trap; float vidí len caster
+      // pasca položená - značku kreslí renderGrid zo state[slot].trap; float vidí len caster
       // (súperovi server trap_set efekt aj trap v dátach rediguje)
       if (e.kind === "trap_set" && Array.isArray(e.cell)) {
         spawnCellFloat(e.cell, "🩸 TRAP SET", "trap-float");
       }
-      // trigger pasce — bunka sa rozžiari (trap-flash rieši renderGrid), float vidia OBAJA
+      // trigger pasce - bunka sa rozžiari (trap-flash rieši renderGrid), float vidia OBAJA
       if (e.kind === "trap_trigger" && Array.isArray(e.cell)) {
         spawnCellFloat(e.cell, "🩸 TRAP!", "trap-float");
       }
-      // zničenie pasce (vlastný vstup castera / petrifikovaný caster / rituálna smrť) — vidia OBAJA:
+      // zničenie pasce (vlastný vstup castera / petrifikovaný caster / rituálna smrť) - vidia OBAJA:
       // súper sa dozvedá, že riziko pasce pominulo
       if (e.kind === "trap_break" && Array.isArray(e.cell)) {
         spawnTrapBreak(e.cell);
       }
-      // teleport pasce: caster zmizne na svojej bunke (OUT — pozícia sa mení až IN frame-om)…
-      // oblak je krvavočervený (blood=true) — téma Vampire/Onryō, nie Narutov biely dym
+      // teleport pasce: caster zmizne na svojej bunke (OUT - pozícia sa mení až IN frame-om)…
+      // oblak je krvavočervený (blood=true) - téma Vampire/Onryō, nie Narutov biely dym
       if (e.kind === "trap_tp_out" && (e.from === "p1" || e.from === "p2")) {
         const p = state?.[e.from];
         if (p && p.x != null) spawnClonePuff([p.x, p.y], true);
         fadeActor(e.from, 1, 0, frameHold);
       }
-      // …a objaví sa na bunke pasce (IN) — pozíciu snapni (teleport nesmie kĺzať cez board);
-      // Onre sa zjavuje s výkrikom (Scream) — bez behania, rovno na bunke pasce
+      // …a objaví sa na bunke pasce (IN) - pozíciu snapni (teleport nesmie kĺzať cez board);
+      // Onre sa zjavuje s výkrikom (Scream) - bez behania, rovno na bunke pasce
       if (e.kind === "trap_tp_in" && (e.from === "p1" || e.from === "p2")) {
         positionActors(state, true);
         const p = state?.[e.from];
         if (p && p.x != null) spawnClonePuff([p.x, p.y], true);
         fadeActor(e.from, 0, 1, frameHold);
-        // zjavenie bez behania: Onre s výkrikom (Scream), Countess v idle — zruš auto-run z posunu pozície
+        // zjavenie bez behania: Onre s výkrikom (Scream), Countess v idle - zruš auto-run z posunu pozície
         if (state?.[e.from]?.char === "onre") setAnim(e.from, "scream", frameHold);
         else setAnim(e.from, "idle");
       }
-      // trigger bez many na útok — teleport prebehol, úder nepadol (LOW MANA float bez prečiarknutia)
+      // trigger bez many na útok - teleport prebehol, úder nepadol (LOW MANA float bez prečiarknutia)
       if (e.kind === "trap_no_mana" && (e.target === "p1" || e.target === "p2")) {
         const [msg, cls] = INVALID_MSG.mana;
         spawnFloat(e.target, msg, cls);
@@ -4218,9 +4286,9 @@ function schedulePlayTimeline(timeline) {
           setTimeout(() => bar.classList.remove("low-warn"), 1000);
         }
       }
-      // Onre: drain many — súperovi ČERVENÝ „−N MANA" (strata), Onremu modrý „+N MANA" (prírastok);
+      // Onre: drain many - súperovi ČERVENÝ „−N MANA" (strata), Onremu modrý „+N MANA" (prírastok);
       // rovnaké znenie ako gain float, nech je z textu aj farby jasné, komu efekt patrí. Prírastok je
-      // oneskorený — po charge stoja obaja na TEJ ISTEJ bunke a floaty by sa prekryli; takto sa číta
+      // oneskorený - po charge stoja obaja na TEJ ISTEJ bunke a floaty by sa prekryli; takto sa číta
       // sekvencia „súper stráca → Onryō získava"
       if (e.kind === "mana_drain" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, `−${e.drained ?? 0} MANA`, "drain-float");
@@ -4234,13 +4302,13 @@ function schedulePlayTimeline(timeline) {
           facingOverride[e.from] = { sx: tcell[0] < px ? -1 : 1, until: performance.now() + frameHold + POSE_TAIL_MS };
         }
       }
-      // Vojak: mierenie — slabý laser sight z hlavne na zvolenú bunku + pulzujúci terčík; laser zhasne
+      // Vojak: mierenie - slabý laser sight z hlavne na zvolenú bunku + pulzujúci terčík; laser zhasne
       // v momente výšľahu na konci cast framu (veľký sprite rieši raf cez dataset.soldierAim)
       if (e.kind === "special" && (e.from === "p1" || e.from === "p2") && state?.[e.from]?.char === "soldier") {
         spawnSoldierAim(e.from, Array.isArray(e.cells) ? e.cells[0] : null, frameHold);
       }
       // Vojak: po výstrele letí zo zbrane tenký červený lúč na zvolenú bunku + výbuch;
-      // zásah (hit/block/mirror frame) padne až po tomto frame — server drží SOLDIER_BEAM_MS
+      // zásah (hit/block/mirror frame) padne až po tomto frame - server drží SOLDIER_BEAM_MS
       if (e.kind === "soldier_beam" && (e.from === "p1" || e.from === "p2")) {
         spawnSoldierBeam(e.from, e.cell, frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
@@ -4254,16 +4322,16 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
-        // (Countess sem už nechodí — jej center melee je jednotný vamp_strike s A1)
+        // (Countess sem už nechodí - jej center melee je jednotný vamp_strike s A1)
         setAnim(e.from, state?.[e.from]?.char === "medusa" ? "attack1_loop" : "attack2_loop", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
-        // Jotaro: figúra hrá Attack_2, stand Attack_2_P, VYMENIA si pozície (swap) — bez veľkého center overlayu
+        // Jotaro: figúra hrá Attack_2, stand Attack_2_P, VYMENIA si pozície (swap) - bez veľkého center overlayu
         if (state?.[e.from]?.char === "jotaro") standAttack[e.from] = { file: "Attack_2_P.png", until: performance.now() + frameHold + POSE_TAIL_MS };
       }
       if (e.kind === "hit" && (e.target === "p1" || e.target === "p2")) {
         setAnim(e.target, "hurt", frameHold);
         // POWER tile bonus: extra dmg z tile ide ako SAMOSTATNÝ zlatý „⚡-2" float (hlavný float ukazuje
-        // základ bez bonusu, HP samozrejme klesli o súčet) — bonus je v e.dmg/e.parts[0] už zarátaný
+        // základ bez bonusu, HP samozrejme klesli o súčet) - bonus je v e.dmg/e.parts[0] už zarátaný
         const bonus = (typeof e.bonus === "number" && e.bonus > 0) ? e.bonus : 0;
         // stacknutý Naruto+klon = súbežné zásahy spojené do jedného úderu → vypíš rozpis „-3 -3 HP"
         if (Array.isArray(e.parts) && e.parts.length > 1 && e.parts.reduce((a, b) => a + b, 0) > 0) {
@@ -4276,9 +4344,9 @@ function schedulePlayTimeline(timeline) {
         if (bonus) { const tgt = e.target; setTimeout(() => spawnFloat(tgt, `⚡ -${bonus}`, "power-float"), 280); }
       }
       if (e.kind === "invalid" && (e.target === "p1" || e.target === "p2")) {
-        // flinch (nie hurt) — klon ho zrkadlí, takže pri neplatnej akcii trhnú obaja Naruti rovnako
+        // flinch (nie hurt) - klon ho zrkadlí, takže pri neplatnej akcii trhnú obaja Naruti rovnako
         setAnim(e.target, "flinch", frameHold);
-        // nevykonaná akcia — prečiarkni práve zaznamenaný badge (log) aj beat (lišta) jemným červeným ✕
+        // nevykonaná akcia - prečiarkni práve zaznamenaný badge (log) aj beat (lišta) jemným červeným ✕
         const acted = lastActed[e.target];
         if (acted) {
           acted.logEl?.classList.add("act-invalid");
@@ -4287,8 +4355,8 @@ function schedulePlayTimeline(timeline) {
         // vždy zobraz dôvod (aj neznámy → default), nech žiadna nevykonaná akcia nie je „tichá“
         const [msg, cls] = INVALID_MSG[e.reason] || INVALID_MSG_DEFAULT;
         spawnFloat(e.target, msg, cls);
-        cloneFloat(e.target, msg, cls); // rovnaká hláška nad klonom — nesmie prezradiť, ktorý je pravý
-        // nedostatok many — navyše výrazná výstraha: bliknutie mana baru v HUD
+        cloneFloat(e.target, msg, cls); // rovnaká hláška nad klonom - nesmie prezradiť, ktorý je pravý
+        // nedostatok many - navyše výrazná výstraha: bliknutie mana baru v HUD
         if (e.reason === "mana") {
           const bar = e.target === "p1" ? hudP1Mana : hudP2Mana;
           if (bar) {
@@ -4299,14 +4367,14 @@ function schedulePlayTimeline(timeline) {
           }
         }
       }
-      // náraz do steny — figúra (Naruto ALEBO jeho klon), ktorá sa daným smerom nedá pohnúť, sa strhne
+      // náraz do steny - figúra (Naruto ALEBO jeho klon), ktorá sa daným smerom nedá pohnúť, sa strhne
       // k stene + OUT OF BOUNDS; tá druhá sa medzitým pohla. e.clone === true → náraz je na klonovi.
       if (e.kind === "wall_bump" && (e.from === "p1" || e.from === "p2")) {
         const onClone = e.clone === true;
         const el = onClone ? cloneEls[e.from] : (e.from === "p1" ? actorP1 : actorP2);
-        // aj diagonálne smery — vlkolakov charge do steny z okrajovej bunky (wall pravidlo)
+        // aj diagonálne smery - vlkolakov charge do steny z okrajovej bunky (wall pravidlo)
         const d = WOLF_DIRS_CLIENT[e.dir] || [0,0];
-        // translate sa skladá „add" na základný transform (translateX(shift) scaleX(scale)) — scaleX prevracia X,
+        // translate sa skladá „add" na základný transform (translateX(shift) scaleX(scale)) - scaleX prevracia X,
         // preto horizontálny náraz násobíme znamienkom facingu, aby smeroval do skutočnej steny
         const scale = computeFacing(state?.p1, state?.p2)[e.from] || 1;
         const nx = d[0] * 14 * scale, ny = d[1] * 14;
@@ -4335,7 +4403,7 @@ function schedulePlayTimeline(timeline) {
           setAnim(e.from, e.luffyForm === "gear3" ? "luffypump" : "luffydeflate", frameHold);
           if (e.luffyForm === "base" || e.luffyForm === "gear3") spawnLuffyModeFloat(e.from, e.luffyForm);
         }
-        // klon sa „nabíja" naprázdno tiež — aura+float na oboch, nech recharge neprezradí pravého
+        // klon sa „nabíja" naprázdno tiež - aura+float na oboch, nech recharge neprezradí pravého
         cloneFloat(e.from, `+${amt}`, dark ? "mana-float dark" : "mana-float");
         spawnChargeAura(e.from, false, false, "clone", dark);
       }
@@ -4372,7 +4440,7 @@ function schedulePlayTimeline(timeline) {
       // gear3 special: dogúľal sa na bunku → guľa sa „rozbalí" cez Special_2 (radiálne päste) a HNEĎ potom
       // je tam už len idle Luffy (impact 3f @ 8fps ≈ 375 ms, potom setAnim revertne na idle). dmg rieši applyHit.
       if (e.kind === "luffy_explode" && (e.from === "p1" || e.from === "p2")) {
-        luffyCenterRemove(); // poistka — stredový sprite je preč pred výbuchom
+        luffyCenterRemove(); // poistka - stredový sprite je preč pred výbuchom
         setAnim(e.from, "luffyimpact", 380); // guľa prehrá Special_2 raz, hneď potom idle
       }
       // base special cvaknutie NA cieľovej bunke: zásah → zastaví na cvaknutí (luffychomphit),
@@ -4382,14 +4450,14 @@ function schedulePlayTimeline(timeline) {
         luffyCenterRemove(); // base: stredový hero-shot zmizne pri cvaknutí NA bunke
       }
       // Luffy priťiahnutie: rovnaká ruka sa prehodí na úchop (L_Fist) a špička sleduje súpera z jeho
-      // pôvodnej bunky na novú (súper sa prisunie cez snapshot — CSS sklz cez --move-ms = MOVE_MS)
+      // pôvodnej bunky na novú (súper sa prisunie cez snapshot - CSS sklz cez --move-ms = MOVE_MS)
       if (e.kind === "luffy_pull" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "luffyrocketpull", frameHold); // telo: ruka reeluje späť a ťahá súpera k Luffymu
         const d = WOLF_DIRS_CLIENT[e.dir] || [1, 0];
         if (Array.isArray(e.fromCell) && Array.isArray(e.toCell))
           luffyGiantPull(e.fromCell, e.toCell, d, MOVE_MS);
       }
-      // Fire Wizard skonzumoval Damage dlaždicu (boost zo specialu) / caster POWER tile — krátky flare na bunke
+      // Fire Wizard skonzumoval Damage dlaždicu (boost zo specialu) / caster POWER tile - krátky flare na bunke
       if (e.kind === "tile_consume" && Array.isArray(e.cell)) {
         spawnTileConsumeFx(e.cell, e.tile);
       }
@@ -4397,7 +4465,7 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "wanderer_no_regen" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, "🪞 MIRROR USED", "wander-nomana-float");
       }
-      // skamenený ťah — akcia sa nevykonala: prečiarkni práve zaznamenaný badge/beat + STONED float
+      // skamenený ťah - akcia sa nevykonala: prečiarkni práve zaznamenaný badge/beat + STONED float
       if (e.kind === "stoned" && (e.target === "p1" || e.target === "p2")) {
         const acted = lastActed[e.target];
         if (acted) {
@@ -4406,30 +4474,30 @@ function schedulePlayTimeline(timeline) {
         }
         spawnFloat(e.target, "🗿 STONED", "stone-float");
       }
-      // zásah Medúziným specialom — postava skamenie (sivú sochu kreslí raf zo state.stone)
+      // zásah Medúziným specialom - postava skamenie (sivú sochu kreslí raf zo state.stone)
       if (e.kind === "petrify" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, "🗿 PETRIFIED", "stone-float");
       }
-      // odkamenenie — socha sa roztrieští (kamenné úlomky) namiesto obyčajného prebliku späť do normálu
+      // odkamenenie - socha sa roztrieští (kamenné úlomky) namiesto obyčajného prebliku späť do normálu
       if (e.kind === "unpetrify" && (e.target === "p1" || e.target === "p2")) {
         spawnStoneShatter(e.target);
       }
-      // Minotaurov special — zasiahnutý blúdi v labyrinte (hmlu/niť kreslí renderGrid zo state.labyrinth/thread)
+      // Minotaurov special - zasiahnutý blúdi v labyrinte (hmlu/niť kreslí renderGrid zo state.labyrinth/thread)
       if (e.kind === "labyrinth" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, "🌀 LOST IN THE LABYRINTH", "maze-float");
       }
-      // vzájomný zásah — labyrint končí, board sa prekliatemu odhalí (stav to už nesie, float len ohlási)
+      // vzájomný zásah - labyrint končí, board sa prekliatemu odhalí (stav to už nesie, float len ohlási)
       if (e.kind === "labyrinth_end" && (e.target === "p1" || e.target === "p2")) {
         spawnFloat(e.target, "🌀 ESCAPED THE LABYRINTH", "maze-float");
       }
-      // istý zásah ukončí labyrint — server odhalil všetko už PRED animáciou akcie (frame nesie plné dáta):
+      // istý zásah ukončí labyrint - server odhalil všetko už PRED animáciou akcie (frame nesie plné dáta):
       // skrytý súper sa prekliatemu zjaví z tmy (fade ako démon/teleport), widget sa odkryl cez state.labReveal
       if (e.kind === "labyrinth_reveal" && (e.target === "p1" || e.target === "p2")) {
         if (me === e.target) fadeActor(otherSlot(), 0, 1, frameHold);
         spawnFloat(e.target, "🌀 REVEALED!", "maze-float");
       }
-      // súper vstúpil na Ariadninu niť — perzistentný obrys kreslí raf zo state.threadMark; navyše
-      // preblik obrysu na KAŽDEJ prejdenej niťovej bunke — okrem mojej vlastnej (tam lovca vidím naživo/lit,
+      // súper vstúpil na Ariadninu niť - perzistentný obrys kreslí raf zo state.threadMark; navyše
+      // preblik obrysu na KAŽDEJ prejdenej niťovej bunke - okrem mojej vlastnej (tam lovca vidím naživo/lit,
       // ten sa rieši fade-om v raf, nie preblikom). Žiadne textové/emoji floaty.
       if (e.kind === "thread_mark" && Array.isArray(e.cell)) {
         if (me === e.target) {
@@ -4442,39 +4510,39 @@ function schedulePlayTimeline(timeline) {
       }
       if (e.kind === "shield" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🛡️ SHIELD", "shield-float");
-        cloneFloat(e.from, "🛡️ SHIELD", "shield-float"); // klon „bráni" tiež — float nesmie prezradiť pravého
+        cloneFloat(e.from, "🛡️ SHIELD", "shield-float"); // klon „bráni" tiež - float nesmie prezradiť pravého
       }
       if (e.kind === "mirror_on" && (e.from === "p1" || e.from === "p2")) {
         spawnFloat(e.from, "🪞 MIRROR", "shield-float");
         cloneFloat(e.from, "🪞 MIRROR", "shield-float");
       }
-      // Naruto: summon klona — postava + 1 kópia na tej istej bunke tvárou v tvár hrajú Special_2
+      // Naruto: summon klona - postava + 1 kópia na tej istej bunke tvárou v tvár hrajú Special_2
       if (e.kind === "clone_summon" && (e.from === "p1" || e.from === "p2")) {
         setAnim(e.from, "special2", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
         spawnCloneSummonFx(e.from, e.cell, frameHold);
       }
       if (e.kind === "clone_born" && (e.from === "p1" || e.from === "p2") && Array.isArray(e.cell)) {
-        cloneDead[e.from] = false; // nový klon žije — zruš „mŕtvy" príznak
+        cloneDead[e.from] = false; // nový klon žije - zruš „mŕtvy" príznak
         spawnCellFloat(e.cell, "👥 SHADOW CLONE", "maze-float");
       }
-      // klon zasiahnutý — puffne v OBLAKU DYMU a natrvalo zmizne (žiadny problik späť)
+      // klon zasiahnutý - puffne v OBLAKU DYMU a natrvalo zmizne (žiadny problik späť)
       if (e.kind === "clone_die" && (e.target === "p1" || e.target === "p2")) {
         cloneDead[e.target] = true;           // positionActors ho odteraz drží skrytého
         const cEl = cloneEls[e.target];
         if (cEl) { cEl.getAnimations().forEach(a => a.cancel()); cEl.style.display = "none"; } // sprite hneď preč (dym ho prekryje)
         if (Array.isArray(e.cell)) spawnClonePuff(e.cell);
       }
-      // kozmetický tile dmg na klonovi (dmg tile klona nezabíja) — klon sa MUSÍ strhnúť a floatnúť ako pravý,
+      // kozmetický tile dmg na klonovi (dmg tile klona nezabíja) - klon sa MUSÍ strhnúť a floatnúť ako pravý,
       // inak by „nezraniteľná" figúrka prezradila, ktorý je klon. Súperovi ukáž „-N HP" (bluff = ako pravý zásah),
-      // vlastnému hráčovi „-N" (pravda — je to len kozmetika, HP mu neklesá).
+      // vlastnému hráčovi „-N" (pravda - je to len kozmetika, HP mu neklesá).
       if (e.kind === "clone_hit" && Array.isArray(e.cell) && (e.target === "p1" || e.target === "p2")) {
         const ownerView = me === e.target;
         spawnCellFloat(e.cell, ownerView ? `-${e.dmg ?? 1}` : `-${e.dmg ?? 1} HP`, "dmg-float");
         cloneFlinch[e.target] = performance.now();
       }
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
-        // odraz na KLONOVI (e.cell) vychádza z klonovej bunky, nie z pravého Naruta — inak by prezradil skutočného
+        // odraz na KLONOVI (e.cell) vychádza z klonovej bunky, nie z pravého Naruta - inak by prezradil skutočného
         // e.destCell: útok vystrelil útočníkov klon → odraz letí DO klonovej bunky (nie do pravého útočníka)
         spawnMirrorReflect(e.target, e.dmg, e.atk, !!e.gold, Array.isArray(e.cell) ? e.cell : null,
           Array.isArray(e.destCell) ? e.destCell : null);
@@ -4482,12 +4550,12 @@ function schedulePlayTimeline(timeline) {
         else spawnFloat(e.target, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
       }
       if (e.kind === "golden_shield" && (e.from === "p1" || e.from === "p2")) {
-        // navonok je to SHIELD, len zlatý — "golden shield" je interné pomenovanie
+        // navonok je to SHIELD, len zlatý - "golden shield" je interné pomenovanie
         spawnFloat(e.from, "🛡️ SHIELD", "golden-float");
         cloneFloat(e.from, "🛡️ SHIELD", "golden-float"); // klon nesmie prezradiť pravého
       }
       if (e.kind === "golden_mirror" && (e.from === "p1" || e.from === "p2")) {
-        // navonok je to MIRROR, len zlatý (predťah) — odraz padne neskôr cez mirror frame
+        // navonok je to MIRROR, len zlatý (predťah) - odraz padne neskôr cez mirror frame
         spawnFloat(e.from, "🪞 MIRROR", "golden-float");
         cloneFloat(e.from, "🪞 MIRROR", "golden-float");
       }
@@ -4498,16 +4566,16 @@ function schedulePlayTimeline(timeline) {
         spawnChargeAura(e.from, true, false, "clone"); // zlatá aura aj na klonovi
         if (e.hpCost) spawnDamageFloat(e.from, e.hpCost); // HP cena golden many ostáva viditeľná
       }
-      // Last Stand — FRAME-DRIVEN: každá fáza je efekt vo svojom frame; WAAPI trvanie = frameHold (= delayMs),
+      // Last Stand - FRAME-DRIVEN: každá fáza je efekt vo svojom frame; WAAPI trvanie = frameHold (= delayMs),
       // takže to v pozadí pauzne/dobehne rovnako ako timeline. HP sa hýbe zo snapshotov (drain/rise), nie lokálne.
-      // Démon útok (buffnutý hráč): veľký démon v strede je jediná show — postavička stojí v idle (žiadna casting póza)
+      // Démon útok (buffnutý hráč): veľký démon v strede je jediná show - postavička stojí v idle (žiadna casting póza)
       if (e.kind === "demon_summon" && (e.from === "p1" || e.from === "p2")) {
         demonCenterAppear();
       }
       if (e.kind === "demon_center_out" && (e.from === "p1" || e.from === "p2")) {
         demonCenterDisappear();
       }
-      // Teleport (výmena maga) — dvojfázovo, postava fade-uje plynulo (ako démon):
+      // Teleport (výmena maga) - dvojfázovo, postava fade-uje plynulo (ako démon):
       // OUT: starý mág plynulo MIZNE (1→0), IN: nový sa plynulo OBJAVUJE (0→1).
       // Explózia je v OBOCH fázach rovnako semi-transparentná (0.75), nech pôsobí konzistentne.
       if (e.kind === "teleport_out" && (e.from === "p1" || e.from === "p2")) {
@@ -4534,7 +4602,7 @@ function schedulePlayTimeline(timeline) {
         lsCenterDisappear(); // stredový démon zmizne (smrť/ležanie rieši st.down v raf)
       }
       if (e.kind === "last_stand_revive" && (e.from === "p1" || e.from === "p2")) {
-        // démon sa objaví ZA postavou — opacity cez CSS transition (0→1); počas revive/rise hráč LEŽÍ (st.down=true),
+        // démon sa objaví ZA postavou - opacity cez CSS transition (0→1); počas revive/rise hráč LEŽÍ (st.down=true),
         // takže raf sa démona nedotýka. Settle (down=false) potom v rafe plynulo stmaví na 0.25.
         _lsBanishing = false;
         placeDeathBehind(e.from);
@@ -4571,7 +4639,7 @@ function schedulePlayTimeline(timeline) {
         lsCenterDisappear(); // smrť/ležanie rieši st.down v raf
       }
       if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) {
-        // THE WORLD zmrazená akcia (frozen) — len ju animuj na boarde; round-script kurzor ostáva na THE WORLD
+        // THE WORLD zmrazená akcia (frozen) - len ju animuj na boarde; round-script kurzor ostáva na THE WORLD
         // (nezaráta sa do beatCounts/logu), tracker tak počas celého time-stopu stojí na akcii THE WORLD
         if (!e.frozen) {
           const logEl  = appendActionLog(e.from, e.action);
@@ -4581,7 +4649,7 @@ function schedulePlayTimeline(timeline) {
         // zapamätaj typ akcie (Jotarov stand rozlišuje move → blip vs dash → beh za Jotarom)
         if (e.from === "p1" || e.from === "p2") curAction[e.from] = e.action?.type || null;
       }
-      // prázdny gold beat (golden shield/mirror = pos 0, golden mana = 7/8) — len posuň zelenú šípku naň
+      // prázdny gold beat (golden shield/mirror = pos 0, golden mana = 7/8) - len posuň zelenú šípku naň
       if (e.kind === "beat_empty" && (e.from === "p1" || e.from === "p2")) {
         const pos = e.beat === "lhope" ? 9 : e.beat === "gpre" ? 0 : (e.from === playStarter) ? 7 : 8;
         qBeatEls.forEach(x => x && x.classList.remove("q-now"));
@@ -4593,7 +4661,7 @@ function schedulePlayTimeline(timeline) {
         }
       }
       if (e.kind === "block" && (e.target === "p1" || e.target === "p2")) {
-        // block na KLONOVI (e.cell) sa ukáže na klonovej bunke — zdieľaný štít sa rozbije na oboch figúrach
+        // block na KLONOVI (e.cell) sa ukáže na klonovej bunke - zdieľaný štít sa rozbije na oboch figúrach
         const bcell = Array.isArray(e.cell) ? e.cell : null;
         spawnShieldBlock(e.target, !!e.gold, bcell); // efektný náraz do štítu
         const bcls = e.gold ? "golden-float" : "block-float"; // zlatý text, ak blokoval golden shield
@@ -4601,7 +4669,7 @@ function schedulePlayTimeline(timeline) {
         else spawnFloat(e.target, "🛡️ BLOCKED", bcls);
       }
       if (e.kind === "heal" && (e.target === "p1" || e.target === "p2")) {
-        // Lightning na heal dlaždici (full-heal pasívka) — „SUPER HEAL" float
+        // Lightning na heal dlaždici (full-heal pasívka) - „SUPER HEAL" float
         if (e.super) spawnFloat(e.target, "SUPER HEAL", "superheal-float");
         else spawnFloat(e.target, `+${e.amount ?? 1} HP`, "heal-float");
       }
@@ -4609,7 +4677,7 @@ function schedulePlayTimeline(timeline) {
     }
     for (const s of ["p1", "p2"]) {
       if (casters.has(s))       { setAnim(s, "casting", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; } // special: malá postava hrá svoj efektový sprite (nie úder)
-      // Medúza strieľa s Attack_2 (krátky úder) — Attack_1 má vyhradený pre melee šľah
+      // Medúza strieľa s Attack_2 (krátky úder) - Attack_1 má vyhradený pre melee šľah
       else if (shooters.has(s)) { setAnim(s, state?.[s]?.char === "medusa" ? "attack2" : "attack", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; }
     }
 
@@ -4617,7 +4685,7 @@ function schedulePlayTimeline(timeline) {
     positionActors(state);
 
     prev = frame;
-    // Jotaro THE WORLD: čiastočná timeline skončila na timestop_wait — NEplánuj ďalší krok a NEspusti koncovú
+    // Jotaro THE WORLD: čiastočná timeline skončila na timestop_wait - NEplánuj ďalší krok a NEspusti koncovú
     // vetvu playbacku (UI sa nesmie odomknúť). Prejdi do ts-módu; pokračovacia timeline príde druhým `state`.
     if (tsWait) { playing = false; tsResumePending = true; enterTimestopMode(); return; } // pokračovanie zachová beat counts
     setTimeout(step, frame.delayMs ?? 600);
@@ -4657,31 +4725,31 @@ function clearActors() {
 function updateCharSelectHp(s) {
   charSelectHp = (s && s.mageHp) ? s.mageHp : null;
   charSelectMana = (s && s.mageMana) ? s.mageMana : null;
-  // tournament: char-select ukazuje LEN draftnutý tím — roster-mode zlúči obe stránky (display:contents)
+  // tournament: char-select ukazuje LEN draftnutý tím - roster-mode zlúči obe stránky (display:contents)
   // a skryje karty mimo tímu + placeholder; kľúče mageHp = presne vlastný tím
   selEl.classList.toggle("no-paging", !!charSelectHp);
   selEl.classList.toggle("roster-mode", !!charSelectHp);
   if (charSelectHp && (charPage !== 0 || hiddenMode)) setCharPage(0); // roster-mode zatvára aj easter-egg stránku
-  // setCharPage sa pri otvorení na stránke 0 nevolá — nadpis drž v synce s režimom aj tu;
+  // setCharPage sa pri otvorení na stránke 0 nevolá - nadpis drž v synce s režimom aj tu;
   // na Hidden stránke cez setHiddenTitle (textContent by zmazal per-písmenové spany neónu)
   const titleEl = document.getElementById("char-page-title");
   if (titleEl) {
     if (hiddenMode && !charSelectHp) setHiddenTitle();
     else titleEl.textContent = charSelectHp ? "Your Team" : CHAR_PAGES[charPage].title;
   }
-  // poradie kariet = poradie draftu (rovnako ako hlavy v HUD — state.roster); stránky sú zlúčené
+  // poradie kariet = poradie draftu (rovnako ako hlavy v HUD - state.roster); stránky sú zlúčené
   // cez display:contents, takže karty sú flex itemy pageru a stačí im nastaviť `order` (1..N)
   const draftOrder = charSelectHp ? (s?.roster?.[me] || Object.keys(charSelectHp)) : null;
   selEl.querySelectorAll(".char-card").forEach((card) => {
     const key = card.dataset.char;
-    if (!key) return; // placeholder "Coming soon" — žiadne HP/dead spracovanie
+    if (!key) return; // placeholder "Coming soon" - žiadne HP/dead spracovanie
     card.classList.toggle("off-roster", !!charSelectHp && !(key in charSelectHp));
     const orderIdx = draftOrder ? draftOrder.indexOf(key) : -1;
     card.style.order = orderIdx >= 0 ? String(orderIdx + 1) : "";
     const statsEl = card.querySelector(".char-stats");
     const hpEl = card.querySelector(".char-hp");
     const manaEl = card.querySelector(".char-mana");
-    if (!charSelectHp) { // single / bo3 — žiadne HP/mana, žiadny dead stav
+    if (!charSelectHp) { // single / bo3 - žiadne HP/mana, žiadny dead stav
       card.classList.remove("dead");
       if (statsEl) statsEl.classList.add("hidden");
       return;
@@ -4732,7 +4800,7 @@ function drawEscanorCard(ctx, cvs, now) {
 
 // Hidden preview postavy (Luffy/Jotaro): bez hoveru Idle, po nadídení cast animácia RAZ a potom
 // slučka chvosta (loopFrom; frames-1 = statický posledný frame). fill dorovnáva väčší frame castu
-// na mierku Idle (drawSprite škáluje podľa výšky framu — inak by postava pri hoveri skočila);
+// na mierku Idle (drawSprite škáluje podľa výšky framu - inak by postava pri hoveri skočila);
 // obe kreslenia idú cez portraitFill (PORTRAIT_SCALE normalizuje figúru na výšku mágov).
 const PREVIEW_CAST = {
   luffy:  { file: "Special_1.png",   frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
@@ -4742,7 +4810,7 @@ const PREVIEW_CAST = {
 };
 const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
 // offsetY −39 (mágovia −52): ich pásy sú bottom-anchored s malým PAD, mágovia majú vo frame
-// väčší spodný okraj — s −52 stáli o ~13 px vyššie; −39 dorovnáva nohy na úroveň mágov (~189 px)
+// väčší spodný okraj - s −52 stáli o ~13 px vyššie; −39 dorovnáva nohy na úroveň mágov (~189 px)
 const PREVIEW_OFF_Y = -39;
 function drawPreviewCard(ctx, cvs, key, now) {
   const dir = charDirFor(key, me);
@@ -4769,12 +4837,12 @@ function drawCharSelectFrame(now) {
     const ctx = cvs.getContext("2d");
     if (key === "escanor") { drawEscanorCard(ctx, cvs, now); return; } // vlastné WeakIdle/IntroStand
     const deadRoster = isMageDead(key) && cvs.closest(".char-card")?.dataset.char; // (turnaj) mŕtvy draftnutý mág
-    // Preview štýl (Luffy/Jotaro) — ALE ak je draftnutý mág mŕtvy (turnaj), prednosť má dead póza (nižšie)
+    // Preview štýl (Luffy/Jotaro) - ALE ak je draftnutý mág mŕtvy (turnaj), prednosť má dead póza (nižšie)
     if (PREVIEW_CAST[key] && !deadRoster) { drawPreviewCard(ctx, cvs, key, now); return; }
     const dir = charDirFor(key, me); // hráč vpravo vidí Medúzu v natívnej tmavej palete (Medusa2)
     if (!dir) return;
     // mŕtvy mág (tournament): dead póza mága + death démon prekrytý cez okno karty
-    // (len skutočné hrateľné karty — preview karty Hidden stránky nemajú data-char na karte a roster stav)
+    // (len skutočné hrateľné karty - preview karty Hidden stránky nemajú data-char na karte a roster stav)
     if (deadRoster) {
       ensureSpriteMeta(dir, ANIM_DEF.dead.file)
         .then(meta => {
@@ -4784,7 +4852,7 @@ function drawCharSelectFrame(now) {
         .then(meta => {
           if (!meta) return;
           ctx.save();
-          ctx.globalAlpha = 0.5; // semi-transparentný démon — dead póza mága ostáva dobre vidno pod ním
+          ctx.globalAlpha = 0.5; // semi-transparentný démon - dead póza mága ostáva dobre vidno pod ním
           drawSprite(ctx, meta, DEATH_ANIM, now, cvs.width, cvs.height, 1.15, 0.5, false, 0, 0);
           ctx.restore();
         })
@@ -4808,12 +4876,12 @@ function drawCharSelectFrame(now) {
   if (abilityHoverChar === "werewolf") markMoonPreview(now);    // cyklí fázu mesiaca + dmg pod mini-doskou
   if (abilityHoverChar === "luffy") markLuffyPreview(now);      // cyklí mód base↔gear3 (zóna dáma/veža + dmg 4/8)
 
-  // malý castiaci mág v bunke castera mini-dosky — animácia špeciálu (efektový sprite). Jotaro je výnimka:
+  // malý castiaci mág v bunke castera mini-dosky - animácia špeciálu (efektový sprite). Jotaro je výnimka:
   // casterom na mini-doske je ON (nie stredová Star Platinum póza), takže kreslíme jeho IDLE (ukotvený na nohy,
   // normalizovaný na výšku mágov cez portraitFill).
   if (abilityHoverChar && abilityCasterCanvas && (SPECIAL_ANIMS[abilityHoverChar] || abilityHoverChar === "luffy")) {
     const dir = charDirFor(abilityHoverChar, me);
-    // Jotaro aj Luffy: casterom na mini-doske je ON — kreslíme IDLE (nie cast/efektový sprite), ukotvený na nohy
+    // Jotaro aj Luffy: casterom na mini-doske je ON - kreslíme IDLE (nie cast/efektový sprite), ukotvený na nohy
     const isIdle = abilityHoverChar === "jotaro" || abilityHoverChar === "luffy";
     const fxAnim = isIdle ? ANIM_DEF.idle : { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
     const offX = isIdle ? 0 : (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
@@ -4835,7 +4903,7 @@ function startCharSelectPreview() {
   document.getElementById("char-ability")?.classList.add("hidden");
   if (charPreviewRaf) cancelAnimationFrame(charPreviewRaf);
   charPreviewRaf = requestAnimationFrame(drawCharSelectFrame);
-  syncRosterGlitch(); // spusti glitch side-postavy — tu už je výber viditeľný (updateCharSelectHp beží kým je selEl ešte .hidden)
+  syncRosterGlitch(); // spusti glitch side-postavy - tu už je výber viditeľný (updateCharSelectHp beží kým je selEl ešte .hidden)
 }
 function stopCharSelectPreview() {
   if (charPreviewRaf) cancelAnimationFrame(charPreviewRaf);
@@ -4903,23 +4971,23 @@ const ABILITY_PREVIEW = {
   fire:      { caster: { x: 0, y: 1 }, dmg: 5, desc: `Boost range ±1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
   lightning: { caster: { x: 1, y: 1 }, dmg: 3, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
   wanderer:  { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round he doesn't use mirror +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
-  // dmg: null = bez dmg — stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
+  // dmg: null = bez dmg - stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
   medusa:    { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
   minotaur:  { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands, where you hunt with 2× dmg. Their steps weave a thread; stepping on it reveals your silhouette" },
   naruto:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
-  // Vojak: cieľová bunka je voľba hráča — náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
+  // Vojak: cieľová bunka je voľba hráča - náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
   soldier:   { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
-  // Vlkolak: charge — náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg podľa fázy
-  // mesiaca cykluje pod mini-doskou (moonCycle — ako Escanorov pride náhľad), preto žiadny effect/stats riadok
+  // Vlkolak: charge - náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg podľa fázy
+  // mesiaca cykluje pod mini-doskou (moonCycle - ako Escanorov pride náhľad), preto žiadny effect/stats riadok
   werewolf:  { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
-  // Countess/Onre: pasca — náhľad ukazuje príkladovú cieľovú bunku (target) ako Vojak
+  // Countess/Onre: pasca - náhľad ukazuje príkladovú cieľovú bunku (target) ako Vojak
   // bonus ikona (heal/drain) sa ukazuje v stats riadku pri dmg (3☠️❤️ / 3☠️💧), nie v texte popisu
-  countess:  { caster: { x: 0, y: 1 }, dmg: 3, bonus: "❤️", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
-  onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell — when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
+  countess:  { caster: { x: 0, y: 1 }, dmg: 3, bonus: "❤️", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell - when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits feed on blood; mirrors are mere shields against her" },
+  onre:      { caster: { x: 0, y: 1 }, dmg: 3, bonus: "💧", target: { x: 2, y: 0 }, desc: "A hidden trap on ANY cell - when the foe enters or crosses it, she teleports there and strikes. Charge and trap hits drain the foe's mana; mirrors are mere shields against her" },
   // Luffy: recharge prepína mód (base ↔ Gear 3). Zóna specialu (dáma base / veža gear3) + dmg (4/8) cyklí
-  // pod mini-doskou (formCycle — ako Escanorov pride / vlkolakov moon náhľad), preto žiadny effect/stats riadok.
+  // pod mini-doskou (formCycle - ako Escanorov pride / vlkolakov moon náhľad), preto žiadny effect/stats riadok.
   luffy:     { caster: { x: 1, y: 1 }, dmg: null, formCycle: true, desc: "Recharge switches Gear. Pick a cell and Luffy rolls there to smash whoever stands on it. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge." },
-  // Jotaro: THE WORLD (jednorazový time-stop) — bez konkrétnych čísel v texte (cost badge nesie 5).
+  // Jotaro: THE WORLD (jednorazový time-stop) - bez konkrétnych čísel v texte (cost badge nesie 5).
   // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
   jotaro:    { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
 };
@@ -4928,9 +4996,9 @@ function renderAbilityPreview(char) {
   if (!def || !charAbilityEl) return;
   abilityHoverChar = char; // preview loop prepne tohto mága na cyklický cast špeciálu
   const w = board.w || 4, h = board.h || 3;
-  // hráč vpravo (p2): náhľad zrkadlovo — caster pri pravom okraji, smerový special (Medúza) mieri doľava
+  // hráč vpravo (p2): náhľad zrkadlovo - caster pri pravom okraji, smerový special (Medúza) mieri doľava
   const mirror = me === "p2";
-  // secret (Hidden preview): žiadny caster ani zóna — mini-doska ostáva celá prázdna
+  // secret (Hidden preview): žiadny caster ani zóna - mini-doska ostáva celá prázdna
   const caster = (def.secret || !def.caster) ? { x: -1, y: -1 }
     : mirror ? { x: w - 1 - def.caster.x, y: def.caster.y } : def.caster;
   const dir = (mirror && def.dir) ? (def.dir === "right" ? "left" : "right") : def.dir;
@@ -4940,7 +5008,7 @@ function renderAbilityPreview(char) {
     : def.target
       ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
       : (def.formCycle && char === "luffy")
-        ? luffyHitSet(caster, "base", w, h) // Luffy: zóna dogúľania (dáma) — cyklí sa v markLuffyPreview
+        ? luffyHitSet(caster, "base", w, h) // Luffy: zóna dogúľania (dáma) - cyklí sa v markLuffyPreview
         : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
@@ -4974,7 +5042,7 @@ function renderAbilityPreview(char) {
   moonPreview = def.moonCycle ? { lvl: 0, last: 0 } : null;
   const caMoon = document.getElementById("ca-moon");
   if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
-  // Luffy: cyklenie módu base↔gear3 — zóna (dáma/veža) + badge (base.png/gear3.png) + dmg (4/8) pod mini-doskou
+  // Luffy: cyklenie módu base↔gear3 - zóna (dáma/veža) + badge (base.png/gear3.png) + dmg (4/8) pod mini-doskou
   luffyPreview = def.formCycle ? { grid, caster, form: "base", last: 0 } : null;
   const caLuffy = document.getElementById("ca-luffy");
   if (caLuffy) { caLuffy.classList.toggle("hidden", !def.formCycle); if (def.formCycle) syncCaLuffy("base"); }
@@ -4989,12 +5057,12 @@ function renderAbilityPreview(char) {
   stats.innerHTML = def.dmg != null
     ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span>${def.bonus ? `<span class="pix-ico" data-emoji="${def.bonus}"></span>` : ""}</span>` // Countess/Onre: bonus ikona (heal ❤️ / drain 💧) hneď za lebkou
     : def.effect
-      ? `<span class="ca-dmg"><span class="ca-num">${def.effect.num ?? ""}</span><span class="pix-ico" data-emoji="${def.effect.emoji ?? "✨"}"></span></span>` // bez dmg — ikona efektu (kameň/labyrint)
-      : ""; // ani dmg, ani effect (vlkolak — dmg cykluje pod mini-doskou) → žiadny stats riadok
+      ? `<span class="ca-dmg"><span class="ca-num">${def.effect.num ?? ""}</span><span class="pix-ico" data-emoji="${def.effect.emoji ?? "✨"}"></span></span>` // bez dmg - ikona efektu (kameň/labyrint)
+      : ""; // ani dmg, ani effect (vlkolak - dmg cykluje pod mini-doskou) → žiadny stats riadok
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
-// Escanor char-select: pride lev + číslo pod mini-doskou (rovnaký indikátor ako HUD widget — swap framu
+// Escanor char-select: pride lev + číslo pod mini-doskou (rovnaký indikátor ako HUD widget - swap framu
 // pride_lion_{0..3}.png, biely → celý zlatý; pri 3 pulz cez .pride-max)
 function syncCaPride(pride) {
   const el = document.getElementById("ca-pride"); if (!el) return;
@@ -5063,7 +5131,7 @@ function markEscPridePreview(now) {
     const on = hit.has(`${c.dataset.gx},${c.dataset.gy}`);
     // SYNCHRÓNNY pulz: fáza animácie sa kotví na globálne hodiny (záporný animation-delay = -(now mod 1s)),
     // inak bunky pridané pri rôznych pride leveloch blikajú každá vo vlastnej fáze. Delay sa nastavuje len
-    // pri PRIDANÍ triedy — zmena delay na bežiacej animácii by ju reštartovala každý frame.
+    // pri PRIDANÍ triedy - zmena delay na bežiacej animácii by ju reštartovala každý frame.
     if (on && !c.classList.contains("hit")) {
       c.style.animationDelay = -(now % 1000) + "ms"; // mini-hit-pulse má 1s cyklus
       c.classList.add("hit");
@@ -5079,7 +5147,7 @@ function clearAbilityPreview() {
   charAbilityEl?.classList.add("hidden");
 }
 selEl.querySelectorAll(".char-card").forEach(card => {
-  // preview karty Hidden stránky (Luffy/Jotaro) nemajú data-char na karte (neklikateľné) — kľúč nesie canvas
+  // preview karty Hidden stránky (Luffy/Jotaro) nemajú data-char na karte (neklikateľné) - kľúč nesie canvas
   const key = card.dataset.char || card.querySelector("canvas.char-canvas")?.dataset.char;
   if (!key) return; // placeholder "Coming soon"
   card.addEventListener("mouseenter", () => {
@@ -5099,13 +5167,13 @@ const charNextBtn = document.getElementById("char-page-next");
 const charPageTitle = document.getElementById("char-page-title");
 function setCharPage(p) {
   hiddenMode = false; selEl.classList.remove("hidden-mode"); stopHiddenFx(); // každé normálne stránkovanie opúšťa easter-egg stránku aj jej efekty
-  if (selEl.classList.contains("no-paging")) p = 0; // tournament — roster-mode zlúči karty, stránkovanie je vypnuté
+  if (selEl.classList.contains("no-paging")) p = 0; // tournament - roster-mode zlúči karty, stránkovanie je vypnuté
   charPage = Math.max(0, Math.min(CHAR_PAGES.length - 1, p));
   selEl.querySelectorAll(".char-cards").forEach(el =>
     el.classList.toggle("hidden", Number(el.dataset.page) !== charPage));
-  // tournament (roster-mode): stránky sú zlúčené na vlastný tím — nadpis "Your Team" namiesto názvu stránky
+  // tournament (roster-mode): stránky sú zlúčené na vlastný tím - nadpis "Your Team" namiesto názvu stránky
   if (charPageTitle) charPageTitle.textContent = selEl.classList.contains("roster-mode") ? "Your Team" : CHAR_PAGES[charPage].title;
-  // krajné šípky sú neviditeľné (visibility) — layout kariet sa pri prepnutí nehýbe
+  // krajné šípky sú neviditeľné (visibility) - layout kariet sa pri prepnutí nehýbe
   charPrevBtn?.classList.toggle("off", charPage === 0);
   charNextBtn?.classList.toggle("off", charPage === CHAR_PAGES.length - 1);
   // tooltip šípky = názov CIEĽOVEJ stránky (nie „Back")
@@ -5118,7 +5186,7 @@ charPrevBtn?.addEventListener("click", () => { if (!hiddenMode) setCharPage(char
 charNextBtn?.addEventListener("click", () => setCharPage(hiddenMode ? 0 : charPage + 1));
 
 /* ---------- Easter egg: skrytá stránka „Hidden" ---------- */
-// Runa v ľavom hornom rohu sa zjavuje podľa blízkosti kurzora — len keď je char-select viditeľný,
+// Runa v ľavom hornom rohu sa zjavuje podľa blízkosti kurzora - len keď je char-select viditeľný,
 // nejde o turnajový roster-mode (tam sa stránkovanie núti na „Your Team") a Hidden ešte nie je otvorená.
 // Klik spustí glitch prechod (cs-glitch) a uprostred neho prepne karty na blok data-page="hidden".
 // Stránka nie je v CHAR_PAGES, takže šípky sa na ňu nedostanú a setCharPage ju vždy zatvorí.
@@ -5128,7 +5196,7 @@ const RUNE_RADIUS = 260; // px od ľavého horného rohu, odkiaľ sa runa začí
 let hiddenFound = false; // po prvom objavení (localStorage) ostáva runa trvalo slabo viditeľná
 try { hiddenFound = localStorage.getItem("arenaHiddenFound") === "1"; } catch {}
 function runeActive() {
-  // turnaj: v DRAFTE (team-mode) runu PUSTÍME — side-postavu (svojej strany) si tam draftneš cez rovnaký
+  // turnaj: v DRAFTE (team-mode) runu PUSTÍME - side-postavu (svojej strany) si tam draftneš cez rovnaký
   // easter-egg ako v single/bo3 (ostáva „tajná"). Roster-mode (výber maga z už draftnutého tímu) ju nepustí:
   // tam sa side-karta zobrazuje priamo v zlúčenom rade kariet, runa je zbytočná a kolidovala by s ním.
   return !selEl.classList.contains("hidden") && !selEl.classList.contains("roster-mode") && !hiddenMode;
@@ -5137,7 +5205,7 @@ document.addEventListener("mousemove", (e) => {
   if (!hiddenRune) return;
   if (!runeActive()) { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); return; }
   const t = Math.max(0, 1 - Math.hypot(e.clientX, e.clientY) / RUNE_RADIUS);
-  // kvadratika — runa sa naplno rozsvieti až tesne pri rohu; po objavení drží slabý základ
+  // kvadratika - runa sa naplno rozsvieti až tesne pri rohu; po objavení drží slabý základ
   hiddenRune.style.opacity = String(Math.max(hiddenFound ? 0.12 : 0, t * t));
   hiddenRune.classList.toggle("near", t > 0.25);
   hiddenRune.classList.toggle("lit", t > 0.75);
@@ -5157,14 +5225,14 @@ function showHiddenPage() {
 }
 
 /* nepravidelné efekty otvorenej Hidden stránky:
-   1) nadpis „Hidden" rozbitý na spany — každé písmeno má vlastnú náhodnú fázu letter-die (pokazený neón),
+   1) nadpis „Hidden" rozbitý na spany - každé písmeno má vlastnú náhodnú fázu letter-die (pokazený neón),
    2) celý char-select občas (3,5–9 s) preblikne rovnakým cs-glitch ako pri vstupe cez runu,
    3) názvy kariet (mená postáv aj „Coming soon") sa každý tick mutujú na glitchnutý secret text (náhodné znaky).
-   Všetko sa vypína cez stopHiddenFx() — volá ho setCharPage, ktorý Hidden stránku vždy zatvára. */
+   Všetko sa vypína cez stopHiddenFx() - volá ho setCharPage, ktorý Hidden stránku vždy zatvára. */
 const HIDDEN_GLITCH_CHARS = "#@$%&*+=/\\<>[]{}01?";
 let hiddenGlitchTimer = 0, hiddenMutateTimer = 0;
 function setHiddenTitle() {
-  if (!charPageTitle || charPageTitle.dataset.hiddenTitle === "1") return; // spany už stoja — neresetuj im fázy
+  if (!charPageTitle || charPageTitle.dataset.hiddenTitle === "1") return; // spany už stoja - neresetuj im fázy
   charPageTitle.dataset.hiddenTitle = "1";
   charPageTitle.textContent = "";
   for (const ch of "Hidden") {
@@ -5191,7 +5259,7 @@ function startHiddenFx() {
   hiddenMutateTimer = setInterval(() => {
     if (!hiddenMode || selEl.classList.contains("hidden")) return;
     selEl.querySelectorAll('.char-cards[data-page="hidden"] .char-name').forEach(el => {
-      // pôvodné meno karty si zapamätaj pri prvom ticku — mutuje sa vždy z originálu, nie z už zglitchnutého textu
+      // pôvodné meno karty si zapamätaj pri prvom ticku - mutuje sa vždy z originálu, nie z už zglitchnutého textu
       const base = el.dataset.baseName ?? (el.dataset.baseName = el.textContent);
       let out = "";
       for (const ch of base)
@@ -5210,14 +5278,14 @@ function stopHiddenFx() {
     if (el.dataset.baseName != null) el.textContent = el.dataset.baseName; // vráť originálne meno karty
   });
 }
-/* „Your Team" (roster-mode): karta side-postavy (Countess/Onre) glitchuje rovnako ako Hidden screen —
+/* „Your Team" (roster-mode): karta side-postavy (Countess/Onre) glitchuje rovnako ako Hidden screen -
    mutuje písmená mena z originálu na náhodné glitch znaky a občas glitchne aj štvorček (canvas).
    V drafte cez runu to už rieši hiddenMutateTimer; tu je paralelný ticker pre roster-mode.
-   Kartu cieli podľa členstva v charSelectHp (vlastný tím) — nezávisle na off-roster/display triedach,
+   Kartu cieli podľa členstva v charSelectHp (vlastný tím) - nezávisle na off-roster/display triedach,
    aby glitchol OBE postavy rovnako (p1 Vampire aj p2 Onryō). Zdieľa dataset.baseName s hidden fx. */
 let rosterGlitchTimer = 0;
 function rosterGlitchCards() {
-  // v „Your Team" (roster-mode) vezmi OBE hidden-char karty (Countess aj Onre) — len jedna je reálne
+  // v „Your Team" (roster-mode) vezmi OBE hidden-char karty (Countess aj Onre) - len jedna je reálne
   // viditeľná (druhú stranu skrýva data-side:none, nedraftnutú off-roster:none), tá neviditeľná sa mutuje
   // neškodne mimo obraz. Žiadna závislosť na off-roster/charSelectHp/layout → glitchne vždy tú viditeľnú.
   if (!selEl.classList.contains("roster-mode") || hiddenMode || selEl.classList.contains("hidden")) return [];
@@ -5256,7 +5324,7 @@ hiddenRune?.addEventListener("click", () => {
   if (!runeActive()) return;
   if (!hiddenFound) { hiddenFound = true; try { localStorage.setItem("arenaHiddenFound", "1"); } catch {} }
   selEl.classList.add("cs-glitch");
-  setTimeout(showHiddenPage, 240); // prepnutie v strede glitchu — musí sedieť s trvaním cs-glitch (.5s)
+  setTimeout(showHiddenPage, 240); // prepnutie v strede glitchu - musí sedieť s trvaním cs-glitch (.5s)
   setTimeout(() => selEl.classList.remove("cs-glitch"), 520);
 });
 
@@ -5268,12 +5336,12 @@ const aimPicker  = document.getElementById("aim-picker");
 const dashBtn    = document.getElementById("dash-btn");
 const dashPicker = document.getElementById("dash-picker");
 const specialBtn    = document.getElementById("special-btn");
-const specialPicker = document.getElementById("special-picker"); // smer pohľadu — používa len Medúza
-const cellPicker    = document.getElementById("cell-picker");    // Vojak/Countess/Onre — mini mapa plochy na výber cieľovej bunky
-const wolfPicker    = document.getElementById("wolf-picker");    // Vlkolak — 8 smerov charge (aj diagonály)
-const aimPickerDiag = document.getElementById("aim-picker-diag"); // Countess/Onre/Jotaro — diagonálny basic (4 smery)
+const specialPicker = document.getElementById("special-picker"); // smer pohľadu - používa len Medúza
+const cellPicker    = document.getElementById("cell-picker");    // Vojak/Countess/Onre - mini mapa plochy na výber cieľovej bunky
+const wolfPicker    = document.getElementById("wolf-picker");    // Vlkolak - 8 smerov charge (aj diagonály)
+const aimPickerDiag = document.getElementById("aim-picker-diag"); // Countess/Onre/Jotaro - diagonálny basic (4 smery)
 const mirrorBtn = document.getElementById("mirror-btn"); // pre Jotara sa mení na Special 1
-const s1Picker  = document.getElementById("s1-picker");  // Jotarov Special 1 — smer left/right
+const s1Picker  = document.getElementById("s1-picker");  // Jotarov Special 1 - smer left/right
 
 function shakeBtn(btn) {
   btn.classList.add("shake");
@@ -5287,7 +5355,7 @@ const meleeBtn = document.getElementById("melee-btn"); // melee má picker (Coun
 const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker, special1: s1Picker };
 const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn, special1: mirrorBtn };
 
-// Vampire/Onryō: dash slot = CHARGE — tlačidlo dostane fialový „Hidden" skin s preblikávaním a ???
+// Vampire/Onryō: dash slot = CHARGE - tlačidlo dostane fialový „Hidden" skin s preblikávaním a ???
 // namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
 // Attack tooltip navyše vysvetlí odraz strely. Volané zo state handlera pri každom snapshote.
 const DASH_TITLE_DEFAULT   = "Dash - move up to 2 cells in a direction (−4 mana)";
@@ -5322,14 +5390,14 @@ function syncDashBtn(char) {
   }
   dashBtn.title = !side ? DASH_TITLE_DEFAULT
     : char === "countess"
-      ? "Charge — rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit heals up to 4 HP (blocked = nothing)"
-      : "Charge — rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit drains up to 4 mana into yours (blocked = nothing)";
+      ? "Charge - rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit heals up to 4 HP (blocked = nothing)"
+      : "Charge - rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit drains up to 4 mana into yours (blocked = nothing)";
   attackBtn.title = side
-    ? "Range Attack — a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance"
+    ? "Range Attack - a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance"
     : ATTACK_TITLE_DEFAULT;
 }
 
-// Luffy: recharge slot = prepínač módu (base↔Gear3) — fialový ❔ „Hidden" skin ako vamp charge.
+// Luffy: recharge slot = prepínač módu (base↔Gear3) - fialový ❔ „Hidden" skin ako vamp charge.
 // Doplní manu A prepne mód (aj pri plnej mane). Pre ostatných mágov vráti bežný recharge.
 const rechargeBtn = document.querySelector('.btn.act.mana[data-act="recharge"]');
 function syncRechargeBtn(char) {
@@ -5343,7 +5411,7 @@ function syncRechargeBtn(char) {
     ico.classList.add("charge-mark");
     ico.textContent = "???";
     if (cost) { cost.innerHTML = `+4${miniPix("💧")}<span class="luffy-swap">⇆</span>`; hydratePix(cost); } // +4 mana + swap znak (prepnutie gearu)
-    rechargeBtn.title = "Switch Gear (Base ↔ Gear 3) — also recharges mana (+4); works even at full mana";
+    rechargeBtn.title = "Switch Gear (Base ↔ Gear 3) - also recharges mana (+4); works even at full mana";
   } else if (ico) {
     ico.classList.remove("charge-mark");
     if (cost) { cost.innerHTML = `+4${miniPix("💧")}`; hydratePix(cost); }
@@ -5356,7 +5424,7 @@ function syncRechargeBtn(char) {
 // Luffy: gear-závislé akcie (range attack + special) sa menia podľa módu → vizuálne ich odlíšime
 // rohovým odznakom módu (base.png / gear3.png) na tlačidle. Toggle podľa zvoleného mága a aktuálnej formy.
 function syncLuffyGearButtons(char) {
-  // odznak (gear3.png) sa ukáže LEN v gear3 móde — vrátane momentu, keď je v tomto kole naplánovaný
+  // odznak (gear3.png) sa ukáže LEN v gear3 móde - vrátane momentu, keď je v tomto kole naplánovaný
   // recharge (luffyEffForm zohľadní prepnutie), aby hráč videl, že basic/special budú v gear3.
   const gear3 = char === "luffy" && luffyEffForm() === "gear3";
   [attackBtn, specialBtn].forEach(b => {
@@ -5366,7 +5434,7 @@ function syncLuffyGearButtons(char) {
   });
 }
 
-// Jotaro nemá mirror — tento slot je Special 1 (Star Platinum): fialový ❔ skin, cost 4, L/R picker.
+// Jotaro nemá mirror - tento slot je Special 1 (Star Platinum): fialový ❔ skin, cost 4, L/R picker.
 // Pre ostatné postavy vráti bežný mirror. Volané zo state handlera pri každom snapshote.
 const MIRROR_TITLE_DEFAULT = "Mirror (−4 mana, reflects all damage of the opponent's next action back at them)";
 function syncMirrorBtn(char) {
@@ -5382,7 +5450,7 @@ function syncMirrorBtn(char) {
     ico.classList.add("charge-mark");
     ico.textContent = "???"; // rovnaký „hidden" vzhľad ako Vampírov charge button
     if (cost) { cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(cost); }
-    mirrorBtn.title = "Star Platinum — a directional (left/right) strike hitting BOTH diagonal cells on that side for 4 dmg";
+    mirrorBtn.title = "Star Platinum - a directional (left/right) strike hitting BOTH diagonal cells on that side for 4 dmg";
   } else if (ico) {
     ico.classList.remove("charge-mark");
     if (cost) { cost.innerHTML = `−4${miniPix("💧")}`; hydratePix(cost); }
@@ -5401,7 +5469,7 @@ function syncMirrorBtn(char) {
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
 function uiLocked() {
-  if (tsPlanning) return false; // Jotaro počas THE WORLD plánuje zmrazené akcie — ovládanie odomknuté
+  if (tsPlanning) return false; // Jotaro počas THE WORLD plánuje zmrazené akcie - ovládanie odomknuté
   return lockedIn || playing || tsFrozen || !!state?.[me]?.locked;
 }
 
@@ -5452,7 +5520,7 @@ function togglePicker(kind, btn, usedType) {
 
 // Move / Attack / Dash: najprv výber smeru v mini-popupe
 moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"));
-// Countess/Onre strieľajú diagonálne — attack otvára diagonálny picker namiesto ortogonálneho
+// Countess/Onre strieľajú diagonálne - attack otvára diagonálny picker namiesto ortogonálneho
 // Luffy: efektívny mód pre plánovaný basic = aktuálny form prepnutý, ak je v tomto kole už naplánovaný
 // recharge (ten prepína mód a vyhodnotí sa pred basicom).
 function luffyEffForm() {
@@ -5478,9 +5546,9 @@ meleeBtn?.addEventListener("click", () => {
   myQueue.push({ type: "melee" });
   renderQueue();
 });
-// Vojak: mini mapa plochy pod special tlačidlom — klik vyberie cieľovú bunku lúča. Blokované:
+// Vojak: mini mapa plochy pod special tlačidlom - klik vyberie cieľovú bunku lúča. Blokované:
 // vlastná GHOST pozícia (kde budem v čase specialu po naplánovaných move/dash) a súperova aktuálna
-// bunka + jeho tieňový klon (obe figúry — blokovanie len pravej by prezradilo, ktorá je skutočná).
+// bunka + jeho tieňový klon (obe figúry - blokovanie len pravej by prezradilo, ktorá je skutočná).
 // V labyrinte má súper x=null (server rediguje) → neblokuje sa nič okrem vlastnej bunky (streľba naslepo).
 // Luffy: dosiahne special cieľovú bunku (dáma base / veža gear3) z pozície gp? Zrkadlí server luffySpecialReaches.
 function luffyReachesCell(gx, gy, x, y, form) {
@@ -5504,8 +5572,8 @@ function buildCellPicker(freeAll = false, luffyForm = null) {
     // Luffy: cieľ musí ležať na platnej línii (dáma/veža) z ghost pozície; ostatné bunky zamknuté.
     // Vlastná aj súperova bunka SÚ platné ciele (dogúľa sa naň a udrie, kto tam stojí).
     if (luffyForm) {
-      // Luffy: len rozlíšenie platná línia (dáma/veža) vs mimo — ŽIADNE značky mojej/súperovej pozície
-      // (tie dávajú zmysel u Soldiera, nie tu — Luffy sa smie dogúľať aj na vlastnú aj na súperovu bunku).
+      // Luffy: len rozlíšenie platná línia (dáma/veža) vs mimo - ŽIADNE značky mojej/súperovej pozície
+      // (tie dávajú zmysel u Soldiera, nie tu - Luffy sa smie dogúľať aj na vlastnú aj na súperovu bunku).
       const reach = !!(gp && luffyReachesCell(gp.x, gp.y, x, y, luffyForm));
       if (!reach) { b.disabled = true; b.classList.add("off-line"); }
       b.addEventListener("mouseenter", () => showPreviewCells([[x, y]]));
@@ -5520,12 +5588,12 @@ function buildCellPicker(freeAll = false, luffyForm = null) {
       cellPicker.appendChild(b);
       continue;
     }
-    // freeAll (pasca Countess/Onre): ŽIADNE blokované bunky — aj súperova aktuálna, aj vlastná
+    // freeAll (pasca Countess/Onre): ŽIADNE blokované bunky - aj súperova aktuálna, aj vlastná
     const isMe  = !freeAll && !!(gp && gp.x === x && gp.y === y);
     const isFoe = !freeAll && (!!(opp && opp.x === x && opp.y === y) || !!(opp?.clone && opp.clone.x === x && opp.clone.y === y));
     if (isMe)       { b.disabled = true; b.classList.add("own"); b.textContent = "▲"; b.title = "Your position at that point of the queue"; }
-    else if (isFoe) { b.disabled = true; b.classList.add("foe"); b.textContent = "✕"; b.title = "Opponent's current cell — they're hit only if they move"; }
-    else if (freeAll && myTrap && myTrap.x === x && myTrap.y === y) { b.classList.add("trap-here"); b.textContent = "◆"; b.title = "Your current trap — recasting replaces it"; }
+    else if (isFoe) { b.disabled = true; b.classList.add("foe"); b.textContent = "✕"; b.title = "Opponent's current cell - they're hit only if they move"; }
+    else if (freeAll && myTrap && myTrap.x === x && myTrap.y === y) { b.classList.add("trap-here"); b.textContent = "◆"; b.title = "Your current trap - recasting replaces it"; }
     b.addEventListener("mouseenter", () => showPreviewCells([[x, y]]));
     b.addEventListener("mouseleave", clearPreviewCells);
     b.addEventListener("click", () => {
@@ -5552,7 +5620,7 @@ specialBtn.addEventListener("click", () => {
     return;
   }
   if (ghostCharAt() === "medusa" || ghostCharAt() === "escanor") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
-  if (ghostCharAt() === "werewolf") { togglePicker("special_wolf", specialBtn, "special"); return; } // charge — 8 smerov
+  if (ghostCharAt() === "werewolf") { togglePicker("special_wolf", specialBtn, "special"); return; } // charge - 8 smerov
   if (ghostCharAt() === "soldier") {
     if (openPicker !== "special_cell") buildCellPicker(); // obsah podľa aktuálnych pozícií + ghost fronty
     togglePicker("special_cell", specialBtn, "special");
@@ -5577,7 +5645,7 @@ specialBtn.addEventListener("click", () => {
   renderQueue();
 });
 
-// Golden predťah: jedno tlačidlo predelené na 2 rovnako široké polovice — ŠTÍT (−3) | MIRROR (−5).
+// Golden predťah: jedno tlačidlo predelené na 2 rovnako široké polovice - ŠTÍT (−3) | MIRROR (−5).
 // Vzájomne výlučné; rozsvieti sa vždy len zvolená polovica. Starterovi zamknuté (vizuálny zámok).
 const goldenBtn = document.getElementById("golden-btn");
 const goldenShieldHalf = goldenBtn.querySelector(".shield-half");
@@ -5595,7 +5663,7 @@ function syncGoldenHalves() {
 function toggleGoldenHalf(mode) {
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(goldenBtn); return; }
-  if (!me || state?.starter === me) { shakeBtn(goldenBtn); return; }
+  if (!me || state?.starter === me || isStonedNow()) { shakeBtn(goldenBtn); return; }
   // golden shield/mirror sa vzájomne vylučuje s bežnou akciou rovnakého druhu vo fronte (zamknuté, kým ju nezrušíš)
   if (mode === "shield") {
     if (!goldenArmed && myQueue.some(a => a.type === "shield")) { shakeBtn(goldenBtn); return; }
@@ -5610,7 +5678,7 @@ function toggleGoldenHalf(mode) {
 goldenShieldHalf?.addEventListener("click", () => toggleGoldenHalf("shield"));
 goldenMirrorHalf?.addEventListener("click", () => toggleGoldenHalf("mirror"));
 
-// Golden Mana | Last Stand — duálne tlačidlo (2 polovice, vzájomne výlučné, ako golden shield/mirror).
+// Golden Mana | Last Stand - duálne tlačidlo (2 polovice, vzájomne výlučné, ako golden shield/mirror).
 // Vykoná sa po konci kola; dostupné obom hráčom; v poslednom (buffnutom) kole zamknuté pre oboch.
 const goldDualBtn = document.getElementById("gold-dual-btn");
 const gmHalf = goldDualBtn.querySelector(".gm-half");
@@ -5625,7 +5693,7 @@ function toggleGoldDual(mode) {
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(goldDualBtn); return; }
   if (!me || !state?.[me]?.char) return;
-  if (state?.goldLocked) { shakeBtn(goldDualBtn); return; } // posledné kolo — zamknuté
+  if (state?.goldLocked) { shakeBtn(goldDualBtn); return; } // posledné kolo - zamknuté
   if (mode === "mana") { goldenManaArmed = !goldenManaArmed; lastStandArmed = false; }
   else                 { lastStandArmed  = !lastStandArmed;  goldenManaArmed = false; }
   syncGoldDualHalves();
@@ -5634,7 +5702,7 @@ function toggleGoldDual(mode) {
 gmHalf?.addEventListener("click", () => toggleGoldDual("mana"));
 lsHalf?.addEventListener("click", () => toggleGoldDual("laststand"));
 
-// Démon útok — tlačidlo dostupné len buffnutému hráčovi v poslednom kole (namiesto zamknutého gold dual buttonu).
+// Démon útok - tlačidlo dostupné len buffnutému hráčovi v poslednom kole (namiesto zamknutého gold dual buttonu).
 // Správa sa ako bežná akcia: pridá/odoberie {type:"demon"} do/z myQueue (max 3, raz za kolo).
 const demonBtn = document.getElementById("demon-btn");
 demonBtn?.addEventListener("click", () => {
@@ -5656,15 +5724,20 @@ demonBtn?.addEventListener("mouseenter", () => {
 });
 demonBtn?.addEventListener("mouseleave", clearPreviewCells);
 
-// Last Hope — len nebuffnutý hráč vo final kole; toggle úvodnej akcie (ako armed flag, nie do myQueue)
+// Last Hope - len nebuffnutý hráč vo final kole; toggle úvodnej akcie (ako armed flag, nie do myQueue)
 const lastHopeBtn = document.getElementById("last-hope-btn");
+// skamenený na začiatku kola → úvodné zlaté akcie (Last Hope, golden shield/mirror) sa na serveri nevykonajú
+// (vyhodnocujú sa pred prvou akciou, kým kameň ešte trvá) - tlačidlá sú preto zamknuté, nie len varované
+function isStonedNow() {
+  return (state?.[me]?.stone || 0) > 0;
+}
 function canPlayLastHope() {
   return !!me && !!state?.[me]?.char && !!state?.goldLocked && !state?.[me]?.lastStandBuff;
 }
 lastHopeBtn?.addEventListener("click", () => {
   if (uiLocked()) return;
   if (openPicker) { shakeBtn(lastHopeBtn); return; }
-  if (!canPlayLastHope()) { shakeBtn(lastHopeBtn); return; }
+  if (!canPlayLastHope() || isStonedNow()) { shakeBtn(lastHopeBtn); return; }
   lastHopeArmed = !lastHopeArmed;
   renderQueue();
 });
@@ -5675,8 +5748,9 @@ function updateGoldenButton() {
     const inGame = !!me && !!state?.[me]?.char;
     goldenBtn.classList.toggle("hidden", !inGame);
     const isStarter = !!me && state?.starter === me;
-    goldenBtn.classList.toggle("locked-perm", isStarter);
-    if (isStarter && (goldenArmed || goldenMirrorArmed)) {
+    const goldLocked = isStarter || isStonedNow(); // skamenený: zlatý predťah by sa nevykonal
+    goldenBtn.classList.toggle("locked-perm", goldLocked);
+    if (goldLocked && (goldenArmed || goldenMirrorArmed)) {
       goldenArmed = false;
       goldenMirrorArmed = false;
     }
@@ -5684,7 +5758,7 @@ function updateGoldenButton() {
   }
   if (goldDualBtn) {
     const available = !!me && !!state?.[me]?.char;
-    const locked = !!state?.goldLocked; // posledné (buffnuté) kolo — duálny button zamknutý pre oboch
+    const locked = !!state?.goldLocked; // posledné (buffnuté) kolo - duálny button zamknutý pre oboch
     goldDualBtn.classList.toggle("hidden", !available);
     goldDualBtn.classList.toggle("locked-perm", locked); // rovnaký zámok (🔒 + sivé) ako golden shield/mirror pre startera
     if (locked) { goldenManaArmed = false; lastStandArmed = false; }
@@ -5693,13 +5767,13 @@ function updateGoldenButton() {
     if (gmCostEl) { gmCostEl.innerHTML = `−${cost}${miniPix("❤️")}`; hydratePix(gmCostEl); }
     syncGoldDualHalves();
   }
-  // démon útok — v poslednom (FINAL) kole pre buffnutého hráča; nahrádza inak zamknutý gold dual button
+  // démon útok - v poslednom (FINAL) kole pre buffnutého hráča; nahrádza inak zamknutý gold dual button
   if (demonBtn) {
     const buffed = !!me && !!state?.[me]?.lastStandBuff;
     const showDemon = !!me && !!state?.[me]?.char && !!state?.goldLocked && buffed;
     demonBtn.classList.toggle("hidden", !showDemon);
     if (showDemon) {
-      if (goldDualBtn) goldDualBtn.classList.add("hidden"); // duálny button je aj tak zamknutý — schovaj ho
+      if (goldDualBtn) goldDualBtn.classList.add("hidden"); // duálny button je aj tak zamknutý - schovaj ho
       const used = myQueue.some(a => a.type === "demon");
       demonBtn.classList.toggle("armed", used);
       demonBtn.disabled = !used && myQueue.length >= 3; // plná fronta a démon nie je v nej → nedá sa pridať
@@ -5708,10 +5782,15 @@ function updateGoldenButton() {
       demonBtn.classList.remove("armed");
     }
   }
-  // Last Hope tlačidlo — len nebuffnutý hráč vo final kole (naľavo od golden shield/mirror)
+  // Last Hope tlačidlo - len nebuffnutý hráč vo final kole (naľavo od golden shield/mirror)
   if (lastHopeBtn) {
     const showHope = canPlayLastHope();
     lastHopeBtn.classList.toggle("hidden", !showHope);
+    const hopeStoned = showHope && isStonedNow();
+    lastHopeBtn.classList.toggle("locked-perm", hopeStoned);
+    if (lastHopeBtn.dataset.baseTitle === undefined) lastHopeBtn.dataset.baseTitle = lastHopeBtn.title;
+    lastHopeBtn.title = hopeStoned ? "Last Hope - locked: you are petrified, it would have no effect" : lastHopeBtn.dataset.baseTitle;
+    if (hopeStoned && lastHopeArmed) lastHopeArmed = false;
     if (showHope) {
       lastHopeBtn.classList.toggle("armed", lastHopeArmed);
     } else {
@@ -5735,7 +5814,7 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     if (uiLocked()) return;
     if (myQueue.length >= 3) return;
 
-    // pri otvorenom pickeri sú klikateľné len jeho šípky — ostatné tlačidlá sú blokované
+    // pri otvorenom pickeri sú klikateľné len jeho šípky - ostatné tlačidlá sú blokované
     const isPickerArrow = !!btn.closest(".dir-picker");
     if (openPicker && !isPickerArrow) { shakeBtn(btn); return; }
 
@@ -5794,7 +5873,7 @@ function unlockAfterConnError() {
 function emitLockIn(payload) {
   let tries = 0;
   const MAX_TRIES = 6; // ~9 s pokusov (6 × 1,5 s), potom to vyhlásime za chybu spojenia
-  const forTurn = state?.turn; // kolo, pre ktoré táto voľba platí — server zahodí zopakovanie, ak sa už posunulo
+  const forTurn = state?.turn; // kolo, pre ktoré táto voľba platí - server zahodí zopakovanie, ak sa už posunulo
   const send = () => {
     tries++;
     socket.timeout(1500).emit("lock_in", payload, forTurn, (err) => {
@@ -5806,7 +5885,7 @@ function emitLockIn(payload) {
   };
   send();
 }
-/* ---------- Jotaro THE WORLD — klientská pauza / ts-mód ---------- */
+/* ---------- Jotaro THE WORLD - klientská pauza / ts-mód ---------- */
 // full-screen overlay pre zmrazeného súpera (text „⏱ TIME HAS STOPPED…"); filter rieši body.timestop-mode
 const tsOverlay = document.createElement("div");
 tsOverlay.id = "timestop-overlay";
@@ -5815,7 +5894,7 @@ tsOverlay.innerHTML = `<div class="ts-overlay-text">⏱ THE WORLD! - TIME HAS ST
 document.body.appendChild(tsOverlay);
 function tsOverlaySet(on) { tsOverlay.classList.toggle("hidden", !on); }
 
-// veľký stredový sprite THE WORLD castu — Star Platinum „menace" (Special_3_P); hrá RAZ a ZAMRZNE na
+// veľký stredový sprite THE WORLD castu - Star Platinum „menace" (Special_3_P); hrá RAZ a ZAMRZNE na
 // poslednom frame (rovnako ako náhľad karty pri výbere). Drží sa počas celého time-stopu, mizne pri konci.
 let worldCenterRaf = 0;
 const worldCenter = document.createElement("canvas");
@@ -5866,20 +5945,20 @@ function enterTimestopMode() {
   tsActive = true; tsJotaroSlot = tsSlot; tsFreezeAt = performance.now();
   if (worldCenter.style.display === "none") spawnWorldCenter(tsSlot);
   if (me === tsSlot) {
-    // Jotarov hráč — plánovanie 3 zmrazených akcií (kvázi nové kolo, všetky typy nanovo)
+    // Jotarov hráč - plánovanie 3 zmrazených akcií (kvázi nové kolo, všetky typy nanovo)
     tsPlanning = true; tsFrozen = false;
     lockedIn = false;
     myQueue = [];
     goldenArmed = goldenMirrorArmed = goldenManaArmed = lastStandArmed = lastHopeArmed = false;
-    // filter time-stopu aj overlay „THE WORLD! — TIME HAS STOPPED…" vidia OBAJA. Overlay je pointer-events:none
+    // filter time-stopu aj overlay „THE WORLD! - TIME HAS STOPPED…" vidia OBAJA. Overlay je pointer-events:none
     // a hore na obrazovke, takže Jotarovi neprekáža v plánovaní zmrazenej trojice.
     document.body.classList.add("timestop-mode");
     tsOverlaySet(true);
     lockBtn.classList.remove("locked", "ready"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
     closePickers(); renderQueue(); syncGoldenHalves(); syncGoldDualHalves(); updateUiLocks();
   } else {
-    // súper — zmrazený, UI zamknuté, full-screen filter + overlay. Stredový Special_3_P vidí PO CELÚ dobu
-    // (kým Jotaro nezadá všetky zmrazené akcie) — center ostáva, mizne až pri obnovení času (timestop_end).
+    // súper - zmrazený, UI zamknuté, full-screen filter + overlay. Stredový Special_3_P vidí PO CELÚ dobu
+    // (kým Jotaro nezadá všetky zmrazené akcie) - center ostáva, mizne až pri obnovení času (timestop_end).
     tsFrozen = true; tsPlanning = false;
     document.body.classList.add("timestop-mode");
     tsOverlaySet(true);
@@ -5898,7 +5977,7 @@ function submitTimestopActions() {
   lockBtn.classList.add("locked"); lockBtn.classList.remove("ready"); lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
   updateUiLocks();
   socket.emit("timestop_actions", payload, (res) => {
-    if (res && res.ok === false) { // server odmietol (nemalo by nastať — validácia zrkadlí klienta) → vráť plánovanie
+    if (res && res.ok === false) { // server odmietol (nemalo by nastať - validácia zrkadlí klienta) → vráť plánovanie
       tsPlanning = true; lockedIn = false;
       lockBtn.classList.remove("locked"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
       updateUiLocks();
@@ -5922,7 +6001,7 @@ lockBtn.addEventListener("click", () => {
   if (goldenManaArmed) payload.push({ type: "golden_mana" });
   else if (lastStandArmed) payload.push({ type: "last_stand" });
   lockedIn = true; // všetky tlačidlá idú do locked stavu až do konca kola
-  emitLockIn(payload); // (až po nastavení lockedIn — helper podľa neho rozhoduje o opakovaní)
+  emitLockIn(payload); // (až po nastavení lockedIn - helper podľa neho rozhoduje o opakovaní)
   closePickers();
   lockBtn.classList.add("locked");
   lockBtn.classList.remove("ready");
@@ -5933,7 +6012,7 @@ lockBtn.addEventListener("click", () => {
 
 /* ---------- Retry ---------- */
 retryBtn.addEventListener("click", () => { socket.emit("retry"); });
-// „Leave the room" — opustí roomku a vráti sa na room-browser (server pošle „rooms")
+// „Leave the room" - opustí roomku a vráti sa na room-browser (server pošle „rooms")
 document.getElementById("leave-room")?.addEventListener("click", () => {
   goOverlay.classList.add("hidden");
   socket.emit("leave_room");
@@ -5973,8 +6052,8 @@ function applyPhaseUI(s) {
   if (needChar || needTeam) {
     updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom); v drafte null → bez statov
     selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
-    if (selEl.classList.contains("hidden")) { teamPick = []; charPage = 1; hiddenMode = false; } // nové otvorenie — od stránky Mages (str. 1), čistý draft, bez easter-egg stránky
-    if (!hiddenMode) setCharPage(charPage); // sync stránky/šípok/nadpisu — aj po Ctrl+F5; state update nesmie zhodiť otvorenú Hidden stránku
+    if (selEl.classList.contains("hidden")) { teamPick = []; charPage = 1; hiddenMode = false; } // nové otvorenie - od stránky Mages (str. 1), čistý draft, bez easter-egg stránky
+    if (!hiddenMode) setCharPage(charPage); // sync stránky/šípok/nadpisu - aj po Ctrl+F5; state update nesmie zhodiť otvorenú Hidden stránku
     if (needTeam) syncTeamUi();
     else selEl.querySelectorAll(".char-card.picked").forEach(c => { c.classList.remove("picked"); c.querySelector(".pick-badge")?.remove(); });
     hideDeathCenter(); selEl.classList.remove("hidden"); startCharSelectPreview(); // démon nesmie visieť cez výber
@@ -5983,7 +6062,7 @@ function applyPhaseUI(s) {
   if (controls && !isSpectator) controls.style.display = (phase === "playing") ? "" : "none";
 }
 
-// séria: v HUD boxe každého hráča rad placeholderov — BO3 = koruny za výhry,
+// séria: v HUD boxe každého hráča rad placeholderov - BO3 = koruny za výhry,
 // tournament = hlavy 3 magov (mŕtvy = lebka, aktuálny = zvýraznený, živí ostatní = klikateľní na výmenu)
 function renderSeriesCrowns(ser) {
   const single = !ser || !ser.format || ser.format === "single";
@@ -6014,7 +6093,7 @@ function updateMatchScore(s) {
 // tournament: 3 hlavy magov v HUD boxe každého hráča na mieste placeholderov (predtým lebky).
 // mŕtvy mág = lebka (nesie info o prehrách), aktuálny = zvýraznený, ostatní živí = klikateľní (len moja strana) na výmenu.
 // poradie hláv = draftnutý tím daného slotu (state.roster, poradie výberu); kým tím nie je známy
-// (fáza team_select — súperov roster je maskovaný), strana nemá žiadne hlavy
+// (fáza team_select - súperov roster je maskovaný), strana nemá žiadne hlavy
 function mageOrderFor(slot) {
   return state?.roster?.[slot]
     || (state?.rosterHp?.[slot] ? Object.keys(state.rosterHp[slot]) : []);
@@ -6029,7 +6108,7 @@ function headStats(slot, char, isCurrent) {
   return null;
 }
 function renderMageHeads() {
-  // labyrint: hlavy (swap buttony) sú počas kliatby skryté u OBOCH hráčov — objavia sa až s labyrinth_end
+  // labyrint: hlavy (swap buttony) sú počas kliatby skryté u OBOCH hráčov - objavia sa až s labyrinth_end
   // (flag labyrinth padá až vtedy, reveal ho drží); visibility drží layout HUD boxu bez skoku
   const labActive = !!(state?.p1?.labyrinth || state?.p2?.labyrinth);
   crownsP1El.classList.toggle("lab-hidden", labActive);
@@ -6038,10 +6117,10 @@ function renderMageHeads() {
     const dead = state?.mageDead?.[slot] || [];
     const cur = state?.[slot]?.char || null;
     const mineSlot = slot === me;
-    // side-postavy (Countess/Onre/Jotaro) v rostri tejto strany a či je práve nasadená niektorá z nich —
+    // side-postavy (Countess/Onre/Jotaro) v rostri tejto strany a či je práve nasadená niektorá z nich -
     // swap DO/Z side-postavy je zakázaný, čo reprezentuje GLITCH: (a) je nasadená → celá zvyšná lavička
     // glitchuje (nedá sa od nej odísť), (b) je na lavičke → jej hlava glitchuje (nedá sa k nej prísť).
-    // Pozor: p2 môže mať v rostri viac side-postáv naraz (napr. Jotaro + Onryō) — glitchovať musia OBE.
+    // Pozor: p2 môže mať v rostri viac side-postáv naraz (napr. Jotaro + Onryō) - glitchovať musia OBE.
     const curIsSide = !!cur && !!SIDE_CHARS[cur];
     return mageOrderFor(slot).map(char => {
       const isDead = dead.includes(char);
@@ -6049,7 +6128,7 @@ function renderMageHeads() {
       // corrupt = táto hlava je „zamknutá" side-postavou (glitch); mŕtvy mág glitch nemá (má lebku)
       const corrupt = !isDead && (curIsSide ? !isCurrent : !!SIDE_CHARS[char]);
       const armed = mineSlot && myQueue.some(a => a.type === "swap" && a.to === char);
-      // Last Stand pakt: buffnutý hráč vo final kole nestrieda — jeho lavička nie je klikateľná;
+      // Last Stand pakt: buffnutý hráč vo final kole nestrieda - jeho lavička nie je klikateľná;
       // glitchujúca (corrupt) hlava tiež nie je klikateľná (nedá sa swapnúť do/zo side-postavy)
       const clickable = mineSlot && !!cur && !isDead && !isCurrent && !corrupt && !uiLocked() && !state?.[slot]?.lastStandBuff;
       let cls = "mhead";
@@ -6060,7 +6139,7 @@ function renderMageHeads() {
       if (clickable) cls += " clickable";
       // HP/mana nad hlavou (mŕtvy mág ich nemá; súperova lavička je skrytá → prázdny riadok pre zarovnanie)
       const st = isDead ? null : headStats(slot, char, isCurrent);
-      // corrupt hlava: HP/mana prepísané glitch znakmi (ticker ich potom mutuje) — data-* drží ikonu
+      // corrupt hlava: HP/mana prepísané glitch znakmi (ticker ich potom mutuje) - data-* drží ikonu
       const statsHtml = st
         ? (corrupt
             ? `<span class="mh-stats"><span class="mh-hp">${pixSvg("heart")}<span class="mh-glitch">##</span></span><span class="mh-mana">${pixSvg("drop")}<span class="mh-glitch">##</span></span></span>`
@@ -6078,7 +6157,7 @@ function renderMageHeads() {
   // hlavy (canvas.mage-head) animuje raf
 }
 // glitch ticker pre corrupt hlavy (zamknuté side-postavou): kým existuje .mhead.corrupt, mutuje ich
-// HP/mana text náhodnými znakmi a občas prebliká celé hlavy — v štýle Hidden stránky
+// HP/mana text náhodnými znakmi a občas prebliká celé hlavy - v štýle Hidden stránky
 let mageGlitchTimer = 0;
 function syncMageGlitch() {
   const any = document.querySelector(".series-crowns .mhead.corrupt");
@@ -6101,7 +6180,7 @@ function syncMageGlitch() {
   }
 }
 
-// klik na hlavu (moja strana, živý ne-aktuálny mág) = toggle swap akcie vo fronte — presne ako démon button
+// klik na hlavu (moja strana, živý ne-aktuálny mág) = toggle swap akcie vo fronte - presne ako démon button
 function toggleSwap(char) {
   if (uiLocked()) return;
   if (openPicker) return;
@@ -6132,7 +6211,7 @@ function toggleSwap(char) {
 const TIMER_DIRS = ["up", "down", "left", "right"];
 let serverTimerEndsAt = 0; // performance.now()-based deadline zo servera (0 = bez limitu)
 
-// DOČASNÁ DIAGNOSTIKA časovača — zapni cez ?tdebug=1; loguje prečo sa časovač (ne)zobrazí
+// DOČASNÁ DIAGNOSTIKA časovača - zapni cez ?tdebug=1; loguje prečo sa časovač (ne)zobrazí
 const TDEBUG = new URLSearchParams(location.search).has("tdebug");
 const tlog = (...a) => { if (TDEBUG) console.log("[timer]", ...a); };
 let _lastPlanning = null;
@@ -6170,11 +6249,11 @@ function tickTurnTimer(now) {
   turnTimerEl.classList.toggle("urgent", remain <= 5000);
   if (remain <= 0) { serverTimerEndsAt = 0; autoLockTimeout(); }
 }
-// vyprší čas — náhodne doplň nevyplnené z 3 základných akcií a zamkni (gold akcie sa nikdy nepridajú samé)
+// vyprší čas - náhodne doplň nevyplnené z 3 základných akcií a zamkni (gold akcie sa nikdy nepridajú samé)
 function autoLockTimeout() {
   if (uiLocked() || playing || !me || state?.[me]?.locked) { stopTurnTimer(); return; }
   const used = new Set(myQueue.map(a => a.type));
-  // golden predťah už pokrýva štít/mirror — nedopĺňaj ich (inak by sa akcia zahrala 2× a server lock odmietol)
+  // golden predťah už pokrýva štít/mirror - nedopĺňaj ich (inak by sa akcia zahrala 2× a server lock odmietol)
   if (goldenArmed) used.add("shield");
   if (goldenMirrorArmed) used.add("mirror");
   const gc = ghostCharAt();
@@ -6189,7 +6268,7 @@ function autoLockTimeout() {
     const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
     if (t === "attack" && gc === "luffy") myQueue.push({ type: t, dir: luffyEffForm() === "gear3" ? ["left", "right"][Math.floor(Math.random() * 2)] : DIAG_KEYS[Math.floor(Math.random() * 4)] });
     else if (t === "attack" && diagChar) myQueue.push({ type: t, dir: DIAG_KEYS[Math.floor(Math.random() * 4)] });
-    else if (t === "special" && vampChar) myQueue.push({ type: t, cell: { x: (Math.random() * board.w) | 0, y: (Math.random() * board.h) | 0 } }); // pasca — ľubovoľná bunka
+    else if (t === "special" && vampChar) myQueue.push({ type: t, cell: { x: (Math.random() * board.w) | 0, y: (Math.random() * board.h) | 0 } }); // pasca - ľubovoľná bunka
     else if (t === "special" && gc === "luffy") { // Luffy special = bunka na platnej línii (dáma/veža) z ghost pozície
       const gp = ghostPos() || state?.[me]; const form = luffyEffForm();
       const opts = [];
@@ -6199,9 +6278,9 @@ function autoLockTimeout() {
     else if (t === "special" && isJotaro) myQueue.push(state?.[me]?.worldUsed ? { type: t, dir: Math.random() < 0.5 ? "left" : "right" } : { type: t }); // Special 2 (smer) / THE WORLD (bez args)
     else if (t === "move" || t === "attack" || t === "dash") myQueue.push({ type: t, dir: TIMER_DIRS[Math.floor(Math.random() * 4)] });
     else if (t === "special" && (ghostCharAt() === "medusa" || ghostCharAt() === "escanor")) myQueue.push({ type: t, dir: Math.random() < 0.5 ? "left" : "right" }); // Medúzin/Escanorov special potrebuje smer
-    else if (t === "special" && ghostCharAt() === "werewolf") myQueue.push({ type: t, dir: WOLF_DIR_KEYS_CLIENT[Math.floor(Math.random() * WOLF_DIR_KEYS_CLIENT.length)] }); // Vlkolakov charge — náhodný z 8 smerov
+    else if (t === "special" && ghostCharAt() === "werewolf") myQueue.push({ type: t, dir: WOLF_DIR_KEYS_CLIENT[Math.floor(Math.random() * WOLF_DIR_KEYS_CLIENT.length)] }); // Vlkolakov charge - náhodný z 8 smerov
     else if (t === "special" && ghostCharAt() === "soldier") {
-      // Vojakov special potrebuje cieľovú bunku — náhodná platná (nie vlastná ghost, nie súperova figúra/klon;
+      // Vojakov special potrebuje cieľovú bunku - náhodná platná (nie vlastná ghost, nie súperova figúra/klon;
       // skrytý súper v labyrinte má x null → neblokuje sa), inak by server celý lock odmietol
       const gp = ghostPos(), opp = state?.[otherSlot()];
       const opts = [];
@@ -6285,7 +6364,7 @@ function showIntermission(gameWinner, series) {
 
   const needed = series?.needed || 1;
   // placeholdery + ikony pre obe strany; práve pridaná koruna víťazovi sa animuje
-  // (aj v tournamente koruny víťazovi — lebky mŕtvych magov nesie HUD v hre, nie tento prechod)
+  // (aj v tournamente koruny víťazovi - lebky mŕtvych magov nesie HUD v hre, nie tento prechod)
   const renderSide = (filled, isMarkSide) => Array.from({ length: needed }, (_, i) => {
     const isOn = i < (filled || 0);
     const isNew = isMarkSide && i === (filled || 0) - 1;
@@ -6298,7 +6377,7 @@ function showIntermission(gameWinner, series) {
   document.getElementById("im-crowns-l").innerHTML = renderSide(fillL, markL);
   document.getElementById("im-crowns-r").innerHTML = renderSide(fillR, markR);
 
-  // popisky strán — kde som ja (sloty sú fixné na celú sériu), drží strany ako koruny v HUD
+  // popisky strán - kde som ja (sloty sú fixné na celú sériu), drží strany ako koruny v HUD
   const whoL = document.getElementById("im-who-l");
   const whoR = document.getElementById("im-who-r");
   whoL.textContent = me === "p1" ? "YOU" : "OPPONENT";
@@ -6320,7 +6399,7 @@ socket.on("you_are", (info) => {
 
 /* ---------- Losovanie farieb (po configure_match) ---------- */
 // Server už osoby vylosoval na sloty (p1 = BIELY vľavo a začína každú hru, p2 = ČIERNY vpravo)
-// a poslal you_are — tu sa výsledok len ZINSCENUJE: strelka na yin-yang kruhu sa roztočí
+// a poslal you_are - tu sa výsledok len ZINSCENUJE: strelka na yin-yang kruhu sa roztočí
 // a dobehne na polovici hráčovej farby (biela vľavo 270°, čierna vpravo 90°). Overlay leží
 // NAD char-selectom, takže výber postavy čaká, kým ruleta dobehne.
 const colorRollEl = document.getElementById("color-roll");
@@ -6335,7 +6414,7 @@ socket.on("color_roll", (info) => {
   colorRollEl.style.opacity = "";
   crResultEl.classList.add("hidden");
   crResultEl.innerHTML = "";
-  // 4 celé otáčky + dobeh na cieľovú farbu ± rozptyl (len vizuálny — výsledok je daný)
+  // 4 celé otáčky + dobeh na cieľovú farbu ± rozptyl (len vizuálny - výsledok je daný)
   const target = (white ? 270 : 90) + (Math.random() * 40 - 20);
   crArrowEl.getAnimations().forEach(a => a.cancel());
   const spin = crArrowEl.animate(
@@ -6344,8 +6423,8 @@ socket.on("color_roll", (info) => {
   );
   spin.onfinish = () => {
     crResultEl.innerHTML = white
-      ? `YOU PLAY <span class="cr-white">⚪ WHITE</span> — YOU GO FIRST!`
-      : `YOU PLAY <span class="cr-black">⚫ BLACK</span> — YOU GO SECOND`;
+      ? `YOU PLAY <span class="cr-white">⚪ WHITE</span> - YOU GO FIRST!`
+      : `YOU PLAY <span class="cr-black">⚫ BLACK</span> - YOU GO SECOND`;
     crResultEl.classList.remove("hidden");
     setTimeout(() => {
       const fade = colorRollEl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: "ease-in", fill: "forwards" });
@@ -6357,7 +6436,7 @@ socket.on("color_roll", (info) => {
   };
 });
 
-// hra je plná — divák hru sleduje, ale nemá výber postavy ani ovládanie (box s hláškou dole)
+// hra je plná - divák hru sleduje, ale nemá výber postavy ani ovládanie (box s hláškou dole)
 let isSpectator = false;
 socket.on("spectator", () => {
   isSpectator = true;
@@ -6376,7 +6455,7 @@ socket.on("reset", () => {
   resetActorFade();
   clearProjectiles(); // žiadny letiaci projektil nesmie prežiť reset
 
-  // reset game-over stavov ešte pred renderHUD — inak by guard nechal visieť GAME OVER text
+  // reset game-over stavov ešte pred renderHUD - inak by guard nechal visieť GAME OVER text
   serverWinner = null;
   serverGameResult = null;
   gameOverShown = false;
@@ -6417,7 +6496,7 @@ socket.on("reset", () => {
 socket.on("state", (s) => {
   tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing });
   state = s; board = s.board || board;
-  // Escanor: keď sa na slote OBJAVÍ (nasadenie na začiatku hry alebo turnajový swap), resetuj premenu — nech sa
+  // Escanor: keď sa na slote OBJAVÍ (nasadenie na začiatku hry alebo turnajový swap), resetuj premenu - nech sa
   // pri najbližšom rozohraní kola prehrá WeakIdle→Transform→Stand znova (nie mid-hra, char sa medzi kolami nemení)
   for (const slot of ["p1", "p2"]) {
     const c = s?.[slot]?.char || null;
@@ -6426,14 +6505,14 @@ socket.on("state", (s) => {
       // sa char maže na null → char-select). Uprostred hry (turn>1) je Escanor už premenený → ukáž silnú
       // formu (Stand, škálovaný podľa pride), NIE weak. Inak (nová hra) sa premena WeakIdle→Transform→Stand hrá.
       const fromReload = escPrevChar[slot] === null;
-      // SWAP = char sa v rozohranej hre zmenil z INEJ živej postavy (nie null) na Escanora — vtedy premenu
+      // SWAP = char sa v rozohranej hre zmenil z INEJ živej postavy (nie null) na Escanora - vtedy premenu
       // preskoč (Stand, pride 0 hneď), nech nekoliduje so swap animáciou. GAME START (fromReload) si premenu
       // ponecháva aj v turnaji.
       const fromSwap = escPrevChar[slot] !== null; // (swap je len v turnaji; medzi hrami je char null)
       escTransformed[slot] = fromSwap || (fromReload && (s.turn || 1) > 1);
     }
     escPrevChar[slot] = c;
-    // Jotaro: keď sa na slote (re)objaví (nasadenie/swap-in — nie mid-hra), prehraj summon intro standu znova
+    // Jotaro: keď sa na slote (re)objaví (nasadenie/swap-in - nie mid-hra), prehraj summon intro standu znova
     if (c === "jotaro" && standPrevChar[slot] !== "jotaro") { standSummoned[slot] = false; standSummonStart[slot] = 0; }
     standPrevChar[slot] = c;
   }
@@ -6452,7 +6531,7 @@ socket.on("state", (s) => {
   updateMatchScore(s);
 
   if (s.timeline) {
-    // finálny stav (vrátane nových tiles) nevykresľuj hneď — ukáže ho až posledný frame timeline
+    // finálny stav (vrátane nových tiles) nevykresľuj hneď - ukáže ho až posledný frame timeline
     schedulePlayTimeline(s.timeline);
   } else if (!playing) {
     // čerstvý stav mimo prehrávania → stredový démon nemá čo visieť (objaví sa len počas timeline);
@@ -6463,7 +6542,7 @@ socket.on("state", (s) => {
     positionActors(s, true);
     renderQueue(); // prekresli round-script lištu (zlatý skeleton mojich slotov hneď, bez interakcie)
   }
-  // počas prehrávania snapshot bez timeline nevykresľuj — framy bežiacej timeline majú prednosť
+  // počas prehrávania snapshot bez timeline nevykresľuj - framy bežiacej timeline majú prednosť
 
   // Jotaro THE WORLD: reload/reclaim počas čakania → snapshot nesie timestop (bez timeline) → obnov ts-mód;
   // ak timestop zmizol (kolo pokračuje inou cestou) → vypni prípadný zaseknutý filter/overlay
@@ -6472,15 +6551,15 @@ socket.on("state", (s) => {
     tsPlanning = false; tsFrozen = false; tsOverlaySet(false); document.body.classList.remove("timestop-mode"); updateUiLocks();
   }
 
-  // dash/attack tlačidlá podľa mága — Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
+  // dash/attack tlačidlá podľa mága - Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
   syncDashBtn(s[me]?.char);
-  // mirror slot podľa mága — Jotaro tu má Special 1 (fialový ❔ skin + L/R picker)
+  // mirror slot podľa mága - Jotaro tu má Special 1 (fialový ❔ skin + L/R picker)
   syncMirrorBtn(s[me]?.char);
-  // recharge slot podľa mága — Luffy tu má prepínač módu (fialový ❔ skin)
+  // recharge slot podľa mága - Luffy tu má prepínač módu (fialový ❔ skin)
   syncRechargeBtn(s[me]?.char);
   // Luffy: odznak módu na gear-závislých tlačidlách (range attack + special)
   syncLuffyGearButtons(s[me]?.char);
-  // label melee podľa mága — Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō majú center strike bez bonusu
+  // label melee podľa mága - Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō majú center strike bez bonusu
   const mineMelee = s[me];
   if (mineMelee?.char && meleeBtn) {
     const mCost = meleeBtn.querySelector(".cost");
@@ -6501,7 +6580,7 @@ socket.on("state", (s) => {
       if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
     }
   }
-  // label special podľa mága — v turnaji po naplánovanom swape platí nový mág (ghostCharAt), nie ten na štarte kola
+  // label special podľa mága - v turnaji po naplánovanom swape platí nový mág (ghostCharAt), nie ten na štarte kola
   const specChar = ghostCharAt();
   if (specChar && specialBtn) {
     specialBtn.classList.remove("hidden-question");
@@ -6520,53 +6599,53 @@ socket.on("state", (s) => {
     }
     const cost = specialBtn.querySelector(".cost");
     if (specChar === "medusa") {
-      // Medúza: žiadny dmg — skamenenie na 2 akcie (smer sa volí v pickeri)
-      specialBtn.title = "Special (−5 mana) — petrifying gaze: choose a direction; a hit opponent skips their next 2 actions";
+      // Medúza: žiadny dmg - skamenenie na 2 akcie (smer sa volí v pickeri)
+      specialBtn.title = "Special (−5 mana) - petrifying gaze: choose a direction; a hit opponent skips their next 2 actions";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 2×🗿`; hydratePix(cost); }
     } else if (specChar === "minotaur") {
-      // Minotaur: žiadny dmg — celoplošný labyrint (trvá do vzájomného zásahu)
-      specialBtn.title = "Special (−5 mana) — hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit";
+      // Minotaur: žiadny dmg - celoplošný labyrint (trvá do vzájomného zásahu)
+      specialBtn.title = "Special (−5 mana) - hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🌀`; hydratePix(cost); }
     } else if (specChar === "naruto") {
-      // Naruto: žiadny priamy dmg — musí stáť sám, prizve tieňového klona (kópia s 1 dmg)
-      specialBtn.title = "Special (−5 mana) — must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit";
+      // Naruto: žiadny priamy dmg - musí stáť sám, prizve tieňového klona (kópia s 1 dmg)
+      specialBtn.title = "Special (−5 mana) - must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 👥`; hydratePix(cost); }
     } else if (specChar === "escanor") {
       // Escanor: smerový dmg (8); rozsah rastie s pride levelom (veľkosť postavy na ploche = indikátor pride)
-      specialBtn.title = "Special (−5 mana, 8 dmg) — choose a direction (left/right)";
+      specialBtn.title = "Special (−5 mana, 8 dmg) - choose a direction (left/right)";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
     } else if (specChar === "soldier") {
-      // Vojak: snajperský lúč na zvolenú bunku — súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
-      specialBtn.title = "Special (−5 mana, 10 dmg) — pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it";
+      // Vojak: snajperský lúč na zvolenú bunku - súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
+      specialBtn.title = "Special (−5 mana, 10 dmg) - pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 10${miniPix("☠️")}`; hydratePix(cost); }
     } else if (specChar === "werewolf") {
-      // Vlkolak: charge jedným z 8 smerov — dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP).
+      // Vlkolak: charge jedným z 8 smerov - dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP).
       // Prekreslenie rieši syncWolfSpecialBtn (aj per-frame v renderHUD); tu vynúť čerstvý prepočet.
       delete specialBtn.dataset.wolfMoon;
       syncWolfSpecialBtn();
     } else if (specChar === "countess" || specChar === "onre") {
-      // Vampire/Onryō: pasca — teleport + bezplatný úder pri súperovom vstupe/prechode
+      // Vampire/Onryō: pasca - teleport + bezplatný úder pri súperovom vstupe/prechode
       const bonus = specChar === "countess" ? "heals you" : "drains the foe's mana into yours";
-      specialBtn.title = `Special (−5 mana, 3 dmg) — set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit ${bonus}. Only one trap — recasting replaces it`;
+      specialBtn.title = `Special (−5 mana, 3 dmg) - set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit ${bonus}. Only one trap - recasting replaces it`;
       const bonusIcon = specChar === "countess" ? miniPix("❤️") : miniPix("💧");
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} 3${miniPix("☠️")}${bonusIcon}`; hydratePix(cost); }
     } else if (specChar === "jotaro") {
-      // klasická ✨ ikona (ako mágovia — reset blok vyššie ju už nastavil); mení sa len cost badge:
+      // klasická ✨ ikona (ako mágovia - reset blok vyššie ju už nastavil); mení sa len cost badge:
       // pred THE WORLD hodiny (⏱), po ňom (worldUsed) Special 2 = 8 dmg
       if (state?.[me]?.worldUsed) {
-        specialBtn.title = "Special 2 (−5 mana, 8 dmg) — a directional (left/right) strike on the adjacent cell";
+        specialBtn.title = "Special 2 (−5 mana, 8 dmg) - a directional (left/right) strike on the adjacent cell";
         if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
       } else {
-        specialBtn.title = "THE WORLD (−5 mana, once per game) — time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes";
+        specialBtn.title = "THE WORLD (−5 mana, once per game) - time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes";
         if (cost) { cost.innerHTML = `−5${miniPix("💧")} ⏱`; hydratePix(cost); }
       }
     } else if (specChar === "luffy") {
-      // pohyb-a-úder ako šachová figúra: base = dáma (4 dmg), gear3 = veža (8 dmg) — podľa efektívnej formy
+      // pohyb-a-úder ako šachová figúra: base = dáma (4 dmg), gear3 = veža (8 dmg) - podľa efektívnej formy
       const g3 = luffyEffForm() === "gear3";
       const dmg = g3 ? 8 : 4;
       specialBtn.title = g3
-        ? "Special (−5 mana, 8 dmg) — GEAR 3: roll like a ROOK (orthogonal lines) to a chosen cell and strike whoever is on it"
-        : "Special (−5 mana, 4 dmg) — roll like a QUEEN (any line) to a chosen cell and strike whoever is on it";
+        ? "Special (−5 mana, 8 dmg) - GEAR 3: roll like a ROOK (orthogonal lines) to a chosen cell and strike whoever is on it"
+        : "Special (−5 mana, 4 dmg) - roll like a QUEEN (any line) to a chosen cell and strike whoever is on it";
       if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
     } else {
       const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
@@ -6580,7 +6659,7 @@ socket.on("state", (s) => {
   setServerTimer(s.timerMs ?? null); // synchronizuj odpočet so serverom (drží aj po refreshi)
 });
 
-// server posiela zostávajúci čas na ťah — klient sa naň synchronizuje (displej + auto-lock)
+// server posiela zostávajúci čas na ťah - klient sa naň synchronizuje (displej + auto-lock)
 socket.on("turn_timer", ({ ms }) => { tlog("recv turn_timer", ms); setServerTimer(ms); });
 
 // Server stále posiela "game_over" – len si zapamätáme, nezobrazíme hneď overlay.
@@ -6589,7 +6668,7 @@ socket.on("game_over", ({ winner }) => {
   serverWinner = winner;
 });
 
-// výsledok jednej hry série — vyhodnotí sa až na konci prehrávania timeline
+// výsledok jednej hry série - vyhodnotí sa až na konci prehrávania timeline
 socket.on("game_result", (r) => { serverGameResult = r; });
 
 // medzi hrami série: resetuj UI kola (skóre ostáva), char-select pre ďalšiu hru riadi nasledujúci state
@@ -6628,7 +6707,7 @@ function raf() {
 
   tickTurnTimer(now); // odpočet času na ťah (auto-lock pri vypršaní)
 
-  // po vypršaní facing override (streľba do strany) otoč postavu späť k súperovi —
+  // po vypršaní facing override (streľba do strany) otoč postavu späť k súperovi -
   // positionActors sa inak volá len pri timeline frame-och, takže posledná akcia kola by ostala "visieť"
   for (const slot of ["p1", "p2"]) {
     const ov = facingOverride[slot];
@@ -6663,11 +6742,11 @@ function raf() {
     else if (!lyingDead && aSt.key === "dead") { aSt.key = "idle"; aSt.until = 0; }
     // skamenená postava = zamrznutá socha (fixný idle frame; sivý nádych rieši actorFilter); smrť má prednosť
     const stoned = (st.stone || 0) > 0 && !lyingDead;
-    // Countess pri caste pasce: A5 (naratívna sekvencia) sa hrá RAZ od frame 0 — relatívny čas nižšie;
+    // Countess pri caste pasce: A5 (naratívna sekvencia) sa hrá RAZ od frame 0 - relatívny čas nižšie;
     // absolútny loop by začal v strede sekvencie (victory/preview loop ostáva)
     const vampCast = st.char === "countess" && aSt.key === "casting";
     // Jotaro: pri výhre ostáva IDLE (special na výhru vedie stand Star Platinum, nie jeho telo);
-    // casting preňho ani nenastáva (útoky hrá cez attack2_loop) — teda nikdy nekreslí special sprite na tele
+    // casting preňho ani nenastáva (útoky hrá cez attack2_loop) - teda nikdy nekreslí special sprite na tele
     let anim = stoned
       ? ANIM_DEF.idle
       : (st.char === "jotaro" && aSt.key === "victory")
@@ -6677,7 +6756,7 @@ function raf() {
       : (aSt.key === "victory" || aSt.key === "casting")
         ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: !vampCast }
         : currentAnim(slot);
-    // Vojak pri caste specialu: mieriaca póza (frame 0) drží, výšľah raz na konci — v synchróne
+    // Vojak pri caste specialu: mieriaca póza (frame 0) drží, výšľah raz na konci - v synchróne
     // s veľkým stredovým overlayom (rovnaké SOLDIER_AIM/FIRE časovanie, čas od setAnim)
     if (st.char === "soldier" && aSt.key === "casting" && !stoned) {
       const fireT = (now - (aSt.start || 0)) - (SOLDIER_AIM_MS - SOLDIER_FIRE_MS);
@@ -6694,7 +6773,7 @@ function raf() {
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
     // Luffy Gear3 basic: odrež zapečenú natiahnutú ruku+päsť z tela (dosah kreslí procedurálna guma)
     const armCrop = LUFFY_ARM_CROP[animState[slot].key] || 0;
-    // Transform (loop:false) a WinSunBoard s loopFrom (zdvih raz, potom chvost — aj pri victory) musia ísť
+    // Transform (loop:false) a WinSunBoard s loopFrom (zdvih raz, potom chvost - aj pri victory) musia ísť
     // od frame 0 → relatívny čas; inak (loop) globálny now je ok
     const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
     // THE WORLD: čas stojí → všetci OKREM Jotara majú zmrazený drawT (statický frame, žiadne cyklenie idle)
@@ -6723,7 +6802,7 @@ function raf() {
         .catch(()=>{}));
   });
 
-  // tieňové klony — zrkadlia animáciu majiteľa (identický vzhľad, rovnaký glow obrán = nerozoznateľné);
+  // tieňové klony - zrkadlia animáciu majiteľa (identický vzhľad, rovnaký glow obrán = nerozoznateľné);
   // hurt/dead majiteľa klon nehrá (zásah naň ho rovno rozplynie), viditeľnosť rieši positionActors
   ["p1", "p2"].forEach(slot => {
     const el = cloneEls[slot];
@@ -6740,7 +6819,7 @@ function raf() {
     // THE WORLD: zmraz aj súperovho klona (všetko okrem Jotara stojí)
     let anim, animT = (tsActive && slot !== tsJotaroSlot) ? tsFreezeAt : (stoned ? 0 : now);
     if (stoned) anim = ANIM_DEF.idle;
-    // Hurt hrá od ZAČIATKU zásahu (animT = now - flAt), nie zamrznutý na poslednom frame — inak by strhnutie
+    // Hurt hrá od ZAČIATKU zásahu (animT = now - flAt), nie zamrznutý na poslednom frame - inak by strhnutie
     // nebolo vidno (neloopová animácia kreslená globálnym `now` uviazne na poslednom frame)
     else if (flinching) { anim = ANIM_DEF.flinch; animT = now - flAt; }
     else if (aSt.key === "victory" || aSt.key === "casting") anim = { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true };
@@ -6753,7 +6832,7 @@ function raf() {
       .catch(() => {});
   });
 
-  // Jotarov stand Star Platinum — kreslí `_P` pás podľa aktuálnej animácie Jotara; summon intro RAZ pri
+  // Jotarov stand Star Platinum - kreslí `_P` pás podľa aktuálnej animácie Jotara; summon intro RAZ pri
   // nasadení (Summon_P, relatívny čas), Dead_P pri smrti. Vždy viditeľný pri žijúcom Jotarovi.
   ["p1", "p2"].forEach(slot => {
     const el = standEls[slot];
@@ -6778,7 +6857,7 @@ function raf() {
     const dead = (st.hp ?? 1) <= 0 || st.down;
     let file = null, drawT = now, loop = true, fps = 8;
 
-    // smrť: stand sa „odsummonuje" — Dead_P sa prehrá RAZ a potom stand ZMIZNE (predtým loopoval → prebliakval).
+    // smrť: stand sa „odsummonuje" - Dead_P sa prehrá RAZ a potom stand ZMIZNE (predtým loopoval → prebliakval).
     if (dead) {
       if (!standDeadStart[slot]) standDeadStart[slot] = now;
       const t = now - standDeadStart[slot];
@@ -6788,13 +6867,13 @@ function raf() {
       standDeadStart[slot] = 0; // Jotaro žije (napr. nová hra) → priprav sviežu smrť
     }
 
-    // MOVE-blip: stand zmizne (Dead_P) na starej bunke a zjaví sa (Summon_P) na novej — snap (bez sklzu).
+    // MOVE-blip: stand zmizne (Dead_P) na starej bunke a zjaví sa (Summon_P) na novej - snap (bez sklzu).
     // Pozíciu tu riadi RAF (transition none); positionActors sa medzitým standu nedotýka (skip pri standBlip).
     const blip = standBlip[slot];
     if (!dead && blip) {
       const t = now - blip.start;
       if (t >= SP_BLIP_DEAD_MS + SP_BLIP_SUMMON_MS) {
-        standBlip[slot] = null; el.style.transition = ""; // koniec blipu — pozíciu zas preberá positionActors
+        standBlip[slot] = null; el.style.transition = ""; // koniec blipu - pozíciu zas preberá positionActors
       } else {
         const phase2 = t >= SP_BLIP_DEAD_MS;
         const cx = phase2 ? st.x : blip.ox, cy = phase2 ? st.y : blip.oy;
@@ -6809,7 +6888,7 @@ function raf() {
         file = phase2 ? "Summon_P.png" : "Dead_P.png";
         drawT = phase2 ? (t - SP_BLIP_DEAD_MS) : t;
         loop = false;
-        fps = phase2 ? 8 : 12; // Summon_P 5f/650ms, Dead_P 6f/500ms — dohrajú sa RAZ v rámci svojej fázy
+        fps = phase2 ? 8 : 12; // Summon_P 5f/650ms, Dead_P 6f/500ms - dohrajú sa RAZ v rámci svojej fázy
       }
     }
     if (!file && !dead && !standSummoned[slot]) { // summon intro (Summon_P) RAZ od nasadenia
@@ -6823,7 +6902,7 @@ function raf() {
       if (!dead && standSwapActive(slot)) file = standAttack[slot].file;
       else file = standFileFor(slot);
     }
-    // ukotvené za NOHY (anchorY 1 + per-frame feet x/botGap) — nohy ostanú STATICKÉ počas celej animácie
+    // ukotvené za NOHY (anchorY 1 + per-frame feet x/botGap) - nohy ostanú STATICKÉ počas celej animácie
     // (nešklbú sa zľava-doprava ani hore-dole, aj keď päsť vyletí bokom); fill normalizovaný podľa výšky framu.
     // vertikálny float / swap-na-zem je v CSS transforme (positionActors / blip vyššie).
     const anim = { file, fps, loop };
@@ -6838,7 +6917,7 @@ function raf() {
       .catch(() => {});
   });
 
-  // summon kópia (Narutov clone_summon) — dočasný canvas na tej istej bunke hrá Special_2 tvárou v tvár
+  // summon kópia (Narutov clone_summon) - dočasný canvas na tej istej bunke hrá Special_2 tvárou v tvár
   cloneSummonFx = cloneSummonFx.filter(f => f.el.isConnected);
   for (const f of cloneSummonFx) {
     const ctx = f.el.getContext("2d");
@@ -6847,7 +6926,7 @@ function raf() {
       .catch(() => {});
   }
 
-  // ghost KLONA — budúca pozícia vlastného klona po naplánovaných movoch (inverzná vertikála)
+  // ghost KLONA - budúca pozícia vlastného klona po naplánovaných movoch (inverzná vertikála)
   {
     const ctx = cloneGhost.getContext("2d");
     const mine = state?.[me];
@@ -6908,7 +6987,7 @@ function raf() {
   }
 
   // labyrint: obrys súpera. Keď lovec (alebo jeho tieňový klon) PRÁVE stojí na niektorej mojej fakľovej
-  // bunke (server pole hunterHere — moja bunka + bunka môjho klona), ukáž tam každú jeho figúru OŽIARENÚ
+  // bunke (server pole hunterHere - moja bunka + bunka môjho klona), ukáž tam každú jeho figúru OŽIARENÚ
   // a správajúcu sa ako mimo labyrintu: normálny pairShift rozostup, tvárou ku mne, živý idle. Inak čierna
   // statická silueta na bunke posledného stretnutia s niťou (threadMark), ako doteraz.
   {
@@ -6972,9 +7051,9 @@ function raf() {
       box.classList.remove("in-maze");
       return;
     }
-    // labyrint: CELÝ súperov widget prekrýva bludisko (assets/minotaur/labyrint.png cez CSS .in-maze) —
+    // labyrint: CELÝ súperov widget prekrýva bludisko (assets/minotaur/labyrint.png cez CSS .in-maze) -
     // blúdiaci (labyrinth) aj skrytý Minotaur (x null): obaja si navzájom vidia len bludisko.
-    // labReveal (istý zásah v tomto ťahu) widget odkryje ešte pred animáciou akcie — HP/mana sú späť.
+    // labReveal (istý zásah v tomto ťahu) widget odkryje ešte pred animáciou akcie - HP/mana sú späť.
     const inMaze = slot !== me && ((st.labyrinth && !st.labReveal) || st.x == null);
     box.classList.toggle("in-maze", inMaze);
     if (inMaze) {
@@ -6993,7 +7072,7 @@ function raf() {
 
     // mŕtvy: prehraj Dead raz od momentu úmrtia a zamrzni na poslednom frame
     const dir = charDirFor(st.char, slot);
-    // THE WORLD: zmraz aj súperov HUD portrét (čas stojí — všetko okrem Jotara zamrzne)
+    // THE WORLD: zmraz aj súperov HUD portrét (čas stojí - všetko okrem Jotara zamrzne)
     const tsFrozenHud = tsActive && slot !== tsJotaroSlot;
     let anim = ANIM_DEF.idle, t = tsFrozenHud ? tsFreezeAt : (stonedHud ? 0 : now);
     if (hp <= 0) {
@@ -7020,7 +7099,7 @@ function raf() {
       .catch(() => {});
   });
 
-  // HUD hlavy magov + swap badge hlavy — animovaný výrez hlavy z idle spritu
+  // HUD hlavy magov + swap badge hlavy - animovaný výrez hlavy z idle spritu
   document.querySelectorAll("canvas.mage-head[data-char]").forEach(cvs => drawMageHeadAnim(cvs, cvs.dataset.char, now));
 
   // specials v strede
@@ -7049,7 +7128,7 @@ function raf() {
       return;
     }
     // Jotarov pár (telo/stand): normalizovaný fill (fh/REF) + nohy ukotvené (anchorY 1) so zarovnaním
-    // cez botGap — nohy oboch figúr sedia na tej istej základni (rovnako ako na doske)
+    // cez botGap - nohy oboch figúr sedia na tej istej základni (rovnako ako na doske)
     if (cvs.dataset.jfig) {
       const anim = { file, fps: Number(cvs.dataset.fps) || 8, loop: true };
       const t = performance.now();
@@ -7078,7 +7157,7 @@ function raf() {
   // nabíjacie aury (golden Last Stand / červená Last Hope / bežný recharge) plynulo sledujú postavu počas pohybu
   document.querySelectorAll(".charge-aura[data-slot]").forEach(cont => placeChargeAura(cont, cont.dataset.slot));
 
-  // Last Stand — trvalý golden stav riadený serverom (state[slot].lastStandBuff):
+  // Last Stand - trvalý golden stav riadený serverom (state[slot].lastStandBuff):
   // žiara postavy (actorFilter) + zlatý HUD + recharge aura + priehľadný démon za postavou
   {
     const buffSlot = state?.p1?.lastStandBuff ? "p1" : state?.p2?.lastStandBuff ? "p2" : null;
@@ -7090,18 +7169,18 @@ function raf() {
       hudBoxP1.classList.toggle("death-golden", goldOn && buffSlot === "p1");
       hudBoxP2.classList.toggle("death-golden", goldOn && buffSlot === "p2");
       if (goldOn && now - _lsAuraAt > 950) { spawnChargeAura(buffSlot, true); _lsAuraAt = now; } // permanentná golden recharge
-      // démon sa drží za postavou na 0.25 — naviazaný na ŽIVÚ (interpolovanú) pozíciu sprite-u postavy,
-      // takže sa kĺže spolu s ňou (nie teleport). Drží sa keď postava STOJÍ (server flag !st.down) — počas
+      // démon sa drží za postavou na 0.25 - naviazaný na ŽIVÚ (interpolovanú) pozíciu sprite-u postavy,
+      // takže sa kĺže spolu s ňou (nie teleport). Drží sa keď postava STOJÍ (server flag !st.down) - počas
       // summon/banish prechodov (st.down=true, resp. _lsBanishing) ho riadia efekty. State-driven = robustné.
       const tgt = state[buffSlot];
-      // labyrint: skrytý buffnutý hráč (x null) — priehľadný démon za postavou sa skryje,
+      // labyrint: skrytý buffnutý hráč (x null) - priehľadný démon za postavou sa skryje,
       // nemá ho kam sledovať (inak by ostal svietiť na starej/rohovej pozícii a prezradil buff)
       if (tgt && tgt.x == null) {
         deathBehind.style.opacity = "0";
       } else if (_lsBanishing && tgt && tgt.down) {
-        // po banish kille hráč leží mŕtvy — démon za postavou nemá za kým visieť; stavová poistka
+        // po banish kille hráč leží mŕtvy - démon za postavou nemá za kým visieť; stavová poistka
         // drží nulu každý tick (fill-forwards animácia banishu mohla racenúť so state updatom).
-        // Summon choreografiu (down=true, _lsBanishing=false) sa toto nedotýka — revive riadi efekt.
+        // Summon choreografiu (down=true, _lsBanishing=false) sa toto nedotýka - revive riadi efekt.
         deathBehind.style.opacity = "0";
       } else if (!_lsBanishing && tgt && tgt.char && !tgt.down) {
         // pozícia sleduje postavu per-frame (bez transition); opacity 0.25 dotiahne CSS transition plynulo (z 1 po settle)
@@ -7117,7 +7196,7 @@ function raf() {
         deathBehind.style.opacity = String(DEATH_SEQ.behindOpacity);
       }
     } else if (_lsRealActive) {
-      // koniec buffnutého stavu (smrť/výhra) — uprac
+      // koniec buffnutého stavu (smrť/výhra) - uprac
       _lsRealActive = false; _lsBanishing = false; _deathGoldenSlot = null;
       hudBoxP1.classList.remove("death-golden");
       hudBoxP2.classList.remove("death-golden");
@@ -7127,13 +7206,13 @@ function raf() {
     }
   }
 
-  // DEATH summon — framy do oboch canvasov: stredový overlay (fill 1.0) + „za postavou" (ako postava: ACTOR rozmer)
+  // DEATH summon - framy do oboch canvasov: stredový overlay (fill 1.0) + „za postavou" (ako postava: ACTOR rozmer)
   ensureSpriteMeta(DEATH_DIR, DEATH_ANIM.file).then(meta => {
     drawSprite(deathCenter.getContext("2d"), meta, DEATH_ANIM, now, deathCenter.width, deathCenter.height, 1.0);
     drawSprite(deathBehind.getContext("2d"), meta, DEATH_ANIM, now, ACTOR_W, ACTOR_H);
   }).catch(()=>{});
 
-  // Last Hope — trvalý červený ultra mód (state[slot].lastHopeBuff): pulzujúci červený mana bar + periodická červená aura
+  // Last Hope - trvalý červený ultra mód (state[slot].lastHopeBuff): pulzujúci červený mana bar + periodická červená aura
   {
     const hopeSlot = state?.p1?.lastHopeBuff ? "p1" : state?.p2?.lastHopeBuff ? "p2" : null;
     hudBoxP1.classList.toggle("hope-red", hopeSlot === "p1");
@@ -7150,7 +7229,7 @@ function raf() {
     }
   }
 
-  // Last Hope summon — hope sprite do stredového overlay (viditeľnosť riadi opacity cez hopeCenterAppear/Disappear)
+  // Last Hope summon - hope sprite do stredového overlay (viditeľnosť riadi opacity cez hopeCenterAppear/Disappear)
   ensureSpriteMeta(HOPE_DIR, HOPE_ANIM.file).then(meta => {
     drawSprite(hopeCenter.getContext("2d"), meta, HOPE_ANIM, now, hopeCenter.width, hopeCenter.height, 1.0);
   }).catch(()=>{});
@@ -7160,7 +7239,7 @@ function raf() {
 requestAnimationFrame(raf);
 
 /* ---------- Initial ---------- */
-// hydratácia pixel ikon — [data-emoji] dostanú pixelizovaný emoji canvas,
+// hydratácia pixel ikon - [data-emoji] dostanú pixelizovaný emoji canvas,
 // [data-pix] ručne kreslené SVG z PIX knižnice (HP/mana v HUD)
 hydratePix();
 document.querySelectorAll(".pix-ico[data-pix]").forEach(el => { el.innerHTML = pixSvg(el.dataset.pix); });
@@ -7174,18 +7253,18 @@ clearActionLogs(); // skeleton placeholderov v zázname kola od začiatku
 
 // hover preview pre special (const specialBtn je deklarovaný pri controls)
 if (specialBtn){
-  // preview z ghost pozície — special by sa vykonal po už naplánovaných akciách
+  // preview z ghost pozície - special by sa vykonal po už naplánovaných akciách
   specialBtn.addEventListener("mouseenter", ()=>{
     const char = ghostCharAt();   // po prípadnom swape vo fronte = nový mág
     const p = ghostPos();
     if (!char || !p) return;
-    if (char === "medusa" || char === "escanor" || char === "werewolf") return; // smerový special — preview ukazujú až šípky pickeru
-    if (char === "jotaro" && state?.[me]?.worldUsed) return; // Special 2 je smerový — preview ukáže L/R picker
+    if (char === "medusa" || char === "escanor" || char === "werewolf") return; // smerový special - preview ukazujú až šípky pickeru
+    if (char === "jotaro" && state?.[me]?.worldUsed) return; // Special 2 je smerový - preview ukáže L/R picker
     showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, worldUsed: state?.[me]?.worldUsed }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
 }
-// hover preview zóny Medúzinho specialu na šípkach pickeru (←/→) — z ghost pozície
+// hover preview zóny Medúzinho specialu na šípkach pickeru (←/→) - z ghost pozície
 specialPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
   btn.addEventListener("mouseenter", () => {
@@ -7196,13 +7275,13 @@ specialPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
-// hover preview Jotarovho Special 1 na šípkach s1-pickera (←/→) — obe diagonály strany z ghost pozície
+// hover preview Jotarovho Special 1 na šípkach s1-pickera (←/→) - obe diagonály strany z ghost pozície
 s1Picker?.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
   btn.addEventListener("mouseenter", () => { const p = ghostPos(); if (p) showPreviewCells(cellsForJotaroS1(p, dir)); });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
-// hover preview dráhy vlkolakovho charge na šípkach 8-smerového pickera — z ghost pozície,
+// hover preview dráhy vlkolakovho charge na šípkach 8-smerového pickera - z ghost pozície,
 // stop na viditeľnej figúre súpera (foe); skrytý súper v labyrinte → dráha až na okraj
 wolfPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
@@ -7214,7 +7293,7 @@ wolfPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
 
-// hover preview zásahovej bunky melee — vlastná bunka z ghost pozície po naplánovaných akciách
+// hover preview zásahovej bunky melee - vlastná bunka z ghost pozície po naplánovaných akciách
 // (meleeBtn je deklarovaný pri controls; Countess/Onre dráhy ukazujú až šípky vamp pickera)
 if (meleeBtn) {
   meleeBtn.addEventListener("mouseenter", () => {
@@ -7224,7 +7303,7 @@ if (meleeBtn) {
   meleeBtn.addEventListener("mouseleave", clearPreviewCells);
 }
 // hover preview dráhy charge Vampire/Onryō na šípkach dash pickera (dash = charge; stop na
-// viditeľnej figúre súpera) — pre ostatné postavy dash hover nič neukazuje (čistý pohyb)
+// viditeľnej figúre súpera) - pre ostatné postavy dash hover nič neukazuje (čistý pohyb)
 dashPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
   btn.addEventListener("mouseenter", () => {
@@ -7245,7 +7324,7 @@ aimPickerDiag?.querySelectorAll("button[data-act]").forEach(btn => {
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
 
-// hover preview dráhy strely na šípkach aim pickeru — z ghost pozície po naplánovaných akciách
+// hover preview dráhy strely na šípkach aim pickeru - z ghost pozície po naplánovaných akciách
 aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
   btn.addEventListener("mouseenter", () => {
@@ -7265,7 +7344,7 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   const btn = document.createElement("button");
   btn.id = "admin-reset";
   btn.textContent = "Reset this room";
-  btn.title = "Zruší LEN túto roomku — odpojí jej hráčov aj divákov (späť na room-browser)";
+  btn.title = "Zruší LEN túto roomku - odpojí jej hráčov aj divákov (späť na room-browser)";
   btn.style.position = "fixed";
   btn.style.right = "14px";
   btn.style.bottom = "14px";
@@ -7288,7 +7367,7 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
 })();
 
 /* ---------- DEBUG: hope sprite animácia (?hopedebug=1) ----------
-   Samostatný náhľad — nájdi správny počet framov v sprite_strip.png (frame inference predpokladá štvorec).
+   Samostatný náhľad - nájdi správny počet framov v sprite_strip.png (frame inference predpokladá štvorec).
    [ / ]  počet framov   |   - / =  fps   |   ←/→  ručný krok   |   medzerník  pauza   |   0  auto */
 (function hopeDebug() {
   const params = new URLSearchParams(location.search);

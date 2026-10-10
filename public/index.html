@@ -18,7 +18,7 @@
     <div class="hud-turn" id="hud-turn"></div>
     <!-- Odpočet času na ťah -->
     <div id="turn-timer" class="turn-timer hidden"></div>
-    <!-- Indikácia čakania na ťah — kto je locknutý a na koho sa čaká -->
+    <!-- Indikácia čakania na ťah - kto je locknutý a na koho sa čaká -->
     <div id="turn-status" class="turn-status hidden"></div>
     <!-- „ROUND N" animácia medzi kolami (round-script ostane vidieť, kým dobehne) -->
     <div id="round-banner" class="round-banner hidden"></div>
@@ -32,7 +32,7 @@
           <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
           <!-- žrď -->
           <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
-          <!-- látka — plochá zelená so zúbkovaným swallowtail zárezom -->
+          <!-- látka - plochá zelená so zúbkovaným swallowtail zárezom -->
           <polygon fill="#2e7d32" stroke="#1b5e20" stroke-width="3" points="
             16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
             78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
@@ -79,7 +79,7 @@
           <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
           <!-- žrď -->
           <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
-          <!-- látka — plochá zelená so zúbkovaným swallowtail zárezom -->
+          <!-- látka - plochá zelená so zúbkovaným swallowtail zárezom -->
           <polygon fill="#2e7d32" stroke="#1b5e20" stroke-width="3" points="
             16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
             78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
@@ -136,11 +136,11 @@
 
   <!-- Controls toolbar -->
   <div class="controls-row">
-    <!-- Last Hope — úvodná akcia NEbuffnutého hráča vo FINAL ROUND (naľavo od golden shield/mirror).
+    <!-- Last Hope - úvodná akcia NEbuffnutého hráča vo FINAL ROUND (naľavo od golden shield/mirror).
          Vykoná sa pred všetkým ostatným: HP padne na 1, mana sa naplní na 10, hráč dáva 4× dmg do konca kola. -->
     <button id="last-hope-btn" class="btn act lasthope hidden" title="Last Hope (FINAL ROUND) - lose all HP but 1, refill mana to 10, deal 4× damage for the rest of the round. Resolves before everything else."><img class="lh-ico" src="/assets/last_hope.png" alt="Last Hope" /><span class="cost lh-cost"><span class="pix-ico mini" data-emoji="❤️"></span>→<span class="pix-ico mini" data-emoji="💧"></span></span></button>
 
-    <!-- Golden predťah — jedno tlačidlo naľavo od panela, predelené na 2 polovice (ŠTÍT | MIRROR);
+    <!-- Golden predťah - jedno tlačidlo naľavo od panela, predelené na 2 polovice (ŠTÍT | MIRROR);
          len pre hráča, ktorý v kole nezačína; rozsvieti sa vždy len zvolená polovica -->
     <div id="golden-btn" class="btn act golden golden-split hidden">
       <button type="button" class="golden-half shield-half" data-gold="shield" title="Golden Shield (−3 mana) - extra action resolved before the round starts. Available only when you go second."><span class="g-ico pix-ico" data-emoji="🛡️"></span><span class="cost">−3<span class="pix-ico mini" data-emoji="💧"></span></span></button>
@@ -149,9 +149,9 @@
 
   <div class="controls">
     <div class="actions">
-      <!-- skupiny akcií — label so „zátvorkou" nad sekciou -->
+      <!-- skupiny akcií - label so „zátvorkou" nad sekciou -->
       <div class="act-group" data-label="MOVE">
-        <!-- Move — otvorí výber smeru -->
+        <!-- Move - otvorí výber smeru -->
         <div class="move-wrap">
           <button id="move-btn" class="btn act move" title="Move - choose a direction"><span class="pix-ico" data-emoji="🚶"></span></button>
           <div id="dir-picker" class="dir-picker hidden">
@@ -162,7 +162,7 @@
           </div>
         </div>
 
-        <!-- Dash — presun až o 2 políčka zvoleným smerom -->
+        <!-- Dash - presun až o 2 políčka zvoleným smerom -->
         <div class="move-wrap">
           <button id="dash-btn" class="btn act dash" title="Dash - move up to 2 cells in a direction (−4 mana)"><span class="pix-ico" data-emoji="🏃"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span></span></button>
           <div id="dash-picker" class="dir-picker hidden">
@@ -175,7 +175,7 @@
       </div>
 
       <div class="act-group" data-label="ATTACK">
-        <!-- Attack — otvorí výber smeru streľby -->
+        <!-- Attack - otvorí výber smeru streľby -->
         <div class="move-wrap">
           <button id="attack-btn" class="btn act attack" title="Range Attack - choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)"><span class="pix-ico" data-emoji="🏹"></span><span class="cost">−1<span class="pix-ico mini" data-emoji="💧"></span> ?<span class="pix-ico mini" data-emoji="☠️"></span></span></button>
           <div id="aim-picker" class="dir-picker hidden">
@@ -184,7 +184,7 @@
             <button class="btn arrow right" data-act="attack:right" title="Shoot Right">→</button>
             <button class="btn arrow down"  data-act="attack:down"  title="Shoot Down">↓</button>
           </div>
-          <!-- Countess/Onre: diagonálny basic — 4 diagonálne smery namiesto ortogonálnych -->
+          <!-- Countess/Onre: diagonálny basic - 4 diagonálne smery namiesto ortogonálnych -->
           <div id="aim-picker-diag" class="dir-picker diag-picker hidden">
             <button class="btn arrow ul" data-act="attack:up_left"    title="Shoot Up-Left">↖</button>
             <button class="btn arrow ur" data-act="attack:up_right"   title="Shoot Up-Right">↗</button>
@@ -192,11 +192,11 @@
             <button class="btn arrow dr" data-act="attack:down_right" title="Shoot Down-Right">↘</button>
           </div>
         </div>
-        <!-- Melee — úder na vlastnej bunke (všetky postavy, bez pickera) -->
+        <!-- Melee - úder na vlastnej bunke (všetky postavy, bez pickera) -->
         <div class="move-wrap">
           <button id="melee-btn" class="btn act melee" title="Melee (−4 mana, 8 dmg, hits only an opponent on your cell)"><span class="pix-ico" data-emoji="🗡️"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span> 8<span class="pix-ico mini" data-emoji="☠️"></span></span></button>
         </div>
-        <!-- Special — Medúza si navyše vyberá smer pohľadu (vľavo/vpravo), ostatní kliknú priamo -->
+        <!-- Special - Medúza si navyše vyberá smer pohľadu (vľavo/vpravo), ostatní kliknú priamo -->
         <div class="move-wrap">
           <button id="special-btn" class="btn act special" title="Special (−5 mana)"><span class="pix-ico" data-emoji="✨"></span><span class="cost">−5<span class="pix-ico mini" data-emoji="💧"></span></span></button>
           <!-- Vojak: mini mapa plochy na výber cieľovej bunky lúča (naplní client.js buildCellPicker) -->
@@ -205,7 +205,7 @@
             <button class="btn arrow left"  data-act="special:left"  title="Gaze Left">←</button>
             <button class="btn arrow right" data-act="special:right" title="Gaze Right">→</button>
           </div>
-          <!-- Vlkolak: charge — 8 smerov (aj diagonály) v 3×3 mriežke -->
+          <!-- Vlkolak: charge - 8 smerov (aj diagonály) v 3×3 mriežke -->
           <div id="wolf-picker" class="dir-picker wolf-picker hidden">
             <button class="btn arrow ul" data-act="special:up_left"    title="Charge Up-Left">↖</button>
             <button class="btn arrow up" data-act="special:up"         title="Charge Up">↑</button>
@@ -222,13 +222,13 @@
 
       <div class="act-group" data-label="DEFEND">
         <button class="btn act shield" data-act="shield" title="Shield (−2 mana, blocks all damage of the opponent's next action)"><span class="pix-ico" data-emoji="🛡️"></span><span class="cost">−2<span class="pix-ico mini" data-emoji="💧"></span></span></button>
-        <!-- Mirror — Jotaro tento slot nemá: syncMirrorBtn ho premení na Special 1 (fialový ❔ skin + L/R picker) -->
+        <!-- Mirror - Jotaro tento slot nemá: syncMirrorBtn ho premení na Special 1 (fialový ❔ skin + L/R picker) -->
         <div class="move-wrap">
           <button id="mirror-btn" class="btn act mirror" data-act="mirror" title="Mirror (−4 mana, reflects all damage of the opponent's next action back at them)"><span class="pix-ico" data-emoji="🪞"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span></span></button>
           <!-- Jotaro Special 1: smer left/right (Star Platinum udrie na obe diagonály strany) -->
           <div id="s1-picker" class="dir-picker special-picker hidden">
-            <button class="btn arrow left"  data-act="special1:left"  title="Star Platinum — Left">←</button>
-            <button class="btn arrow right" data-act="special1:right" title="Star Platinum — Right">→</button>
+            <button class="btn arrow left"  data-act="special1:left"  title="Star Platinum - Left">←</button>
+            <button class="btn arrow right" data-act="special1:right" title="Star Platinum - Right">→</button>
           </div>
         </div>
       </div>
@@ -246,18 +246,18 @@
     </div>
   </div>
 
-    <!-- Golden Mana | Last Stand — jedno tlačidlo rozdelené na 2 polovice (ako golden shield/mirror), vzájomne výlučné. Vykoná sa po konci kola. -->
+    <!-- Golden Mana | Last Stand - jedno tlačidlo rozdelené na 2 polovice (ako golden shield/mirror), vzájomne výlučné. Vykoná sa po konci kola. -->
     <div id="gold-dual-btn" class="btn act golden golden-split hidden">
       <button type="button" class="golden-half gm-half" data-dual="mana" title="Golden Mana Refill (+6 mana for HP, cost grows each use) - extra action resolved after the round ends."><span class="g-ico pix-ico" data-emoji="🙏"></span><span class="cost gm-gain">+6<span class="pix-ico mini" data-emoji="💧"></span></span><span class="cost gm-hp" id="gm-cost">−1<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
       <button type="button" class="golden-half ls-half" data-dual="laststand" title="Last Stand (−10 HP) - the demon kills you and revives you at full HP/mana. Next round is your LAST: you deal 2× damage and take ½, but if you don't kill the opponent you die. The demon is shared - only one player can summon it. Locks this gold button for both next round."><img class="ls-ico" src="/assets/last_stand.png" alt="Last Stand" /><span class="cost">−10<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
     </div>
 
-    <!-- Démon útok — len pre buffnutého hráča v poslednom (FINAL) kole, namiesto zamknutého gold dual buttonu.
+    <!-- Démon útok - len pre buffnutého hráča v poslednom (FINAL) kole, namiesto zamknutého gold dual buttonu.
          Zaberá jeden z 3 akčných slotov; 10 dmg na všetky políčka okrem toho, na ktorom stojíš. -->
     <button id="demon-btn" class="btn act demon hidden" title="Demon Attack (−10 mana) - 10 damage to every cell except the one you stand on. Counts as one of your 3 actions; only in your FINAL ROUND."><img class="ls-ico" src="/assets/last_stand.png" alt="Demon" /><span class="cost">−10<span class="pix-ico mini" data-emoji="💧"></span></span></button>
   </div>
 
-  <!-- Character select — skryté by default, nech pri načítaní nepreblikne pred loginom (JS ho zobrazí pri hre) -->
+  <!-- Character select - skryté by default, nech pri načítaní nepreblikne pred loginom (JS ho zobrazí pri hre) -->
   <div id="char-select" class="char-select hidden">
     <!-- výber postáv je stránkovaný: str. 0 = základní magovia, str. 1 = experimentálne postavy -->
     <div class="char-page-title" id="char-page-title">Mages</div>
@@ -316,12 +316,12 @@
           <div class="char-name">Naruto</div>
         </div>
       </div>
-      <!-- skrytá stránka „Hidden" — easter egg: nie je v CHAR_PAGES (šípky sa na ňu nedostanú),
+      <!-- skrytá stránka „Hidden" - easter egg: nie je v CHAR_PAGES (šípky sa na ňu nedostanú),
            otvára ju len runa v ľavom hornom rohu (#hidden-rune); pravá šípka z nej vracia na str. 0 -->
       <div class="char-cards hidden" data-page="hidden">
         <!-- nové postavy sú viazané na STRANU hráča: P1 vidí LEN Countess Vampire, P2 LEN Onre
              (karta druhej strany je skrytá cez CSS podľa #char-select.p2-side + data-side).
-             Hrateľné len v single/bo3 — v turnaji sa na Hidden stránku nedá dostať (runeActive). -->
+             Hrateľné len v single/bo3 - v turnaji sa na Hidden stránku nedá dostať (runeActive). -->
         <div class="char-card hidden-char" data-char="countess" data-side="p1">
           <canvas class="char-canvas" width="220" height="240" data-char="countess"></canvas>
           <div class="char-stats hidden" data-char="countess"><span class="char-hp"></span><span class="char-mana"></span></div>
@@ -332,26 +332,26 @@
           <div class="char-stats hidden" data-char="onre"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Onryō</div>
         </div>
-        <!-- Jotaro (JJBA, stand Star Platinum) — HRATEĽNÝ, viazaný na P2 ako Onryō -->
+        <!-- Jotaro (JJBA, stand Star Platinum) - HRATEĽNÝ, viazaný na P2 ako Onryō -->
         <div class="char-card hidden-char" data-char="jotaro" data-side="p2">
           <canvas class="char-canvas" width="220" height="240" data-char="jotaro"></canvas>
           <div class="char-stats hidden" data-char="jotaro"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Jotaro</div>
         </div>
-        <!-- Luffy (One Piece) — HRATEĽNÝ (WIP), viazaný na P1 ako Vampire. WIP páska ostáva,
+        <!-- Luffy (One Piece) - HRATEĽNÝ (WIP), viazaný na P1 ako Vampire. WIP páska ostáva,
              kým nebude hotový (base/gear3 módy, gear3 pull, chess special). -->
         <div class="char-card hidden-char" data-char="luffy" data-side="p1">
           <canvas class="char-canvas" width="220" height="240" data-char="luffy"></canvas>
           <div class="char-stats hidden" data-char="luffy"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Luffy</div>
-          <!-- rozpracovaná postava — diagonálna WIP páska v pravom hornom rohu (ostáva do dokončenia) -->
+          <!-- rozpracovaná postava - diagonálna WIP páska v pravom hornom rohu (ostáva do dokončenia) -->
           <div class="wip-ribbon">WIP</div>
         </div>
         <div class="char-card soon"><div class="soon-mark">???</div><div class="char-name">Coming soon</div></div>
       </div>
       <button id="char-page-next" class="char-arrow" title="Experimental">&#9654;</button>
     </div>
-    <!-- turnajový draft: potvrdenie tímu 3 postáv — viditeľné len v team-mode (fáza team_select) -->
+    <!-- turnajový draft: potvrdenie tímu 3 postáv - viditeľné len v team-mode (fáza team_select) -->
     <div class="team-bar">
       <button id="team-confirm" class="team-confirm" disabled>PICK YOUR TEAM (0/3)</button>
     </div>
@@ -359,14 +359,14 @@
     <div id="char-ability" class="char-ability hidden">
       <div class="ca-title" id="ca-title"></div>
       <div class="ca-grid" id="ca-grid"></div>
-      <!-- pride/moon riadok — vždy prítomný fixný slot (nech centrovanie panelu neskáče podľa postavy);
+      <!-- pride/moon riadok - vždy prítomný fixný slot (nech centrovanie panelu neskáče podľa postavy);
            vnútri sa pride (Escanor) a moon (Vlkolak) prepínajú cez .hidden, prázdny slot drží výšku -->
       <div class="ca-extra">
-        <!-- Escanor: pride level pod mini-doskou — lev + číslo ako v HUD widgete, cyklí spolu s náhľadom zóny -->
+        <!-- Escanor: pride level pod mini-doskou - lev + číslo ako v HUD widgete, cyklí spolu s náhľadom zóny -->
         <div class="ca-pride hidden" id="ca-pride"><img src="/assets/pride_lion_0.png" alt="Pride" /><span class="pride-num">0</span></div>
-        <!-- Vlkolak: fáza mesiaca + dmg pod mini-doskou — cyklí 0→3 (naplní client.js syncCaMoon) -->
+        <!-- Vlkolak: fáza mesiaca + dmg pod mini-doskou - cyklí 0→3 (naplní client.js syncCaMoon) -->
         <div class="ca-moon hidden" id="ca-moon"><img src="/assets/moon_0.png" alt="Moon" /><span class="ca-moon-dmg"></span></div>
-        <!-- Luffy: mód (base/gear3) + dmg pod mini-doskou — cyklí base↔gear3 spolu so zónou (naplní syncCaLuffy) -->
+        <!-- Luffy: mód (base/gear3) + dmg pod mini-doskou - cyklí base↔gear3 spolu so zónou (naplní syncCaLuffy) -->
         <div class="ca-luffy hidden" id="ca-luffy"><img src="/assets/luffy/base.png" alt="Gear" /><span class="ca-luffy-dmg"></span></div>
       </div>
       <div class="ca-text" id="ca-text"></div>
@@ -374,7 +374,7 @@
     </div>
   </div>
 
-  <!-- Easter egg: runa (kľúčová dierka) v ľavom hornom rohu — client.js jej riadi opacity podľa
+  <!-- Easter egg: runa (kľúčová dierka) v ľavom hornom rohu - client.js jej riadi opacity podľa
        vzdialenosti kurzora od rohu; klik spustí glitch prechod na skrytú stránku postáv „Hidden" -->
   <div id="hidden-rune" class="hidden-rune" title="???" aria-hidden="true">
     <svg viewBox="0 0 24 24">
@@ -383,7 +383,7 @@
     </svg>
   </div>
 
-  <!-- Losovanie farieb po nastavení zápasu — točiaca sa strelka na yin-yang kruhu skončí na farbe hráča.
+  <!-- Losovanie farieb po nastavení zápasu - točiaca sa strelka na yin-yang kruhu skončí na farbe hráča.
        Pridelenie urobil server ešte pred animáciou (p1 = biely vľavo a začína, p2 = čierny vpravo). -->
   <div id="color-roll" class="color-roll hidden">
     <div class="cr-title">DRAWING SIDES…</div>
@@ -407,15 +407,15 @@
     <div class="cr-result hidden" id="cr-result"></div>
   </div>
 
-  <!-- Tretí a ďalší pripojený hráč — hra je plná, len informačná hláška -->
+  <!-- Tretí a ďalší pripojený hráč - hra je plná, len informačná hláška -->
   <div id="spectator" class="spectator hidden">Game in progress…</div>
 
-  <!-- Chyba spojenia pri odosielaní ťahu — server nepotvrdil prijatie, treba potvrdiť znova -->
+  <!-- Chyba spojenia pri odosielaní ťahu - server nepotvrdil prijatie, treba potvrdiť znova -->
   <div id="conn-error" class="conn-error hidden">
     ⚠ Move could not be delivered (connection error). Check your network and <b>lock in your move again</b>.
   </div>
 
-  <!-- Úvodná obrazovka — nastavenia zápasu (vidí len host = prvý pripojený) -->
+  <!-- Úvodná obrazovka - nastavenia zápasu (vidí len host = prvý pripojený) -->
   <div id="lobby" class="lobby hidden">
     <div class="lobby-card">
       <h1 class="lobby-title">ARENA</h1>
@@ -512,7 +512,7 @@
     </div>
   </div>
 
-  <!-- Game over — verdikt sa píše do hud-turn, tu je len Play again v strede -->
+  <!-- Game over - verdikt sa píše do hud-turn, tu je len Play again v strede -->
   <div id="gameover" class="gameover hidden">
     <div class="go-buttons">
       <button id="retry" class="retry">Play again?</button>
@@ -520,7 +520,7 @@
     </div>
   </div>
 
-  <!-- Room browser — po logine; zatiaľ 1 roomka (create / join / spectate) -->
+  <!-- Room browser - po logine; zatiaľ 1 roomka (create / join / spectate) -->
   <div id="rooms" class="rooms hidden">
     <div class="rooms-card">
       <h1 class="rooms-title">ARENA</h1>
@@ -528,7 +528,7 @@
     </div>
   </div>
 
-  <!-- Prihlásenie — meno + heslo (brána pred pripojením); ostane skryté, kým JS nerozhodne -->
+  <!-- Prihlásenie - meno + heslo (brána pred pripojením); ostane skryté, kým JS nerozhodne -->
   <div id="login" class="login hidden">
     <form id="login-form" class="login-card">
       <h1 class="login-title">ARENA</h1>
