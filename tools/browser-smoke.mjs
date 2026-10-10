@@ -276,6 +276,9 @@ async function runAgainst(root, label) {
       }
       log(`${side}: UI sonda ${chars.length} postáv`);
       host.sock.close();
+      // stránku odpoj skôr, než zhasne pomocný server (inak socket reconnect = ERR_CONNECTION_REFUSED)
+      await br.send("Page.navigate", { url: "about:blank" });
+      await sleep(300);
       probeSrv?.kill();
       await sleep(500);
     }

@@ -6,7 +6,7 @@ import * as G from "/shared/geometry.js";
 import {
   CHAR_META, SIDE_CHARS, VAMP_CHARS, SPECIAL_ANIMS, FX_OFFSET_X, CHAR_ANIMS, SPRITE_FILE_ALIAS, PORTRAIT_SCALE,
   HEAD_CX, HEAD_TOP, HEAD_CROP, PAIR_SHIFT, TELEPORT_DIR, TELEPORT_COUNT, TELEPORT_FX, PREVIEW_CAST, ABILITY_PREVIEW,
-  CHAR_BUTTONS, CHARS_BY_KEY,
+  CHAR_BUTTONS, CHARS_BY_KEY, SIZE_LEVEL, ACTION_ANIMS, PROJECTILE,
 } from "/chars/index.js";
 import { WOLF_MOON_DMG } from "/chars/werewolf.js";
 import { SPECIAL_FPS } from "/chars/common.js";
@@ -1644,7 +1644,7 @@ function projectileOrient(charKey, dir) {
   // Countess/Onre/Jotaro majú úzky diagonálny projektil (Jotaro = letiaca päsť Star Platinum).
   // Nepoužívaj scaleX+rotate kombináciu: pri ľavých diagonálach zrkadlenie mení aj znamienko
   // rotácie a špic (päsť) môže mieriť zle - preto čistá rotácia (base = doprava).
-  if (charKey === "countess" || charKey === "onre" || charKey === "jotaro") {
+  if (PROJECTILE[charKey]?.orient === "rotate") {
     return {
       right: "rotate(0deg)", down_right: "rotate(45deg)", down: "rotate(90deg)", down_left: "rotate(135deg)",
       left: "rotate(180deg)", up_left: "rotate(-135deg)", up: "rotate(-90deg)", up_right: "rotate(-45deg)",
@@ -1664,13 +1664,13 @@ function spawnOrMoveProjectile(c, s) {
   let entry = projectiles.get(key);
   if (entry && entry.retire) { clearTimeout(entry.retire); entry.retire = null; } // strela ešte letí ďalej
   // Vojakov granát sa kotúľa PO ZEMI (spodok bunky), nie stredom ako mágove strely
-  const yOff = charKey === "soldier" ? Math.round(TILE_H * 0.3) : 0;
+  const yOff = Math.round(TILE_H * (PROJECTILE[charKey]?.yOff || 0));
   const dst = projCenter(c.cell[0], c.cell[1]);
   if (!entry) {
     const el = document.createElement("canvas");
     // Escanorova základná strela (slnko) ostáva relatívne malá: autorská veľkosť = pride3 (strop), nižšie menšia;
     // Vojakov granát je MALÝ (kotúľajúci sa projektil veľkosti ~⅓ bunky, nie ohnivá guľa); ostatné postavy bez zmeny
-    const fx = charKey === "escanor" ? escChargeMul(c.from) : charKey === "soldier" ? 0.3 : 1;
+    const fx = charKey === "escanor" ? escChargeMul(c.from) : (PROJECTILE[charKey]?.scale ?? 1);
     const px = Math.round(TILE_H * CHARGE_SCALE * fx);
     el.width = px; el.height = px;
     el.className = "projectile";
@@ -1709,7 +1709,7 @@ function retireProjectile(key) {
   entry.retire = setTimeout(() => {
     entry.el.remove(); projectiles.delete(key);
     // Vojakov granát: výbuch na poslednej bunke letu - na súperovi/klonovi, alebo na okraji plochy v smere hodu
-    if (entry.charKey === "soldier" && Array.isArray(entry.lastCell)) spawnExplosionAt(entry.lastCell, entry.from, 1.2);
+    if (PROJECTILE[entry.charKey]?.explodeAtEnd && Array.isArray(entry.lastCell)) spawnExplosionAt(entry.lastCell, entry.from, 1.2);
   }, CHARGE_STEP_MS);
 }
 // zosúlaď perzistentné projektily s charge efektmi tohto frame-u: nové/pohnuté posuň, chýbajúce stiahni
@@ -2692,7 +2692,7 @@ function renderGrid(s, effects = []) {
       if (caster?.char === "jotaro") {
         jotaroCenter.push({ from: e.from, jotaroPair: true, spFile: "Attack_2_P.png" });
       } else {
-        const atk = caster?.char === "medusa" ? ANIM_DEF.attack1_loop : ANIM_DEF.attack2_loop;
+        const atk = ANIM_DEF[ACTION_ANIMS[caster?.char]?.melee || "attack2_loop"];
         meleeCasts.push({ from: e.from, file: atk.file, fps: atk.fps });
       }
     }
@@ -2948,42 +2948,34 @@ function planWarnings() {
   // golden predťah (len nestartér) sa platí pred prvou akciou startera
   if (goldenArmed && mana >= 3) mana -= 3;
   else if (goldenMirrorArmed && mana >= 5) mana -= 5;
-  let form = mine.form || "base";   // Luffy: recharge prepína base↔gear3
   let hasClone = !!mine.clone;      // Naruto: klon sa môže pohnúť/strieľať aj keď Naruto narazí do steny
   for (let i = 0; i < myQueue.length; i++) {
     const a = myQueue[i];
     if (!a || a.type === "stoned" || a.type === "swap") continue;
     const char = ghostCharAt(i);
+    const def = CHARS_BY_KEY[char];
     const p = ghostPos(i);
     const cost = PLAN_COST[a.type] || 0;
     if (cost > mana) { out[i] = `Not enough mana (planned ${mana}, needs ${cost}) - this action will fail`; continue; }
     mana -= cost;
     if (a.type === "recharge") {
-      if (char !== "luffy" && mana >= PLAN_MAX_MANA) out[i] = "Mana will already be full - recharge has no effect";
+      if (!def?.planRechargeAlwaysUseful && mana >= PLAN_MAX_MANA) out[i] = "Mana will already be full - recharge has no effect";
       mana = Math.min(PLAN_MAX_MANA, mana + PLAN_RECHARGE);
-      if (char === "luffy") form = form === "gear3" ? "base" : "gear3";
       continue;
     }
     if (a.type === "mirror" && foeMirrorImmune()) { out[i] = MIRROR_IMMUNE_WARN; continue; }
-    if (a.type === "special" && char === "naruto") { hasClone = true; continue; }
+    if (a.type === "special" && def?.planClone) { hasClone = true; continue; }
     if (!p) continue;
-    const wallSafe = char === "naruto" && hasClone; // klonova figúra môže akciu vykonať aj tak
+    const wallSafe = !!def?.planClone && hasClone; // klonova figúra môže akciu vykonať aj tak
     const d = D4[a.dir];
     if (!wallSafe && (a.type === "move" || a.type === "dash") && d && !inB(p.x + d[0], p.y + d[1])) {
       out[i] = "Off the board - this action has no effect";
     } else if (!wallSafe && a.type === "attack" && !cellsForAimPreview(p, a.dir, char).length) {
       out[i] = "Attack off the board - mana is spent, no effect";
     } else if (a.type === "special") {
-      const dx = a.dir === "left" ? -1 : a.dir === "right" ? 1 : 0;
-      if (char === "medusa" && (foe?.stone || 0) > i) {
-        // súper je pri tejto akcii ešte socha (kameň ubúda až na konci kroku jeho posledného skameneného ťahu)
-        out[i] = "Opponent is still petrified at this point - petrify has no effect";
-      } else if ((char === "escanor" || (char === "jotaro" && mine.worldUsed)) && dx && !inB(p.x + dx, p.y)) {
-        out[i] = "Special off the board - mana is spent, no effect";
-      } else if (char === "werewolf") {
-        const wd = WOLF_DIRS_CLIENT[a.dir];
-        if (wd && !inB(p.x + wd[0], p.y + wd[1])) out[i] = "Charge off the board - mana is spent, no effect";
-      }
+      // varovanie specialu podľa postavy (register: planSpecialWarn - petrify na sochu, special/charge mimo plochy)
+      const w = def?.planSpecialWarn?.({ p, dir: a.dir, i, foe, mine, inB, G });
+      if (w) out[i] = w;
     }
   }
   return out;
@@ -3042,9 +3034,10 @@ let escPrideDisplayChar = { p1: null, p2: null };
 // escPrideDisplay drží počas prehrávania kola STARÝ level pre oba prípady (nová veľkosť až po floate)
 const escPrideMul = a => {
   // Luffy: veľkosť sa medzi módmi NEMENÍ (žiadny size tell) - normalizuje ju LUFFY_BOARD_FILL.
-  const lvl = a?.char === "escanor" ? (a.pride || 0) : a?.char === "werewolf" ? (a.moon || 0) : null;
-  if (lvl === null) return 1;
-  const base = a.char === "werewolf" ? 0.7 : 1;
+  const sl = SIZE_LEVEL[a?.char]; // register: sizeLevel { stat, base }
+  if (!sl) return 1;
+  const lvl = a[sl.stat] || 0;
+  const base = sl.base;
   // držanú veľkosť aplikuj len keď patrí TEJ ISTEJ postave (swap v strede kola mení char → inak by
   // sa napr. vlkolakov mesiac 3 aplikoval na čerstvo swapnutého Escanora a nafúkol ho)
   const held = (a.slot && escPrideDisplay[a.slot] != null && escPrideDisplayChar[a.slot] === a.char) ? escPrideDisplay[a.slot] : null;
@@ -3708,7 +3701,7 @@ function schedulePlayTimeline(timeline) {
   const first = timeline[0];
   // levelová veľkosť (Escanor pride / Vlkolakova fáza mesiaca) pred kolom - na konci prehrávania porovnáme
   // s novou hodnotou → float (lev ▲▼ / nová fáza mesiaca)
-  const lvlOf = (a) => a?.char === "escanor" ? (a.pride ?? 0) : a?.char === "werewolf" ? (a.moon ?? 0) : null;
+  const lvlOf = (a) => SIZE_LEVEL[a?.char] ? (a[SIZE_LEVEL[a.char].stat] ?? 0) : null;
   const preLvl = { p1: lvlOf(first.p1), p2: lvlOf(first.p2) };
   const preChar = { p1: first.p1?.char || null, p2: first.p2?.char || null }; // char na začiatku kola (swap ho zmení)
   // drž veľkosť podľa levelu NA ZAČIATKU kola cez celé kolo (nová veľkosť sa aplikuje až po kole, keď sa
@@ -4019,7 +4012,7 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
         // (Countess sem už nechodí - jej center melee je jednotný vamp_strike s A1)
-        setAnim(e.from, state?.[e.from]?.char === "medusa" ? "attack1_loop" : "attack2_loop", frameHold);
+        setAnim(e.from, ACTION_ANIMS[state?.[e.from]?.char]?.melee || "attack2_loop", frameHold);
         lastAttackEndAt[e.from] = performance.now() + frameHold;
         // Jotaro: figúra hrá Attack_2, stand Attack_2_P, VYMENIA si pozície (swap) - bez veľkého center overlayu
         if (state?.[e.from]?.char === "jotaro") standAttack[e.from] = { file: "Attack_2_P.png", until: performance.now() + frameHold + POSE_TAIL_MS };
@@ -4092,7 +4085,8 @@ function schedulePlayTimeline(timeline) {
         const dark = !!e.dark; // Pútnikova pasívna mana = tá istá animácia, len celá v čiernej
         spawnManaFloat(e.from, amt, false, dark);
         spawnChargeAura(e.from, false, false, "actor", dark); // „Goku" nabíjacia aura na postave
-        if (state?.[e.from]?.char === "soldier") setAnim(e.from, "recharge", frameHold); // Vojak má vlastnú recharge pózu
+        const rechAnim = ACTION_ANIMS[state?.[e.from]?.char]?.recharge; // vlastná recharge póza (Vojak)
+        if (rechAnim) setAnim(e.from, rechAnim, frameHold);
         // Luffy: recharge PREPÍNA mód → prehraj prepínaciu pózu (base→gear3 = pumpovanie pästí, gear3→base = splasknutie)
         // a ukáž nad ním float s odznakom NOVEJ formy (na ktorú sa práve prepol)
         if (state?.[e.from]?.char === "luffy") {
@@ -4379,7 +4373,7 @@ function schedulePlayTimeline(timeline) {
     for (const s of ["p1", "p2"]) {
       if (casters.has(s))       { setAnim(s, "casting", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; } // special: malá postava hrá svoj efektový sprite (nie úder)
       // Medúza strieľa s Attack_2 (krátky úder) - Attack_1 má vyhradený pre melee šľah
-      else if (shooters.has(s)) { setAnim(s, state?.[s]?.char === "medusa" ? "attack2" : "attack", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; }
+      else if (shooters.has(s)) { setAnim(s, ACTION_ANIMS[state?.[s]?.char]?.shot || "attack", frameHold); lastAttackEndAt[s] = performance.now() + frameHold; }
     }
 
     renderGrid(state, frame.effects || []);

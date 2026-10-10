@@ -22,4 +22,6 @@ export default {
   },
   // range self - summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
   specialZone: ({ me }) => [[me.x, me.y]],
+  // plánovanie: special prizve klona; s klonom akcia do steny nie je zbytočná (klonova figúra sa môže pohnúť/strieľať)
+  planClone: true,
 };

@@ -31,4 +31,11 @@ export default {
   specialTarget: (ui) => ui.worldUsed ? "dir" : "none",
   // Special 2: jediná susedná bunka (x±dir, y); THE WORLD: globálny cast → bliká celá doska (nič neleakuje)
   specialZone: ({ G, board, me, dir }) => me.worldUsed ? G.jotaroS2Cells(board, me, dir) : G.allCells(board),
+  // letiaca päsť Star Platinum - čistá rotácia (base = doprava)
+  projectile: { orient: "rotate" },
+  // ⚠ pri plánovaní: Special 2 (po THE WORLD) mimo plochy
+  planSpecialWarn: (a) => a.mine.worldUsed ? (({ p, dir, inB }) => {
+    const dx = dir === "left" ? -1 : dir === "right" ? 1 : 0;
+    return dx && !inB(p.x + dx, p.y) ? "Special off the board - mana is spent, no effect" : null;
+  })(a) : null,
 };

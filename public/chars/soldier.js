@@ -28,4 +28,7 @@ export default {
   },
   // mini mapa pod tlačidlom; cieľová bunka je súčasť AKCIE (cell) - zóna sa z pozície neodvodzuje
   specialTarget: "cell",
+  actionAnims: { recharge: "recharge" }, // jediný s vlastnou recharge pózou
+  // granát: malý (~⅓ bunky), kotúľa sa PO ZEMI (spodok bunky) a vybuchne na poslednej bunke letu
+  projectile: { scale: 0.3, yOff: 0.3, explodeAtEnd: true },
 };

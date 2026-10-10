@@ -56,4 +56,6 @@ export default {
   },
   // mini mapa BEZ blokovaných buniek; cast bliká celou plochou (server posiela cells), cieľ sa nezvýrazní - pasca je tajná
   specialTarget: "trap",
+  // úzky diagonálny projektil - čistá rotácia (base = doprava), nie scaleX zrkadlenie
+  projectile: { orient: "rotate" },
 };

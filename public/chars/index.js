@@ -33,6 +33,14 @@
 //   specialTarget  cieľ specialu: "none" (default) | "dir" (L/R) | "wolf" (8 smerov) | "cell" (vojak) |
 //                  "trap" (bunka bez blokovania) | "luffy" (bunky na línii) - alebo funkcia (ui) → typ
 //   specialZone    ({ G, board, me, dir, tiles }) → [[x,y]…] náhľad zóny specialu (G = shared/geometry.js)
+//   sizeLevel      { stat, base } - veľkosť na ploche base·1.2^level podľa verejného stavu (Escanor pride, vlkolak moon)
+//   actionAnims    { melee?, shot?, recharge? } - kľúč ANIM_DEF pre malú postavu pri akcii (default attack2_loop / attack / aura)
+//   projectile     { orient?: "rotate", scale?, yOff?, explodeAtEnd? } - basic strela (Charge.png): orientácia čistou
+//                  rotáciou, veľkosť (× výška bunky), posun nadol (× výška bunky), výbuch na poslednej bunke letu
+//   planSpecialWarn ({ p, dir, i, foe, mine, inB, G }) → text ⚠ | null - varovanie v lište pri plánovaní specialu
+//                  (p = ghost pozícia, i = index akcie vo fronte)
+//   planClone      special prizve klona - s ním akcia do steny nie je zbytočná (Naruto)
+//   planRechargeAlwaysUseful  recharge má efekt aj pri plnej mane (Luffy - prepína gear)
 import fire from "./fire.js";
 import lightning from "./lightning.js";
 import wanderer from "./wanderer.js";
@@ -73,3 +81,6 @@ export const TELEPORT_FX = collect("teleportFx");
 export const PREVIEW_CAST = collect("previewCast");
 export const ABILITY_PREVIEW = collect("abilityPreview");
 export const CHAR_BUTTONS = collect("buttons");
+export const SIZE_LEVEL = collect("sizeLevel");
+export const ACTION_ANIMS = collect("actionAnims");
+export const PROJECTILE = collect("projectile");

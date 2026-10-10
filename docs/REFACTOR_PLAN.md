@@ -187,6 +187,10 @@ previews importujú `shared/geometry.js`.
       mirror), `specialTarget` (typ pickera), `specialZone` (náhľad zóny). browser-smoke rozšírený o UI sondu (ako
       hráč na p1 aj p2 zvolí každú postavu a uloží akčné tlačidlá + náhľady vo výbere; HEAD výsledok sa kešuje).
       Overenie: zóny == stará `cellsForSpecialPreview` (89 856 prípadov), UI sonda 52/52, 196 rovnakých spritov.
+- [x] **6b-2 - deklaratívne správanie:** `sizeLevel` (veľkosť podľa pride/moon), `projectile` (rotácia, granát),
+      `actionAnims` (melee/strela/recharge póza), `planSpecialWarn`/`planClone`/`planRechargeAlwaysUseful` (⚠ v lište).
+      Overenie: varovania == stará logika (33 696 prípadov), browser-smoke --compare bez rozdielu. V client.js ostáva
+      76 vetiev podľa mena (zo ~155) - choreografia timeline (Escanor slnko, Jotaro stand, Luffy, Vojak, Vampire, HUD odznaky).
 - [ ] **6b - choreografia do registra.** V `client.js` ostáva ~155 vetiev podľa mien
       (najviac escanor 33, jotaro 30, luffy 23, countess/onre 24, werewolf 14, soldier 12, medusa 10). Návrh:
       háčiky klientskej postavy (`onEffect(kind, e, ctx)` pre vlastné efekty timeline, `castOverlay`,

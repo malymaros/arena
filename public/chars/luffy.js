@@ -43,4 +43,6 @@ export default {
       : { title: "Special (−5 mana, 4 dmg) - roll like a QUEEN (any line) to a chosen cell and strike whoever is on it", cost: "−5{💧} 4{☠️}" },
   },
   specialTarget: "luffy", // mini mapa s bunkami len na platnej línii (dáma / veža)
+  // plánovanie: recharge prepína gear, takže nie je zbytočný ani pri plnej mane (žiadne ⚠)
+  planRechargeAlwaysUseful: true,
 };

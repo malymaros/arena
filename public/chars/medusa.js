@@ -24,4 +24,8 @@ export default {
   specialTarget: "dir", // smerový special (left/right picker)
   // vlastné políčko + všetko striktne zvoleným smerom v riadkoch ±1
   specialZone: ({ G, board, me, dir }) => G.medusaCells(board, me, dir),
+  // melee = šľah celým telom (Attack_1), basic strela = Attack_2
+  actionAnims: { melee: "attack1_loop", shot: "attack2" },
+  // ⚠ pri plánovaní: súper je pri tejto akcii ešte socha (kameň ubúda až na konci kroku jeho posledného skameneného ťahu)
+  planSpecialWarn: ({ i, foe }) => (foe?.stone || 0) > i ? "Opponent is still petrified at this point - petrify has no effect" : null,
 };

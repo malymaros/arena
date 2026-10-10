@@ -49,4 +49,11 @@ export default {
     const delta = G.DIR8[dir];
     return delta ? G.runPath(board, me.x, me.y, delta, me.foe).path : [];
   },
+  // veľkosť podľa fázy mesiaca: nov = zmenšená základná forma 0.7×, spln ≈ 1.21×
+  sizeLevel: { stat: "moon", base: 0.7 },
+  // ⚠ pri plánovaní: charge z okraja mimo plochy
+  planSpecialWarn: ({ p, dir, inB, G }) => {
+    const wd = G.DIR8[dir];
+    return wd && !inB(p.x + wd[0], p.y + wd[1]) ? "Charge off the board - mana is spent, no effect" : null;
+  },
 };
