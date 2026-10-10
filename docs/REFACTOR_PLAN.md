@@ -167,8 +167,10 @@ previews importujú `shared/geometry.js`.
       trigger pasce (mechanika enginu, úder cez `vampMeleeLand` z postavy) a pár detailov choreografie
       (Vojakov granát, anim. názvy pasce, Fire na Damage dlaždici).
 - Overenie: po každom kroku difftest 2 420 zápasov = 0 rozdielov, golden 48/48, `npm test` (aj turnaj/swap).
-- [ ] Rozdelenie mechaník enginu do modulov (`labyrinth.js`, `timestop.js`, `laststand.js`, `tiles.js`) -
-      čisto organizačné, navrhnuté ako ďalší krok.
+- [x] Rozdelenie mechaník enginu do modulov `engine/labyrinth.js` (redakcia, niť, odhalenie/koniec), `timestop.js`
+      (THE WORLD), `laststand.js` (Last Stand/Hope, démon, násobiče dmg), `tiles.js` (dlaždice). Moduly sú továrne
+      `xxxModule(E)`; `E` = vnútorný scope enginu (getter/setter pre `game`/`rand`/`actionSteps` + funkcie). Čisto
+      organizačné: difftest 4 840 zápasov = 0 rozdielov, golden 48/48, `npm test`. game.js 2 472 → ~1 850 riadkov.
 
 ## Rozhodnutia (na schválenie)
 
