@@ -2480,8 +2480,9 @@ function displayDir(action, ownerSlot) {
   // ktorá figúra je pravá. Súperovi ho anonymizujeme na „↕" (vlastný hráč vidí skutočný smer).
   const vertMirrored = action?.type === "move" || action?.type === "dash" || action?.type === "attack";
   // anonymizuj len keď Naruto SKUTOČNE má klona - bez klona sa vertikála nerozdvojuje a smer nič neprezrádza
+  // (klona má len Naruto - nastavuje ho jedine jeho special, swap ho maže)
   if (vertMirrored && (dir === "up" || dir === "down") &&
-      ownerSlot && ownerSlot !== me && state?.[ownerSlot]?.char === "naruto" && state?.[ownerSlot]?.clone) {
+      ownerSlot && ownerSlot !== me && state?.[ownerSlot]?.clone) {
     return "vert";
   }
   return dir;
