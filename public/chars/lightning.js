@@ -14,4 +14,10 @@ export default {
   teleportCount: 10,
   teleportFx: { scale: 1.6, anchor: "feet", bottomTrim: 0.17, dy: 0.20 }, // blesk šľahá od nôh nahor
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: 3, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
+  // tlačidlá: cena {emoji} = pixelová mini ikona (client costHtml)
+  buttons: {
+    special: { title: "Special (−5 mana, 3 dmg)", cost: "−5{💧} 3{☠️}" },
+  },
+  // náhľad zóny specialu: všetky políčka opačnej „šachovej" farby než na ktorej stojí
+  specialZone: ({ G, board, me }) => G.lightningCells(board, me),
 };

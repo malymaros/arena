@@ -25,4 +25,11 @@ export default {
   // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3, viď renderAbilityPreview;
   // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", prideCycle: true, desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
+  buttons: {
+    // smerový dmg (8); rozsah rastie s pride levelom (veľkosť postavy na ploche = indikátor pride)
+    special: { title: "Special (−5 mana, 8 dmg) - choose a direction (left/right)", cost: "−5{💧} 8{☠️}" },
+  },
+  specialTarget: "dir",
+  // smerový (left/right) - rozsah podľa pride levelu (kotva mimo plochy = prázdna zóna aj pri pride 3)
+  specialZone: ({ G, board, me, dir }) => G.escanorCells(board, me, dir),
 };

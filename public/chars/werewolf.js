@@ -2,6 +2,10 @@
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 import { SPECIAL_FPS } from "./common.js";
 
+// dmg charge podľa fázy mesiaca - MUSÍ sedieť so serverovým WOLF_MOON_DMG
+export const WOLF_MOON_DMG = [2, 4, 6, 8];
+const moonLvl = (ui) => Math.max(0, Math.min(3, ui.st?.moon || 0));
+
 export default {
   key: "werewolf",
   // Vlkolak: natívna p2 paleta (Werewolf_2, teplejší odtieň); Charge.png = prefarbený fire fireball per paleta
@@ -26,4 +30,23 @@ export default {
   // Vlkolak: charge - náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg podľa fázy
   // mesiaca cykluje pod mini-doskou (moonCycle - ako Escanorov pride náhľad), preto žiadny effect/stats riadok
   abilityPreview: { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
+  buttons: {
+    // charge jedným z 8 smerov - dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP);
+    // specialKey = kedy prekresliť (client to kontroluje aj per-frame)
+    special: (ui) => {
+      const dmg = WOLF_MOON_DMG[moonLvl(ui)];
+      return {
+        title: `Special (−5 mana, ${dmg} dmg by moon phase) - charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`,
+        cost: `−5{💧} ${dmg}{☠️}`,
+      };
+    },
+    specialKey: (ui) => String(moonLvl(ui)),
+  },
+  specialTarget: "wolf", // 8-smerový picker
+  // dráha charge: zvoleným z 8 smerov po PRVÚ figúru súpera (aj jeho klon) alebo okraj - zrkadlí server.
+  // Súpera dodáva volajúci cez me.foe; bez neho (char-select) alebo so skrytým súperom (x null) až na okraj.
+  specialZone: ({ G, board, me, dir }) => {
+    const delta = G.DIR8[dir];
+    return delta ? G.runPath(board, me.x, me.y, delta, me.foe).path : [];
+  },
 };

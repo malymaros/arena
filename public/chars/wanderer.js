@@ -15,4 +15,9 @@ export default {
   teleportCount: 10,
   teleportFx: { scale: 1.6, anchor: "torso", dy: 0.12 },
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: 8, desc: `Each round he doesn't use mirror +2<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
+  // tlačidlá: cena {emoji} = pixelová mini ikona (client costHtml)
+  buttons: {
+    special: { title: "Special (−5 mana, 8 dmg)", cost: "−5{💧} 8{☠️}" },
+  },
+  specialZone: ({ G, board, me }) => G.diagNeighbors(board, me),
 };

@@ -6,7 +6,9 @@ import * as G from "/shared/geometry.js";
 import {
   CHAR_META, SIDE_CHARS, VAMP_CHARS, SPECIAL_ANIMS, FX_OFFSET_X, CHAR_ANIMS, SPRITE_FILE_ALIAS, PORTRAIT_SCALE,
   HEAD_CX, HEAD_TOP, HEAD_CROP, PAIR_SHIFT, TELEPORT_DIR, TELEPORT_COUNT, TELEPORT_FX, PREVIEW_CAST, ABILITY_PREVIEW,
+  CHAR_BUTTONS, CHARS_BY_KEY,
 } from "/chars/index.js";
+import { WOLF_MOON_DMG } from "/chars/werewolf.js";
 import { SPECIAL_FPS } from "/chars/common.js";
 // trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
 // (inak by sa vrátený hráč stal divákom a server by prestal brať jeho lock_in)
@@ -165,8 +167,6 @@ const moonDmg   = { p1: document.getElementById("mdmg-p1"), p2: document.getElem
 const luffyBadge = { p1: document.getElementById("luffy-p1"), p2: document.getElementById("luffy-p2") };
 // Luffy: info o basic (šípky diag/orto) + special (šípky dáma/veža + dmg) vpravo v HUD widgete
 const luffyInfo = { p1: document.getElementById("luffy-info-p1"), p2: document.getElementById("luffy-info-p2") };
-// dmg vlkolakovho charge podľa fázy mesiaca - MUSÍ sedieť so serverovým WOLF_MOON_DMG
-const WOLF_MOON_DMG = [2, 4, 6, 8];
 // 8 smerov vlkolakovho specialu - MUSÍ sedieť so serverovým WOLF_DIRS
 const WOLF_DIRS_CLIENT = G.DIR8; // 8 smerov (vlkolakov charge, smer strely) - zo shared/geometry.js
 const WOLF_DIR_KEYS_CLIENT = Object.keys(WOLF_DIRS_CLIENT);
@@ -2402,7 +2402,7 @@ function renderHUD() {
   renderPrideHud("p1"); renderPrideHud("p2");
   renderMoonHud("p1"); renderMoonHud("p2");
   renderLuffyHud("p1"); renderLuffyHud("p2");
-  syncWolfSpecialBtn(); // dmg na special tlačidle drž v sync s HUD fázou mesiaca (aj per-frame počas kola)
+  syncDynamicSpecialBtn(); // dmg na special tlačidle drž v sync s HUD fázou mesiaca (aj per-frame počas kola)
   updateGoldenButton();
 }
 
@@ -2454,15 +2454,32 @@ function renderMoonHud(slot) {
 // pri každom renderHUD (aj per-frame počas prehrávania) - nie len raz pri príchode state eventu: vtedy s[me]
 // nesie počiatočný frame kola (schedulePlayTimeline ho premutuje späť), takže po zmene fázy ostávalo tlačidlo
 // celé plánovanie na starom dmg. Zdroj = state[me].moon, rovnaký ako HUD ikona → obe sa preklopia naraz.
-function syncWolfSpecialBtn() {
-  if (!specialBtn || ghostCharAt() !== "werewolf") return;
-  const lvl = Math.max(0, Math.min(3, state?.[me]?.moon || 0));
-  if (specialBtn.dataset.wolfMoon === String(lvl)) return;
-  specialBtn.dataset.wolfMoon = String(lvl);
-  const dmg = WOLF_MOON_DMG[lvl];
-  specialBtn.title = `Special (−5 mana, ${dmg} dmg by moon phase) - charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`;
+// stav pre premenlivé skiny tlačidiel z registra (buttons.* ako funkcia): vlastný hráč, efektívny Gear 3, THE WORLD
+function buttonUi() {
+  return { st: state?.[me], gear3: luffyEffForm() === "gear3", worldUsed: !!state?.[me]?.worldUsed };
+}
+// cena tlačidla z registra: {emoji} → pixelová mini ikona
+function costHtml(cost) { return cost.replace(/\{(.+?)\}/gu, (_, e) => miniPix(e)); }
+// title + cena special tlačidla z registra postavy (statické alebo (ui) → {...}); force = prekresli aj bez zmeny kľúča
+function applySpecialSkin(char, force) {
+  const def = CHAR_BUTTONS[char]?.special;
+  if (!specialBtn || !def) return;
+  const ui = buttonUi();
+  // specialKey: premenlivý obsah (vlkolakova fáza mesiaca) - prekresli len pri zmene
+  const key = CHAR_BUTTONS[char].specialKey?.(ui);
+  if (key != null) {
+    if (!force && specialBtn.dataset.specialKey === key) return;
+    specialBtn.dataset.specialKey = key;
+  }
+  const v = typeof def === "function" ? def(ui) : def;
+  specialBtn.title = v.title;
   const cost = specialBtn.querySelector(".cost");
-  if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
+  if (cost) { cost.innerHTML = costHtml(v.cost); hydratePix(cost); }
+}
+// per-frame (renderHUD): obsah závislý od stavu počas kola (fáza mesiaca) drž v sync - len postavy so specialKey
+function syncDynamicSpecialBtn() {
+  const c = ghostCharAt();
+  if (c && CHAR_BUTTONS[c]?.specialKey) applySpecialSkin(c, false);
 }
 
 // Escanor: pride level (ikona+číslo) vľavo, rozsah abilitky pri aktuálnom pride (minimapka) vpravo v HUD widgete.
@@ -2848,51 +2865,11 @@ function renderThreadLines(s) {
 }
 
 /* ---------- Special preview (hover) ---------- */
-// dir sa týka len Medúzy (left/right) - ostatné speciály smer nemajú
+// zóna specialu z registra postavy (specialZone - geometria zo shared/geometry.js, tá istá ako na serveri);
+// dir pre smerové speciály, meState.foe pre vlkolakov charge, worldUsed/pride z meState
 function cellsForSpecialPreview(meState, dir){
   if (!meState || !meState.char) return [];
-  const { x, y, char } = meState;
-  const cells = [];
-  if (char === "medusa"){
-    // vlastné políčko + všetko striktne zvoleným smerom v riadkoch ±1
-    return G.medusaCells(board, meState, dir);
-  } else if (char === "fire"){
-    // celý riadok; ak (ghost) pozícia stojí na Damage dlaždici, riadky ±1 (server: fireOnDmgTile)
-    const onDmg = (state?.tiles || []).some(t => t.type === "dmg" && t.x === x && t.y === y);
-    return G.fireCells(board, meState, onDmg);
-  } else if (char === "lightning"){
-    // všetky políčka opačnej "šachovej" farby než na ktorej stojí
-    return G.lightningCells(board, meState);
-  } else if (char === "wanderer"){
-    return G.diagNeighbors(board, meState);
-  } else if (char === "minotaur"){
-    // celoplošný (labyrint zasiahne súpera kdekoľvek)
-    return G.allCells(board);
-  } else if (char === "naruto"){
-    // range self - summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
-    cells.push([x, y]);
-  } else if (char === "soldier" || char === "countess" || char === "onre"){
-    // cieľová bunka je súčasť AKCIE (cell), nie odvoditeľná z pozície - hover fronty ju rieši
-    // attachQueueHover, prehrávanie číta sp.cells zo servera, char-select ABILITY_PREVIEW.target
-    // (Countess/Onre: pasca - cast bliká CELOU plochou ako Minotaurov, server posiela plné cells;
-    // cieľová bunka samotná sa nikdy nezvýrazní, pasca je tajná)
-    return cells;
-  } else if (char === "werewolf"){
-    // dráha charge: z pozície zvoleným z 8 smerov po PRVÚ figúru súpera (aj jeho klon) alebo okraj -
-    // zrkadlí doSpecial na serveri. Súpera dodáva volajúci cez meState.foe (hover fronty/pickera);
-    // bez neho (char-select ukážka) alebo so skrytým súperom v labyrinte (x null) ide dráha až na okraj.
-    const delta = WOLF_DIRS_CLIENT[dir];
-    if (!delta) return cells;
-    return G.runPath(board, x, y, delta, meState.foe).path;
-  } else if (char === "jotaro"){
-    // special = Special 2 (po THE WORLD, worldUsed): jediná susedná bunka (x±dir, y). THE WORLD (pred ním):
-    // cast je globálny → celá doska blikne (nič konkrétne neleakuje). worldUsed nesie meState.
-    return meState.worldUsed ? G.jotaroS2Cells(board, meState, dir) : G.allCells(board);
-  } else if (char === "escanor"){
-    // smerový (left/right) - rozsah podľa pride levelu (kotva mimo plochy = prázdna zóna aj pri pride 3)
-    return G.escanorCells(board, meState, dir);
-  }
-  return cells;
+  return CHARS_BY_KEY[meState.char]?.specialZone?.({ G, board, me: meState, dir, tiles: state?.tiles }) || [];
 }
 // Jotarov Special 1 (mirror slot): obe diagonálne bunky zvolenej strany (x±dir, y±1) - zrkadlí jotaroS1Cells
 function cellsForJotaroS1(p, dir){
@@ -5047,29 +5024,36 @@ const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, 
 // Vampire/Onryō: dash slot = CHARGE - tlačidlo dostane fialový „Hidden" skin s preblikávaním a ???
 // namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
 // Attack tooltip navyše vysvetlí odraz strely. Volané zo state handlera pri každom snapshote.
-const DASH_TITLE_DEFAULT   = "Dash - move up to 2 cells in a direction (−4 mana)";
+// bežný vzhľad tlačidiel, ktoré postava môže preskinovať (buttons.<slot> v registri)
+const BTN_BASE = {
+  dash:     { emoji: "🏃", title: "Dash - move up to 2 cells in a direction (−4 mana)", cost: "−4{💧}" },
+  recharge: { emoji: "🙏", title: "Recharge (+4 mana)", cost: "+4{💧}" },
+  mirror:   { emoji: "🪞", title: "Mirror (−4 mana, reflects all damage of the opponent's next action back at them)", cost: "−4{💧}" },
+  melee:    { title: "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)", cost: "−4{💧} 8{☠️}" },
+};
 const ATTACK_TITLE_DEFAULT = "Range Attack - choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)";
-function syncDashBtn(char) {
-  const side = char === "countess" || char === "onre";
-  dashBtn.classList.toggle("vamp-charge", side);
-  dashPicker?.classList.toggle("vamp-charge", side);
-  const ico = dashBtn.querySelector(".pix-ico");
-  const cost = dashBtn.querySelector(".cost");
-  if (ico && side) {
+// skin tlačidla podľa postavy: def.skin = trieda tlačidla aj jeho pickera + fialová „???" ikona
+// (Vampire/Onryō charge, Jotarov Special 1, Luffyho prepínač gearu); bez skinu bežná ikona/cena/tooltip
+function applyBtnSkin(slot, btn, picker, char) {
+  if (!btn) return;
+  const base = BTN_BASE[slot], def = CHAR_BUTTONS[char]?.[slot];
+  // všetky skiny tohto slotu v registri - aktívny len ten postavin
+  for (const sk of new Set(Object.values(CHAR_BUTTONS).map(b => b[slot]?.skin).filter(Boolean))) {
+    btn.classList.toggle(sk, def?.skin === sk);
+    picker?.classList.toggle(sk, def?.skin === sk);
+  }
+  const ico = btn.querySelector(".pix-ico");
+  const cost = btn.querySelector(".cost");
+  if (!ico) return;
+  if (def?.skin) {
     delete ico.dataset.emoji;
     delete ico.dataset.done;
     ico.classList.add("charge-mark");
     ico.textContent = "???";
-    if (cost) {
-      const bonus = char === "countess" ? miniPix("❤️") : miniPix("💧");
-      cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}${bonus}`;
-      hydratePix(cost);
-    }
-  } else if (ico) {
+  } else {
     ico.classList.remove("charge-mark");
-    if (cost) { cost.innerHTML = `−4${miniPix("💧")}`; hydratePix(cost); }
-    if (ico.dataset.emoji !== "🏃") {
-      ico.dataset.emoji = "🏃";
+    if (ico.dataset.emoji !== base.emoji) {
+      ico.dataset.emoji = base.emoji;
       ico.innerHTML = "";
       delete ico.dataset.done;
       pixelizeEmoji(ico);
@@ -5077,38 +5061,18 @@ function syncDashBtn(char) {
       pixelizeEmoji(ico);
     }
   }
-  dashBtn.title = !side ? DASH_TITLE_DEFAULT
-    : char === "countess"
-      ? "Charge - rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit heals up to 4 HP (blocked = nothing)"
-      : "Charge - rush in a direction; stops at the first foe and strikes for 4 dmg. A landed hit drains up to 4 mana into yours (blocked = nothing)";
-  attackBtn.title = side
-    ? "Range Attack - a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance"
-    : ATTACK_TITLE_DEFAULT;
+  if (cost) { cost.innerHTML = costHtml(def?.cost ?? base.cost); hydratePix(cost); }
+  btn.title = def?.title ?? base.title;
+}
+function syncDashBtn(char) {
+  applyBtnSkin("dash", dashBtn, dashPicker, char);
+  attackBtn.title = CHAR_BUTTONS[char]?.attack?.title ?? ATTACK_TITLE_DEFAULT;
 }
 
 // Luffy: recharge slot = prepínač módu (base↔Gear3) - fialový ❔ „Hidden" skin ako vamp charge.
 // Doplní manu A prepne mód (aj pri plnej mane). Pre ostatných mágov vráti bežný recharge.
 const rechargeBtn = document.querySelector('.btn.act.mana[data-act="recharge"]');
-function syncRechargeBtn(char) {
-  if (!rechargeBtn) return;
-  const lu = char === "luffy";
-  rechargeBtn.classList.toggle("luffy-switch", lu);
-  const ico = rechargeBtn.querySelector(".pix-ico");
-  const cost = rechargeBtn.querySelector(".cost");
-  if (ico && lu) {
-    delete ico.dataset.emoji; delete ico.dataset.done;
-    ico.classList.add("charge-mark");
-    ico.textContent = "???";
-    if (cost) { cost.innerHTML = `+4${miniPix("💧")}<span class="luffy-swap">⇆</span>`; hydratePix(cost); } // +4 mana + swap znak (prepnutie gearu)
-    rechargeBtn.title = "Switch Gear (Base ↔ Gear 3) - also recharges mana (+4); works even at full mana";
-  } else if (ico) {
-    ico.classList.remove("charge-mark");
-    if (cost) { cost.innerHTML = `+4${miniPix("💧")}`; hydratePix(cost); }
-    if (ico.dataset.emoji !== "🙏") { ico.dataset.emoji = "🙏"; ico.innerHTML = ""; delete ico.dataset.done; pixelizeEmoji(ico); }
-    else if (!ico.dataset.done) pixelizeEmoji(ico);
-    rechargeBtn.title = "Recharge (+4 mana)";
-  }
-}
+function syncRechargeBtn(char) { applyBtnSkin("recharge", rechargeBtn, null, char); }
 
 // Luffy: gear-závislé akcie (range attack + special) sa menia podľa módu → vizuálne ich odlíšime
 // rohovým odznakom módu (base.png / gear3.png) na tlačidle. Toggle podľa zvoleného mága a aktuálnej formy.
@@ -5125,35 +5089,7 @@ function syncLuffyGearButtons(char) {
 
 // Jotaro nemá mirror - tento slot je Special 1 (Star Platinum): fialový ❔ skin, cost 4, L/R picker.
 // Pre ostatné postavy vráti bežný mirror. Volané zo state handlera pri každom snapshote.
-const MIRROR_TITLE_DEFAULT = "Mirror (−4 mana, reflects all damage of the opponent's next action back at them)";
-function syncMirrorBtn(char) {
-  if (!mirrorBtn) return;
-  const jo = char === "jotaro";
-  mirrorBtn.classList.toggle("jotaro-s1", jo);
-  s1Picker?.classList.toggle("jotaro-s1", jo);
-  const ico = mirrorBtn.querySelector(".pix-ico");
-  const cost = mirrorBtn.querySelector(".cost");
-  if (ico && jo) {
-    delete ico.dataset.emoji;
-    delete ico.dataset.done;
-    ico.classList.add("charge-mark");
-    ico.textContent = "???"; // rovnaký „hidden" vzhľad ako Vampírov charge button
-    if (cost) { cost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(cost); }
-    mirrorBtn.title = "Star Platinum - a directional (left/right) strike hitting BOTH diagonal cells on that side for 4 dmg";
-  } else if (ico) {
-    ico.classList.remove("charge-mark");
-    if (cost) { cost.innerHTML = `−4${miniPix("💧")}`; hydratePix(cost); }
-    mirrorBtn.title = MIRROR_TITLE_DEFAULT;
-    if (ico.dataset.emoji !== "🪞") {
-      ico.dataset.emoji = "🪞";
-      ico.innerHTML = "";
-      delete ico.dataset.done;
-      pixelizeEmoji(ico);
-    } else if (!ico.dataset.done) {
-      pixelizeEmoji(ico);
-    }
-  }
-}
+function syncMirrorBtn(char) { applyBtnSkin("mirror", mirrorBtn, s1Picker, char); }
 
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
@@ -5293,31 +5229,27 @@ function buildCellPicker(freeAll = false, luffyForm = null) {
 }
 // Special: Medúza/Escanor si najprv vyberú smer pohľadu (←/→), Vlkolak jeden z 8 smerov charge,
 // Vojak cieľovú bunku; ostatní pridajú akciu priamo
+// typ cieľa specialu z registra (specialTarget, prípadne podľa stavu - Jotaro po THE WORLD smerový)
+function specialTargetOf(char) {
+  const t = CHARS_BY_KEY[char]?.specialTarget;
+  return (typeof t === "function" ? t(buttonUi()) : t) || "none";
+}
 specialBtn.addEventListener("click", () => {
-  if (ghostCharAt() === "jotaro") {
-    // po THE WORLD (worldUsed): Special 2 = smerový (left/right) → picker; pred ním: THE WORLD bez smeru → priamo
-    if (state?.[me]?.worldUsed) { togglePicker("special", specialBtn, "special"); return; }
-    if (uiLocked()) return;
-    if (openPicker) { shakeBtn(specialBtn); return; }
-    if (myQueue.length >= 3 || myQueue.some(a => a.type === "special")) { shakeBtn(specialBtn); return; }
-    myQueue.push({ type: "special" });
-    renderQueue();
-    return;
-  }
-  if (ghostCharAt() === "medusa" || ghostCharAt() === "escanor") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
-  if (ghostCharAt() === "werewolf") { togglePicker("special_wolf", specialBtn, "special"); return; } // charge - 8 smerov
-  if (ghostCharAt() === "soldier") {
+  const target = specialTargetOf(ghostCharAt());
+  if (target === "dir") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
+  if (target === "wolf") { togglePicker("special_wolf", specialBtn, "special"); return; } // charge - 8 smerov
+  if (target === "cell") {
     if (openPicker !== "special_cell") buildCellPicker(); // obsah podľa aktuálnych pozícií + ghost fronty
     togglePicker("special_cell", specialBtn, "special");
     return;
   }
-  if (ghostCharAt() === "luffy") {
+  if (target === "luffy") {
     // pohyb-a-úder ako šachová figúra: mini mapa s bunkami len na platnej línii (dáma base / veža gear3)
     if (openPicker !== "special_cell") buildCellPicker(false, luffyEffForm());
     togglePicker("special_cell", specialBtn, "special");
     return;
   }
-  if (ghostCharAt() === "countess" || ghostCharAt() === "onre") {
+  if (target === "trap") {
     // pasca: rovnaká mini mapa ako Vojak, ale BEZ blokovaných buniek (aj súperova aktuálna, aj vlastná)
     if (openPicker !== "special_cell") buildCellPicker(true);
     togglePicker("special_cell", specialBtn, "special");
@@ -6206,23 +6138,10 @@ socket.on("state", (s) => {
   // label melee podľa mága - Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō majú center strike bez bonusu
   const mineMelee = s[me];
   if (mineMelee?.char && meleeBtn) {
+    const def = CHAR_BUTTONS[mineMelee.char]?.melee ?? BTN_BASE.melee;
+    meleeBtn.title = def.title;
     const mCost = meleeBtn.querySelector(".cost");
-    if (mineMelee.char === "medusa") {
-      meleeBtn.title = "Melee (−4 mana, 4 dmg, hits your cell + all diagonal neighbours)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(mCost); }
-    } else if (mineMelee.char === "countess") {
-      meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
-    } else if (mineMelee.char === "onre") {
-      meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
-    } else if (mineMelee.char === "jotaro") {
-      meleeBtn.title = "Melee (−4 mana, 4 dmg, hits only an opponent on your cell)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 4${miniPix("☠️")}`; hydratePix(mCost); }
-    } else {
-      meleeBtn.title = "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)";
-      if (mCost) { mCost.innerHTML = `−4${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(mCost); }
-    }
+    if (mCost) { mCost.innerHTML = costHtml(def.cost); hydratePix(mCost); }
   }
   // label special podľa mága - v turnaji po naplánovanom swape platí nový mág (ghostCharAt), nie ten na štarte kola
   const specChar = ghostCharAt();
@@ -6241,63 +6160,8 @@ socket.on("state", (s) => {
         pixelizeEmoji(specIco);
       }
     }
-    const cost = specialBtn.querySelector(".cost");
-    if (specChar === "medusa") {
-      // Medúza: žiadny dmg - skamenenie na 2 akcie (smer sa volí v pickeri)
-      specialBtn.title = "Special (−5 mana) - petrifying gaze: choose a direction; a hit opponent skips their next 2 actions";
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 2×🗿`; hydratePix(cost); }
-    } else if (specChar === "minotaur") {
-      // Minotaur: žiadny dmg - celoplošný labyrint (trvá do vzájomného zásahu)
-      specialBtn.title = "Special (−5 mana) - hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit";
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 🌀`; hydratePix(cost); }
-    } else if (specChar === "naruto") {
-      // Naruto: žiadny priamy dmg - musí stáť sám, prizve tieňového klona (kópia s 1 dmg)
-      specialBtn.title = "Special (−5 mana) - must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit";
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 👥`; hydratePix(cost); }
-    } else if (specChar === "escanor") {
-      // Escanor: smerový dmg (8); rozsah rastie s pride levelom (veľkosť postavy na ploche = indikátor pride)
-      specialBtn.title = "Special (−5 mana, 8 dmg) - choose a direction (left/right)";
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
-    } else if (specChar === "soldier") {
-      // Vojak: snajperský lúč na zvolenú bunku - súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
-      specialBtn.title = "Special (−5 mana, 10 dmg) - pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it";
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 10${miniPix("☠️")}`; hydratePix(cost); }
-    } else if (specChar === "werewolf") {
-      // Vlkolak: charge jedným z 8 smerov - dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP).
-      // Prekreslenie rieši syncWolfSpecialBtn (aj per-frame v renderHUD); tu vynúť čerstvý prepočet.
-      delete specialBtn.dataset.wolfMoon;
-      syncWolfSpecialBtn();
-    } else if (specChar === "countess" || specChar === "onre") {
-      // Vampire/Onryō: pasca - teleport + bezplatný úder pri súperovom vstupe/prechode
-      const bonus = specChar === "countess" ? "heals you" : "drains the foe's mana into yours";
-      specialBtn.title = `Special (−5 mana, 3 dmg) - set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit ${bonus}. Only one trap - recasting replaces it`;
-      const bonusIcon = specChar === "countess" ? miniPix("❤️") : miniPix("💧");
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} 3${miniPix("☠️")}${bonusIcon}`; hydratePix(cost); }
-    } else if (specChar === "jotaro") {
-      // klasická ✨ ikona (ako mágovia - reset blok vyššie ju už nastavil); mení sa len cost badge:
-      // pred THE WORLD hodiny (⏱), po ňom (worldUsed) Special 2 = 8 dmg
-      if (state?.[me]?.worldUsed) {
-        specialBtn.title = "Special 2 (−5 mana, 8 dmg) - a directional (left/right) strike on the adjacent cell";
-        if (cost) { cost.innerHTML = `−5${miniPix("💧")} 8${miniPix("☠️")}`; hydratePix(cost); }
-      } else {
-        specialBtn.title = "THE WORLD (−5 mana, once per game) - time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes";
-        if (cost) { cost.innerHTML = `−5${miniPix("💧")} ⏱`; hydratePix(cost); }
-      }
-    } else if (specChar === "luffy") {
-      // pohyb-a-úder ako šachová figúra: base = dáma (4 dmg), gear3 = veža (8 dmg) - podľa efektívnej formy
-      const g3 = luffyEffForm() === "gear3";
-      const dmg = g3 ? 8 : 4;
-      specialBtn.title = g3
-        ? "Special (−5 mana, 8 dmg) - GEAR 3: roll like a ROOK (orthogonal lines) to a chosen cell and strike whoever is on it"
-        : "Special (−5 mana, 4 dmg) - roll like a QUEEN (any line) to a chosen cell and strike whoever is on it";
-      if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
-    } else {
-      const dmg = { fire:5, lightning:3, wanderer:8 }[specChar];
-      if (dmg != null) {
-        specialBtn.title = `Special (−5 mana, ${dmg} dmg)`;
-        if (cost) { cost.innerHTML = `−5${miniPix("💧")} ${dmg}${miniPix("☠️")}`; hydratePix(cost); }
-      }
-    }
+    // title + cena podľa postavy (register: buttons.special; vlkolak per-frame cez syncDynamicSpecialBtn)
+    applySpecialSkin(specChar, true);
   }
 
   setServerTimer(s.timerMs ?? null); // synchronizuj odpočet so serverom (drží aj po refreshi)
@@ -6902,8 +6766,8 @@ if (specialBtn){
     const char = ghostCharAt();   // po prípadnom swape vo fronte = nový mág
     const p = ghostPos();
     if (!char || !p) return;
-    if (char === "medusa" || char === "escanor" || char === "werewolf") return; // smerový special - preview ukazujú až šípky pickeru
-    if (char === "jotaro" && state?.[me]?.worldUsed) return; // Special 2 je smerový - preview ukáže L/R picker
+    const target = specialTargetOf(char);
+    if (target === "dir" || target === "wolf") return; // smerový special - preview ukazujú až šípky pickeru
     showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, worldUsed: state?.[me]?.worldUsed }));
   });
   specialBtn.addEventListener("mouseleave", clearPreviewCells);
@@ -6914,7 +6778,7 @@ specialPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   btn.addEventListener("mouseenter", () => {
     const char = ghostCharAt();
     const p = ghostPos();
-    if ((char === "medusa" || char === "escanor" || char === "jotaro") && p)
+    if (specialTargetOf(char) === "dir" && p)
       showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, worldUsed: state?.[me]?.worldUsed }, dir));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
@@ -6931,8 +6795,9 @@ wolfPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   const dir = btn.dataset.act.split(":")[1];
   btn.addEventListener("mouseenter", () => {
     const p = ghostPos();
-    if (ghostCharAt() === "werewolf" && p)
-      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char: "werewolf", foe: state?.[otherSlot()] }, dir));
+    const char = ghostCharAt();
+    if (specialTargetOf(char) === "wolf" && p)
+      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, foe: state?.[otherSlot()] }, dir));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
@@ -6953,7 +6818,7 @@ dashPicker?.querySelectorAll("button[data-act]").forEach(btn => {
   btn.addEventListener("mouseenter", () => {
     const p = ghostPos();
     const char = ghostCharAt();
-    if ((char === "countess" || char === "onre") && p)
+    if (VAMP_CHARS[char] && p) // dash = charge
       showPreviewCells(cellsForVampChargePreview(p, dir, state?.[otherSlot()]));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);

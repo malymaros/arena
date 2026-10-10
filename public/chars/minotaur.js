@@ -16,4 +16,9 @@ export default {
   headCrop: { cx: 0.46, cy: 0.40, size: 0.30, cxP2: 0.51, cyP2: 0.43 }, // namerané z Idle.png (rohy+hlava riadky ~36–74); cxP2/cyP2 = korekcia na posunutú figúru v Minotaur_2
   pairShift: 70,
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands, where you hunt with 2× dmg. Their steps weave a thread; stepping on it reveals your silhouette" },
+  buttons: {
+    // žiadny dmg - celoplošný labyrint (trvá do vzájomného zásahu)
+    special: { title: "Special (−5 mana) - hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit", cost: "−5{💧} 🌀" },
+  },
+  specialZone: ({ G, board }) => G.allCells(board), // celoplošný (labyrint zasiahne súpera kdekoľvek)
 };

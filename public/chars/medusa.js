@@ -15,4 +15,13 @@ export default {
   pairShift: 80,
   // dmg: null = bez dmg - stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
+  buttons: {
+    // širší dosah melee (diagonály) za nižší dmg
+    melee: { title: "Melee (−4 mana, 4 dmg, hits your cell + all diagonal neighbours)", cost: "−4{💧} 4{☠️}" },
+    // žiadny dmg - skamenenie na 2 akcie (smer sa volí v pickeri)
+    special: { title: "Special (−5 mana) - petrifying gaze: choose a direction; a hit opponent skips their next 2 actions", cost: "−5{💧} 2×🗿" },
+  },
+  specialTarget: "dir", // smerový special (left/right picker)
+  // vlastné políčko + všetko striktne zvoleným smerom v riadkoch ±1
+  specialZone: ({ G, board, me, dir }) => G.medusaCells(board, me, dir),
 };

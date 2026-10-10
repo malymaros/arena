@@ -95,10 +95,11 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
       **`meta`** `{ name, dir, dirP2? }`, **`specialAnim`** (efektový sprite specialu), **`headCx`/`headTop`/`headCrop`**,
       `pairShift`, `portraitScale`, **`abilityPreview`** (popis + náhľadová zóna v char-selecte), podľa potreby
       `anims` (nové anim kľúče), `spriteAlias` (chýbajúce súbory), `side`/`vamp`, `teleport*`, `previewCast`.
+- [ ] **`buttons`** — tooltip + cena (`"−5{💧} 8{☠️}"`) special/melee tlačidla, prípadne skin dash/mirror/recharge slotu.
+- [ ] **`specialTarget`** (`dir` / `wolf` / `cell` / `trap` / `luffy` / `none`) a **`specialZone`** — náhľad zóny zo
+      `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
 
 ### `public/client.js` (render/animácie/vstup — choreografia je zatiaľ tu, register ju postupne preberá)
-- [ ] **`cellsForSpecialPreview(meState, dir)`** — náhľad zóny pri hoveri/caste; zónu ber zo
-      `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
 - [ ] **Label special tlačidla** (blok `if (specChar === …)` v state handleri, ~riadok 3600) — cost badge
       + tooltip pre nový special. Pozor: číta sa cez `ghostCharAt()` (turnaj swap).
 - [ ] Ak má special **smer** — pridaj do pickera (ako medusa) a do `actionIcon`/`actionBadgeView` (šípky).

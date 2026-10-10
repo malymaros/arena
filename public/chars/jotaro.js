@@ -18,4 +18,17 @@ export default {
   // Jotaro: THE WORLD (jednorazový time-stop) - bez konkrétnych čísel v texte (cost badge nesie 5).
   // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
+  buttons: {
+    melee: { title: "Melee (−4 mana, 4 dmg, hits only an opponent on your cell)", cost: "−4{💧} 4{☠️}" },
+    // mirror slot = Special 1 (Star Platinum) - fialový „???" skin + L/R picker
+    mirror: { skin: "jotaro-s1", title: "Star Platinum - a directional (left/right) strike hitting BOTH diagonal cells on that side for 4 dmg", cost: "−4{💧} 4{☠️}" },
+    // klasická ✨ ikona; mení sa len cena: pred THE WORLD hodiny (⏱), po ňom (worldUsed) Special 2 = 8 dmg
+    special: (ui) => ui.worldUsed
+      ? { title: "Special 2 (−5 mana, 8 dmg) - a directional (left/right) strike on the adjacent cell", cost: "−5{💧} 8{☠️}" }
+      : { title: "THE WORLD (−5 mana, once per game) - time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes", cost: "−5{💧} ⏱" },
+  },
+  // THE WORLD bez cieľa; po ňom Special 2 smerový (L/R picker)
+  specialTarget: (ui) => ui.worldUsed ? "dir" : "none",
+  // Special 2: jediná susedná bunka (x±dir, y); THE WORLD: globálny cast → bliká celá doska (nič neleakuje)
+  specialZone: ({ G, board, me, dir }) => me.worldUsed ? G.jotaroS2Cells(board, me, dir) : G.allCells(board),
 };

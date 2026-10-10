@@ -26,6 +26,13 @@
 //                  teleportFx { scale (× políčko), anchor "feet"|"torso", bottomTrim (priehľadný spodok PNG), dy (posun nadol) }
 //   previewCast    hover animácia preview karty (Luffy, Jotaro)
 //   abilityPreview { caster, dmg, desc… } - náhľad specialu vo výbere postáv
+//   buttons        skiny akčných tlačidiel { melee, special, dash, attack, recharge, mirror }: { title, cost, skin? }
+//                  alebo funkcia (ui) → { title, cost } pre premenlivý obsah (ui = { st, gear3, worldUsed });
+//                  cost = HTML s {emoji} tokenmi (pixelové mini ikony), skin = trieda tlačidla aj pickera
+//                  s „???" ikonou (vamp-charge, jotaro-s1, luffy-switch); special.specialKey(ui) = kedy prekresliť
+//   specialTarget  cieľ specialu: "none" (default) | "dir" (L/R) | "wolf" (8 smerov) | "cell" (vojak) |
+//                  "trap" (bunka bez blokovania) | "luffy" (bunky na línii) - alebo funkcia (ui) → typ
+//   specialZone    ({ G, board, me, dir, tiles }) → [[x,y]…] náhľad zóny specialu (G = shared/geometry.js)
 import fire from "./fire.js";
 import lightning from "./lightning.js";
 import wanderer from "./wanderer.js";
@@ -65,3 +72,4 @@ export const TELEPORT_COUNT = collect("teleportCount");
 export const TELEPORT_FX = collect("teleportFx");
 export const PREVIEW_CAST = collect("previewCast");
 export const ABILITY_PREVIEW = collect("abilityPreview");
+export const CHAR_BUTTONS = collect("buttons");

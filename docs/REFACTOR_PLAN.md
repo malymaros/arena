@@ -183,7 +183,11 @@ previews importujú `shared/geometry.js`.
       boti hrajú seedované zápasy (všetkých 13 postáv, aj side-postavy a turnaj so swapmi), prehliadač ich sleduje
       ako divák pri 8× zrýchlenom čase, plus hover všetkých kariet vo výbere. Padá na JS výnimkách, console.error
       a 4xx; `--compare` spustí to isté nad HEAD a porovná množinu načítaných spritov.
-- [ ] **6b - choreografia a skiny tlačidiel do registra.** V `client.js` ostáva ~155 vetiev podľa mien
+- [x] **6b-1 - tlačidlá a special do registra:** `buttons` (tooltip/cena/skin melee, special, dash, attack, recharge,
+      mirror), `specialTarget` (typ pickera), `specialZone` (náhľad zóny). browser-smoke rozšírený o UI sondu (ako
+      hráč na p1 aj p2 zvolí každú postavu a uloží akčné tlačidlá + náhľady vo výbere; HEAD výsledok sa kešuje).
+      Overenie: zóny == stará `cellsForSpecialPreview` (89 856 prípadov), UI sonda 52/52, 196 rovnakých spritov.
+- [ ] **6b - choreografia do registra.** V `client.js` ostáva ~155 vetiev podľa mien
       (najviac escanor 33, jotaro 30, luffy 23, countess/onre 24, werewolf 14, soldier 12, medusa 10). Návrh:
       háčiky klientskej postavy (`onEffect(kind, e, ctx)` pre vlastné efekty timeline, `castOverlay`,
       `boardScale` pre pride/moon/gear3 veľkosť, `buttons` pre special/dash/mirror skin a picker) - po jednej

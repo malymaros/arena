@@ -11,6 +11,8 @@
 //   node tools/browser-smoke.mjs                      → beh nad pracovným stromom, súhrn + exit 1 pri chybách
 //   node tools/browser-smoke.mjs --compare            → navyše ten istý beh nad HEAD (git archive) a diff assetov
 //   node tools/browser-smoke.mjs --speed 6 --only fire  (len zápasy s danou postavou)
+//   node tools/browser-smoke.mjs --compare --no-matches (len UI sonda: tlačidlá a náhľady per postava, ~2 min)
+//   Výsledok HEAD sa kešuje v tmp podľa commitu (opakované --compare počas refaktoru pustí len pracovný strom).
 import { spawn, execSync } from "node:child_process";
 import { io } from "socket.io-client";
 import WebSocket from "ws";
@@ -23,6 +25,8 @@ const opt = (n, d) => { const i = args.indexOf("--" + n); return i >= 0 ? args[i
 const SPEED = Number(opt("speed", 8));
 const ONLY = opt("only", null);
 const COMPARE = args.includes("--compare");
+const NO_MATCHES = args.includes("--no-matches");
+const PROBE_VER = 2; // verzia scenára sondy - zmena zneplatní keš výsledkov HEAD
 const PASS = "smoke";
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -207,9 +211,9 @@ async function runAgainst(root, label) {
   await br.send("Animation.setPlaybackRate", { playbackRate: SPEED });
   await br.send("Page.addScriptToEvaluateOnNewDocument", { source: WARP });
   // nová identita (arenaId v storage by inak prevzala miesto z predošlej roomky)
-  const login = async (name) => {
+  const login = async (name, at = url) => {
     await br.evaluate(`try { localStorage.clear(); sessionStorage.clear(); } catch {}`);
-    await br.send("Page.navigate", { url });
+    await br.send("Page.navigate", { url: at });
     await sleep(1500);
     await br.evaluate(`(() => { document.getElementById("login-name").value = "${name}"; document.getElementById("login-pass").value = "${PASS}";
       document.getElementById("login-form").requestSubmit(); })()`);
@@ -217,31 +221,65 @@ async function runAgainst(root, label) {
   };
   const log = (s) => console.log(`[${label}] ${s}`);
 
+  const ui = {}; // UI sonda: obsah akčných tlačidiel per strana+postava, náhľad specialu per karta
   try {
-    // 1) výber postáv ako hráč B: hover každej karty (náhľad specialu, preview karty, Hidden stránka)
-    {
-      const host = await connect(url, "hostbot");
+    // 1) UI sonda ako hráč: na p2 (tento server, host = p1) aj na p1 (druhý server s FORCE_FIRST_STARTER=B).
+    //    Hover každej karty (náhľad specialu, preview karty, Hidden stránka), potom každá postava danej strany:
+    //    zvoliť ju a zaznamenať akčné tlačidlá (cena/dmg/tooltip/skin podľa postavy).
+    const STD = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor", "soldier", "werewolf"];
+    // side-postavy s vlastným skinom tlačidiel striedané s bežnými - sonda overí aj návrat skinu na bežný
+    const SIDES = [{ side: "p2", chars: ["onre", "fire", "jotaro", ...STD.slice(1), "onre", "jotaro"], force: "A" },
+                   { side: "p1", chars: ["countess", "fire", "luffy", ...STD.slice(1), "countess", "luffy"], force: "B" }]
+      .map(s => ({ ...s, chars: s.chars.filter(c => !ONLY || c === ONLY) }));
+    for (const { side, chars, force } of SIDES) {
+      if (!chars.length) continue;
+      let probeSrv = null, at = url;
+      if (force !== "A") {
+        const p = port + 5;
+        probeSrv = spawn(process.execPath, ["server.js"], { cwd: root, env: { ...process.env, PORT: String(p), FORCE_FIRST_STARTER: force, PLAYER_KEYS: PASS, ARENA_SEED: "1" }, stdio: "ignore" });
+        await sleep(1300);
+        at = `http://localhost:${p}`;
+      }
+      const host = await connect(at, "hostbot");
       host.sock.emit("create_room");
-      await login("viewer");
+      await login("viewer", at);
       await br.evaluate(`document.querySelector(".room-btn.join")?.click()`);
       await sleep(600);
-      host.sock.emit("configure_match", CONFIG);
-      await sleep(1500 / SPEED + 2500); // farebné koleso
-      const cards = await br.evaluate(`(async () => {
-        const cards = [...document.querySelectorAll("#char-select [data-char], #char-select .char-card")];
-        for (const c of cards) {
-          c.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-          c.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-          await new Promise(r => setTimeout(r, 2500 / ${SPEED}));
-          c.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
-          c.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+      let first = true;
+      for (const ch of chars) {
+        if (!first) { host.sock.emit("retry"); await sleep(200); }
+        host.sock.emit("configure_match", CONFIG);
+        await sleep(1500 / SPEED + 2500); // farebné koleso
+        if (first) {
+          const abil = await br.evaluate(`(async () => {
+            const out = {};
+            for (const c of document.querySelectorAll("#char-select .char-card")) {
+              c.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+              c.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+              await new Promise(r => setTimeout(r, 2500 / ${SPEED}));
+              if (c.dataset.char) out[c.dataset.char] = ["ca-title", "ca-text", "ca-stats"].map(id => document.getElementById(id)?.innerHTML ?? "").join(" | ");
+              c.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+              c.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+            }
+            return out;
+          })()`);
+          for (const [k, v] of Object.entries(abil || {})) ui[`${side} výber ${k}`] = v;
+          log(`${side}: hover ${Object.keys(abil || {}).length} kariet`);
+          first = false;
         }
-        return cards.length;
-      })()`);
-      log(`výber postáv: hover ${cards} kariet`);
+        await br.evaluate(`document.querySelector('.char-card[data-char="${ch}"]')?.click()`);
+        host.sock.emit("choose_character", "fire");
+        await waitFor(() => host.st?.p1?.char && host.st?.p2?.char, 5000, `probe ${side} ${ch}`);
+        await sleep(1200);
+        ui[`${side} tlačidlá ${ch}${ui[`${side} tlačidlá ${ch}`] !== undefined ? " (2.)" : ""}`] = await br.evaluate(`JSON.stringify([...document.querySelectorAll(".btn.act, .golden-half")].map(b =>
+          [b.id || b.dataset.act || b.className, b.className, b.title, b.innerHTML]))`);
+      }
+      log(`${side}: UI sonda ${chars.length} postáv`);
       host.sock.close();
+      probeSrv?.kill();
       await sleep(500);
     }
+    if (NO_MATCHES) throw "skip";
     // 2) zápasy so sledovaním ako divák
     const c1 = await connect(url, "alpha"), c2 = await connect(url, "beta");
     c1.sock.emit("create_room");
@@ -296,13 +334,13 @@ async function runAgainst(root, label) {
     }
     c1.sock.close(); c2.sock.close();
   } catch (e) {
-    errors.push("beh testu: " + e.message);
+    if (e !== "skip") errors.push("beh testu: " + e.message);
   } finally {
     br.close();
     server.kill();
   }
   if (serverErr.trim()) errors.push("stderr servera: " + serverErr.trim().slice(0, 500));
-  return { errors, failed, assets };
+  return { errors, failed, assets, ui };
 }
 
 /* ---------- hlavný beh ---------- */
@@ -328,7 +366,18 @@ if (COMPARE) {
   execSync(`git worktree add --detach "${dir}" HEAD`, { stdio: "ignore" });
   const linkedModules = !fs.existsSync(path.join(dir, "node_modules")); // node_modules je v repe verziované
   if (linkedModules) fs.symlinkSync(path.resolve("node_modules"), path.join(dir, "node_modules"), "junction");
-  const old = await runAgainst(dir, "HEAD");
+  // výsledok HEAD sa kešuje podľa commitu a voľby behu (HEAD sa medzi krokmi refaktoru nemení)
+  const sha = execSync("git rev-parse --short HEAD").toString().trim();
+  const headCache = path.join(os.tmpdir(), `arena-smoke-head-v${PROBE_VER}-${sha}-${ONLY || "all"}${NO_MATCHES ? "-ui" : ""}.json`);
+  let old;
+  if (fs.existsSync(headCache)) {
+    const c = JSON.parse(fs.readFileSync(headCache, "utf8"));
+    old = { ...c, assets: new Set(c.assets) };
+    console.log(`(HEAD ${sha}: výsledok z keše)`);
+  } else {
+    old = await runAgainst(dir, "HEAD");
+    fs.writeFileSync(headCache, JSON.stringify({ ...old, assets: [...old.assets] }));
+  }
   console.log(`\n=== HEAD: ${old.errors.length} chýb, ${old.failed.length} zlyhaných požiadaviek, ${old.assets.size} assetov`);
   const onlyOld = [...old.assets].filter(a => !cur.assets.has(a)).sort();
   const onlyNew = [...cur.assets].filter(a => !old.assets.has(a)).sort();
@@ -337,6 +386,18 @@ if (COMPARE) {
   if (linkedModules) try { fs.unlinkSync(path.join(dir, "node_modules")); } catch {}
   try { execSync(`git worktree remove --force "${dir}"`, { stdio: "ignore" }); } catch {}
   bad += onlyOld.length + onlyNew.length;
+  // UI sonda: akčné tlačidlá a náhľady specialov musia byť rovnaké
+  const uiKeys = [...new Set([...Object.keys(old.ui || {}), ...Object.keys(cur.ui || {})])].sort();
+  const uiDiff = uiKeys.filter(k => JSON.stringify(old.ui?.[k]) !== JSON.stringify(cur.ui?.[k]));
+  console.log(`UI sonda: ${uiKeys.length} záznamov, rozdielnych ${uiDiff.length}`);
+  for (const k of uiDiff) {
+    const a = String(old.ui?.[k] ?? "∅"), b = String(cur.ui?.[k] ?? "∅");
+    let i = 0; while (i < a.length && a[i] === b[i]) i++;
+    console.log(`  ≠ ${k} @${i}
+     HEAD: …${a.slice(Math.max(0, i - 60), i + 140)}
+     nové: …${b.slice(Math.max(0, i - 60), i + 140)}`);
+  }
+  bad += uiDiff.length;
 }
 console.log(bad ? "\nDYMOVÝ TEST: PROBLÉMY" : "\nDYMOVÝ TEST OK");
 process.exit(bad ? 1 : 0);

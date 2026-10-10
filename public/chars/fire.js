@@ -13,4 +13,11 @@ export default {
   teleportCount: 6,
   teleportFx: { scale: 1.0, anchor: "feet" }, // oheň horí od zeme, zmestí sa do políčka
   abilityPreview: { caster: { x: 0, y: 1 }, dmg: 5, desc: `Boost range ±1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
+  // tlačidlá: cena {emoji} = pixelová mini ikona (client costHtml)
+  buttons: {
+    special: { title: "Special (−5 mana, 5 dmg)", cost: "−5{💧} 5{☠️}" },
+  },
+  // náhľad zóny specialu: celý riadok; na Damage dlaždici riadky ±1 (server: fireOnDmgTile)
+  specialZone: ({ G, board, me, tiles }) =>
+    G.fireCells(board, me, (tiles || []).some(t => t.type === "dmg" && t.x === me.x && t.y === me.y)),
 };

@@ -22,4 +22,10 @@ export default {
   pairShift: 70,
   // Vojak: cieľová bunka je voľba hráča - náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
   abilityPreview: { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
+  buttons: {
+    // snajperský lúč na zvolenú bunku - súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
+    special: { title: "Special (−5 mana, 10 dmg) - pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it", cost: "−5{💧} 10{☠️}" },
+  },
+  // mini mapa pod tlačidlom; cieľová bunka je súčasť AKCIE (cell) - zóna sa z pozície neodvodzuje
+  specialTarget: "cell",
 };
