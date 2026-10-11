@@ -12,6 +12,11 @@
 //   drawCenter(cvs, ctx, now) → true  raf stredového spritu - true = nakreslené (inak bežný loop)
 //   centerCast(e) → sp | null     efekt autora zrkadlený do stredového spritu (renderGrid; sp ako melee cast)
 //   clearOverlays()               koniec hry/medzihra - zmaž vlastné overlaye, ktoré renderGrid nemaže
+//   hud(slot, p)                  renderHUD (per frame) pre každý slot a KAŽDÚ postavu - vlastné HUD prvky; ak p?.char
+//                                 nie je táto postava, skry ich
+//   preview({ grid, caster, dir }) → { frame(now), close() }
+//                                 náhľad specialu vo výbere postáv (hover karty): grid = mini-doska (.mini-cell
+//                                 s data-gx/gy), caster = bunka castera; frame volá raf, close pri odchode/inej karte
 import soldier from "./soldier.js";
 import werewolf from "./werewolf.js";
 import countess from "./countess.js";

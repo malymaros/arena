@@ -7,6 +7,11 @@ export default {
   meta: { name: "Jotaro",  dir: "jotaro", dirP2: "jotaro" },
   side: "p2",
   specialAnim: { file: "Special_2_P.png",  fps: SPECIAL_FPS, loop: true }, // Star Platinum úder (stred castu; F5 doladí per special1/2 + THE WORLD)
+  victoryAnim: { file: "Idle.png", fps: 6, loop: true }, // výhra vedie stand Star Platinum, telo ostáva v idle
+  // figúra cez ~0.78 framu (mágovia ~0.52) → menší fill; pásy majú rôznu výšku framu (Idle/Attack/Special 144,
+  // Run/Hurt 128) pri rovnako veľkej figúre → fill × fh/refH, nech Jotaro pri pohybe „nenarastie"; ukotvený na nohy
+  boardFit: { fill: 0.66, refH: 144, offY: 4 },
+  previewIdleCaster: true, // na mini-doske výberu je casterom ON (nie stredová Star Platinum póza) → idle
   portraitScale: 0.66,
   headCx: 0.47,
   headTop: 0.45,

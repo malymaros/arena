@@ -6,7 +6,7 @@ import * as G from "/shared/geometry.js";
 import {
   CHAR_META, SIDE_CHARS, VAMP_CHARS, SPECIAL_ANIMS, FX_OFFSET_X, CHAR_ANIMS, SPRITE_FILE_ALIAS, PORTRAIT_SCALE,
   HEAD_CX, HEAD_TOP, HEAD_CROP, PAIR_SHIFT, TELEPORT_DIR, TELEPORT_COUNT, TELEPORT_FX, PREVIEW_CAST, ABILITY_PREVIEW,
-  CHAR_BUTTONS, CHARS_BY_KEY, SIZE_LEVEL, ACTION_ANIMS, PROJECTILE,
+  CHAR_BUTTONS, CHAR_LIST, CHARS_BY_KEY, SIZE_LEVEL, ACTION_ANIMS, PROJECTILE,
 } from "/chars/index.js";
 import { WOLF_MOON_DMG } from "/chars/werewolf.js";
 import { CHAR_FX_FACTORIES } from "/chars/fx/index.js";
@@ -33,6 +33,7 @@ const C = {
   get WOLF_DIRS_CLIENT() { return WOLF_DIRS_CLIENT; },
   get charDirFor() { return charDirFor; }, get usesAltColor() { return usesAltColor; },
   get computeFacing() { return computeFacing; },
+  get hydratePix() { return hydratePix; }, get G() { return G; },
 };
 // háčiky choreografie per postava (effect / boardAnim / centerCanvas / drawCenter - popis v public/chars/fx/index.js)
 const CHAR_FX = Object.fromEntries(Object.entries(CHAR_FX_FACTORIES).map(([k, f]) => [k, f(C)]));
@@ -192,10 +193,6 @@ const prideRange = { p1: document.getElementById("prange-p1"), p2: document.getE
 // Vlkolak: fáza mesiaca (ikona bez čísla) vľavo + dmg specialu pri aktuálnej fáze vpravo v HUD widgete
 const moonBadge = { p1: document.getElementById("moon-p1"), p2: document.getElementById("moon-p2") };
 const moonDmg   = { p1: document.getElementById("mdmg-p1"), p2: document.getElementById("mdmg-p2") };
-// Luffy: odznak módu (Base / Gear 3) vľavo v HUD widgete (analogicky k mesiacu)
-const luffyBadge = { p1: document.getElementById("luffy-p1"), p2: document.getElementById("luffy-p2") };
-// Luffy: info o basic (šípky diag/orto) + special (šípky dáma/veža + dmg) vpravo v HUD widgete
-const luffyInfo = { p1: document.getElementById("luffy-info-p1"), p2: document.getElementById("luffy-info-p2") };
 // 8 smerov vlkolakovho specialu - MUSÍ sedieť so serverovým WOLF_DIRS
 const WOLF_DIRS_CLIENT = G.DIR8; // 8 smerov (vlkolakov charge, smer strely) - zo shared/geometry.js
 const WOLF_DIR_KEYS_CLIENT = Object.keys(WOLF_DIRS_CLIENT);
@@ -247,27 +244,14 @@ const ACTOR_W = Math.round(TILE_W * ACTOR_SCALE);
 const ACTOR_H = Math.round(TILE_H * ACTOR_SCALE);
 // Jotaro (a jeho stand) majú figúru cez väčšinu framu → na boarde ich kreslíme menšie, aby výškou sedeli
 // s mágmi (namerané: jotaro figúra 0.78 framu vs mágovia ~0.52). Stand sa navyše VZNÁŠA za chrbtom (float Y).
-const JOTARO_BOARD_FILL = 0.66;
+const JOTARO_BOARD_FILL = CHARS_BY_KEY.jotaro.boardFit.fill; // register (public/chars/jotaro.js) - stand ho zdieľa
 // Jotarove pásy majú RÔZNU výšku framu (Idle/Attack/Special 144 px, ale Run/Hurt len 128 px) pri takmer
 // rovnako veľkej figúre (~110–112 px). drawSprite škáluje podľa výšky framu (fill × dstH/fh), takže tá istá
 // figúra v nižšom frame vyjde väčšia → Jotaro „narastie", keď sa hýbe. Normalizujeme fill × (fh/REF), čím sa
 // škála stane nezávislou od paddingu framu (na obraze závisí len od skutočnej výšky figúry). REF = 144.
-const JOTARO_FRAME_REF_H = 144;
+const JOTARO_FRAME_REF_H = CHARS_BY_KEY.jotaro.boardFit.refH;
 // Konštantná škála na obraze (px na obraze / px zdroja) po normalizácii fill × fh/REF - nezávislá od framu.
 const JOTARO_SCALE = Math.min(ACTOR_W, ACTOR_H) / JOTARO_FRAME_REF_H * JOTARO_BOARD_FILL;
-// Luffy má rovnaký problém (figúra ~0.88 framu → pri fill 0.95 je „obrovský"). Normalizujeme rovnako
-// ako Jotara (menší board fill + fill × fh/REF). REF = výška Idle framu (128).
-const LUFFY_BOARD_FILL = 0.58;
-const LUFFY_FRAME_REF_H = 128;
-// Luffy je menší (fill 0.58) → pri anchorY 0.5 (stred) by mu nohy plávali vysoko. Ukotvíme ho SPODKOM
-// (anchorY 1) na rovnakú nožnú líniu ako mágovia (fire wizard): mág pri fille 0.95 sedí ~8 px nad
-// spodkom canvasu, tak Luffyho spodok zdvihneme o toľko istého (offsetY záporné = hore).
-const LUFFY_BOARD_OFF_Y = 4;
-// Gear3 basic (Giant Pistol): telové pózy L_GiantPunch/L_RocketPull majú natiahnutú ruku + giant päsť
-// ZAPEČENÚ v sprite (vpravo). Kreslíme len Luffyho TELO (odrežeme pravú časť framu) - dosah rieši
-// procedurálna gumená ruka, ktorá sa naťahuje od tela po reálnu bunku súpera a nesie giant päsť na špičke.
-// (frac = koľko šírky framu odseknúť sprava; laditeľné podľa toho, kde v pásoch končí Luffyho telo)
-const LUFFY_ARM_CROP = { luffygiantpunch: 0.56, luffyrocketpull: 0.5 };
 // Star Platinum `_P` pásy (a Jotarove telo) majú v ÚTOČNÝCH pózach figúru zámerne posunutú tak, aby BBOX
 // ostal centrovaný (napr. pri údere päsť vyletí bokom a telo/nohy sú odtlačené na druhú stranu). Keby sme
 // kreslili centrované na frame, NOHY by pri animácii uskakovali zľava doprava a hore-dole. Preto ukotvujeme
@@ -602,7 +586,7 @@ let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let escPridePreview = null;      // Escanor char-select: cyklenie pride 0→3 v náhľade zóny (viď markEscPridePreview)
 let moonPreview = null;          // Vlkolak char-select: cyklenie fázy mesiaca 0→3 + dmg (viď markMoonPreview)
-let luffyPreview = null;         // Luffy char-select: cyklenie módu base↔gear3 (zóna dáma/veža + dmg 4/8; viď markLuffyPreview)
+let abilityFx = null;            // náhľad specialu z registra fx (preview → { frame, close }; Luffy: cyklenie módu base↔gear3)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
 
 // počas special castu skryjeme bežný actor sprite
@@ -2171,33 +2155,10 @@ function renderHUD() {
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
   renderPrideHud("p1"); renderPrideHud("p2");
   renderMoonHud("p1"); renderMoonHud("p2");
-  renderLuffyHud("p1"); renderLuffyHud("p2");
+  // vlastné HUD prvky postáv z registra fx (Luffy: odznak módu + info) - každá postava, pri inom charaktere ich skryje
+  for (const fx of Object.values(CHAR_FX)) if (fx.hud) { fx.hud("p1", state?.p1); fx.hud("p2", state?.p2); }
   syncDynamicSpecialBtn(); // dmg na special tlačidle drž v sync s HUD fázou mesiaca (aj per-frame počas kola)
   updateGoldenButton();
-}
-
-// Luffy: odznak aktuálneho módu (BASE / GEAR 3) vľavo v HUD widgete (na mieste mesiaca). Gear 3 = zlatý pulz.
-function renderLuffyHud(slot) {
-  const el = luffyBadge[slot], info = luffyInfo[slot];
-  if (!el) return;
-  const p = state?.[slot];
-  if (!p || p.char !== "luffy") { el.classList.add("hidden"); if (info) info.classList.add("hidden"); return; }
-  const gear3 = p.form === "gear3";
-  el.classList.toggle("gear3", gear3);
-  const img = el.querySelector("img");
-  const src = gear3 ? "/assets/luffy/gear3.png" : "/assets/luffy/base.png";
-  if (img && !img.getAttribute("src").endsWith(src)) img.src = src;
-  el.classList.remove("hidden");
-  // info: basic = diagonálny (base) / ortogonálny (gear3); special = dáma (base, diag+orto) / veža (gear3, orto) + dmg
-  if (info) {
-    const s = info.querySelector(".li-spec"), d = info.querySelector(".li-dmg");
-    // special šípka z moves.png: dáma 8-smerov (base) / veža orto (gear3)
-    const specSrc = gear3 ? "/assets/luffy/moves_ortho.png" : "/assets/luffy/moves_all.png";
-    if (s && !s.getAttribute("src")?.endsWith(specSrc)) s.src = specSrc;
-    const dmg = gear3 ? "8" : "4";
-    if (d && d.dataset.dmg !== dmg) { d.dataset.dmg = dmg; d.innerHTML = `${dmg}<span class="pix-ico mini" data-emoji="☠️"></span>`; hydratePix(d); }
-    info.classList.remove("hidden");
-  }
 }
 
 // Vlkolak: fáza mesiaca (ikona BEZ čísla - level 0–3 je interný, hráč vidí len mesiac) vľavo,
@@ -2225,8 +2186,10 @@ function renderMoonHud(slot) {
 // nesie počiatočný frame kola (schedulePlayTimeline ho premutuje späť), takže po zmene fázy ostávalo tlačidlo
 // celé plánovanie na starom dmg. Zdroj = state[me].moon, rovnaký ako HUD ikona → obe sa preklopia naraz.
 // stav pre premenlivé skiny tlačidiel z registra (buttons.* ako funkcia): vlastný hráč, efektívny Gear 3, THE WORLD
+// + stav plánovania postavy z registra (planUi - Luffy: gear3 = efektívny mód po naplánovanom rechargi)
 function buttonUi() {
-  return { st: state?.[me], gear3: luffyEffForm() === "gear3", worldUsed: !!state?.[me]?.worldUsed };
+  const st = state?.[me];
+  return { st, worldUsed: !!st?.worldUsed, ...CHARS_BY_KEY[st?.char]?.planUi?.(st, myQueue) };
 }
 // cena tlačidla z registra: {emoji} → pixelová mini ikona
 function costHtml(cost) { return cost.replace(/\{(.+?)\}/gu, (_, e) => miniPix(e)); }
@@ -2764,8 +2727,8 @@ function cellsForAimPreview(meState, dir, char){
   // (Riadime sa smerom, nie formou - picker ponúka diag v base, ortogonálne v gear3.)
   const isDiag = delta[0] !== 0 && delta[1] !== 0;
   if (SIDE_CHARS[char] && isDiag) return vampShotRoute(meState.x, meState.y, dir);
-  // Luffy GEAR 3 basic = naťahovacia ruka (pull) - dráha sa ZASTAVÍ na prvej figúre súpera (nie po okraj)
-  const stopAtFoe = char === "luffy" && luffyEffForm() === "gear3";
+  // register aimStopsAtFoe (Luffy GEAR 3 basic = naťahovacia ruka) - dráha sa ZASTAVÍ na prvej figúre súpera
+  const stopAtFoe = !!CHARS_BY_KEY[char]?.aimStopsAtFoe?.(buttonUi());
   const foe = stopAtFoe ? state?.[me === "p1" ? "p2" : "p1"] : null;
   return G.runPath(board, meState.x, meState.y, delta, foe).path;
 }
@@ -2802,7 +2765,7 @@ let escPrideDisplayChar = { p1: null, p2: null };
 // vlkolakova ZÁKLADNÁ forma (nov) je zmenšená na 0.7× a rastie z nej (spln ≈ 1.21×), Escanor od 1×.
 // escPrideDisplay drží počas prehrávania kola STARÝ level pre oba prípady (nová veľkosť až po floate)
 const escPrideMul = a => {
-  // Luffy: veľkosť sa medzi módmi NEMENÍ (žiadny size tell) - normalizuje ju LUFFY_BOARD_FILL.
+  // Luffy: veľkosť sa medzi módmi NEMENÍ (žiadny size tell) - normalizuje ju boardFit.
   const sl = SIZE_LEVEL[a?.char]; // register: sizeLevel { stat, base }
   if (!sl) return 1;
   const lvl = a[sl.stat] || 0;
@@ -3124,7 +3087,7 @@ function renderQueue() {
   // THE WORLD plánovanie: NEprestavuj pôvodnú lištu (ostáva „executing"), zadávaj do samostatného placeholdera
   if (tsPlanning) { renderTsQueue(); updateActionButtons(); syncGoldenHalves(); updateGoldenButton(); updateLockButton(); return; }
   hideTsQueue();
-  syncLuffyGearButtons(ghostCharAt()); // Luffy: gear odznak na range/special reaguje aj na naplánovaný recharge
+  syncButtonBadges(ghostCharAt()); // Luffy: gear odznak na range/special reaguje aj na naplánovaný recharge
   ensureStonePrefix();
   queueEl.innerHTML = "";
   qBeatEls = [];
@@ -4241,19 +4204,18 @@ function drawCharSelectFrame(now) {
 
   if (abilityHoverChar === "escanor") markEscPridePreview(now); // cyklí zvýraznenie zóny podľa pride
   if (abilityHoverChar === "werewolf") markMoonPreview(now);    // cyklí fázu mesiaca + dmg pod mini-doskou
-  if (abilityHoverChar === "luffy") markLuffyPreview(now);      // cyklí mód base↔gear3 (zóna dáma/veža + dmg 4/8)
+  if (abilityHoverChar) abilityFx?.frame(now);                  // register fx (Luffy: cyklí mód base↔gear3 - zóna dáma/veža + dmg 4/8)
 
-  // malý castiaci mág v bunke castera mini-dosky - animácia špeciálu (efektový sprite). Jotaro je výnimka:
-  // casterom na mini-doske je ON (nie stredová Star Platinum póza), takže kreslíme jeho IDLE (ukotvený na nohy,
+  // malý castiaci mág v bunke castera mini-dosky - animácia špeciálu (efektový sprite). Výnimka previewIdleCaster
+  // (Jotaro, Luffy): casterom na mini-doske je ON (nie stredová póza), takže kreslíme jeho IDLE (ukotvený na nohy,
   // normalizovaný na výšku mágov cez portraitFill).
-  if (abilityHoverChar && abilityCasterCanvas && (SPECIAL_ANIMS[abilityHoverChar] || abilityHoverChar === "luffy")) {
+  const isIdle = !!CHARS_BY_KEY[abilityHoverChar]?.previewIdleCaster;
+  if (abilityHoverChar && abilityCasterCanvas && (SPECIAL_ANIMS[abilityHoverChar] || isIdle)) {
     const dir = charDirFor(abilityHoverChar, me);
-    // Jotaro aj Luffy: casterom na mini-doske je ON - kreslíme IDLE (nie cast/efektový sprite), ukotvený na nohy
-    const isIdle = abilityHoverChar === "jotaro" || abilityHoverChar === "luffy";
     const fxAnim = isIdle ? ANIM_DEF.idle : { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
     const offX = isIdle ? 0 : (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
     const fillUse = isIdle ? portraitFill(abilityHoverChar, 1.1) : 1.1;
-    const anchorUse = isIdle ? 0.95 : 0.5; // Jotaro/Luffy vypĺňajú väčšinu framu → ukotvi na nohy
+    const anchorUse = isIdle ? 0.95 : 0.5; // idle casteri (Jotaro/Luffy) vypĺňajú väčšinu framu → ukotvi na nohy
     if (dir) ensureSpriteMeta(dir, fxAnim.file)
       .then(meta => drawSprite(abilityCasterCanvas.getContext("2d"), meta, fxAnim, now, abilityCasterCanvas.width, abilityCasterCanvas.height, fillUse, anchorUse, true, offX))
       .catch(() => {});
@@ -4335,6 +4297,7 @@ function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
   if (!def || !charAbilityEl) return;
   abilityHoverChar = char; // preview loop prepne tohto mága na cyklický cast špeciálu
+  abilityFx?.close(); abilityFx = null;
   const w = board.w || 4, h = board.h || 3;
   // hráč vpravo (p2): náhľad zrkadlovo - caster pri pravom okraji, smerový special (Medúza) mieri doľava
   const mirror = me === "p2";
@@ -4347,8 +4310,8 @@ function renderAbilityPreview(char) {
     ? new Set()
     : def.target
       ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
-      : (def.formCycle && char === "luffy")
-        ? luffyHitSet(caster, "base", w, h) // Luffy: zóna dogúľania (dáma) - cyklí sa v markLuffyPreview
+      : CHAR_FX[char]?.preview
+        ? new Set() // zónu kreslí náhľad z registra fx (Luffy: dogúľanie dáma/veža - cyklí sa)
         : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
@@ -4382,10 +4345,8 @@ function renderAbilityPreview(char) {
   moonPreview = def.moonCycle ? { lvl: 0, last: 0 } : null;
   const caMoon = document.getElementById("ca-moon");
   if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
-  // Luffy: cyklenie módu base↔gear3 - zóna (dáma/veža) + badge (base.png/gear3.png) + dmg (4/8) pod mini-doskou
-  luffyPreview = def.formCycle ? { grid, caster, form: "base", last: 0 } : null;
-  const caLuffy = document.getElementById("ca-luffy");
-  if (caLuffy) { caLuffy.classList.toggle("hidden", !def.formCycle); if (def.formCycle) syncCaLuffy("base"); }
+  // náhľad z registra fx (Luffy: cyklenie módu base↔gear3 - zóna dáma/veža + badge + dmg 4/8 pod mini-doskou)
+  abilityFx = CHAR_FX[char]?.preview?.({ grid, caster, dir }) || null;
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → obal do JEDNÉHO divu (.ca-text je flex,
   // inak by sa každý textový kúsok/ikona stali samostatným flex-itemom a text sa rozhádže), potom hydratuj ikony
@@ -4428,38 +4389,6 @@ function markMoonPreview(now) {
   if (now - s.last >= 1500) { s.last = now; s.lvl = (s.lvl + 1) % 4; syncCaMoon(s.lvl); }
 }
 
-// Luffy char-select: množina bún zóny specialu (dáma base / veža gear3) z pozície castera
-function luffyHitSet(caster, form, w, h) {
-  const set = new Set();
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
-    if (!(x === caster.x && y === caster.y) && luffyReachesCell(caster.x, caster.y, x, y, form)) set.add(`${x},${y}`);
-  return set;
-}
-// Luffy char-select: mód (base/gear3) + dmg pod mini-doskou (base.png/gear3.png; gear3 pulzuje ako max)
-function syncCaLuffy(form) {
-  const el = document.getElementById("ca-luffy"); if (!el) return;
-  const gear3 = form === "gear3";
-  const img = el.querySelector("img");
-  const src = gear3 ? "/assets/luffy/gear3.png" : "/assets/luffy/base.png";
-  if (img && !img.getAttribute("src").endsWith(src)) img.src = src;
-  el.classList.toggle("gear3-max", gear3);
-  const dmgEl = el.querySelector(".ca-luffy-dmg");
-  if (dmgEl) { dmgEl.innerHTML = `${gear3 ? 8 : 4}<span class="pix-ico mini" data-emoji="☠️"></span>`; hydratePix(dmgEl); }
-}
-// Luffy char-select: cyklenie módu base↔gear3 (badge + zóna dáma/veža, tempo ako pride/moon náhľad)
-function markLuffyPreview(now) {
-  const s = luffyPreview; if (!s) return;
-  if (!s.last) s.last = now;
-  if (now - s.last >= 1500) { s.last = now; s.form = s.form === "base" ? "gear3" : "base"; syncCaLuffy(s.form); }
-  const hit = luffyHitSet(s.caster, s.form, board.w || 4, board.h || 3);
-  s.grid.querySelectorAll(".mini-cell").forEach(c => {
-    if (c.classList.contains("caster")) return;
-    const on = hit.has(`${c.dataset.gx},${c.dataset.gy}`);
-    if (on && !c.classList.contains("hit")) { c.style.animationDelay = -(now % 1000) + "ms"; c.classList.add("hit"); }
-    else if (!on) c.classList.remove("hit");
-  });
-}
-
 // Escanor char-select: prekresli zvýraznené bunky pre daný pride level (cyklí 0→3 v drawCharSelectFrame)
 function markEscPridePreview(now) {
   const s = escPridePreview; if (!s) return;
@@ -4483,7 +4412,7 @@ function clearAbilityPreview() {
   abilityCasterCanvas = null;
   escPridePreview = null;
   moonPreview = null;
-  luffyPreview = null;
+  abilityFx?.close(); abilityFx = null;
   charAbilityEl?.classList.add("hidden");
 }
 selEl.querySelectorAll(".char-card").forEach(card => {
@@ -4748,17 +4677,15 @@ function syncDashBtn(char) {
 const rechargeBtn = document.querySelector('.btn.act.mana[data-act="recharge"]');
 function syncRechargeBtn(char) { applyBtnSkin("recharge", rechargeBtn, null, char); }
 
-// Luffy: gear-závislé akcie (range attack + special) sa menia podľa módu → vizuálne ich odlíšime
-// rohovým odznakom módu (base.png / gear3.png) na tlačidle. Toggle podľa zvoleného mága a aktuálnej formy.
-function syncLuffyGearButtons(char) {
-  // odznak (gear3.png) sa ukáže LEN v gear3 móde - vrátane momentu, keď je v tomto kole naplánovaný
-  // recharge (luffyEffForm zohľadní prepnutie), aby hráč videl, že basic/special budú v gear3.
-  const gear3 = char === "luffy" && luffyEffForm() === "gear3";
-  [attackBtn, specialBtn].forEach(b => {
-    if (!b) return;
-    b.classList.toggle("luffy-gear", gear3);
-    b.classList.toggle("luffy-gear3", gear3);
-  });
+// odznak stavu postavy na tlačidlách z registra (buttonBadge - Luffy: gear3.png na range attack + special,
+// aj keď je v tomto kole naplánovaný recharge, aby hráč videl, že basic/special budú v gear3)
+function syncButtonBadges(char) {
+  const btns = { attack: attackBtn, special: specialBtn };
+  for (const c of CHAR_LIST) {
+    const bb = c.buttonBadge; if (!bb) continue;
+    const on = c.key === char && !!bb.on(buttonUi());
+    for (const sl of bb.slots) { const b = btns[sl]; if (b) bb.cls.forEach(k => b.classList.toggle(k, on)); }
+  }
 }
 
 // Jotaro nemá mirror - tento slot je Special 1 (Star Platinum): fialový ❔ skin, cost 4, L/R picker.
@@ -4820,20 +4747,13 @@ function togglePicker(kind, btn, usedType) {
 // Move / Attack / Dash: najprv výber smeru v mini-popupe
 moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"));
 // Countess/Onre strieľajú diagonálne - attack otvára diagonálny picker namiesto ortogonálneho
-// Luffy: efektívny mód pre plánovaný basic = aktuálny form prepnutý, ak je v tomto kole už naplánovaný
-// recharge (ten prepína mód a vyhodnotí sa pred basicom).
-function luffyEffForm() {
-  let f = state?.[me]?.form || "base";
-  if (myQueue.some(a => a.type === "recharge")) f = f === "gear3" ? "base" : "gear3";
-  return f;
-}
 attackBtn.addEventListener("click", () => {
   const c = ghostCharAt();
-  // Luffy: base = diagonálny picker, gear3 = ortogonálny (ale LEN doľava/doprava); ostatné side-postavy vždy diagonálne
-  const gear3 = c === "luffy" && luffyEffForm() === "gear3";
-  const kind = c === "luffy" ? (gear3 ? "attack" : "attack_diag")
-             : SIDE_CHARS[c] ? "attack_diag" : "attack";
-  aimPicker.classList.toggle("lr-only", gear3); // Gear3 basic = skry ↑/↓, nechaj len ←/→
+  // typ pickera z registra (attackPicker - Luffy: base diag, gear3 len ←/→); inak side-postavy diagonálne
+  const ap = CHARS_BY_KEY[c]?.attackPicker;
+  const pk = (typeof ap === "function" ? ap(buttonUi()) : ap) || (SIDE_CHARS[c] ? "diag" : "ortho");
+  const kind = pk === "diag" ? "attack_diag" : "attack";
+  aimPicker.classList.toggle("lr-only", pk === "lr"); // lr = ortogonálny picker bez ↑/↓
   togglePicker(kind, attackBtn, "attack");
 });
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
@@ -4849,11 +4769,8 @@ meleeBtn?.addEventListener("click", () => {
 // vlastná GHOST pozícia (kde budem v čase specialu po naplánovaných move/dash) a súperova aktuálna
 // bunka + jeho tieňový klon (obe figúry - blokovanie len pravej by prezradilo, ktorá je skutočná).
 // V labyrinte má súper x=null (server rediguje) → neblokuje sa nič okrem vlastnej bunky (streľba naslepo).
-// Luffy: dosiahne special cieľovú bunku (dáma base / veža gear3) z pozície gp? Zrkadlí server luffySpecialReaches.
-function luffyReachesCell(gx, gy, x, y, form) {
-  return G.luffySpecialReaches(board, gx, gy, x, y, form);
-}
-function buildCellPicker(freeAll = false, luffyForm = null) {
+// reach (register specialReach - Luffy): len bunky, kam special z ghost pozície dosiahne
+function buildCellPicker(freeAll = false, reach = null) {
   if (!cellPicker) return;
   cellPicker.innerHTML = "";
   cellPicker.style.gridTemplateColumns = `repeat(${board.w}, auto)`;
@@ -4864,13 +4781,13 @@ function buildCellPicker(freeAll = false, luffyForm = null) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "btn mini-target";
-    // Luffy: cieľ musí ležať na platnej línii (dáma/veža) z ghost pozície; ostatné bunky zamknuté.
+    // reach (Luffy): cieľ musí ležať na platnej línii (dáma/veža) z ghost pozície; ostatné bunky zamknuté.
     // Vlastná aj súperova bunka SÚ platné ciele (dogúľa sa naň a udrie, kto tam stojí).
-    if (luffyForm) {
-      // Luffy: len rozlíšenie platná línia (dáma/veža) vs mimo - ŽIADNE značky mojej/súperovej pozície
+    if (reach) {
+      // len rozlíšenie platná línia vs mimo - ŽIADNE značky mojej/súperovej pozície
       // (tie dávajú zmysel u Soldiera, nie tu - Luffy sa smie dogúľať aj na vlastnú aj na súperovu bunku).
-      const reach = !!(gp && luffyReachesCell(gp.x, gp.y, x, y, luffyForm));
-      if (!reach) { b.disabled = true; b.classList.add("off-line"); }
+      const ok = !!(gp && reach({ G, board, ui: buttonUi(), g: gp, x, y }));
+      if (!ok) { b.disabled = true; b.classList.add("off-line"); }
       b.addEventListener("mouseenter", () => showPreviewCells([[x, y]]));
       b.addEventListener("mouseleave", clearPreviewCells);
       b.addEventListener("click", () => {
@@ -4917,9 +4834,9 @@ specialBtn.addEventListener("click", () => {
     togglePicker("special_cell", specialBtn, "special");
     return;
   }
-  if (target === "luffy") {
-    // pohyb-a-úder ako šachová figúra: mini mapa s bunkami len na platnej línii (dáma base / veža gear3)
-    if (openPicker !== "special_cell") buildCellPicker(false, luffyEffForm());
+  if (target === "reach") {
+    // mini mapa s bunkami len tam, kam special dosiahne (Luffy: pohyb-a-úder ako dáma base / veža gear3)
+    if (openPicker !== "special_cell") buildCellPicker(false, CHARS_BY_KEY[ghostCharAt()].specialReach);
     togglePicker("special_cell", specialBtn, "special");
     return;
   }
@@ -5807,8 +5724,8 @@ socket.on("state", (s) => {
   syncMirrorBtn(s[me]?.char);
   // recharge slot podľa mága - Luffy tu má prepínač módu (fialový ❔ skin)
   syncRechargeBtn(s[me]?.char);
-  // Luffy: odznak módu na gear-závislých tlačidlách (range attack + special)
-  syncLuffyGearButtons(s[me]?.char);
+  // odznak stavu na tlačidlách (Luffy: mód na range attack + special)
+  syncButtonBadges(s[me]?.char);
   // label melee podľa mága - Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō majú center strike bez bonusu
   const mineMelee = s[me];
   if (mineMelee?.char && meleeBtn) {
@@ -5928,10 +5845,8 @@ function raf() {
     // casting preňho ani nenastáva (útoky hrá cez attack2_loop) - teda nikdy nekreslí special sprite na tele
     let anim = stoned
       ? ANIM_DEF.idle
-      : (st.char === "jotaro" && aSt.key === "victory")
-        ? ANIM_DEF.idle
-      : (st.char === "luffy" && aSt.key === "victory")
-        ? { file: "Win.png", fps: 6, loop: true } // Luffy víťazí → Win.png (nemá SPECIAL_ANIMS)
+      : (aSt.key === "victory" && CHARS_BY_KEY[st.char]?.victoryAnim)
+        ? CHARS_BY_KEY[st.char].victoryAnim // register (Luffy Win.png - nemá SPECIAL_ANIMS; Jotaro idle)
       : (aSt.key === "victory" || aSt.key === "casting")
         ? { file: SPECIAL_ANIMS[st.char].file, fps: SPECIAL_FPS, loop: true }
         : currentAnim(slot);
@@ -5947,8 +5862,8 @@ function raf() {
     }
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
-    // Luffy Gear3 basic: odrež zapečenú natiahnutú ruku+päsť z tela (dosah kreslí procedurálna guma)
-    const armCrop = LUFFY_ARM_CROP[animState[slot].key] || 0;
+    // anim.armCrop (Luffy Gear3 basic): odrež zapečenú natiahnutú ruku+päsť z tela (dosah kreslí procedurálna guma)
+    const armCrop = anim.armCrop || 0;
     // Transform (loop:false) a WinSunBoard s loopFrom (zdvih raz, potom chvost - aj pri victory) musia ísť
     // od frame 0 → relatívny čas; inak (loop) globálny now je ok
     const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
@@ -5957,22 +5872,15 @@ function raf() {
     const drawT = tsFrozenActor ? tsFreezeAt
                 : (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
                 : escWinsun ? (now - (animState[slot].start || 0))
-                : (VAMP_ONESHOT_KEYS.has(aSt.key) || anim.fromStart) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast) hrá RAZ od frame 0, potom drží pózu
-                : (aSt.key === "luffypump" || aSt.key === "luffydeflate" || aSt.key === "luffyrolltravel" || aSt.key === "luffychomp" || aSt.key === "luffychomphit" || aSt.key === "luffyball" || aSt.key === "luffyballspin" || aSt.key === "luffyimpact" || aSt.key === "luffygiantrocket" || aSt.key === "luffygiantpunch" || aSt.key === "luffyrocketpull" || aSt.key === "luffygiantretract") ? (now - (aSt.start || 0)) // Luffy prepínacie/roll/Giant Pistol pózy hrajú RAZ od frame 0
+                : (VAMP_ONESHOT_KEYS.has(aSt.key) || anim.fromStart) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast, Luffyho prepínacie/roll/Giant Pistol pózy) hrá RAZ od frame 0, potom drží pózu
                 : (stoned ? 0 : now);
-    // Jotarov pás má figúru cez ~78 % framu (mágovia ~52 %) a nohy 5,6 % nad spodkom framu → pri fill 0.95/
-    // anchorY 0.5 je „obrovský" a nohy vysoko. Kreslíme ho menší (JOTARO_BOARD_FILL) a ukotvený na nohy
-    // (anchorY 1) na rovnaký spodný okraj ako mágovia.
-    const jotaro = st.char === "jotaro";
-    const luffy = st.char === "luffy";
-    const bFill = jotaro ? JOTARO_BOARD_FILL : luffy ? LUFFY_BOARD_FILL : 0.95;
-    const bAnchorY = (jotaro || luffy) ? 1 : 0.5; // Luffy ukotvený na nohy (ako Jotaro), nie na stred
-    const bOffY = jotaro ? 4 : luffy ? LUFFY_BOARD_OFF_Y : 0; // dorovnaj nohy na nožnú líniu mágov
+    // register boardFit (Jotaro, Luffy - figúra cez väčšinu framu, pri fill 0.95/anchorY 0.5 „obrovská" a nohy
+    // vysoko): menší fill normalizovaný na výšku framu (fh/refH, nech rôzne pásy nevyjdú rôzne veľké),
+    // ukotvený na nohy (anchorY 1) na nožnú líniu mágov
+    const fit = CHARS_BY_KEY[st.char]?.boardFit;
     ensureSpriteMeta(dir, anim.file)
-      // Jotaro/Luffy: normalizuj fill podľa výšky framu (fh/REF), nech rôzne pásy nevyjdú rôzne veľké
       .then(meta => drawSprite(ctx, meta, anim, drawT, ACTOR_W, ACTOR_H,
-        jotaro ? bFill * (meta.fh / JOTARO_FRAME_REF_H) : luffy ? bFill * (meta.fh / LUFFY_FRAME_REF_H) : bFill,
-        bAnchorY, true, 0, bOffY, poseCrop, armCrop))
+        fit ? fit.fill * (meta.fh / fit.refH) : 0.95, fit ? 1 : 0.5, true, 0, fit ? fit.offY : 0, poseCrop, armCrop))
       .catch(() => ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(metaIdle => drawSprite(ctx, metaIdle, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H))
         .catch(()=>{}));
@@ -6151,13 +6059,11 @@ function raf() {
       else { actorGhost.style.transformOrigin = ""; actorGhost.style.transform = `scaleX(${gFace})`; }
       actorGhost.classList.toggle("alt-color", usesAltColor(ghostChar, me));
       const dir = charDirFor(ghostChar, me);
-      // Jotarov/Luffyho ghost menší + ukotvený na nohy ako na boarde (rovnaká normalizácia veľkosti)
-      const gJot = ghostChar === "jotaro";
-      const gLuf = ghostChar === "luffy";
+      // boardFit ghost (Jotaro/Luffy) menší + ukotvený na nohy ako na boarde (rovnaká normalizácia veľkosti)
+      const gFit = CHARS_BY_KEY[ghostChar]?.boardFit;
       ensureSpriteMeta(dir, ANIM_DEF.idle.file)
         .then(meta => drawSprite(ctx, meta, ANIM_DEF.idle, now, ACTOR_W, ACTOR_H,
-          gJot ? JOTARO_BOARD_FILL : gLuf ? LUFFY_BOARD_FILL * (meta.fh / LUFFY_FRAME_REF_H) : 0.95,
-          (gJot || gLuf) ? 1 : 0.5, true, 0, gJot ? 4 : gLuf ? LUFFY_BOARD_OFF_Y : 0))
+          gFit ? gFit.fill * (meta.fh / gFit.refH) : 0.95, gFit ? 1 : 0.5, true, 0, gFit ? gFit.offY : 0))
         .catch(() => {});
     }
   }

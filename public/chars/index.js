@@ -11,7 +11,8 @@
 //   vamp           1 - vamp kit (charge v dash slote, pasca, mirror-imunita) - podmnožina side (Jotaro nie)
 //   specialAnim    { file, fps, loop… } - veľký stredový sprite castu specialu (aj victory/preview)
 //   fxOffsetX      efektový sprite má obsah mimo stredu framu - vodorovná korekcia v náhľade (zlomok šírky canvasu)
-//   anims          { key: { file, fps, loop… } } - vlastné animácie postavy (pridajú sa do ANIM_DEF)
+//   anims          { key: { file, fps, loop… } } - vlastné animácie postavy (pridajú sa do ANIM_DEF); fromStart = na doske
+//                  hrá RAZ od frame 0 (čas od setAnim), armCrop = zlomok šírky framu odseknutý sprava (Luffyho ruka)
 //   spriteAlias    { "prefix priečinka": { "Očakávaný.png": "Skutočný.png" } } - chýbajúce/premapované súbory
 //   portraitScale  násobič veľkosti v karte výberu a HUD portréte: mágovia vypĺňajú frame len z ~51 % výšky,
 //                  Medúza 59 %, Minotaur 72 %, Luffy/Jotaro 88/78 % → zmenšenie na porovnateľnú výšku
@@ -27,11 +28,21 @@
 //   previewCast    hover animácia preview karty (Luffy, Jotaro)
 //   abilityPreview { caster, dmg, desc… } - náhľad specialu vo výbere postáv
 //   buttons        skiny akčných tlačidiel { melee, special, dash, attack, recharge, mirror }: { title, cost, skin? }
-//                  alebo funkcia (ui) → { title, cost } pre premenlivý obsah (ui = { st, gear3, worldUsed });
+//                  alebo funkcia (ui) → { title, cost } pre premenlivý obsah (ui = { st, worldUsed, …planUi });
 //                  cost = HTML s {emoji} tokenmi (pixelové mini ikony), skin = trieda tlačidla aj pickera
 //                  s „???" ikonou (vamp-charge, jotaro-s1, luffy-switch); special.specialKey(ui) = kedy prekresliť
 //   specialTarget  cieľ specialu: "none" (default) | "dir" (L/R) | "wolf" (8 smerov) | "cell" (vojak) |
-//                  "trap" (bunka bez blokovania) | "luffy" (bunky na línii) - alebo funkcia (ui) → typ
+//                  "trap" (bunka bez blokovania) | "reach" (len bunky, kam dosiahne specialReach) - alebo funkcia (ui) → typ
+//   specialReach   ({ G, board, ui, g, x, y }) → bool - picker "reach": dosiahne special bunku (x,y) z ghost pozície g?
+//   planUi         (st, queue) → { … } - doplní ui (stav pre premenlivé tlačidlá) o stav plánovania postavy
+//                  (Luffy: gear3 = efektívny mód po naplánovanom rechargi)
+//   attackPicker   "ortho" | "diag" | "lr" alebo (ui) → typ - picker basicu (default: side-postava diag, inak ortho)
+//   aimStopsAtFoe  (ui) → bool - náhľad basicu sa zastaví na prvej figúre súpera (Luffy Giant Pistol)
+//   buttonBadge    { cls: [triedy], slots: [tlačidlá], on: (ui) → bool } - odznak stavu na tlačidlách (Luffy gear3)
+//   victoryAnim    anim malej postavy pri výhre (default: slučka specialAnim)
+//   boardFit       { fill, refH, offY } - menší fill na doske normalizovaný na výšku framu (fill × fh/refH),
+//                  ukotvený na nohy (anchorY 1) a zdvihnutý o offY px (default fill 0.95, stred) - aj ghost
+//   previewIdleCaster  caster na mini-doske výberu hrá IDLE (nie efektový sprite specialu)
 //   specialZone    ({ G, board, me, dir, tiles }) → [[x,y]…] náhľad zóny specialu (G = shared/geometry.js)
 //   sizeLevel      { stat, base } - veľkosť na ploche base·1.2^level podľa verejného stavu (Escanor pride, vlkolak moon)
 //   actionAnims    { melee?, shot?, recharge? } - kľúč ANIM_DEF pre malú postavu pri akcii (default attack2_loop / attack / aura)

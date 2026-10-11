@@ -177,7 +177,72 @@ export default function luffyFx(C) {
     }).catch(() => {});
   }
 
+  // HUD: odznak aktuálneho módu (BASE / GEAR 3) vľavo v HUD widgete (na mieste mesiaca). Gear 3 = zlatý pulz.
+  const badge = { p1: document.getElementById("luffy-p1"), p2: document.getElementById("luffy-p2") };
+  const info = { p1: document.getElementById("luffy-info-p1"), p2: document.getElementById("luffy-info-p2") };
+  function hud(slot, p) {
+    const el = badge[slot], inf = info[slot];
+    if (!el) return;
+    if (!p || p.char !== "luffy") { el.classList.add("hidden"); if (inf) inf.classList.add("hidden"); return; }
+    const gear3 = p.form === "gear3";
+    el.classList.toggle("gear3", gear3);
+    const img = el.querySelector("img");
+    const src = gear3 ? "/assets/luffy/gear3.png" : "/assets/luffy/base.png";
+    if (img && !img.getAttribute("src").endsWith(src)) img.src = src;
+    el.classList.remove("hidden");
+    // info: basic = diagonálny (base) / ortogonálny (gear3); special = dáma (base, diag+orto) / veža (gear3, orto) + dmg
+    if (inf) {
+      const s = inf.querySelector(".li-spec"), d = inf.querySelector(".li-dmg");
+      // special šípka z moves.png: dáma 8-smerov (base) / veža orto (gear3)
+      const specSrc = gear3 ? "/assets/luffy/moves_ortho.png" : "/assets/luffy/moves_all.png";
+      if (s && !s.getAttribute("src")?.endsWith(specSrc)) s.src = specSrc;
+      const dmg = gear3 ? "8" : "4";
+      if (d && d.dataset.dmg !== dmg) { d.dataset.dmg = dmg; d.innerHTML = `${dmg}<span class="pix-ico mini" data-emoji="☠️"></span>`; C.hydratePix(d); }
+      inf.classList.remove("hidden");
+    }
+  }
+
+  // výber postáv: cyklenie módu base↔gear3 - zóna dogúľania (dáma/veža) + badge (base.png/gear3.png) + dmg (4/8)
+  // pod mini-doskou (tempo ako pride/moon náhľad)
+  const caEl = () => document.getElementById("ca-luffy");
+  function syncCa(form) {
+    const el = caEl(); if (!el) return;
+    const gear3 = form === "gear3";
+    const img = el.querySelector("img");
+    const src = gear3 ? "/assets/luffy/gear3.png" : "/assets/luffy/base.png";
+    if (img && !img.getAttribute("src").endsWith(src)) img.src = src;
+    el.classList.toggle("gear3-max", gear3);
+    const dmgEl = el.querySelector(".ca-luffy-dmg");
+    if (dmgEl) { dmgEl.innerHTML = `${gear3 ? 8 : 4}<span class="pix-ico mini" data-emoji="☠️"></span>`; C.hydratePix(dmgEl); }
+  }
+  function preview({ grid, caster }) {
+    const s = { form: "base", last: 0 };
+    const hitSet = () => {
+      const set = new Set(), w = C.board.w || 4, h = C.board.h || 3;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+        if (!(x === caster.x && y === caster.y) && C.G.luffySpecialReaches(C.board, caster.x, caster.y, x, y, s.form)) set.add(`${x},${y}`);
+      return set;
+    };
+    const frame = (now) => {
+      if (!s.last) s.last = now;
+      if (now - s.last >= 1500) { s.last = now; s.form = s.form === "base" ? "gear3" : "base"; syncCa(s.form); }
+      const hit = hitSet();
+      grid.querySelectorAll(".mini-cell").forEach(c => {
+        if (c.classList.contains("caster")) return;
+        const on = hit.has(`${c.dataset.gx},${c.dataset.gy}`);
+        if (on && !c.classList.contains("hit")) { c.style.animationDelay = -(now % 1000) + "ms"; c.classList.add("hit"); }
+        else if (!on) c.classList.remove("hit");
+      });
+    };
+    caEl()?.classList.remove("hidden");
+    syncCa("base");
+    frame(performance.now()); // zóna base hneď (nie až v ďalšom raf)
+    return { frame, close: () => caEl()?.classList.add("hidden") };
+  }
+
   return {
+    hud,
+    preview,
     // koniec hry/medzihra: stredový hero-shot po game over už renderGrid neuprace
     clearOverlays: luffyCenterRemove,
     effect(e, frameHold) {
