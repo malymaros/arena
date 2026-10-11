@@ -243,6 +243,7 @@ export default function luffyFx(C) {
   return {
     hud,
     preview,
+    previewZone: true, // zónu náhľadu kreslí preview (cyklí s módom)
     // koniec hry/medzihra: stredový hero-shot po game over už renderGrid neuprace
     clearOverlays: luffyCenterRemove,
     effect(e, frameHold) {

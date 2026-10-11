@@ -8,7 +8,6 @@ import {
   HEAD_CX, HEAD_TOP, HEAD_CROP, PAIR_SHIFT, TELEPORT_DIR, TELEPORT_COUNT, TELEPORT_FX, PREVIEW_CAST, ABILITY_PREVIEW,
   CHAR_BUTTONS, CHAR_LIST, CHARS_BY_KEY, SIZE_LEVEL, ACTION_ANIMS, PROJECTILE,
 } from "/chars/index.js";
-import { WOLF_MOON_DMG } from "/chars/werewolf.js";
 import { CHAR_FX_FACTORIES } from "/chars/fx/index.js";
 
 // klientský scope pre choreografiu postáv (public/chars/fx/*): lenivé gettery (moduly ich čítajú až pri
@@ -201,8 +200,6 @@ const hudCharP1 = document.getElementById("hud-char-p1");
 const hudCharP2 = document.getElementById("hud-char-p2");
 // Escanor pride indikátor (ikona+číslo) + rozsah abilitky (minimapka) v HUD widgete
 // Vlkolak: fáza mesiaca (ikona bez čísla) vľavo + dmg specialu pri aktuálnej fáze vpravo v HUD widgete
-const moonBadge = { p1: document.getElementById("moon-p1"), p2: document.getElementById("moon-p2") };
-const moonDmg   = { p1: document.getElementById("mdmg-p1"), p2: document.getElementById("mdmg-p2") };
 // 8 smerov vlkolakovho specialu - MUSÍ sedieť so serverovým WOLF_DIRS
 const WOLF_DIRS_CLIENT = G.DIR8; // 8 smerov (vlkolakov charge, smer strely) - zo shared/geometry.js
 const WOLF_DIR_KEYS_CLIENT = Object.keys(WOLF_DIRS_CLIENT);
@@ -504,7 +501,6 @@ let lastStandArmed = false;    // objednaný Last Stand (duálny s golden mana, 
 let lastHopeArmed = false;     // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
 let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
-let moonPreview = null;          // Vlkolak char-select: cyklenie fázy mesiaca 0→3 + dmg (viď markMoonPreview)
 let abilityFx = null;            // náhľad specialu z registra fx (preview → { frame, close }; Luffy: cyklenie módu base↔gear3)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
 
@@ -1901,31 +1897,10 @@ function renderHUD() {
   actorP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   hudCharP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
-  renderMoonHud("p1"); renderMoonHud("p2");
-  // vlastné HUD prvky postáv z registra fx (Escanor pride, Luffy mód) - každá postava, pri inom charaktere ich skryje
+  // vlastné HUD prvky postáv z registra fx (Escanor pride, vlkolakov mesiac, Luffy mód) - každá postava, pri inom charaktere ich skryje
   fxAll("hud", "p1", state?.p1); fxAll("hud", "p2", state?.p2);
   syncDynamicSpecialBtn(); // dmg na special tlačidle drž v sync s HUD fázou mesiaca (aj per-frame počas kola)
   updateGoldenButton();
-}
-
-// Vlkolak: fáza mesiaca (ikona BEZ čísla - level 0–3 je interný, hráč vidí len mesiac) vľavo,
-// dmg specialu pri aktuálnej fáze vpravo v HUD widgete. Pri inej postave sa oba prvky skryjú.
-function renderMoonHud(slot) {
-  const p = state?.[slot];
-  const badge = moonBadge[slot], dmgEl = moonDmg[slot];
-  if (!badge || !dmgEl) return;
-  if (!p || p.char !== "werewolf") { badge.classList.add("hidden"); dmgEl.classList.add("hidden"); return; }
-  const lvl = Math.max(0, Math.min(3, p.moon || 0));
-  const img = badge.querySelector("img");
-  if (img && !img.getAttribute("src").endsWith("_" + lvl + ".png")) img.src = "/assets/moon_" + lvl + ".png";
-  badge.classList.toggle("moon-max", lvl >= 3); // spln pulzuje (max dmg)
-  badge.classList.remove("hidden");
-  if (dmgEl.dataset.lvl !== String(lvl)) { // prekresli len pri zmene (renderHUD beží per frame)
-    dmgEl.dataset.lvl = String(lvl);
-    dmgEl.innerHTML = `${WOLF_MOON_DMG[lvl]}<span class="pix-ico mini" data-emoji="☠️"></span>`;
-    hydratePix(dmgEl);
-  }
-  dmgEl.classList.remove("hidden");
 }
 
 // Vlkolak: dmg na SPECIAL tlačidle musí sedieť so zobrazenou fázou mesiaca (HUD ikonou). Prepočítava sa preto
@@ -3808,7 +3783,6 @@ function drawCharSelectFrame(now) {
       .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
   });
 
-  if (abilityHoverChar === "werewolf") markMoonPreview(now);    // cyklí fázu mesiaca + dmg pod mini-doskou
   if (abilityHoverChar) abilityFx?.frame(now);                  // register fx (Luffy: cyklí mód base↔gear3 - zóna dáma/veža + dmg 4/8)
 
   // malý castiaci mág v bunke castera mini-dosky - animácia špeciálu (efektový sprite). Výnimka previewIdleCaster
@@ -3915,8 +3889,8 @@ function renderAbilityPreview(char) {
     ? new Set()
     : def.target
       ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
-      : CHAR_FX[char]?.preview
-        ? new Set() // zónu kreslí náhľad z registra fx (Luffy: dogúľanie dáma/veža - cyklí sa)
+      : CHAR_FX[char]?.previewZone
+        ? new Set() // zónu kreslí náhľad z registra fx (Escanor pride, Luffy dogúľanie dáma/veža - cyklí sa)
         : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
@@ -3940,12 +3914,8 @@ function renderAbilityPreview(char) {
     }
     grid.appendChild(c);
   }
-  // Vlkolak: cyklenie fázy mesiaca 0→3 + dmg vedľa nej pod mini-doskou (rovnaký štýl ako pride náhľad;
-  // dráha charge od fázy nezávisí, cyklí len badge)
-  moonPreview = def.moonCycle ? { lvl: 0, last: 0 } : null;
-  const caMoon = document.getElementById("ca-moon");
-  if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
-  // náhľad z registra fx (Escanor: cyklenie pride 0→3 + lev; Luffy: mód base↔gear3 - zóna dáma/veža + badge + dmg 4/8)
+  // náhľad z registra fx (Escanor: cyklenie pride 0→3 + lev; vlkolak: fáza mesiaca + dmg; Luffy: mód base↔gear3 -
+  // zóna dáma/veža + badge + dmg 4/8)
   abilityFx = CHAR_FX[char]?.preview?.({ grid, caster, dir }) || null;
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → obal do JEDNÉHO divu (.ca-text je flex,
@@ -3963,26 +3933,9 @@ function renderAbilityPreview(char) {
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
-// Vlkolak char-select: fáza mesiaca + dmg pod mini-doskou (moon_{0..3}.png; spln pulzuje ako max)
-function syncCaMoon(lvl) {
-  const el = document.getElementById("ca-moon"); if (!el) return;
-  const img = el.querySelector("img");
-  if (img && !img.getAttribute("src").endsWith("_" + lvl + ".png")) img.src = "/assets/moon_" + lvl + ".png";
-  el.classList.toggle("pride-max", lvl >= 3); // rovnaký pulz ako pride 3
-  const dmgEl = el.querySelector(".ca-moon-dmg");
-  if (dmgEl) { dmgEl.innerHTML = `${WOLF_MOON_DMG[lvl]}<span class="pix-ico mini" data-emoji="☠️"></span>`; hydratePix(dmgEl); }
-}
-// Vlkolak char-select: cyklenie fázy 0→3 (posúva drawCharSelectFrame, tempo ako pride náhľad)
-function markMoonPreview(now) {
-  const s = moonPreview; if (!s) return;
-  if (!s.last) s.last = now;
-  if (now - s.last >= 1500) { s.last = now; s.lvl = (s.lvl + 1) % 4; syncCaMoon(s.lvl); }
-}
-
 function clearAbilityPreview() {
   abilityHoverChar = null;
   abilityCasterCanvas = null;
-  moonPreview = null;
   abilityFx?.close(); abilityFx = null;
   charAbilityEl?.classList.add("hidden");
 }

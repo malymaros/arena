@@ -17,6 +17,7 @@
 //   preview({ grid, caster, dir }) → { frame(now), close() }
 //                                 náhľad specialu vo výbere postáv (hover karty): grid = mini-doska (.mini-cell
 //                                 s data-gx/gy), caster = bunka castera; frame volá raf, close pri odchode/inej karte
+//   previewZone: true             zónu na mini-doske kreslí preview (inak ju vyznačí generický náhľad zo specialZone)
 //   ownCenter: [kind…]            druhy efektov (melee/special/special1), ktorých stredový overlay aj `casting` pózu
 //                                 vlastní modul - generický stred sa preskočí (vlastný dodá centerCast)
 //   spawnCenter(sp, facing) → true  vlastný vznik stredového overlayu pre cast sp (namiesto generického canvasu);

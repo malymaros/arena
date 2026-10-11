@@ -28,8 +28,8 @@ export default {
   headCrop: { cx: 0.73, cy: 0.62, size: 0.24, cxP2: 0.72 }, // zhrbený vlk hľadí doprava - hlava vpredu vpravo (bbox po recentrovaní x27–102, y71–127)
   pairShift: 110,
   // Vlkolak: charge - náhľad ukazuje príkladovú dráhu doprava (bez súpera = po okraj); dmg podľa fázy
-  // mesiaca cykluje pod mini-doskou (moonCycle - ako Escanorov pride náhľad), preto žiadny effect/stats riadok
-  abilityPreview: { caster: { x: 0, y: 1 }, dmg: null, dir: "right", moonCycle: true, desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
+  // mesiaca cykluje pod mini-doskou (preview v public/chars/fx/werewolf.js - ako Escanorov pride náhľad), preto žiadny effect/stats riadok
+  abilityPreview: { caster: { x: 0, y: 1 }, dmg: null, dir: "right", desc: "Charge in one of 8 directions - stops at the first foe in his path (or the edge). The lower his HP, the fuller the moon and the higher the dmg" },
   buttons: {
     // charge jedným z 8 smerov - dmg podľa AKTUÁLNEJ fázy mesiaca (mení sa na konci kola podľa HP);
     // specialKey = kedy prekresliť (client to kontroluje aj per-frame)

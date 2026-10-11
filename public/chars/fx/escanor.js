@@ -215,6 +215,7 @@ export default function escanorFx(C) {
     ownCenter: ["special"],
     hud,
     preview,
+    previewZone: true, // zónu náhľadu kreslí preview (cyklí s pride)
 
     // začiatok prehrávania kola: zruš zvyšky choreografie a RAZ prehraj premenu (WeakIdle→Stand) pred prvými
     // akciami; ak sú dvaja Escanori, paralelne. Timeline sa o dĺžku premeny oneskorí (len prvé kolo po nasadení).

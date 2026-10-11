@@ -191,14 +191,13 @@ previews importujú `shared/geometry.js`.
       `actionAnims` (melee/strela/recharge póza), `planSpecialWarn`/`planClone`/`planRechargeAlwaysUseful` (⚠ v lište).
       Overenie: varovania == stará logika (33 696 prípadov), browser-smoke --compare bez rozdielu. V client.js ostáva
       76 vetiev podľa mena (zo ~155) - choreografia timeline (Escanor slnko, Jotaro stand, Luffy, Vojak, Vampire, HUD odznaky).
-- [ ] **6c - choreografia do registra `public/chars/fx/<key>.js`** (rozpracované). Továreň `(C) → háčiky`
+- [x] **6c - choreografia do registra `public/chars/fx/<key>.js`**. Továreň `(C) → háčiky`
       (`effect`, `boardAnim`, `centerCanvas`, `drawCenter` - popis v `fx/index.js`), `C` = lenivé gettery
       klientského scope v `client.js`. Hotové: **Vojak** (mierenie, laser, lúč, výšľah), **Vlkolak** (otočenie,
       `wolfrun`/`wolfstrike`), **Countess/Onryō** (one-shot A-sheety na doske aj v strede cez nový háčik
       `centerCast` a príznak `anim.fromStart`, Onryō výkrik pri teleporte pasce; hover charge číta `VAMP_CHARS`), **Naruto** (anonymizácia vertikály podľa klona),
       **Luffy - timeline** (forma, Giant Pistol ruka, special guľa/kotúľ + háčik `clearOverlays`). **Luffy - zvyšok:** háčiky `hud` (odznak módu + info) a `preview` (cyklenie base↔gear3 vo výbere), dáta `boardFit`/`victoryAnim`/`previewIdleCaster` (aj Jotaro), `fromStart`/`armCrop` v animáciách, plánovanie `planUi`/`attackPicker`/`aimStopsAtFoe`/`buttonBadge`/`specialReach` (picker `"reach"`) - v client.js ostali len vetvy podľa druhu efektu (`luffy_*`). **Jotaro - stand Star Platinum** (`fx/jotaro.js`): canvas, summon/Dead_P, výmena pozícií pri útoku, blip pri pohybe, stredový pár; nové háčiky `init`/`position`/`drawBoard`/`stateChar`/`resetActors` (volané na každom module), `moved`/`bodyShift`, `spawnCenter` a `ownCenter` (generický stred aj `casting` póza sa vynechajú); dáta `mirrorSlot`. THE WORLD (pauza, menace) ostáva v client.js - mechanika enginu. **Escanor** (`fx/escanor.js`): premena cez `roundIntro` (oneskorenie timeline) a `stateChar`, choreografia slnka, WeakIdle v `boardAnim`, pride HUD (`hud`) a náhľad (`preview`), karta (`drawCard`), stred a strela škálované s pride (`centerScale`/`centerPlace`/`projectileScale`), float `levelFloat` (aj vlkolakov mesiac); dáta `fromStart` na transform/winsun, `victoryAnim`, `headIdleFile`. Overenie: browser-smoke `--compare` 0 chýb, sonda 52/52, assety zhodné; stopa sa
-      líši len v počte `charge-aura.gold` (±2 - Last Stand aura v raf je časovaná hodinami, šum). Ďalej:
-      vlkolakov HUD a náhľad mesiaca.
+      líši len v počte `charge-aura.gold` (±2 - Last Stand aura v raf je časovaná hodinami, šum). **Vlkolak - HUD a náhľad** (`hud`/`preview`, príznak `previewZone` pre moduly, ktoré zónu kreslia samé). V client.js ostali z mien len `charDirFor("soldier")` v zdieľanom `spawnExplosionAt` (výbuch volajú moduly fx) a `charDirFor("jotaro")` v THE WORLD menace (mechanika enginu). Šum stopy: počet zlatých Last Stand aur kolíše aj medzi behmi HEAD (77-84).
 - [ ] **6b - choreografia do registra (pôvodný návrh).** V `client.js` ostáva ~155 vetiev podľa mien
       (najviac escanor 33, jotaro 30, luffy 23, countess/onre 24, werewolf 14, soldier 12, medusa 10). Návrh:
       háčiky klientskej postavy (`onEffect(kind, e, ctx)` pre vlastné efekty timeline, `castOverlay`,
