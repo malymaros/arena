@@ -4,6 +4,19 @@
 // Továreň dostane C = klientský scope (client.js) a vráti háčiky choreografie (popis: public/chars/fx/index.js).
 export default function werewolfFx(C) {
   return {
+    // po kole sa zmenila fáza mesiaca → float s NOVOU fázou nad ním (bez farieb/šípok - hráč vidí
+    // len mesiac, čísla 0–3 sú čisto interné; aj pri preskoku o viac levelov sa ukáže len výsledná fáza)
+    levelFloat(slot, level) {
+      const p = C.state?.[slot]; if (!p || p.x == null) return;
+      const { left, top } = C.cellToPx(p.x, p.y);
+      const el = document.createElement("div");
+      el.className = "moon-float";
+      el.innerHTML = `<img src="/assets/moon_${Math.max(0, Math.min(3, level))}.png" alt="" />`;
+      el.style.left = (left + C.TILE_W / 2) + "px";
+      el.style.top = (top - 24) + "px";
+      C.actorsEl.appendChild(el);
+      setTimeout(() => el.remove(), 1700);
+    },
     effect(e, frameHold) {
       if (e.from !== "p1" && e.from !== "p2") return;
       // rozbehový cast aj beh charge - otočený v horizontálnom smere behu

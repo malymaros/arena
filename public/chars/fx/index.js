@@ -25,9 +25,16 @@
 //   init()                        vytvor DOM (volá client.js po vytvorení actor canvasov - rozmery ACTOR_W/H)
 //   position({ s, facing, snap }) positionActors: umiestni vlastné figúry (snap = bez slideu)
 //   drawBoard(now)                raf: nakresli vlastné figúry
-//   stateChar(slot, char)         príchod snapshotu: postava na slote (detekcia (re)nasadenia)
+//   stateChar(slot, char, s)      príchod snapshotu s: postava na slote (detekcia (re)nasadenia)
+//   roundIntro() → ms             začiatok prehrávania kola (pred prvým frame-om) - úvodná animácia; timeline sa
+//                                 oneskorí o najdlhší vrátený čas (Escanorova premena)
 //   resetActors()                 clearActors: skry/vyčisti figúry a ich stav
 // Podľa postavy na slote:
+//   centerScale(slot) → násobok   veľkosť generického stredového overlayu (Escanorovo melee rastie s Pride)
+//   centerPlace(cvs, flip) → true vlastné umiestnenie generického stredového overlayu (ukotvenie za nohy)
+//   projectileScale(slot) → násobok  veľkosť basic strely (prednosť pred projectile.scale z dát)
+//   levelFloat(slot, lvl, up)     po kole sa zmenil level veľkosti (sizeLevel) → float nad postavou
+//   drawCard(ctx, cvs, now) → true  vlastné kreslenie karty vo výbere postáv (Escanor WeakIdle / IntroStand)
 //   moved(slot, before, frm)      frame posunul postavu (before → frm) - lokomócia vlastných figúr
 //   bodyShift(slot, fc) → px      dodatočný vodorovný posun tela v positionActors (fc = facing)
 import soldier from "./soldier.js";
@@ -36,5 +43,6 @@ import countess from "./countess.js";
 import onre from "./onre.js";
 import luffy from "./luffy.js";
 import jotaro from "./jotaro.js";
+import escanor from "./escanor.js";
 
-export const CHAR_FX_FACTORIES = { soldier, werewolf, countess, onre, luffy, jotaro };
+export const CHAR_FX_FACTORIES = { soldier, werewolf, countess, onre, luffy, jotaro, escanor };

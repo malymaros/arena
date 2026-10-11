@@ -37,9 +37,14 @@ const C = {
   get animState() { return animState; }, get currentFacing() { return currentFacing; },
   get spriteFrameIndex() { return spriteFrameIndex; },
   get worldCenterShown() { return worldCenter.style.display !== "none"; },
+  get gridEl() { return gridEl; }, get spawnFloat() { return spawnFloat; }, get INVALID_MSG() { return INVALID_MSG; },
+  get cellsForSpecialPreview() { return cellsForSpecialPreview; },
+  get escPrideDisplay() { return escPrideDisplay; }, get escPrideDisplayChar() { return escPrideDisplayChar; },
+  get me() { return me; }, get abilityHoverChar() { return abilityHoverChar; },
 };
-// háčik volaný na KAŽDOM module fx, ktorý ho má (position / drawBoard / stateChar / resetActors)
-const fxAll = (hook, ...args) => { for (const fx of Object.values(CHAR_FX)) fx[hook]?.(...args); };
+// háčik volaný na KAŽDOM module fx, ktorý ho má (position / drawBoard / stateChar / resetActors / hud / roundIntro);
+// vráti výsledky volaní (roundIntro → oneskorenie timeline v ms)
+const fxAll = (hook, ...args) => Object.values(CHAR_FX).filter(fx => fx[hook]).map(fx => fx[hook](...args));
 // generický stredový overlay / casting póza efektu kind sa preskočí - choreografiu vlastní register fx (Jotaro)
 const fxOwnsCenter = (char, kind) => !!CHAR_FX[char]?.ownCenter?.includes(kind);
 // háčiky choreografie per postava (effect / boardAnim / centerCanvas / drawCenter - popis v public/chars/fx/index.js)
@@ -195,8 +200,6 @@ const hudP2Mana = document.getElementById("p2-mana");
 const hudCharP1 = document.getElementById("hud-char-p1");
 const hudCharP2 = document.getElementById("hud-char-p2");
 // Escanor pride indikátor (ikona+číslo) + rozsah abilitky (minimapka) v HUD widgete
-const prideBadge = { p1: document.getElementById("pride-p1"), p2: document.getElementById("pride-p2") };
-const prideRange = { p1: document.getElementById("prange-p1"), p2: document.getElementById("prange-p2") };
 // Vlkolak: fáza mesiaca (ikona bez čísla) vľavo + dmg specialu pri aktuálnej fáze vpravo v HUD widgete
 const moonBadge = { p1: document.getElementById("moon-p1"), p2: document.getElementById("moon-p2") };
 const moonDmg   = { p1: document.getElementById("mdmg-p1"), p2: document.getElementById("mdmg-p2") };
@@ -487,8 +490,6 @@ const ANIM_DEF = {
 };
 // neloopové one-shot animácie kreslené relatívnym časom od setAnim (hrajú RAZ od frame 0, potom držia pózu)
 const VAMP_ONESHOT_KEYS = new Set(["wolfstrike", "vampstrike", "vattack1", "va1", "va2", "va3", "va4", "scream"]);
-const TRANSFORM_FPS = 5, TRANSFORM_FRAMES = 17;
-const TRANSFORM_MS = Math.round(TRANSFORM_FRAMES * 1000 / TRANSFORM_FPS); // ~3.4s - dramatická premena pred prvým rozohraním
 
 let me = null;
 let isHost = false;               // prvý pripojený hráč nastavuje zápas v lobby
@@ -503,7 +504,6 @@ let lastStandArmed = false;    // objednaný Last Stand (duálny s golden mana, 
 let lastHopeArmed = false;     // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
 let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
-let escPridePreview = null;      // Escanor char-select: cyklenie pride 0→3 v náhľade zóny (viď markEscPridePreview)
 let moonPreview = null;          // Vlkolak char-select: cyklenie fázy mesiaca 0→3 + dmg (viď markMoonPreview)
 let abilityFx = null;            // náhľad specialu z registra fx (preview → { frame, close }; Luffy: cyklenie módu base↔gear3)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
@@ -528,11 +528,6 @@ function resetActorFade() {
 }
 
 let animState = { p1: { key:"idle", until:0 }, p2: { key:"idle", until:0 } };
-// Escanor: pred premenou je idle WeakIdle; pri prvom rozohraní kola (po nasadení / swape) sa RAZ prehrá Transform,
-// odvtedy je idle Stand. escTransformed drží, či daný slot už premenu odohral; escPrevChar deteguje (re)nasadenie.
-let escTransformed = { p1: false, p2: false };
-let escPrevChar = { p1: null, p2: null };
-let escTransformStart = { p1: 0, p2: 0 }; // čas štartu premeny - Transform (loop:false) sa musí kresliť RELATÍVNYM časom
 // klonový flinch (tile zásah na klonovi) - čas štartu; klon sa strhne rovnako ako pravý Naruto pri zásahu,
 // aby „nezraniteľne" nestál a neprezradil sa. Nezávislé od animState (to zdieľa s majiteľom).
 let cloneFlinch = { p1: 0, p2: 0 };
@@ -705,7 +700,7 @@ function drawMageHeadAnim(cvs, char, now) {
   const isP2Sheet = dir === CHAR_META[char]?.dirP2;
   const cx = (isP2Sheet && c.cxP2 != null) ? c.cxP2 : c.cx;
   const cy = (isP2Sheet && c.cyP2 != null) ? c.cyP2 : c.cy;
-  const idleFile = char === "escanor" ? "WeakIdle.png" : ANIM_DEF.idle.file; // Escanor: hlava zo slabej formy
+  const idleFile = CHARS_BY_KEY[char]?.headIdleFile || ANIM_DEF.idle.file; // register (Escanor: hlava zo slabej formy)
   ensureSpriteMeta(dir, idleFile).then(meta => {
     const ctx = cvs.getContext("2d");
     const fps = ANIM_DEF.idle.fps || 6;
@@ -749,18 +744,6 @@ function currentAnim(slot) {
 }
 
 /* ---------- specials/melee v strede boardu ---------- */
-// Escanorove stredové overlaye (special WinSun aj melee postava) rastú s Pridom - ukotvené za NOHY:
-// drawSprite kreslí frame na 95 % canvasu centrovane, takže nohy sedia ~0.95 výšky canvasu. Nohy držíme
-// na mieste, kde by boli pri pride0 (centrovaný basePx canvas), rast ide len nahor a do šírky.
-// top = pevný bod nôh (nezávislý od px), translateY(-95 %) je relatívny k výške elementu → nohy vždy na top.
-// Pri pride0 (px == basePx) je výsledok identický s pôvodným centrovaním translate(-50%,-50%).
-const ESC_CENTER_FEET = 0.95;
-function escCenterAnchor(el, flip) {
-  const basePx = Math.round(TILE_H * SPECIAL_SCALE);
-  el.style.left = "50%";
-  el.style.top  = `calc(50% + ${Math.round(basePx * (ESC_CENTER_FEET - 0.5))}px)`;
-  el.style.transform = `translate(-50%, -${ESC_CENTER_FEET * 100}%) scaleX(${flip})`;
-}
 // veľký centrálny overlay - pre special efektový sprite mága, pre melee zväčšená postava so sekaním
 function updateSpecialCenter(casts) {
   actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
@@ -779,8 +762,8 @@ function updateSpecialCenter(casts) {
     const file   = sp.file || SPECIAL_ANIMS[caster.char].file;
 
     const cvs = document.createElement("canvas");
-    // Escanorovo melee sem chodí (jeho special je odfiltrovaný a rieši ho spawnBigOnce) → stredová postava škáluje s Pridom
-    const fx = caster.char === "escanor" ? escFxMul(sp.from) : 1;
+    // veľkosť z registra fx (Escanorovo melee: stredová postava škáluje s Pridom)
+    const fx = CHAR_FX[caster.char]?.centerScale?.(sp.from) ?? 1;
     const px  = Math.round(TILE_H * SPECIAL_SCALE * fx);
     cvs.width = px; cvs.height = px;
     cvs.className = "special-center";
@@ -801,9 +784,7 @@ function updateSpecialCenter(casts) {
     }
 
     const flip = currentFacing(sp.from, facing);
-    if (caster.char === "escanor") {
-      escCenterAnchor(cvs, flip); // rastie s Pridom → nohy fixné, rast nahor
-    } else {
+    if (!cfx?.centerPlace?.(cvs, flip)) { // register fx (Escanor: rastie s Pridom → nohy fixné, rast nahor)
       cvs.style.left = "50%";
       cvs.style.top  = "50%";
       cvs.style.transform = `translate(-50%, -50%) scaleX(${flip})`;
@@ -811,135 +792,6 @@ function updateSpecialCenter(casts) {
 
     actorsEl.appendChild(cvs);
   }
-}
-
-// Escanor special - vlastná riadená choreografia (NECYKLÍ). Musí časovo sedieť s ESC_SPECIAL_MS na serveri
-// (server podrží zásah presne o dĺžku choreografie, aby dmg dopadol AŽ po dokončení výbuchu):
-//   WinSun (raz, visí dlhšie) → CruelSunHold (raz, dohrá celá) → slnko odletí z držanej pozície na cieľ
-//   → slow-mo SunBurst (počas neho blikajú všetky aktívne políčka) → [server: dmg] → SunFade.
-const WINSUN_FPS = 7, WINSUN_HOLD_MS = 700;                 // fáza 1: WinSun visí dlhšie
-const CRUELHOLD_ONCE_MS = Math.round(13 * 1000 / 11);       // CruelSunHold raz (13f @ 11fps) - musí dohrať pred letom
-const ESC_TRAVEL_MS = 600;                                  // let slnka na cieľ
-const ESC_BURST_FPS = 6, ESC_FADE_FPS = 6;                  // slow-mo výbuch
-
-// slow-mo výbuch (SunBurst→SunFade) na cieľovej bunke; počas SunBurst blikajú aktívne políčka (zoneCells)
-function spawnSunFxAt(cell, slot, zoneCells) {
-  if (!Array.isArray(cell)) return;
-  const dir = charDirFor("escanor", slot);
-  const { left, top } = cellToPx(cell[0], cell[1]);
-  const size = Math.round(TILE_H * 1.8 * escFxMul(slot)); // škáluje s Pridom (pride3 = súčasná veľkosť)
-  const el = document.createElement("canvas");
-  el.width = size; el.height = size; el.className = "sun-fx";
-  Object.assign(el.style, { position: "absolute", left: (left + TILE_W/2 - size/2) + "px", top: (top + TILE_H/2 - size/2) + "px", pointerEvents: "none", zIndex: 7, imageRendering: "pixelated" });
-  actorsEl.appendChild(el);
-  const cellEls = (zoneCells || []).map(([x, y]) => gridEl.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`)).filter(Boolean);
-  cellEls.forEach(c => c.classList.add("esc-burst-cell")); // blik aktívnych políčok počas výbuchu
-  const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
-  Promise.all([ensureSpriteMeta(dir, "SunBurst.png"), ensureSpriteMeta(dir, "SunFade.png")]).then(([bm, fm]) => {
-    const bDur = bm.frames * 1000 / ESC_BURST_FPS, fDur = fm.frames * 1000 / ESC_FADE_FPS, t0 = performance.now();
-    const step = () => {
-      if (!el.isConnected) return;
-      const t = performance.now() - t0;
-      if (t < bDur)             { drawSprite(ctx, bm, { file: "SunBurst.png", frames: bm.frames, frameIndex: Math.min(bm.frames-1, Math.floor(t/1000*ESC_BURST_FPS)) }, 0, size, size); requestAnimationFrame(step); }
-      else if (t < bDur + fDur) { cellEls.forEach(c => c.classList.remove("esc-burst-cell")); drawSprite(ctx, fm, { file: "SunFade.png", frames: fm.frames, frameIndex: Math.min(fm.frames-1, Math.floor((t-bDur)/1000*ESC_FADE_FPS)) }, 0, size, size); requestAnimationFrame(step); }
-      else { cellEls.forEach(c => c.classList.remove("esc-burst-cell")); el.remove(); }
-    };
-    requestAnimationFrame(step);
-  }).catch(() => { cellEls.forEach(c => c.classList.remove("esc-burst-cell")); el.remove(); });
-}
-// veľký stredový sprite (WinSun) sa prehrá RAZ a chvíľu visí, potom onDone
-function spawnBigOnce(file, slot, onDone) {
-  const dir = charDirFor("escanor", slot);
-  const px = Math.round(TILE_H * SPECIAL_SCALE * escFxMul(slot)); // WinSun škáluje s Pridom (pride3 = súčasná veľkosť)
-  const cvs = document.createElement("canvas");
-  cvs.width = px; cvs.height = px; cvs.className = "esc-big"; // VLASTNÁ trieda - NIE .special-center (updateSpecialCenter ju maže každý frame)
-  if (usesAltColor("escanor", slot)) cvs.classList.add("alt-color");
-  const flip = computeFacing(state?.p1, state?.p2)[slot] || 1;
-  Object.assign(cvs.style, { position: "absolute", zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
-  escCenterAnchor(cvs, flip); // rastie s Pridom → nohy fixné, rast nahor
-  actorsEl.appendChild(cvs);
-  const ctx = cvs.getContext("2d"); ctx.imageSmoothingEnabled = false;
-  ensureSpriteMeta(dir, file).then(meta => {
-    const dur = meta.frames * 1000 / WINSUN_FPS, t0 = performance.now();
-    const step = () => {
-      if (!cvs.isConnected) return;
-      const t = performance.now() - t0;
-      drawSprite(ctx, meta, { file, frames: meta.frames, frameIndex: Math.min(meta.frames - 1, Math.floor(t / 1000 * WINSUN_FPS)) }, 0, px, px);
-      if (t < dur + WINSUN_HOLD_MS) requestAnimationFrame(step);
-      else { cvs.remove(); onDone && onDone(); }
-    };
-    requestAnimationFrame(step);
-  }).catch(() => { cvs.remove(); onDone && onDone(); });
-}
-// slnko odletí Z DRŽANEJ POZÍCIE (nad postavou) do stredu cieľovej bunky, potom slow-mo SunBurst→SunFade;
-// offboard hod: cieľ je bunka MIMO plochy - slnko počas letu vyhasína, žiadny burst, nad casterom OUT OF BOUNDS
-function travelSunThenBurst(slot, target, zoneCells, offboard = false) {
-  const c = state?.[slot]; if (!c) { if (!offboard) spawnSunFxAt(target, slot, zoneCells); return; }
-  const dir = charDirFor("escanor", slot);
-  const s = cellToPx(c.x, c.y), e = cellToPx(target[0], target[1]);
-  const size = Math.round(TILE_H * 1.25 * escFxMul(slot)); // letiace slnko škáluje s Pridom (pride3 = súčasná veľkosť)
-  const sx = s.left + TILE_W / 2 - size / 2, sy = s.top - size * 0.55; // nad hlavou = kde postava drží slnko
-  const ex = e.left + TILE_W / 2 - size / 2, ey = e.top + TILE_H / 2 - size / 2;
-  const el = document.createElement("canvas"); el.width = size; el.height = size; el.className = "sun-fx";
-  Object.assign(el.style, { position: "absolute", left: sx + "px", top: sy + "px", zIndex: 7, pointerEvents: "none", imageRendering: "pixelated", transition: `left ${ESC_TRAVEL_MS}ms ease-in, top ${ESC_TRAVEL_MS}ms ease-in, opacity ${ESC_TRAVEL_MS}ms ease-in` });
-  actorsEl.appendChild(el);
-  const ctx = el.getContext("2d"); ctx.imageSmoothingEnabled = false;
-  let alive = true;
-  const spin = () => { if (!alive || !el.isConnected) return; ensureSpriteMeta(dir, "Charge.png").then(m => { drawSprite(ctx, m, { file: "Charge.png", frames: m.frames, frameIndex: Math.floor(performance.now() / 1000 * 12) % m.frames }, 0, size, size); }); requestAnimationFrame(spin); };
-  requestAnimationFrame(spin);
-  void el.offsetWidth; // commitni štartovú pozíciu, aby CSS transition animoval pohyb (inak skočí/preblikne bez pohybu)
-  el.style.left = ex + "px"; el.style.top = ey + "px"; // sklz na cieľ
-  if (offboard) el.style.opacity = "0"; // let do autu = slnko cestou vyhasne
-  setTimeout(() => {
-    alive = false; el.remove();
-    if (offboard) { const [msg, cls] = INVALID_MSG.offboard; spawnFloat(slot, msg, cls); }
-    else spawnSunFxAt(target, slot, zoneCells);
-  }, ESC_TRAVEL_MS);
-}
-function runEscanorSpecial(slot, dir, zoneCells, offboard = false) {
-  const c = state?.[slot]; if (!c) return;
-  const dx = dir === "left" ? -1 : 1;
-  // offboard: cieľ NEclampovať - slnko letí na bunku za okrajom (do autu); inak clamp na plochu
-  const target = offboard ? [c.x + dx, c.y] : [Math.max(0, Math.min(board.w - 1, c.x + dx)), c.y];
-  // fáza 1: malá postava WinSunBoard (zdvih so slnkom RAZ, potom len ústa + preblikávajúce slnko - loopFrom 4)
-  // + veľký WinSun raz (visí dlhšie)
-  setAnim(slot, "winsun", 60000);
-  spawnBigOnce("WinSun.png", slot, () => {
-    // fáza 2: malá postava CruelSunHold - nech DOHRÁ CELÁ (raz) pred letom slnka (nech nie sú dve slnká naraz)
-    setAnim(slot, "cruelhold", CRUELHOLD_ONCE_MS);
-    setTimeout(() => {
-      setAnim(slot, "wintalk", ESC_TRAVEL_MS + 2000); // ústa bez slnka (žiadny nový zdvih) - slnko už letí samo
-      travelSunThenBurst(slot, target, zoneCells, offboard);
-    }, CRUELHOLD_ONCE_MS);
-  });
-}
-let escSpecialFired = false; // celá choreografia sa spustí len raz za special (nie na každom beate)
-
-// Escanor: po kole sa zmenil pride → krátky float nad ním. up=true → zelený lev + ▲ (rástol), inak červený + ▼.
-function spawnPrideFloat(slot, up) {
-  const p = state?.[slot]; if (!p || p.x == null) return;
-  const { left, top } = cellToPx(p.x, p.y);
-  const el = document.createElement("div");
-  el.className = "pride-float " + (up ? "up" : "down");
-  el.innerHTML = `<span class="pf-lion"></span><span class="pf-arrow">${up ? "▲" : "▼"}</span>`; // solídny lev + šípka vedľa
-  el.style.left = (left + TILE_W / 2) + "px";
-  el.style.top = (top - 24) + "px";
-  actorsEl.appendChild(el);
-  setTimeout(() => el.remove(), 1700);
-}
-
-// Vlkolak: po kole sa zmenila fáza mesiaca → float s NOVOU fázou nad ním (bez farieb/šípok - hráč vidí
-// len mesiac, čísla 0–3 sú čisto interné; aj pri preskoku o viac levelov sa ukáže len výsledná fáza)
-function spawnMoonFloat(slot, level) {
-  const p = state?.[slot]; if (!p || p.x == null) return;
-  const { left, top } = cellToPx(p.x, p.y);
-  const el = document.createElement("div");
-  el.className = "moon-float";
-  el.innerHTML = `<img src="/assets/moon_${Math.max(0, Math.min(3, level))}.png" alt="" />`;
-  el.style.left = (left + TILE_W / 2) + "px";
-  el.style.top = (top - 24) + "px";
-  actorsEl.appendChild(el);
-  setTimeout(() => el.remove(), 1700);
 }
 
 /* ---------- výbuch (Vojakov Explosion.png): dopad snajperského lúča aj koniec letu granátu ---------- */
@@ -1318,9 +1170,9 @@ function spawnOrMoveProjectile(c, s) {
   const dst = projCenter(c.cell[0], c.cell[1]);
   if (!entry) {
     const el = document.createElement("canvas");
-    // Escanorova základná strela (slnko) ostáva relatívne malá: autorská veľkosť = pride3 (strop), nižšie menšia;
-    // Vojakov granát je MALÝ (kotúľajúci sa projektil veľkosti ~⅓ bunky, nie ohnivá guľa); ostatné postavy bez zmeny
-    const fx = charKey === "escanor" ? escChargeMul(c.from) : (PROJECTILE[charKey]?.scale ?? 1);
+    // register fx projectileScale (Escanorova strela - slnko - škáluje s Pridom) alebo projectile.scale
+    // (Vojakov granát je MALÝ - kotúľajúci sa projektil veľkosti ~⅓ bunky); ostatné postavy bez zmeny
+    const fx = CHAR_FX[charKey]?.projectileScale?.(c.from) ?? (PROJECTILE[charKey]?.scale ?? 1);
     const px = Math.round(TILE_H * CHARGE_SCALE * fx);
     el.width = px; el.height = px;
     el.className = "projectile";
@@ -2049,10 +1901,9 @@ function renderHUD() {
   actorP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   hudCharP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
-  renderPrideHud("p1"); renderPrideHud("p2");
   renderMoonHud("p1"); renderMoonHud("p2");
-  // vlastné HUD prvky postáv z registra fx (Luffy: odznak módu + info) - každá postava, pri inom charaktere ich skryje
-  for (const fx of Object.values(CHAR_FX)) if (fx.hud) { fx.hud("p1", state?.p1); fx.hud("p2", state?.p2); }
+  // vlastné HUD prvky postáv z registra fx (Escanor pride, Luffy mód) - každá postava, pri inom charaktere ich skryje
+  fxAll("hud", "p1", state?.p1); fxAll("hud", "p2", state?.p2);
   syncDynamicSpecialBtn(); // dmg na special tlačidle drž v sync s HUD fázou mesiaca (aj per-frame počas kola)
   updateGoldenButton();
 }
@@ -2109,37 +1960,6 @@ function applySpecialSkin(char, force) {
 function syncDynamicSpecialBtn() {
   const c = ghostCharAt();
   if (c && CHAR_BUTTONS[c]?.specialKey) applySpecialSkin(c, false);
-}
-
-// Escanor: pride level (ikona+číslo) vľavo, rozsah abilitky pri aktuálnom pride (minimapka) vpravo v HUD widgete.
-// Smer zóny = kam Escanor pozerá (na súpera). Pri inej postave sa oba prvky skryjú.
-function renderPrideHud(slot) {
-  const p = state?.[slot];
-  const badge = prideBadge[slot], range = prideRange[slot];
-  if (!badge || !range) return;
-  if (!p || p.char !== "escanor") { badge.classList.add("hidden"); range.classList.add("hidden"); return; }
-  const pride = Math.max(0, Math.min(3, p.pride || 0));
-  const numEl = badge.querySelector(".pride-num");
-  if (numEl) numEl.textContent = pride;
-  // lev = indikátor levelu: swap framu (0=biely … 3=celý zlatý); pri 3 pulzuje (max)
-  const imgEl = badge.querySelector("img");
-  if (imgEl && !imgEl.getAttribute("src").endsWith("_" + pride + ".png")) imgEl.src = "/assets/pride_lion_" + pride + ".png";
-  badge.classList.toggle("pride-max", pride >= 3);
-  badge.classList.remove("hidden");
-  // rozsah zóny na minimapke (aktuálna pozícia + pride + smer k súperovi)
-  if (p.x == null) { range.classList.add("hidden"); return; } // labyrint: skrytá pozícia
-  const facing = computeFacing(state?.p1, state?.p2)[slot] || 1;
-  const dir = facing < 0 ? "left" : "right";
-  const hit = new Set(cellsForSpecialPreview({ x: p.x, y: p.y, char: "escanor", pride }, dir).map(([x, y]) => `${x},${y}`));
-  range.style.gridTemplateColumns = `repeat(${board.w}, auto)`;
-  range.innerHTML = "";
-  for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) {
-    const c = document.createElement("div"); c.className = "pr-cell";
-    if (hit.has(`${x},${y}`)) c.classList.add("hit");          // range (aj na políčku hráča)
-    if (x === p.x && y === p.y) c.classList.add("caster");     // pozícia hráča = červená bodka (navrch range)
-    range.appendChild(c);
-  }
-  range.classList.remove("hidden");
 }
 
 /* ---------- záznam akcií kola pod widgetom ---------- */
@@ -2414,12 +2234,10 @@ function renderGrid(s, effects = []) {
   reconcileProjectiles(charges, s); // plynulé projektily kĺžu v #actors (mimo mazaného gridu)
 
   renderThreadLines(s);
-  // Escanor: veľký centrálny sprite pri caste = WinSun (Escanor drží rastúce slnko); malá postava ostáva Win
-  // Escanor má vlastnú necyklenú choreografiu (runEscanorSpecial) - z generického looping centra ho vynechaj.
-  // Stred, ktorý vlastní register fx (ownCenter - Jotaro: Special 2 pár cez centerCast, Special 1 ZÁMERNE bez
-  // stredu; THE WORLD má vlastný menace spawnWorldCenter), sa tiež vynechá.
+  // stred, ktorý vlastní register fx (ownCenter), sa vynechá - Escanor: vlastná necyklená choreografia slnka;
+  // Jotaro: Special 2 pár cez centerCast, Special 1 ZÁMERNE bez stredu (THE WORLD má vlastný menace spawnWorldCenter)
   updateSpecialCenter(
-    specials.filter(sp => s?.[sp.from]?.char !== "escanor" && !fxOwnsCenter(s?.[sp.from]?.char, sp.kind))
+    specials.filter(sp => !fxOwnsCenter(s?.[sp.from]?.char, sp.kind))
       .concat(meleeCasts)
   );
 }
@@ -2665,18 +2483,6 @@ const escPrideMul = a => {
   const pr = held != null ? held : lvl;
   return base * Math.pow(1.2, Math.max(0, Math.min(3, pr)));
 };
-// Escanorove FX (WinSun, melee center, letiace slnko, výbuch, charge strela) škálujú s Pridom rovnako ako telo:
-// pride0 = súčasná (autorská) veľkosť ako u ostatných post­áv, rast NAD ňu (1.2^pride, pride3 ≈ 1.73×) - nikdy menšie.
-// Číta ten istý zdroj Pride ako telo (escPrideDisplay počas prehrávania kola, inak state[slot].pride).
-function escFxMul(slot) {
-  // držaný level ber len keď patrí Escanorovi (po swape z inej postavy drží char jej level - ignoruj)
-  const held = (escPrideDisplay[slot] != null && escPrideDisplayChar[slot] === "escanor") ? escPrideDisplay[slot] : null;
-  const pr = held != null ? held : (state?.[slot]?.pride || 0);
-  return Math.pow(1.2, Math.max(0, Math.min(3, pr)));
-}
-// Charge (základná strela) je výnimka: má ostať relatívne malá → autorská veľkosť = PRIDE 3 (strop),
-// pri nižšom Pride ešte menšia (pride0 ≈ 0.58×). Preto exponent posunutý o -3 oproti escFxMul.
-function escChargeMul(slot) { return escFxMul(slot) * Math.pow(1.2, -3); }
 const PAIR_SHIFT_DEFAULT = 22;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho vráti 0.
 // Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere - bunka je aj tak
@@ -3292,10 +3098,8 @@ function schedulePlayTimeline(timeline) {
 
   clearActionLogs(); // záznam predošlého kola zmizne so začiatkom nového
   clearProjectiles(); // žiadne staré projektily nesmú prejsť do nového kola
-  escSpecialFired = false; // Escanor: choreografia specialu sa spustí max raz za kolo
   escPrideDisplay = { p1: null, p2: null }; // zruš prípadné podržanie starej veľkosti z minulého kola
   escPrideDisplayChar = { p1: null, p2: null };
-  actorsEl.querySelectorAll(".sun-fx, .esc-big").forEach(n => n.remove());
 
   const first = timeline[0];
   // levelová veľkosť (Escanor pride / Vlkolakova fáza mesiaca) pred kolom - na konci prehrávania porovnáme
@@ -3323,18 +3127,9 @@ function schedulePlayTimeline(timeline) {
   renderGrid(state, first.effects || []);
   positionActors(state, true);
 
-  // Escanor: pred prvými akciami sa RAZ prehrá premena (WeakIdle→Stand); ak sú dvaja Escanori, paralelne.
-  // Timeline sa o dĺžku premeny oneskorí (len prvé kolo po nasadení).
-  let preDelay = 0;
-  for (const slot of ["p1", "p2"]) {
-    if (state[slot]?.char === "escanor" && !escTransformed[slot]) {
-      setAnim(slot, "transform", TRANSFORM_MS);
-      escTransformStart[slot] = performance.now(); // Transform sa kreslí relatívnym časom (now - start)
-      const sl = slot;
-      setTimeout(() => { escTransformed[sl] = true; }, TRANSFORM_MS);
-      preDelay = TRANSFORM_MS;
-    }
-  }
+  // úvod kola z registra fx (Escanor: RAZ premena WeakIdle→Stand pred prvými akciami, zruší zvyšky slnka) -
+  // timeline sa oneskorí o najdlhší úvod
+  const preDelay = Math.max(0, ...fxAll("roundIntro"));
 
   let i = 1;
   let prev = first;
@@ -3354,8 +3149,8 @@ function schedulePlayTimeline(timeline) {
         const charChanged = (state?.[slot]?.char || null) !== preChar[slot];
         if (nowLvl === null || charChanged) { escPrideDisplay[slot] = null; escPrideDisplayChar[slot] = null; continue; }
         if (preLvl[slot] != null && nowLvl !== preLvl[slot]) {
-          if (state[slot].char === "escanor") spawnPrideFloat(slot, nowLvl > preLvl[slot]); // lev NAD ním, veľkosť ešte stará
-          else spawnMoonFloat(slot, nowLvl); // vlkolak: len nová fáza mesiaca, bez farieb a šípok
+          // float z registra fx (Escanor: lev ▲▼ NAD ním, veľkosť ešte stará; vlkolak: len nová fáza mesiaca)
+          CHAR_FX[state[slot].char]?.levelFloat?.(slot, nowLvl, nowLvl > preLvl[slot]);
           const sl = slot;
           setTimeout(() => { escPrideDisplay[sl] = null; positionActors(state); }, 650); // potom plynulé zväčšenie/zmenšenie
         } else {
@@ -3447,9 +3242,9 @@ function schedulePlayTimeline(timeline) {
         spawnFloat(e.from, msg, cls);
         cloneFloat(e.from, msg, cls);
       }
-      // Escanor rieši vlastná choreografia; postava s vlastným stredom specialu (register fx ownCenter - Jotaro:
-      // figúra hrá Attack_2 a útok vizuálne vedie stand) nie je center-cast
-      if (e.kind === "special" && e.from && state?.[e.from]?.char !== "escanor" && !fxOwnsCenter(state?.[e.from]?.char, "special")) casters.add(e.from);
+      // postava s vlastným stredom specialu (register fx ownCenter - Escanor: vlastná choreografia slnka;
+      // Jotaro: figúra hrá Attack_2 a útok vizuálne vedie stand) nie je center-cast
+      if (e.kind === "special" && e.from && !fxOwnsCenter(state?.[e.from]?.char, "special")) casters.add(e.from);
       // Jotaro THE WORLD: cast → menace (Special_3_P) hrá v NORMÁLNYCH farbách; čas sa zamrazí (filter +
       // zmrazenie animácií) AŽ po dohraní menace - pri timestop_wait v enterTimestopMode. wait → pauza;
       // ts_hit/ts_mirror → announce float nad zmrazeným súperom (bez zmeny HP); end → vypni filter
@@ -3548,13 +3343,6 @@ function schedulePlayTimeline(timeline) {
       }
       // choreografia autora efektu (register fx: public/chars/fx/<key>.js - Vojak, Vlkolak, Luffy, …)
       CHAR_FX[state?.[e.from]?.char]?.effect?.(e, frameHold);
-      // Escanor special fáza 2: po caste (WinSun+Win) malá postava prejde na CruelSunHold a na cieľovej bunke
-      // (políčko pred Escanorom v zvolenom smere) sa prehrá SunBurst→SunFade. Spustí sa RAZ za special.
-      if (e.kind === "special" && !escSpecialFired && state?.[e.from]?.char === "escanor") {
-        escSpecialFired = true;
-        // offboard = hod do autu: slnko odletí von z plochy a vyhasne (bez burstu), OUT OF BOUNDS float
-        runEscanorSpecial(e.from, e.dir, e.cells, !!e.offboard); // WinSun (raz) → CruelSunHold → slnko na cieľ → SunBurst (blik políčok) → dmg → SunFade
-      }
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
         // looping → malá postava sa seká súbežne s veľkým sprite-om (re-triggered každý beat); Medúza = Attack_1
         // (Countess sem už nechodí - jej center melee je jednotný vamp_strike s A1)
@@ -3954,29 +3742,6 @@ function isMageDead(key) {
   return !!charSelectHp && (charSelectHp[key] ?? 0) <= 0;
 }
 
-// Escanor (ukážka): bez hoveru WeakIdle loop; po nadídení IntroStand (intro raz → loop Stand).
-const ESC_INTRO = { file: "IntroStand.png", frames: 22, fps: 9, loopFrom: 17 }; // musí sedieť s export_escanor.cjs
-const ESC_WEAK  = { file: "WeakIdle.png", frames: 4, fps: 5, loop: true };
-let escHoverT0 = 0; // čas nadídenia na Escanor kartu (štart IntroStand)
-function drawEscanorCard(ctx, cvs, now) {
-  const dir = charDirFor("escanor", me); // p2 = escanor_2 (červené oblečenie)
-  const hover = abilityHoverChar === "escanor";
-  if (hover) {
-    if (!escHoverT0) escHoverT0 = now;
-    const { frames, fps, loopFrom } = ESC_INTRO;
-    const fi = Math.floor((now - escHoverT0) / 1000 * fps);
-    const idx = fi < frames ? fi : loopFrom + ((fi - frames) % (frames - loopFrom));
-    ensureSpriteMeta(dir, ESC_INTRO.file)
-      .then(meta => drawSprite(ctx, meta, { file: ESC_INTRO.file, frames, frameIndex: idx }, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52))
-      .catch(() => {});
-  } else {
-    escHoverT0 = 0;
-    ensureSpriteMeta(dir, ESC_WEAK.file)
-      .then(meta => drawSprite(ctx, meta, ESC_WEAK, now, cvs.width, cvs.height, 1.31, 0.98, true, 0, -52))
-      .catch(() => {});
-  }
-}
-
 // Hidden preview postavy (Luffy/Jotaro, previewCast v registri): bez hoveru Idle, po nadídení cast animácia
 // RAZ a potom slučka chvosta (loopFrom); obe kreslenia idú cez portraitFill.
 const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
@@ -4006,7 +3771,7 @@ function drawCharSelectFrame(now) {
   canvases.forEach((cvs) => {
     const key = cvs.dataset.char;
     const ctx = cvs.getContext("2d");
-    if (key === "escanor") { drawEscanorCard(ctx, cvs, now); return; } // vlastné WeakIdle/IntroStand
+    if (CHAR_FX[key]?.drawCard?.(ctx, cvs, now)) return; // register fx (Escanor: vlastné WeakIdle/IntroStand)
     const deadRoster = isMageDead(key) && cvs.closest(".char-card")?.dataset.char; // (turnaj) mŕtvy draftnutý mág
     // Preview štýl (Luffy/Jotaro) - ALE ak je draftnutý mág mŕtvy (turnaj), prednosť má dead póza (nižšie)
     if (PREVIEW_CAST[key] && !deadRoster) { drawPreviewCard(ctx, cvs, key, now); return; }
@@ -4043,7 +3808,6 @@ function drawCharSelectFrame(now) {
       .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
   });
 
-  if (abilityHoverChar === "escanor") markEscPridePreview(now); // cyklí zvýraznenie zóny podľa pride
   if (abilityHoverChar === "werewolf") markMoonPreview(now);    // cyklí fázu mesiaca + dmg pod mini-doskou
   if (abilityHoverChar) abilityFx?.frame(now);                  // register fx (Luffy: cyklí mód base↔gear3 - zóna dáma/veža + dmg 4/8)
 
@@ -4172,21 +3936,16 @@ function renderAbilityPreview(char) {
       abilityCasterCanvas = mini;
     } else if (hit.has(`${x},${y}`)) {
       c.classList.add("hit");
-      c.style.animationDelay = -(performance.now() % 1000) + "ms"; // sync fáza pulzu s neskôr pridanými bunkami (viď markEscPridePreview)
+      c.style.animationDelay = -(performance.now() % 1000) + "ms"; // sync fáza pulzu s neskôr pridanými bunkami
     }
     grid.appendChild(c);
   }
-  // Escanor: cyklenie pride 0→3 (raf posúva); mini-caster hrá Win (SPECIAL_ANIMS.escanor);
-  // pod mini-doskou pride lev + číslo (ako HUD widget), synchrónne s cyklom
-  escPridePreview = def.prideCycle ? { grid, caster, dir, pride: 0, last: 0 } : null;
-  const caPride = document.getElementById("ca-pride");
-  if (caPride) { caPride.classList.toggle("hidden", !def.prideCycle); if (def.prideCycle) syncCaPride(0); }
   // Vlkolak: cyklenie fázy mesiaca 0→3 + dmg vedľa nej pod mini-doskou (rovnaký štýl ako pride náhľad;
   // dráha charge od fázy nezávisí, cyklí len badge)
   moonPreview = def.moonCycle ? { lvl: 0, last: 0 } : null;
   const caMoon = document.getElementById("ca-moon");
   if (caMoon) { caMoon.classList.toggle("hidden", !def.moonCycle); if (def.moonCycle) syncCaMoon(0); }
-  // náhľad z registra fx (Luffy: cyklenie módu base↔gear3 - zóna dáma/veža + badge + dmg 4/8 pod mini-doskou)
+  // náhľad z registra fx (Escanor: cyklenie pride 0→3 + lev; Luffy: mód base↔gear3 - zóna dáma/veža + badge + dmg 4/8)
   abilityFx = CHAR_FX[char]?.preview?.({ grid, caster, dir }) || null;
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → obal do JEDNÉHO divu (.ca-text je flex,
@@ -4204,16 +3963,6 @@ function renderAbilityPreview(char) {
   hydratePix(stats);
   charAbilityEl.classList.remove("hidden");
 }
-// Escanor char-select: pride lev + číslo pod mini-doskou (rovnaký indikátor ako HUD widget - swap framu
-// pride_lion_{0..3}.png, biely → celý zlatý; pri 3 pulz cez .pride-max)
-function syncCaPride(pride) {
-  const el = document.getElementById("ca-pride"); if (!el) return;
-  const numEl = el.querySelector(".pride-num");
-  if (numEl) numEl.textContent = pride;
-  const img = el.querySelector("img");
-  if (img && !img.getAttribute("src").endsWith("_" + pride + ".png")) img.src = "/assets/pride_lion_" + pride + ".png";
-  el.classList.toggle("pride-max", pride >= 3);
-}
 // Vlkolak char-select: fáza mesiaca + dmg pod mini-doskou (moon_{0..3}.png; spln pulzuje ako max)
 function syncCaMoon(lvl) {
   const el = document.getElementById("ca-moon"); if (!el) return;
@@ -4230,28 +3979,9 @@ function markMoonPreview(now) {
   if (now - s.last >= 1500) { s.last = now; s.lvl = (s.lvl + 1) % 4; syncCaMoon(s.lvl); }
 }
 
-// Escanor char-select: prekresli zvýraznené bunky pre daný pride level (cyklí 0→3 v drawCharSelectFrame)
-function markEscPridePreview(now) {
-  const s = escPridePreview; if (!s) return;
-  if (!s.last) s.last = now;
-  if (now - s.last >= 1500) { s.last = now; s.pride = (s.pride + 1) % 4; syncCaPride(s.pride); } // ~1.5s na level (pomalšie, nech sa dá zóna prečítať)
-  const hit = new Set(cellsForSpecialPreview({ x: s.caster.x, y: s.caster.y, char: "escanor", pride: s.pride }, s.dir).map(([x, y]) => `${x},${y}`));
-  s.grid.querySelectorAll(".mini-cell").forEach(c => {
-    if (c.classList.contains("caster")) return;
-    const on = hit.has(`${c.dataset.gx},${c.dataset.gy}`);
-    // SYNCHRÓNNY pulz: fáza animácie sa kotví na globálne hodiny (záporný animation-delay = -(now mod 1s)),
-    // inak bunky pridané pri rôznych pride leveloch blikajú každá vo vlastnej fáze. Delay sa nastavuje len
-    // pri PRIDANÍ triedy - zmena delay na bežiacej animácii by ju reštartovala každý frame.
-    if (on && !c.classList.contains("hit")) {
-      c.style.animationDelay = -(now % 1000) + "ms"; // mini-hit-pulse má 1s cyklus
-      c.classList.add("hit");
-    } else if (!on) c.classList.remove("hit");
-  });
-}
 function clearAbilityPreview() {
   abilityHoverChar = null;
   abilityCasterCanvas = null;
-  escPridePreview = null;
   moonPreview = null;
   abilityFx?.close(); abilityFx = null;
   charAbilityEl?.classList.add("hidden");
@@ -5504,23 +5234,11 @@ socket.on("reset", () => {
 socket.on("state", (s) => {
   tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing });
   state = s; board = s.board || board;
-  // Escanor: keď sa na slote OBJAVÍ (nasadenie na začiatku hry alebo turnajový swap), resetuj premenu - nech sa
-  // pri najbližšom rozohraní kola prehrá WeakIdle→Transform→Stand znova (nie mid-hra, char sa medzi kolami nemení)
   for (const slot of ["p1", "p2"]) {
     const c = s?.[slot]?.char || null;
-    if (c === "escanor" && escPrevChar[slot] !== "escanor") {
-      // escPrevChar === null = čerstvo načítaná stránka (Ctrl+F5) ALEBO nasadenie na začiatku hry (medzi hrami
-      // sa char maže na null → char-select). Uprostred hry (turn>1) je Escanor už premenený → ukáž silnú
-      // formu (Stand, škálovaný podľa pride), NIE weak. Inak (nová hra) sa premena WeakIdle→Transform→Stand hrá.
-      const fromReload = escPrevChar[slot] === null;
-      // SWAP = char sa v rozohranej hre zmenil z INEJ živej postavy (nie null) na Escanora - vtedy premenu
-      // preskoč (Stand, pride 0 hneď), nech nekoliduje so swap animáciou. GAME START (fromReload) si premenu
-      // ponecháva aj v turnaji.
-      const fromSwap = escPrevChar[slot] !== null; // (swap je len v turnaji; medzi hrami je char null)
-      escTransformed[slot] = fromSwap || (fromReload && (s.turn || 1) > 1);
-    }
-    escPrevChar[slot] = c;
-    fxAll("stateChar", slot, c); // register fx (Jotaro: (re)nasadenie → summon intro standu znova)
+    // register fx: postava sa na slote (znova) objavila - Escanor: reset premeny (nasadenie / turnajový swap),
+    // Jotaro: summon intro standu znova
+    fxAll("stateChar", slot, c, s);
   }
   // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
   if (!s.timeline) _finalRoundActive = !!s.goldLocked;
@@ -5692,26 +5410,14 @@ function raf() {
     // póza podľa choreografie postavy (register fx; Vojak: mieriaca póza + výšľah v synchróne so stredovým overlayom;
     // Countess: A5 cast pasce RAZ od frame 0) - anim.fromStart = relatívny čas od setAnim (drawT nižšie)
     anim = CHAR_FX[st.char]?.boardAnim?.({ slot, st, aSt, now, stoned, lyingDead, anim }) ?? anim;
-    // Escanor: počas premeny hraj Transform; pred premenou (idle) hraj slabú formu WeakIdle;
-    // víťazstvo = STREDOVÁ special animácia na jeho postavičke (WinSunBoard: zdvih slnka raz, potom ústa + preblik)
-    if (st.char === "escanor" && !stoned && !lyingDead) {
-      if (animState[slot].key === "transform") anim = ANIM_DEF.transform;
-      else if (animState[slot].key === "victory") anim = ANIM_DEF.winsun;
-      else if (!escTransformed[slot] && animState[slot].key === "idle") anim = ANIM_DEF.weakidle;
-    }
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (cloneSummonPose[slot] && performance.now() < cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
     // anim.armCrop (Luffy Gear3 basic): odrež zapečenú natiahnutú ruku+päsť z tela (dosah kreslí procedurálna guma)
     const armCrop = anim.armCrop || 0;
-    // Transform (loop:false) a WinSunBoard s loopFrom (zdvih raz, potom chvost - aj pri victory) musia ísť
-    // od frame 0 → relatívny čas; inak (loop) globálny now je ok
-    const escWinsun = st.char === "escanor" && (animState[slot].key === "winsun" || animState[slot].key === "victory");
     // THE WORLD: čas stojí → všetci OKREM Jotara majú zmrazený drawT (statický frame, žiadne cyklenie idle)
     const tsFrozenActor = tsActive && slot !== tsJotaroSlot;
     const drawT = tsFrozenActor ? tsFreezeAt
-                : (st.char === "escanor" && animState[slot].key === "transform") ? (now - escTransformStart[slot])
-                : escWinsun ? (now - (animState[slot].start || 0))
-                : (VAMP_ONESHOT_KEYS.has(aSt.key) || anim.fromStart) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast, Luffyho prepínacie/roll/Giant Pistol pózy) hrá RAZ od frame 0, potom drží pózu
+                : (VAMP_ONESHOT_KEYS.has(aSt.key) || anim.fromStart) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast, Escanorova premena a WinSunBoard, Luffyho pózy) hrá RAZ od frame 0
                 : (stoned ? 0 : now);
     // register boardFit (Jotaro, Luffy - figúra cez väčšinu framu, pri fill 0.95/anchorY 0.5 „obrovská" a nohy
     // vysoko): menší fill normalizovaný na výšku framu (fh/refH, nech rôzne pásy nevyjdú rôzne veľké),

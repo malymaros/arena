@@ -41,6 +41,7 @@
 //   aimStopsAtFoe  (ui) → bool - náhľad basicu sa zastaví na prvej figúre súpera (Luffy Giant Pistol)
 //   buttonBadge    { cls: [triedy], slots: [tlačidlá], on: (ui) → bool } - odznak stavu na tlačidlách (Luffy gear3)
 //   victoryAnim    anim malej postavy pri výhre (default: slučka specialAnim)
+//   headIdleFile   pás, z ktorého sa reže HUD hlava (default Idle.png; Escanor WeakIdle.png)
 //   boardFit       { fill, refH, offY } - menší fill na doske normalizovaný na výšku framu (fill × fh/refH),
 //                  ukotvený na nohy (anchorY 1) a zdvihnutý o offY px (default fill 0.95, stred) - aj ghost
 //   previewIdleCaster  caster na mini-doske výberu hrá IDLE (nie efektový sprite specialu)
