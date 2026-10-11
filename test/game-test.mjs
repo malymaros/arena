@@ -18,7 +18,7 @@ function startServer() {
     // FORCE_FIRST_STARTER: v produkcii sa osoby losujú na sloty (p1 = biely, začína každú hru) —
     // testy fixujú osobu A (host) na p1, aby deterministické scenáre (golden akcie nestartéra, démon startera…) sedeli
     // PLAYER_KEYS: explicitné testovacie heslo (server vyžaduje heslo; default je "hamara") — deterministické, nezávislé od dev prostredia
-    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ARENA_SEED: process.env.ARENA_SEED || "1" },
+    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ADMIN_KEY: "testadmin", ARENA_SEED: process.env.ARENA_SEED || "1" },
     stdio: "ignore",
   });
   return new Promise((resolve) => setTimeout(() => resolve(proc), 1200));
@@ -1838,9 +1838,7 @@ async function main() {
   {
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const S1L = { type: "special1", dir: "left" };
-  const S1R = { type: "special1", dir: "right" };
   const S2L = { type: "special", dir: "left" };
-  const S2R = { type: "special", dir: "right" };
   // c1 = p1 (fire), c2 = p2 (jotaro). mana:100 tiles = žiadny dmg šum pri 8-dmg zásahoch
   async function freshJotaro(p1char = "fire", tileWeights = { dmg: 0, heal: 0, mana: 100, ik: 0 }) {
     c1.sock.emit("retry");
@@ -2109,8 +2107,16 @@ async function main() {
     "TR: kolo v 2. roomke NEpresiaklo do 1. roomky (izolácia)");
 
   /* ---------- TR3: per-room admin reset zruší LEN svoju roomku (druhá beží ďalej) ---------- */
-  // c1 (v roomke A) spustí per-room reset → roomka A zmizne, roomka B (c3/c4) prežije
+  // zlý / prázdny kľúč sa ignoruje (bez platného ADMIN_KEY je admin reset vypnutý)
   c1.sock.emit("admin_reset_room", "");
+  c3.sock.emit("admin_reset_all", "zly");
+  await new Promise(r => setTimeout(r, 400));
+  const cW = await connect();
+  await waitFor(() => cW.rooms != null, 5000, "cW dostal room-browser");
+  check((cW.rooms.rooms || []).length === 2, "TR3: admin reset so zlým kľúčom nič nezrušil (2 v zozname)", `rooms=${JSON.stringify(cW.rooms?.rooms)}`);
+  cW.sock.close();
+  // c1 (v roomke A) spustí per-room reset → roomka A zmizne, roomka B (c3/c4) prežije
+  c1.sock.emit("admin_reset_room", "testadmin");
   await new Promise(r => setTimeout(r, 400));
   const cX = await connect(); // nový príchod → room-browser
   await waitFor(() => cX.rooms != null, 5000, "cX dostal room-browser po per-room resete");
@@ -2118,8 +2124,8 @@ async function main() {
   cX.sock.close();
 
   /* ---------- TR2: admin „RESET ROOMS" (browser) zruší VŠETKY bežiace roomky ---------- */
-  // teraz beží 1 roomka (c3/c4); globálny admin reset (prázdny kľúč = povolený, ADMIN_KEY nenastavený) ju má zrušiť
-  c3.sock.emit("admin_reset_all", "");
+  // teraz beží 1 roomka (c3/c4); globálny admin reset so správnym kľúčom ju má zrušiť
+  c3.sock.emit("admin_reset_all", "testadmin");
   await new Promise(r => setTimeout(r, 400));
   const c5 = await connect(); // nový príchod → room-browser
   await waitFor(() => c5.rooms != null, 5000, "c5 dostal room-browser po admin resete");

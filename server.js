@@ -43,7 +43,7 @@ app.use("/shared", express.static(path.join(__dirname, "shared"), {
 }));
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
+const ADMIN_KEY = process.env.ADMIN_KEY || ""; // heslo pre admin reset; bez neho je admin reset VYPNUTÝ
 // Heslá pre vstup do hry (rozdáva admin): čiarkou oddelený zoznam. Zatiaľ natvrdo "hamara"
 // (default), prepísateľné cez env PLAYER_KEYS=heslo1,heslo2 (napr. systemd deploy/arena.service).
 // POZOR: repo je verejné → tento default je viditeľný; na reálne tajné heslo nastav env a zmaž default.
@@ -63,8 +63,9 @@ function validateName(raw) {
   const n = raw.trim();
   return /^[A-Za-z]{1,8}$/.test(n) ? n : null;
 }
+// bez nastaveného ADMIN_KEY je admin reset vypnutý (nie otvorený) - verejný server nesmie resetovať hocikto
 function okAdmin(keyFromClient) {
-  return !ADMIN_KEY || ADMIN_KEY === keyFromClient;
+  return !!ADMIN_KEY && typeof keyFromClient === "string" && ADMIN_KEY === keyFromClient;
 }
 
 /* ==================== Room factory ==================== */
