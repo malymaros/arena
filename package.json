@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "start": "node server.js",
+        "lint": "eslint .",
         "test": "node test/engine-scenarios.mjs && node test/game-test.mjs",
         "golden": "node test/golden.mjs",
         "golden:update": "node test/golden.mjs --update",
@@ -15,6 +16,8 @@
         "socket.io": "^4.7.5"
     },
     "devDependencies": {
+        "eslint": "^9.39.5",
+        "globals": "^17.13.0",
         "socket.io-client": "^4.8.3"
     }
 }

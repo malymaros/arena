@@ -1,7 +1,7 @@
 // Luffy SPECIAL = pohyb-a-úder ako šachová figúra. Base = DÁMA (4 dmg, Special_7 roll-bounce), gear3 = VEŽA
 // (8 dmg, balón + Special_2 impact). Cieľová bunka na platnej línii (aj vlastná); Luffy sa NA ňu dogúľa a dá
 // dmg tomu, kto na nej stojí (súper / klon). Ide cez obrany ako každý dmg special.
-import { SPECIAL_COST, SMALL_DELAY_MS, ANIM_SLOW, BASIC_COST, BASIC_DMG_MAX, CLONE_DMG, MOVE_DELAY_MS, MAX_MANA, RECHARGE_GAIN } from "../constants.js";
+import { SPECIAL_COST, SMALL_DELAY_MS, ANIM_SLOW, BASIC_COST, BASIC_DMG_MAX, MOVE_DELAY_MS, MAX_MANA, RECHARGE_GAIN } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 
 const LUFFY_SPECIAL_DMG = { base: 4, gear3: 8 };

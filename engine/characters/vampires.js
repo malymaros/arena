@@ -1,7 +1,7 @@
 // Vampire (countess, p1) a Onryō (onre, p2): special = skrytá PASCA na zvolenej bunke - BEZ obmedzení
 // (aj súperova aktuálna bunka; trigger až pri opätovnom vstupe/prechode). Značku vidí len caster. Max 1
 // pasca - recast starú nahradí. Trigger rieši resolveTrapsAfterAction/triggerTrap v engine.
-import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, VAMP_CAST_MS, START_HP, MAX_MANA, MELEE_COST, MELEE_REPEAT, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS, VAMP_TRAP_BONUS, CLONE_DMG, DASH_COST, MOVE_DELAY_MS, WOLF_STRIKE_MS, VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS } from "../constants.js";
+import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, VAMP_CAST_MS, START_HP, MAX_MANA, MELEE_COST, MELEE_REPEAT, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS, DASH_COST, MOVE_DELAY_MS, WOLF_STRIKE_MS, VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 
 const validCell = (ctx, c) => !!c && Number.isInteger(c.x) && Number.isInteger(c.y) && ctx.inBounds(c.x, c.y);

@@ -49,10 +49,10 @@ export function createEngine(io = {}) {
     runRoundLoop, finishRound, pushInvalid, killClone, breakTrap, strikeZone,
     kitOf,
   };
-  const { redactActor, redactHunterActor, redactTilesFor, hunterLitCells, redactSnapshotFor, redactRosterMana, redactEffect, maskTrapFrame, redactTimelineFor, labyrinthMul, endLabyrinths, revealLabyrinths, applyLabyrinth, loseInLabyrinth, trackSteps } = Object.assign(E, labyrinthModule(E));
-  const { PAUSE, frozenActive, noteFrozenHit, noteFrozenClone, validTimestopQueue, doJotaroWorld, runTimestopActions, applyTimestopResume } = Object.assign(E, timestopModule(E));
-  const { dealMul, recvDmg, doDemon, lsTweenFrames, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
-  const { fireOnDmgTile, hasTile, hasIK, defenseBlockedBy, powerBoost, pickCell, endOfStepTileEffects, rollTileType, endOfRoundTiles, commitPendingTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
+  const { redactHunterActor, redactSnapshotFor, redactRosterMana, redactTimelineFor, labyrinthMul, endLabyrinths, revealLabyrinths, applyLabyrinth, loseInLabyrinth, trackSteps } = Object.assign(E, labyrinthModule(E));
+  const { PAUSE, frozenActive, noteFrozenHit, noteFrozenClone, validTimestopQueue, doJotaroWorld, runTimestopActions } = Object.assign(E, timestopModule(E));
+  const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
+  const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
