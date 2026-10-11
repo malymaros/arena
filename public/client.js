@@ -1,6 +1,8 @@
 // public/client.js
 // herná geometria (zóny specialov, dráhy striel, ghost simulácia) - ten istý modul používa server (engine)
 import * as G from "/shared/geometry.js";
+// časovanie timeline zdieľané so serverom (delayMs framov ↔ dĺžky klientskych animácií)
+import { ANIM_SLOW, CHARGE_STEP_MS } from "/shared/timing.js";
 // klientský register postáv (public/chars/<key>.js) - dáta postáv: meno/priečinky, animácie, aliasy súborov,
 // výrezy hláv, odstupy, teleport, náhľady vo výbere (význam polí: public/chars/index.js)
 import {
@@ -9,6 +11,16 @@ import {
   CHAR_BUTTONS, CHAR_LIST, CHARS_BY_KEY, SIZE_LEVEL, ACTION_ANIMS, PROJECTILE,
 } from "/chars/index.js";
 import { CHAR_FX_FACTORIES } from "/chars/fx/index.js";
+import { SPECIAL_FPS } from "/chars/common.js";
+// UI moduly klienta (public/client/*)
+import { socket, hideRooms } from "/client/net.js";
+import { playback } from "/client/playback.js";
+import { pixSvg, miniPix, tileSvg, hydratePix, pixelizeEmoji } from "/client/pix.js";
+import { renderArenaLayers } from "/client/arena-bg.js";
+import { showLobby } from "/client/lobby.js";
+import { showIntermission } from "/client/intermission.js";
+import "/client/admin.js";       // ?admin=1 → tlačidlo reset roomky
+import "/client/debug-hope.js";  // ?hopedebug=1 → náhľad hope sprite
 
 // klientský scope pre choreografiu postáv (public/chars/fx/*): lenivé gettery (moduly ich čítajú až pri
 // prehrávaní, deklarácie nižšie sú vtedy už inicializované) - stav hry, rozmery, DOM vrstvy, pomocníci
@@ -50,132 +62,6 @@ const fxOwnsCenter = (char, kind) => !!CHAR_FX[char]?.ownCenter?.includes(kind);
 const CHAR_FX = Object.fromEntries(Object.entries(CHAR_FX_FACTORIES).map(([k, f]) => [k, f(C)]));
 // koniec hry/medzihra: uprac vlastné overlaye postáv (napr. Luffyho stredový hero-shot), ktoré renderGrid nemaže
 const clearCharOverlays = () => Object.values(CHAR_FX).forEach(fx => fx.clearOverlays?.());
-import { SPECIAL_FPS } from "/chars/common.js";
-// trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
-// (inak by sa vrátený hráč stal divákom a server by prestal brať jeho lock_in)
-let arenaId = null;
-try {
-  arenaId = localStorage.getItem("arenaId");
-  if (!arenaId) {
-    arenaId = (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(16).slice(2));
-    localStorage.setItem("arenaId", arenaId);
-  }
-} catch { arenaId = null; } // localStorage zakázaný (napr. privátny režim) → bez reclaimu, len bežné pripojenie
-// autoConnect:false - najprv login (meno + heslo), potom socket.connect() s auth údajmi.
-// Všetky socket.on(...) handlery sa registrujú normálne aj na nepripojený socket.
-const socket = io({ auth: { id: arenaId }, autoConnect: false });
-
-/* ---------- Prihlásenie (meno + heslo) - brána pred pripojením ---------- */
-(function initLogin() {
-  const NAME_RE = /^[A-Za-z]{1,8}$/;
-  const loginEl = document.getElementById("login");
-  const nameInp = document.getElementById("login-name");
-  const passInp = document.getElementById("login-pass");
-  const form    = document.getElementById("login-form");
-  const errEl   = document.getElementById("login-error");
-  const showErr = (m) => { if (errEl) { errEl.textContent = m; errEl.classList.remove("hidden"); } };
-  const hideErr = () => errEl?.classList.add("hidden");
-
-  // sanitizácia mena za behu: povolené len A–Z/a–z, max 8 znakov
-  nameInp?.addEventListener("input", () => { nameInp.value = nameInp.value.replace(/[^A-Za-z]/g, "").slice(0, 8); });
-
-  const connectWith = (name, pass) => { socket.auth = { id: arenaId, name, pass }; socket.connect(); };
-
-  // tichý reconnect po refreshi (údaje z tejto session - sessionStorage, nie localStorage, kvôli heslu)
-  let saved = null;
-  try { saved = JSON.parse(sessionStorage.getItem("arenaLogin") || "null"); } catch {}
-  if (saved && NAME_RE.test(saved.name || "")) connectWith(saved.name, saved.pass || "");
-  else loginEl?.classList.remove("hidden");
-
-  form?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = (nameInp?.value || "").trim();
-    const pass = passInp?.value || "";
-    if (!NAME_RE.test(name)) { showErr("Name: 1–8 letters a–z, no spaces or symbols."); return; }
-    try { sessionStorage.setItem("arenaLogin", JSON.stringify({ name, pass })); } catch {}
-    hideErr();
-    connectWith(name, pass);
-  });
-
-  socket.on("connect", () => { hideErr(); loginEl?.classList.add("hidden"); });
-  // middleware odmietnutie = fatálne (socket.io neskúša znova); dočasné sieťové chyby ignorujeme (retry beží sám)
-  socket.on("connect_error", (err) => {
-    const m = err && err.message;
-    if (m === "bad_pass" || m === "bad_name") {
-      try { sessionStorage.removeItem("arenaLogin"); } catch {}
-      loginEl?.classList.remove("hidden");
-      showErr(m === "bad_pass" ? "Wrong password." : "Invalid name (1–8 letters a–z).");
-    }
-  });
-})();
-
-/* ---------- Room browser (po logine): zoznam roomiek - create / join / spectate ---------- */
-const roomsEl     = document.getElementById("rooms");
-const roomsListEl = document.getElementById("rooms-list");
-// admin režim (?admin=1[&key=…]) → room-browser dostane aj destruktívny „RESET ROOMS" (všetky roomky)
-const ADMIN_QP    = new URLSearchParams(location.search);
-const IS_ADMIN    = ADMIN_QP.has("admin");
-const ADMIN_KEY   = ADMIN_QP.get("key") || "";
-function hideRooms() { roomsEl?.classList.add("hidden"); }
-function renderRooms(info) {
-  if (!roomsListEl) return;
-  roomsListEl.innerHTML = "";
-  // spätná kompat.: starý formát bol jeden objekt; nový je { rooms: [...], canCreate }
-  const list = Array.isArray(info?.rooms) ? info.rooms : [];
-  // existujúce roomky → Join (voľné miesto) alebo Spectate (plná)
-  list.forEach((r, i) => {
-    const card = document.createElement("div");
-    card.className = "room-card";
-    const label = document.createElement("div");
-    label.className = "room-label";
-    label.innerHTML = `ROOM ${i + 1} <span class="room-count">${r.players}/${r.max}</span>`;
-    const b = document.createElement("button");
-    if (r.canJoin) {
-      b.className = "room-btn join";
-      b.textContent = "JOIN";
-      b.addEventListener("click", () => { b.disabled = true; socket.emit("join_room", { roomId: r.id }); });
-    } else {
-      b.className = "room-btn spectate";
-      b.textContent = "SPECTATE";
-      b.addEventListener("click", () => { b.disabled = true; socket.emit("spectate_room", { roomId: r.id }); });
-    }
-    card.appendChild(label);
-    card.appendChild(b);
-    roomsListEl.appendChild(card);
-  });
-  // vytvor novú roomku (staneš sa hostom a nastavíš parametre) - ak sa ešte dá (limit)
-  if (info?.canCreate) {
-    const b = document.createElement("button");
-    b.className = "room-btn create";
-    b.textContent = "CREATE ROOM";
-    b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
-    roomsListEl.appendChild(b);
-  }
-  // admin: zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM) - len s ?admin=1
-  if (IS_ADMIN && list.length > 0) {
-    const rb = document.createElement("button");
-    rb.className = "room-btn reset";
-    rb.textContent = "RESET ROOMS";
-    rb.title = "Zruší VŠETKY roomky a odpojí všetkých hráčov aj divákov";
-    rb.addEventListener("click", () => {
-      if (!confirm("Zrušiť VŠETKY roomky a odpojiť všetkých hráčov aj divákov?")) return;
-      rb.disabled = true;
-      socket.emit("admin_reset_all", ADMIN_KEY);
-      fetch(`/admin/reset-all${ADMIN_KEY ? `?key=${encodeURIComponent(ADMIN_KEY)}` : ""}`).catch(() => {});
-    });
-    roomsListEl.appendChild(rb);
-  }
-}
-socket.on("rooms", (info) => {
-  document.getElementById("login")?.classList.add("hidden");
-  // browsing socket nedostáva state → herné obrazovky (viditeľné by default) treba schovať, nech neprebliknú spod room-browsera
-  ["char-select", "lobby", "lobby-wait", "host-wait", "team-wait", "spectator", "gameover", "intermission"].forEach(id =>
-    document.getElementById(id)?.classList.add("hidden"));
-  renderRooms(info);
-  roomsEl?.classList.remove("hidden");
-});
-// miesto sa medzičasom zaplnilo - server pošle aj čerstvý „rooms", ktorý prekreslí na Spectate
-socket.on("join_denied", () => { /* rooms event prekreslí kartu */ });
 
 const gridEl   = document.getElementById("grid");
 const actorsEl = document.getElementById("actors");
@@ -202,7 +88,6 @@ const hudCharP2 = document.getElementById("hud-char-p2");
 // Vlkolak: fáza mesiaca (ikona bez čísla) vľavo + dmg specialu pri aktuálnej fáze vpravo v HUD widgete
 // 8 smerov vlkolakovho specialu - MUSÍ sedieť so serverovým WOLF_DIRS
 const WOLF_DIRS_CLIENT = G.DIR8; // 8 smerov (vlkolakov charge, smer strely) - zo shared/geometry.js
-const WOLF_DIR_KEYS_CLIENT = Object.keys(WOLF_DIRS_CLIENT);
 const flagP1    = document.getElementById("flag-p1");
 const flagP2    = document.getElementById("flag-p2");
 const logP1     = document.getElementById("log-p1");
@@ -420,8 +305,6 @@ const qCursor = document.createElement("div");
 qCursor.className = "q-cursor";
 
 // === Timing ===
-// celkové spomalenie animácií kola (1 = pôvodné tempo) - MUSÍ sedieť so server.js ANIM_SLOW
-const ANIM_SLOW = 1.8;
 const MOVE_MS = Math.round(700 * ANIM_SLOW); // pohyb na boarde; CSS číta --move-ms (nastavené nižšie)
 // POZN.: neslučkové animácie (attack/attack2/hurt/dead) sa kvôli drawSprite(t=now) reálne neprehrávajú
 // frame po frame - len držia poslednú pózu. Preto ich NEdržíme fixný čas (predtým 2400 ms = vizuálny „drag“),
@@ -449,7 +332,6 @@ document.documentElement.style.setProperty("--move-ms", MOVE_MS + "ms"); // drž
 // Projektil
 const CHARGE_SCALE = 1.0;
 const CHARGE_ANIM  = { file: "Charge.png", fps: 8, loop: true };
-const CHARGE_STEP_MS = Math.round(240 * ANIM_SLOW); // dĺžka preletu 1 bunky; MUSÍ sedieť so server.js CHARGE_STEP_MS
 document.documentElement.style.setProperty("--charge-ms", CHARGE_STEP_MS + "ms"); // plynulý sklz projektilu (CSS .projectile)
 
 // Special anim
@@ -490,7 +372,6 @@ const VAMP_ONESHOT_KEYS = new Set(["wolfstrike", "vampstrike", "vattack1", "va1"
 
 let me = null;
 let isHost = false;               // prvý pripojený hráč nastavuje zápas v lobby
-let serverGameResult = null;      // výsledok poslednej dohranej hry (séria) - vyhodnotí sa na konci timeline
 let board = { w: 4, h: 3 };
 let state = { p1:null, p2:null, arena:null, turn:1, starter:"p1", phase:"lobby" };
 let myQueue = [];
@@ -499,7 +380,6 @@ let goldenMirrorArmed = false; // objednaný golden mirror - ten istý predťah,
 let goldenManaArmed = false;   // objednaný golden mana refill (extra akcia po konci kola)
 let lastStandArmed = false;    // objednaný Last Stand (duálny s golden mana, výlučný)
 let lastHopeArmed = false;     // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
-let chosenChar = null;
 let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let abilityFx = null;            // náhľad specialu z registra fx (preview → { frame, close }; Luffy: cyklenie módu base↔gear3)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
@@ -534,10 +414,7 @@ const SPRITES = {};
 let actorsInitialized = false;
 
 // --- nový game-over manažment na klientovi
-let serverWinner = null;          // koho ohlásil server
-let gameOverShown = false;        // či už bolo zobrazené GO
 let lastAttackEndAt = { p1:0, p2:0 }; // kedy (v čase performance.now) dobehne posledná animácia útoku
-let _finalRoundActive = false;    // „FINAL ROUND" sa zobrazí hore až keď prebehne banner (nie už počas summonu)
 
 // preview loop
 let charPreviewRaf = 0;
@@ -1555,247 +1432,6 @@ function spawnMirrorReflect(defenderSlot, dmg = 1, atkKind = "basic", gold = fal
   }
 }
 
-/* ---------- arena ---------- */
-// interné rozlíšenie pozadia - vrstvy sa zmenšia sem a CSS ich roztiahne s pixelated,
-// čím vzniknú skutočné veľké pixely (menšie čísla = hrubší pixel art)
-const ARENA_RES = { w: 320, h: 180 };
-function renderArenaLayers(arenaKey, layerFiles) {
-  arenaEl.innerHTML = "";
-  if (!arenaKey || !Array.isArray(layerFiles) || !layerFiles.length) return;
-  layerFiles.forEach((file, i) => {
-    const cvs = document.createElement("canvas");
-    cvs.className = "layer";
-    cvs.width = ARENA_RES.w; cvs.height = ARENA_RES.h;
-    cvs.style.zIndex = String(i);
-    const img = new Image();
-    img.onload = () => {
-      const ctx = cvs.getContext("2d");
-      // cover: vyplň celý canvas, prebytok orež - rovnaká logika ako object-fit: cover
-      const s  = Math.max(ARENA_RES.w / img.width, ARENA_RES.h / img.height);
-      const dw = img.width * s, dh = img.height * s;
-      ctx.drawImage(img, (ARENA_RES.w - dw) / 2, (ARENA_RES.h - dh) / 2, dw, dh);
-    };
-    img.src = `/arenas/${arenaKey}/${file}`;
-    arenaEl.appendChild(cvs);
-  });
-}
-
-/* ---------- pixel-art ikony (tiles, tlačidlá, HUD) ---------- */
-// 8×8 mriežka, znak = farba z palety, bodka = priehľadné; kreslí sa ako SVG rect-y (crispEdges)
-const PIX = {
-  flame: { pal: { a: "#ff7043", b: "#ffd54f" }, rows: [
-    "....a...",
-    "...aa...",
-    "..aaaa..",
-    "..aaaa..",
-    ".aabbaa.",
-    ".abbbba.",
-    ".abbbba.",
-    "..aaaa..",
-  ]},
-  heart: { pal: { a: "#e53935", b: "#ff8a80" }, rows: [
-    "........",
-    ".aa..aa.",
-    "abaaaaaa",
-    "aaaaaaaa",
-    "aaaaaaaa",
-    ".aaaaaa.",
-    "..aaaa..",
-    "...aa...",
-  ]},
-  drop: { pal: { a: "#1e88e5", b: "#82c4ff" }, rows: [
-    "...a....",
-    "...aa...",
-    "..aaaa..",
-    "..aaaa..",
-    ".aaaaaa.",
-    ".baaaaa.",
-    ".baaaaa.",
-    "..aaaa..",
-  ]},
-  skull: { pal: { a: "#e8e8e8", b: "#1a1a1a" }, rows: [
-    "..aaaa..",
-    ".aaaaaa.",
-    ".abaaba.",
-    ".abaaba.",
-    ".aaaaaa.",
-    "..abba..",
-    "..aaaa..",
-    "..a..a..",
-  ]},
-  // POWER tile - zlatý meč (útok z tejto bunky dostane +2 dmg, tile sa spotrebuje)
-  sword: { pal: { a: "#ffd54f", b: "#b26a00" }, rows: [
-    "...aa...",
-    "...aa...",
-    "...aa...",
-    "...aa...",
-    ".bbaabb.",
-    "...bb...",
-    "...bb...",
-    "........",
-  ]},
-  // BLOCK tile - sivý štít s červeným ✕ (na tejto bunke sa nedá castnúť shield/mirror)
-  shieldx: { pal: { a: "#9aa0a8", b: "#e53935" }, rows: [
-    ".aaaaaa.",
-    ".abaaba.",
-    ".aabbaa.",
-    ".aabbaa.",
-    ".abaaba.",
-    "..aaaa..",
-    "...aa...",
-    "........",
-  ]},
-  boot: { pal: { a: "#e0e0e0", b: "#8d6e63" }, rows: [
-    "..aaa...",
-    "..aaa...",
-    "..aaa...",
-    "..aaa...",
-    "..aaaa..",
-    "..aaaaa.",
-    ".bbbbbb.",
-    "........",
-  ]},
-  chevrons: { pal: { a: "#ffffff" }, rows: [
-    "aa..aa..",
-    ".aa..aa.",
-    "..aa..aa",
-    ".aa..aa.",
-    "aa..aa..",
-    "........",
-    "........",
-    "........",
-  ]},
-  plus: { pal: { a: "#82c4ff" }, rows: [
-    "...aa...",
-    "...aa...",
-    ".aaaaaa.",
-    ".aaaaaa.",
-    "...aa...",
-    "...aa...",
-    "........",
-    "........",
-  ]},
-  shield: { pal: { a: "#00363d", b: "#b2ebf2" }, rows: [
-    ".aaaaaa.",
-    ".abbbba.",
-    ".abbbba.",
-    ".abbbba.",
-    "..abba..",
-    "..abba..",
-    "...aa...",
-    "........",
-  ]},
-  mirror: { pal: { a: "#d4a017", b: "#b2ebf2", c: "#ffffff" }, rows: [
-    ".aaaaaa.",
-    ".abbbba.",
-    ".abbcba.",
-    ".abcbba.",
-    ".acbbba.",
-    ".abbbba.",
-    ".aaaaaa.",
-    "........",
-  ]},
-  arrow: { pal: { a: "#fff3c4" }, rows: [
-    "........",
-    ".....a..",
-    "......a.",
-    "aaaaaaaa",
-    "......a.",
-    ".....a..",
-    "........",
-    "........",
-  ]},
-  sword: { pal: { a: "#e0e0e0", c: "#6d4c41", d: "#d4a017" }, rows: [
-    "...aa...",
-    "...aa...",
-    "...aa...",
-    "...aa...",
-    ".dddddd.",
-    "...cc...",
-    "...cc...",
-    "........",
-  ]},
-  star: { pal: { a: "#e1bee7", b: "#ffffff" }, rows: [
-    "...aa...",
-    "..aaaa..",
-    ".aabbaa.",
-    "aabbbbaa",
-    ".aabbaa.",
-    "..aaaa..",
-    "...aa...",
-    "........",
-  ]},
-  // séria - vyhratá hra: plná zlatá koruna s gemmami
-  crown: { pal: { a: "#ffcf3f", b: "#c98a17", c: "#ff5a5a" }, rows: [
-    ".a.aa.a.",
-    ".a.aa.a.",
-    ".aaaaaa.",
-    ".acaaca.",
-    ".abaaba.",
-    ".aaaaaa.",
-    "........",
-    "........",
-  ]},
-  // séria - nezískaná hra: len obrys koruny (tlmená zlatá)
-  crown_outline: { pal: { o: "#7d6526" }, rows: [
-    ".o.oo.o.",
-    ".o.oo.o.",
-    ".oo..oo.",
-    ".o....o.",
-    ".o....o.",
-    ".oooooo.",
-    "........",
-    "........",
-  ]},
-  // tournament - ešte neprehraná hra: len tlmený obrys lebky
-  skull_outline: { pal: { o: "#5a5a5a" }, rows: [
-    "..oooo..",
-    ".o....o.",
-    ".o.oo.o.",
-    ".o.oo.o.",
-    ".o....o.",
-    "..oooo..",
-    "..o..o..",
-    "..o..o..",
-  ]},
-};
-function pixSvg(name) {
-  const def = PIX[name];
-  if (!def) return "";
-  let rects = "";
-  def.rows.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      const c = def.pal[row[x]];
-      if (c) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
-    }
-  });
-  return `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
-}
-// malá inline ikonka do cost riadkov - pixelizované emoji, hydratuje hydratePix()
-const miniPix = (emoji) => `<span class="pix-ico mini" data-emoji="${emoji}"></span>`;
-// špeciálne políčka mapujú na ikony knižnice
-const TILE_TO_PIX = { dmg: "flame", heal: "heart", mana: "drop", ik: "skull", power: "sword", block: "shieldx" };
-function tileSvg(type) { return pixSvg(TILE_TO_PIX[type] || type); }
-
-// jemná pixelizácia emoji: nakreslí sa do malého canvasu a CSS ho roztiahne s pixelated
-function pixelizeEmoji(el, res) {
-  if (el.dataset.done) return;
-  el.dataset.done = "1";
-  el.innerHTML = "";
-  res = res || (el.classList.contains("mini") ? 10 : 20);
-  const cvs = document.createElement("canvas");
-  cvs.width = res; cvs.height = res;
-  const ctx = cvs.getContext("2d");
-  ctx.font = `${res - 3}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(el.dataset.emoji, res / 2, res / 2 + 1);
-  el.appendChild(cvs);
-}
-function hydratePix(root = document) {
-  root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => pixelizeEmoji(el));
-}
-
 /* ---------- HUD ---------- */
 // spojitý bar s 10 zárezmi: hlavná výplň + biely „trail", ktorý sa pri strate stiahne s oneskorením
 function renderBar(el, value) {
@@ -1838,7 +1474,7 @@ function updateTurnStatus() {
 
   const timerMode = !!state?.config?.timer && state.config.timer !== "off";
   let txt = null, cls = null;
-  if (!playing && !gameOverShown && mine?.char && opp?.char) {
+  if (!playback.playing && !playback.gameOverShown && mine?.char && opp?.char) {
     if (mine.locked && !opp.locked) {
       // „locked - waiting" - vo fixnom časovom režime skry; v quickdraw a bezčasovom nechaj
       if (!timerMode || state.config.timer === "quickdraw") { txt = "✔ LOCKED - WAITING FOR OPPONENT…"; cls = "waiting"; }
@@ -1855,10 +1491,10 @@ function updateTurnStatus() {
 }
 
 function renderHUD() {
-  if (hudTurn && !gameOverShown) {
-    // posledné (buffnuté) kolo po Last Stand → „FINAL ROUND"; prepne sa až s bannerom (_finalRoundActive)
+  if (hudTurn && !playback.gameOverShown) {
+    // posledné (buffnuté) kolo po Last Stand → „FINAL ROUND"; prepne sa až s bannerom (playback.finalRoundActive)
     hudTurn.textContent = (state?.phase === "playing")
-      ? (_finalRoundActive ? "FINAL ROUND" : `ROUND ${state.turn}`)
+      ? (playback.finalRoundActive ? "FINAL ROUND" : `ROUND ${state.turn}`)
       : "";
   }
   updateTurnStatus();
@@ -2688,7 +2324,7 @@ let qBeatEls = []; // sloty podľa pozície 0..8 (pre kurzor + odhalenie súpera
 // skamenené ťahy nového kola sú vopred zamknuté ako pass (🗿) - predvyplnia sa na začiatok fronty
 // a nedajú sa odobrať (undo poistka); hráč plánuje len zvyšné sloty
 function ensureStonePrefix() {
-  if (!me || isSpectator || playing || lockedIn) return;
+  if (!me || isSpectator || playback.playing || lockedIn) return;
   const mine = state?.[me];
   if (!mine || !mine.char || mine.locked || state?.phase !== "playing") return;
   const need = Math.min(3, mine.stone || 0);
@@ -2731,7 +2367,7 @@ function hideTsQueue() { tsQueueEl.classList.add("hidden"); queueEl.classList.re
 
 function renderQueue() {
   // THE WORLD plánovanie: NEprestavuj pôvodnú lištu (ostáva „executing"), zadávaj do samostatného placeholdera
-  if (tsPlanning) { renderTsQueue(); updateActionButtons(); syncGoldenHalves(); updateGoldenButton(); updateLockButton(); return; }
+  if (playback.tsPlanning) { renderTsQueue(); updateActionButtons(); syncGoldenHalves(); updateGoldenButton(); updateLockButton(); return; }
   hideTsQueue();
   syncButtonBadges(ghostCharAt()); // Luffy: gear odznak na range/special reaguje aj na naplánovaný recharge
   ensureStonePrefix();
@@ -2920,7 +2556,7 @@ function updateActionButtons() {
 function updateLockButton() {
   // Jotaro THE WORLD: počas plánovania zmrazenej trojice je button „EXECUTE" (ignoruj stale state[me].locked
   // z pôvodného locku kola - inak by ho renderQueue po prvej akcii zamkol a hráč by nemohol odoslať)
-  if (tsPlanning) {
+  if (playback.tsPlanning) {
     lockBtn.classList.remove("locked");
     lockBtn.textContent = "EXECUTE";
     lockBtn.disabled = false;
@@ -2935,7 +2571,7 @@ function updateLockButton() {
     lockBtn.classList.remove("locked"); lockBtn.textContent = "LOCK IN"; lockBtn.disabled = false;
   }
   // počas prehrávania kola sa nedá lockovať (zabráni súbežným timeline)
-  if (playing && !locked) {
+  if (playback.playing && !locked) {
     lockBtn.disabled = true;
     lockBtn.classList.remove("ready");
     updateUiLocks();
@@ -2958,8 +2594,8 @@ function computeWinnerFromState(s) {
 
 /* ---------- GameOver sekvencia ---------- */
 function showGameOverSequence(winner) {
-  if (gameOverShown) return;
-  gameOverShown = true;
+  if (playback.gameOverShown) return;
+  playback.gameOverShown = true;
 
   const loser = winner === "p1" ? "p2" : (winner === "p2" ? "p1" : null);
 
@@ -2984,7 +2620,7 @@ function showGameOverSequence(winner) {
       else if (me)                  { verdict = "LOSER!"; cls = "lose"; }
       else                          { verdict = `${winner.toUpperCase()} WINS`; cls = "tie"; } // divák
       // pri sérii (BO3/BO5) doplň finálne skóre
-      const ser = serverGameResult?.series || state?.series;
+      const ser = playback.serverGameResult?.series || state?.series;
       let scoreLine = "";
       if (ser && ser.format && ser.format !== "single") {
         // skóre drží strany (ľavá : pravá), rovnako ako koruny v HUD - nie „ja : oponent"
@@ -3025,7 +2661,7 @@ function playNewRoundTransition(nextTurn, done) {
   const final = !!state?.goldLocked;
   if (final) {
     roundBannerEl.innerHTML = 'FINAL ROUND<span class="rb-demon"><img src="/assets/last_stand.png" alt="" /></span>';
-    _finalRoundActive = true; // text hore sa prepne až teraz (s bannerom)
+    playback.finalRoundActive = true; // text hore sa prepne až teraz (s bannerom)
   } else {
     roundBannerEl.textContent = `ROUND ${nextTurn}`;
   }
@@ -3040,33 +2676,18 @@ function playNewRoundTransition(nextTurn, done) {
 }
 
 /* ---------- Timeline prehrávanie ---------- */
-let playGen = 0;      // generácia prehrávania - novšia timeline zruší staršiu slučku
-let playing = false;  // počas prehrávania neaktualizuj UI zo snapshotov a drž LOCK zamknutý
 // len na čítanie pre tools/browser-smoke.mjs (boti čakajú, kým divák dohrá timeline) - na hru bez vplyvu
-Object.defineProperty(window, "__arenaPlaying", { get: () => playing });
-// Jotaro THE WORLD: tsPlanning = som Jotaro a plánujem 3 zmrazené akcie (UI odomknuté, lock → timestop_actions);
-// tsFrozen = som súper a čakám zmrazený (UI zamknuté, full-screen filter). Práve jeden je aktívny počas pauzy.
-let tsPlanning = false;
-let tsFrozen = false;
-// tsActive = beží time-stop (od timestop_start po timestop_end) - počas neho zmrazíme animácie VŠETKÝCH
-// okrem Jotara (tsJotaroSlot); tsFreezeAt = čas zmrazenia (statický drawT pre zmrazené figúry)
-let tsActive = false;
-let tsJotaroSlot = null;
-let tsFreezeAt = 0;
-// round-script beat counts - MODULOVÉ, aby prežili pauzu THE WORLD: pokračovacia timeline pokračuje
-// v číslovaní beatov (kurzor tak po obnovení času skočí na správnu ĎALŠIU akciu, nie na začiatok lišty)
-let roundBeatCounts = { p1: 0, p2: 0 };
-let tsResumePending = false; // ďalšia timeline je pokračovanie po THE WORLD → NEresetuj beat counts
+Object.defineProperty(window, "__arenaPlaying", { get: () => playback.playing });
 
 function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
 
-  const gen = ++playGen;
-  playing = true;
+  const gen = ++playback.playGen;
+  playback.playing = true;
   // Jotaro THE WORLD: nová timeline (vrátane pokračovacej po zmrazení) = pauza sa skončila; overlay + ts-queue
   // + stredový Special_3_P skry (u súpera to je moment „Jotaro klikol EXECUTE"); filter body.timestop-mode
   // nechaj - pokračovacia timeline ho zhasne až efektom timestop_end
-  tsPlanning = false; tsFrozen = false; tsOverlaySet(false); hideTsQueue(); hideWorldCenter();
+  playback.tsPlanning = false; playback.tsFrozen = false; tsOverlaySet(false); hideTsQueue(); hideWorldCenter();
   hideConnError();  // kolo sa vyhodnotilo → prípadná hláška o chybe spojenia je už neaktuálna
   stopTurnTimer(); // kolo sa už vyhodnocuje (server poslal timeline) - zhasni prípadný stale časovač
   updateUiLocks(); // počas vyhodnocovania sú všetky tlačidlá zamknuté a stmavené
@@ -3087,11 +2708,11 @@ function schedulePlayTimeline(timeline) {
   for (const slot of ["p1", "p2"]) if (preLvl[slot] != null) { escPrideDisplay[slot] = preLvl[slot]; escPrideDisplayChar[slot] = preChar[slot]; }
   // kurzor v lište: poradie beatov sa zhoduje so serverovým resolveTurn (štartér je prvý v dvojici)
   const playStarter = first.starter ?? state?.starter ?? "p1";
-  // beat counts prežijú pauzu THE WORLD: pokračovacia timeline (tsResumePending) NEresetuje číslovanie,
+  // beat counts prežijú pauzu THE WORLD: pokračovacia timeline (playback.tsResumePending) NEresetuje číslovanie,
   // takže kurzor po obnovení času skočí na akciu VPRAVO od THE WORLD (nie na začiatok lišty)
-  if (!tsResumePending) roundBeatCounts = { p1: 0, p2: 0 };
-  tsResumePending = false;
-  const beatCounts = roundBeatCounts;
+  if (!playback.tsResumePending) playback.roundBeatCounts = { p1: 0, p2: 0 };
+  playback.tsResumePending = false;
+  const beatCounts = playback.roundBeatCounts;
   // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) - keď príde "invalid", prečiarkneme ju
   const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
@@ -3110,10 +2731,10 @@ function schedulePlayTimeline(timeline) {
   let prev = first;
 
   const step = () => {
-    if (gen !== playGen) return; // medzitým začala novšia timeline - túto slučku ukonči
+    if (gen !== playback.playGen) return; // medzitým začala novšia timeline - túto slučku ukonči
 
     if (i >= timeline.length) {
-      playing = false;
+      playback.playing = false;
 
       // Escanor/Vlkolak: level sa po kole zmenil → veľkosť je stále držaná na starej (od začiatku kola);
       // ukáž float nad ním (lev ▲▼ / nová fáza mesiaca) a AŽ POTOM (po pauze) pusti na novú veľkosť
@@ -3134,14 +2755,14 @@ function schedulePlayTimeline(timeline) {
       }
 
       // koniec hry: ak séria pokračuje -> medzihra; ak je rozhodnutá -> game over
-      const winner = serverWinner || serverGameResult?.gameWinner || computeWinnerFromState(state);
+      const winner = playback.serverWinner || playback.serverGameResult?.gameWinner || computeWinnerFromState(state);
       if (winner) {
         clearRoundCursor();
         // banish/summon: démon ešte chvíľu drží, potom zmizne - stredový AJ ten za postavou
         // (koniec hry = žiadny démon na ploche, nech už jeho animácie dopadli akokoľvek)
         setTimeout(() => { hideDeathCenter(); hideDeathBehind(); }, 700);
-        if (serverGameResult && !serverGameResult.matchOver) {
-          playGameEndAnim(winner, () => showIntermission(winner, serverGameResult.series));
+        if (playback.serverGameResult && !playback.serverGameResult.matchOver) {
+          playGameEndAnim(winner, () => showIntermission(winner, playback.serverGameResult.series, me));
         } else {
           showGameOverSequence(winner);
         }
@@ -3152,7 +2773,7 @@ function schedulePlayTimeline(timeline) {
       // „ROUND N" animáciu a až po nej resetuj lištu na ďalšie kolo
       const doneGen = gen;
       playNewRoundTransition(NEXT_TURN, () => {
-        if (doneGen !== playGen) return; // medzitým začalo nové prehrávanie - neresetuj
+        if (doneGen !== playback.playGen) return; // medzitým začalo nové prehrávanie - neresetuj
         state.turn = NEXT_TURN;
         state.starter = NEXT_STARTER;
         renderHUD();
@@ -3231,7 +2852,7 @@ function schedulePlayTimeline(timeline) {
       if (e.kind === "ts_mirror" && (e.target === "p1" || e.target === "p2")) spawnFloat(e.target, "MIRRORED", "ts-float");
       if (e.kind === "timestop_end") {
         document.body.classList.remove("timestop-mode");
-        tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // čas sa rozbehol - animácie zas bežia
+        playback.tsActive = false; playback.tsJotaroSlot = null; hideWorldCenter(); // čas sa rozbehol - animácie zas bežia
       }
       // strelec sa otočí v smere horizontálnej streľby (vertikálna facing nemení; diagonály podľa
       // horizontálnej zložky - Countess/Onre strieľajú šikmo)
@@ -3631,11 +3252,11 @@ function schedulePlayTimeline(timeline) {
     prev = frame;
     // Jotaro THE WORLD: čiastočná timeline skončila na timestop_wait - NEplánuj ďalší krok a NEspusti koncovú
     // vetvu playbacku (UI sa nesmie odomknúť). Prejdi do ts-módu; pokračovacia timeline príde druhým `state`.
-    if (tsWait) { playing = false; tsResumePending = true; enterTimestopMode(); return; } // pokračovanie zachová beat counts
+    if (tsWait) { playback.playing = false; playback.tsResumePending = true; enterTimestopMode(); return; } // pokračovanie zachová beat counts
     setTimeout(step, frame.delayMs ?? 600);
   };
 
-  if (preDelay > 0) setTimeout(() => { if (gen === playGen) step(); }, preDelay); // počkaj na premenu Escanora
+  if (preDelay > 0) setTimeout(() => { if (gen === playback.playGen) step(); }, preDelay); // počkaj na premenu Escanora
   else step();
 }
 
@@ -3657,7 +3278,7 @@ function clearActors() {
   cloneSummonPose = { p1: null, p2: null };
   cloneDead = { p1: false, p2: false };
   fxAll("resetActors"); // figúry postáv z registra fx (Jotarov stand)
-  tsActive = false; tsJotaroSlot = null; hideWorldCenter(); // THE WORLD vizuál nesmie prežiť reset/novú hru
+  playback.tsActive = false; playback.tsJotaroSlot = null; hideWorldCenter(); // THE WORLD vizuál nesmie prežiť reset/novú hru
   youMarker.style.display = "none";
   actorsInitialized = false;
 }
@@ -3826,7 +3447,6 @@ selEl.addEventListener("click", (e) => {
   if (!key) return; // placeholder "Coming soon" nie je voliteľný
   if (selEl.classList.contains("team-mode")) { toggleTeamPick(key); return; } // draft: klik = toggle výberu
   if (isMageDead(key)) return; // mŕtveho maga (tournament) sa nedá zvoliť
-  chosenChar = key;
   socket.emit("choose_character", key);
 });
 
@@ -3870,8 +3490,7 @@ teamConfirmBtn?.addEventListener("click", () => {
 
 /* ---------- Náhľad špeciálu mága (hover vo výbere) ---------- */
 const charAbilityEl = document.getElementById("char-ability");
-// cena many špeciálu v náhľade (pozícia castera a popis = abilityPreview postavy v registri)
-const SPECIAL_MANA = 5;
+// pozícia castera a popis náhľadu = abilityPreview postavy v registri
 function renderAbilityPreview(char) {
   const def = ABILITY_PREVIEW[char];
   if (!def || !charAbilityEl) return;
@@ -4219,8 +3838,8 @@ function syncMirrorBtn(char) { applyBtnSkin("mirror", mirrorBtn, s1Picker, char)
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 let lockedIn = false;
 function uiLocked() {
-  if (tsPlanning) return false; // Jotaro počas THE WORLD plánuje zmrazené akcie - ovládanie odomknuté
-  return lockedIn || playing || tsFrozen || !!state?.[me]?.locked;
+  if (playback.tsPlanning) return false; // Jotaro počas THE WORLD plánuje zmrazené akcie - ovládanie odomknuté
+  return lockedIn || playback.playing || playback.tsFrozen || !!state?.[me]?.locked;
 }
 
 // vizuálne zámky: otvorený picker zamyká ostatné akčné tlačidlá, LOCK IN zamyká všetky
@@ -4241,12 +3860,12 @@ function updateUiLocks() {
   const locked = uiLocked();
   actionButtonsAll().forEach(b => {
     let bl = locked || (!!openPicker && b !== openBtn);
-    // počas THE WORLD plánovania (tsPlanning): special (THE WORLD práve beží) + golden/gold-dual/démon/last-hope
+    // počas THE WORLD plánovania (playback.tsPlanning): special (THE WORLD práve beží) + golden/gold-dual/démon/last-hope
     // sú v zmrazenej trojici zakázané → zamkni ich (special1 v mirror slote a základné akcie ostávajú)
-    if (tsPlanning && (b === specialBtn || b.id === "golden-btn" || b.id === "gold-dual-btn" || b.id === "demon-btn" || b.id === "last-hope-btn")) bl = true;
+    if (playback.tsPlanning && (b === specialBtn || b.id === "golden-btn" || b.id === "gold-dual-btn" || b.id === "demon-btn" || b.id === "last-hope-btn")) bl = true;
     b.classList.toggle("locked-ui", bl);
   });
-  undoBtn.classList.toggle("locked-ui", locked && !tsPlanning);
+  undoBtn.classList.toggle("locked-ui", locked && !playback.tsPlanning);
 }
 
 function closePickers() {
@@ -4610,7 +4229,7 @@ function emitLockIn(payload) {
     tries++;
     socket.timeout(1500).emit("lock_in", payload, forTurn, (err) => {
       if (!err) { hideConnError(); return; }   // server POTVRDIL prijatie ťahu → hotovo
-      if (!lockedIn || playing) return;         // kolo sa medzitým vyriešilo/odomklo → nič nerob
+      if (!lockedIn || playback.playing) return;         // kolo sa medzitým vyriešilo/odomklo → nič nerob
       if (tries < MAX_TRIES) { send(); return; } // stratený packet → skús znova
       unlockAfterConnError();                    // vyčerpané pokusy → odomkni + oznám chybu
     });
@@ -4671,14 +4290,14 @@ function hideWorldCenter() {
 // súper čaká zamrznutý s full-screen filtrom a zamknutým UI.
 function enterTimestopMode() {
   const tsSlot = state?.timestop?.slot;
-  if (!tsSlot || isSpectator) { tsPlanning = false; tsFrozen = false; tsOverlaySet(false); return; }
+  if (!tsSlot || isSpectator) { playback.tsPlanning = false; playback.tsFrozen = false; tsOverlaySet(false); return; }
   // TERAZ (menace dohral) zamrazíme čas: zmrazenie animácií board figúr (okrem Jotara) + filter (rieši sa nižšie).
   // Pri reloade/reclaime sem prídeme bez predošlého timestop_start → dospawnujeme menace, nech je vidno.
-  tsActive = true; tsJotaroSlot = tsSlot; tsFreezeAt = performance.now();
+  playback.tsActive = true; playback.tsJotaroSlot = tsSlot; playback.tsFreezeAt = performance.now();
   if (worldCenter.style.display === "none") spawnWorldCenter(tsSlot);
   if (me === tsSlot) {
     // Jotarov hráč - plánovanie 3 zmrazených akcií (kvázi nové kolo, všetky typy nanovo)
-    tsPlanning = true; tsFrozen = false;
+    playback.tsPlanning = true; playback.tsFrozen = false;
     lockedIn = false;
     myQueue = [];
     goldenArmed = goldenMirrorArmed = goldenManaArmed = lastStandArmed = lastHopeArmed = false;
@@ -4691,7 +4310,7 @@ function enterTimestopMode() {
   } else {
     // súper - zmrazený, UI zamknuté, full-screen filter + overlay. Stredový Special_3_P vidí PO CELÚ dobu
     // (kým Jotaro nezadá všetky zmrazené akcie) - center ostáva, mizne až pri obnovení času (timestop_end).
-    tsFrozen = true; tsPlanning = false;
+    playback.tsFrozen = true; playback.tsPlanning = false;
     document.body.classList.add("timestop-mode");
     tsOverlaySet(true);
     updateUiLocks();
@@ -4702,15 +4321,15 @@ function enterTimestopMode() {
 function submitTimestopActions() {
   if (myQueue.length !== 3) { lockBtn.classList.add("shake"); setTimeout(() => lockBtn.classList.remove("shake"), 400); return; }
   const payload = [...myQueue];
-  tsPlanning = false;
-  lockedIn = true; // drž zamknuté, kým nepríde pokračovacia timeline (playing ju prevezme)
+  playback.tsPlanning = false;
+  lockedIn = true; // drž zamknuté, kým nepríde pokračovacia timeline (playback.playing ju prevezme)
   hideWorldCenter(); // klik na EXECUTE → stredový Special_3_P zmizne (u Jotara hneď; u súpera pri pokračovaní)
   closePickers();
   lockBtn.classList.add("locked"); lockBtn.classList.remove("ready"); lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
   updateUiLocks();
   socket.emit("timestop_actions", payload, (res) => {
     if (res && res.ok === false) { // server odmietol (nemalo by nastať - validácia zrkadlí klienta) → vráť plánovanie
-      tsPlanning = true; lockedIn = false;
+      playback.tsPlanning = true; lockedIn = false;
       lockBtn.classList.remove("locked"); lockBtn.disabled = false; lockBtn.textContent = "EXECUTE";
       updateUiLocks();
     }
@@ -4718,8 +4337,8 @@ function submitTimestopActions() {
 }
 
 lockBtn.addEventListener("click", () => {
-  if (tsPlanning) { submitTimestopActions(); return; } // THE WORLD: lock button = EXECUTE zmrazenej trojice
-  if (playing) return; // počas prehrávania kola nelockuj
+  if (playback.tsPlanning) { submitTimestopActions(); return; } // THE WORLD: lock button = EXECUTE zmrazenej trojice
+  if (playback.playing) return; // počas prehrávania kola nelockuj
   if (uiLocked()) return;
   if (myQueue.length !== 3) {
     lockBtn.classList.add("shake");
@@ -4773,7 +4392,7 @@ function applyPhaseUI(s) {
   }
 
   // turnajový draft: kým nepotvrdím tím, char-select beží v team-mode (toggle výber + confirm);
-  // po potvrdení „TEAM LOCKED" čakačka, kým tím nepotvrdí aj súper (server vtedy prepne na playing)
+  // po potvrdení „TEAM LOCKED" čakačka, kým tím nepotvrdí aj súper (server vtedy prepne na playback.playing)
   const teamPhase = phase === "team_select" && !isSpectator && me;
   const needTeam = teamPhase && !s?.rosterReady?.[me];
   teamWaitEl?.classList.toggle("hidden", !(teamPhase && !needTeam));
@@ -4959,12 +4578,12 @@ function stopTurnTimer() {
 // tik (volaný z raf): odpočet zobraz len počas plánovania; pri vypršaní auto-lockne
 function tickTurnTimer(now) {
   const mine = state?.[me];
-  const planning = !!serverTimerEndsAt && !playing && !gameOverShown && state?.phase === "playing"
+  const planning = !!serverTimerEndsAt && !playback.playing && !playback.gameOverShown && state?.phase === "playing"
     && !isSpectator && mine?.char && state?.[otherSlot()]?.char && !mine.locked;
   if (TDEBUG && planning !== _lastPlanning) {
     _lastPlanning = planning;
     tlog(`planning=${planning}`, {
-      timerEndsAt: !!serverTimerEndsAt, playing, gameOverShown, phase: state?.phase,
+      timerEndsAt: !!serverTimerEndsAt, playing: playback.playing, gameOverShown: playback.gameOverShown, phase: state?.phase,
       isSpectator, me, mineChar: mine?.char, otherChar: state?.[otherSlot()]?.char, mineLocked: mine?.locked,
     });
   }
@@ -4982,7 +4601,7 @@ function tickTurnTimer(now) {
 }
 // vyprší čas - náhodne doplň nevyplnené z 3 základných akcií a zamkni (gold akcie sa nikdy nepridajú samé)
 function autoLockTimeout() {
-  if (uiLocked() || playing || !me || state?.[me]?.locked) { stopTurnTimer(); return; }
+  if (uiLocked() || playback.playing || !me || state?.[me]?.locked) { stopTurnTimer(); return; }
   // vypršaný čas: rozpracované akcie ostanú, každý nevyplnený slot = PASS (THINKING, −2 many na serveri)
   while (myQueue.length < 3) myQueue.push({ type: "pass" });
   const payload = [...myQueue];
@@ -4998,86 +4617,6 @@ function autoLockTimeout() {
   lockBtn.classList.add("locked"); lockBtn.classList.remove("ready");
   lockBtn.textContent = "LOCKED"; lockBtn.disabled = true;
   stopTurnTimer();
-}
-
-/* ---------- Lobby (host nastavuje zápas) ---------- */
-let lobbyBuilt = false;
-function showLobby() {
-  lobbyEl.classList.remove("hidden");
-  if (lobbyBuilt) return;
-  lobbyBuilt = true;
-
-  // segmentové prepínače: klik nastaví .active v rámci skupiny
-  lobbyEl.querySelectorAll(".opt-row").forEach(row => {
-    row.addEventListener("click", (e) => {
-      const btn = e.target.closest(".opt");
-      if (!btn) return;
-      row.querySelectorAll(".opt").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-    });
-  });
-
-  const sumEl = document.getElementById("lobby-weights-sum");
-  const startBtn = document.getElementById("lobby-start");
-  const inputs = [...lobbyEl.querySelectorAll("#lobby-weights input")];
-  const refreshSum = () => {
-    const sum = inputs.reduce((a, i) => a + (parseInt(i.value, 10) || 0), 0);
-    sumEl.textContent = `Total: ${sum}%`;
-    const ok = sum === 100;
-    sumEl.classList.toggle("bad", !ok);
-    startBtn.disabled = !ok;
-  };
-  inputs.forEach(i => i.addEventListener("input", refreshSum));
-  refreshSum();
-
-  startBtn.addEventListener("click", () => {
-    const pick = (id) => lobbyEl.querySelector(`#${id} .opt.active`)?.dataset.val;
-    const weights = {};
-    inputs.forEach(i => { weights[i.dataset.key] = parseInt(i.value, 10) || 0; });
-    const config = {
-      format: pick("lobby-format") || "single",
-      tilesPerRound: parseInt(pick("lobby-tiles-count") || "1", 10),
-      tileWeights: weights,
-      timer: pick("lobby-timer") || "off",
-      tilePreview: (pick("lobby-preview") || "on") === "on",
-      colorPref: pick("lobby-color") || "random",
-    };
-    if (Object.values(weights).reduce((a, b) => a + b, 0) !== 100) return;
-    socket.emit("configure_match", config);
-  });
-}
-
-/* ---------- Intermission (medzi hrami série) ---------- */
-function showIntermission(gameWinner, series) {
-  const mineWon = me && gameWinner === me;
-  document.getElementById("im-title").textContent =
-    gameWinner === "draw" ? "TIE" : (mineWon ? "YOU WON THIS GAME!" : "YOU LOST THIS GAME");
-
-  const needed = series?.needed || 1;
-  // placeholdery + ikony pre obe strany; práve pridaná koruna víťazovi sa animuje
-  // (aj v tournamente koruny víťazovi - lebky mŕtvych magov nesie HUD v hre, nie tento prechod)
-  const renderSide = (filled, isMarkSide) => Array.from({ length: needed }, (_, i) => {
-    const isOn = i < (filled || 0);
-    const isNew = isMarkSide && i === (filled || 0) - 1;
-    return `<span class="crown${isNew ? " new" : ""}">${pixSvg(isOn ? "crown" : "crown_outline")}</span>`;
-  }).join("");
-  const fillL = series?.winsP1;
-  const fillR = series?.winsP2;
-  const markL = gameWinner === "p1";
-  const markR = gameWinner === "p2";
-  document.getElementById("im-crowns-l").innerHTML = renderSide(fillL, markL);
-  document.getElementById("im-crowns-r").innerHTML = renderSide(fillR, markR);
-
-  // popisky strán - kde som ja (sloty sú fixné na celú sériu), drží strany ako koruny v HUD
-  const whoL = document.getElementById("im-who-l");
-  const whoR = document.getElementById("im-who-r");
-  whoL.textContent = me === "p1" ? "YOU" : "OPPONENT";
-  whoR.textContent = me === "p2" ? "YOU" : "OPPONENT";
-  whoL.className = "im-who " + (me === "p1" ? "you" : "opp");
-  whoR.className = "im-who " + (me === "p2" ? "you" : "opp");
-
-  document.getElementById("im-next").textContent = "Next game starting…";
-  intermissionEl.classList.remove("hidden");
 }
 
 /* ---------- Sockets ---------- */
@@ -5140,22 +4679,21 @@ socket.on("spectator", () => {
 });
 
 socket.on("reset", () => {
-  playGen++;        // zruš prípadné bežiace prehrávanie
-  playing = false;
+  playback.playGen++;        // zruš prípadné bežiace prehrávanie
+  playback.playing = false;
   hideConnError();
   resetActorFade();
   clearProjectiles(); // žiadny letiaci projektil nesmie prežiť reset
 
   // reset game-over stavov ešte pred renderHUD - inak by guard nechal visieť GAME OVER text
-  serverWinner = null;
-  serverGameResult = null;
-  gameOverShown = false;
+  playback.serverWinner = null;
+  playback.serverGameResult = null;
+  playback.gameOverShown = false;
   lastAttackEndAt = { p1:0, p2:0 };
   stopTurnTimer();
   intermissionEl.classList.add("hidden");
 
   goOverlay.classList.add("hidden");
-  chosenChar = null;
   dirPicker.classList.add("hidden");
   aimPicker.classList.add("hidden");
   clearActionLogs();
@@ -5185,7 +4723,7 @@ socket.on("reset", () => {
 });
 
 socket.on("state", (s) => {
-  tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing });
+  tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing: playback.playing });
   state = s; board = s.board || board;
   for (const slot of ["p1", "p2"]) {
     const c = s?.[slot]?.char || null;
@@ -5194,7 +4732,7 @@ socket.on("state", (s) => {
     fxAll("stateChar", slot, c, s);
   }
   // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
-  if (!s.timeline) _finalRoundActive = !!s.goldLocked;
+  if (!s.timeline) playback.finalRoundActive = !!s.goldLocked;
 
   // arena
   if (s.arena && s.arena !== arenaEl.dataset.key) {
@@ -5210,7 +4748,7 @@ socket.on("state", (s) => {
   if (s.timeline) {
     // finálny stav (vrátane nových tiles) nevykresľuj hneď - ukáže ho až posledný frame timeline
     schedulePlayTimeline(s.timeline);
-  } else if (!playing) {
+  } else if (!playback.playing) {
     // čerstvý stav mimo prehrávania → stredový démon nemá čo visieť (objaví sa len počas timeline);
     // toto ho po reconnecte/refreshi spoľahlivo schová bez nutnosti F5
     hideDeathCenter();
@@ -5224,8 +4762,8 @@ socket.on("state", (s) => {
   // Jotaro THE WORLD: reload/reclaim počas čakania → snapshot nesie timestop (bez timeline) → obnov ts-mód;
   // ak timestop zmizol (kolo pokračuje inou cestou) → vypni prípadný zaseknutý filter/overlay
   if (s.timestop && !s.timeline) enterTimestopMode();
-  else if (!s.timestop && !s.timeline && (tsPlanning || tsFrozen)) {
-    tsPlanning = false; tsFrozen = false; tsOverlaySet(false); document.body.classList.remove("timestop-mode"); updateUiLocks();
+  else if (!s.timestop && !s.timeline && (playback.tsPlanning || playback.tsFrozen)) {
+    playback.tsPlanning = false; playback.tsFrozen = false; tsOverlaySet(false); document.body.classList.remove("timestop-mode"); updateUiLocks();
   }
 
   // dash/attack tlačidlá podľa mága - Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
@@ -5274,17 +4812,17 @@ socket.on("turn_timer", ({ ms }) => { tlog("recv turn_timer", ms); setServerTime
 // Server stále posiela "game_over" – len si zapamätáme, nezobrazíme hneď overlay.
 // Overlay zobrazíme až po dobehnutí útoku a animácii smrti.
 socket.on("game_over", ({ winner }) => {
-  serverWinner = winner;
+  playback.serverWinner = winner;
 });
 
 // výsledok jednej hry série - vyhodnotí sa až na konci prehrávania timeline
-socket.on("game_result", (r) => { serverGameResult = r; });
+socket.on("game_result", (r) => { playback.serverGameResult = r; });
 
 // medzi hrami série: resetuj UI kola (skóre ostáva), char-select pre ďalšiu hru riadi nasledujúci state
 socket.on("new_game", () => {
   tlog("recv new_game");
-  playGen++; playing = false;
-  serverWinner = null; serverGameResult = null; gameOverShown = false;
+  playback.playGen++; playback.playing = false;
+  playback.serverWinner = null; playback.serverGameResult = null; playback.gameOverShown = false;
   lastAttackEndAt = { p1:0, p2:0 };
   hideDeathCenter(); // démon zo summon/banish nesmie prejsť do ďalšej hry
   hideDeathBehind(); // ani ten za postavou (banish ho mohol nechať visieť pri race s koncom hry)
@@ -5293,7 +4831,6 @@ socket.on("new_game", () => {
   stopTurnTimer();
   intermissionEl.classList.add("hidden");
   goOverlay.classList.add("hidden");
-  chosenChar = null;
   dirPicker.classList.add("hidden"); aimPicker.classList.add("hidden");
   clearActionLogs();
   myQueue = []; goldenArmed = false; goldenMirrorArmed = false; goldenManaArmed = false; lastStandArmed = false; lastHopeArmed = false; lockedIn = false;
@@ -5368,8 +4905,8 @@ function raf() {
     // anim.armCrop (Luffy Gear3 basic): odrež zapečenú natiahnutú ruku+päsť z tela (dosah kreslí procedurálna guma)
     const armCrop = anim.armCrop || 0;
     // THE WORLD: čas stojí → všetci OKREM Jotara majú zmrazený drawT (statický frame, žiadne cyklenie idle)
-    const tsFrozenActor = tsActive && slot !== tsJotaroSlot;
-    const drawT = tsFrozenActor ? tsFreezeAt
+    const tsFrozenActor = playback.tsActive && slot !== playback.tsJotaroSlot;
+    const drawT = tsFrozenActor ? playback.tsFreezeAt
                 : (VAMP_ONESHOT_KEYS.has(aSt.key) || anim.fromStart) ? (now - (aSt.start || 0)) // one-shot (strike/scream/heal beaty, A5 cast, Escanorova premena a WinSunBoard, Luffyho pózy) hrá RAZ od frame 0
                 : (stoned ? 0 : now);
     // register boardFit (Jotaro, Luffy - figúra cez väčšinu framu, pri fill 0.95/anchorY 0.5 „obrovská" a nohy
@@ -5399,7 +4936,7 @@ function raf() {
     const flAt = cloneFlinch[slot] || 0;
     const flinching = !stoned && flAt && (now - flAt) < 700; // tile zásah na klonovi → strhnutie (Hurt.png) ako pravý
     // THE WORLD: zmraz aj súperovho klona (všetko okrem Jotara stojí)
-    let anim, animT = (tsActive && slot !== tsJotaroSlot) ? tsFreezeAt : (stoned ? 0 : now);
+    let anim, animT = (playback.tsActive && slot !== playback.tsJotaroSlot) ? playback.tsFreezeAt : (stoned ? 0 : now);
     if (stoned) anim = ANIM_DEF.idle;
     // Hurt hrá od ZAČIATKU zásahu (animT = now - flAt), nie zamrznutý na poslednom frame - inak by strhnutie
     // nebolo vidno (neloopová animácia kreslená globálnym `now` uviazne na poslednom frame)
@@ -5430,7 +4967,7 @@ function raf() {
     const ctx = cloneGhost.getContext("2d");
     const mine = state?.[me];
     const cg = simulatedClonePos();
-    const show = mine && mine.char && mine.clone && !mine.locked && !playing && cg &&
+    const show = mine && mine.char && mine.clone && !mine.locked && !playback.playing && cg &&
                  myQueue.some(a => a.type === "move" || a.type === "dash") &&
                  (cg.x !== mine.clone.x || cg.y !== mine.clone.y);
     if (!show) {
@@ -5455,7 +4992,7 @@ function raf() {
     const ctx = actorGhost.getContext("2d");
     const mine = state?.[me];
     const gp = ghostPos();
-    const show = mine && mine.char && !mine.locked && !playing && gp &&
+    const show = mine && mine.char && !mine.locked && !playback.playing && gp &&
                  myQueue.some(a => a.type === "move" || a.type === "dash" || a.type === "special") && // special: vlkolakov charge; dash: aj charge Vampire/Onryō
                  (gp.x !== mine.x || gp.y !== mine.y);
     if (!show) {
@@ -5570,8 +5107,8 @@ function raf() {
     // mŕtvy: prehraj Dead raz od momentu úmrtia a zamrzni na poslednom frame
     const dir = charDirFor(st.char, slot);
     // THE WORLD: zmraz aj súperov HUD portrét (čas stojí - všetko okrem Jotara zamrzne)
-    const tsFrozenHud = tsActive && slot !== tsJotaroSlot;
-    let anim = ANIM_DEF.idle, t = tsFrozenHud ? tsFreezeAt : (stonedHud ? 0 : now);
+    const tsFrozenHud = playback.tsActive && slot !== playback.tsJotaroSlot;
+    let anim = ANIM_DEF.idle, t = tsFrozenHud ? playback.tsFreezeAt : (stonedHud ? 0 : now);
     if (hp <= 0) {
       if (!hudDeadSince[slot]) hudDeadSince[slot] = now;
       anim = ANIM_DEF.dead;
@@ -5802,98 +5339,3 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
-
-/* ---------- Admin reset button (zobraz len s ?admin=1) ---------- */
-(function mountAdminReset(){
-  const qp = new URLSearchParams(location.search);
-  if (!qp.has("admin")) return; // zobraz len pre admin režim
-
-  const key = qp.get("key") || "";
-  const btn = document.createElement("button");
-  btn.id = "admin-reset";
-  btn.textContent = "Reset this room";
-  btn.title = "Zruší LEN túto roomku - odpojí jej hráčov aj divákov (späť na room-browser)";
-  btn.style.position = "fixed";
-  btn.style.right = "14px";
-  btn.style.bottom = "14px";
-  btn.style.zIndex = "50";
-  btn.style.padding = "10px 14px";
-  btn.style.borderRadius = "10px";
-  btn.style.border = "1px solid #5a1a1a";
-  btn.style.background = "#8e0000";
-  btn.style.color = "#fff";
-  btn.style.fontWeight = "800";
-  btn.style.cursor = "pointer";
-  btn.style.boxShadow = "0 6px 18px rgba(0,0,0,.35)";
-
-  btn.addEventListener("click", () => {
-    if (!confirm("Zrušiť TÚTO roomku a odpojiť jej hráčov aj divákov?")) return;
-    socket.emit("admin_reset_room", key);
-  });
-
-  document.body.appendChild(btn);
-})();
-
-/* ---------- DEBUG: hope sprite animácia (?hopedebug=1) ----------
-   Samostatný náhľad - nájdi správny počet framov v sprite_strip.png (frame inference predpokladá štvorec).
-   [ / ]  počet framov   |   - / =  fps   |   ←/→  ručný krok   |   medzerník  pauza   |   0  auto */
-(function hopeDebug() {
-  const params = new URLSearchParams(location.search);
-  if (!params.has("hopedebug")) return;
-
-  const ov = document.createElement("div");
-  Object.assign(ov.style, {
-    position: "fixed", inset: "0", zIndex: "2000000", background: "#101012",
-    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px",
-  });
-  const info = document.createElement("div");
-  Object.assign(info.style, { color: "#fff", font: "15px monospace", textAlign: "center", whiteSpace: "pre", lineHeight: "1.5" });
-  const cv = document.createElement("canvas");
-  cv.width = 512; cv.height = 512;
-  Object.assign(cv.style, { width: "512px", height: "512px", imageRendering: "pixelated", background: "#1c1c20", border: "1px solid #444" });
-  ov.appendChild(info); ov.appendChild(cv);
-  document.body.appendChild(ov);
-
-  const ctx = cv.getContext("2d");
-  let frames = Number(params.get("frames")) || 18; // štart = inference (9216/512)
-  let fps = 10, manual = -1, paused = false;
-
-  const img = new Image();
-  img.src = "/assets/hope/sprite_strip.png";
-
-  function draw(t) {
-    if (img.complete && img.naturalWidth) {
-      const fw = img.naturalWidth / frames, fh = img.naturalHeight;
-      const idx = manual >= 0 ? manual : (paused ? 0 : Math.floor((t / (1000 / fps)) % frames));
-      ctx.clearRect(0, 0, cv.width, cv.height);
-      ctx.imageSmoothingEnabled = false;
-      const scale = Math.min(cv.width / fw, cv.height / fh);
-      const dw = fw * scale, dh = fh * scale;
-      ctx.drawImage(img, Math.round(idx * fw), 0, Math.round(fw), fh, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
-      info.textContent =
-        `hope sprite ${img.naturalWidth}×${img.naturalHeight}\n` +
-        `frames=${frames}  frameW=${(img.naturalWidth / frames).toFixed(1)}  fps=${fps}  frame=${idx}${manual >= 0 ? " [MANUAL]" : paused ? " [PAUSE]" : ""}\n` +
-        `[ / ] frames     - / = fps     ←/→ krok     medzerník pauza     0 auto`;
-    } else {
-      info.textContent = "načítavam /assets/hope/sprite_strip.png …";
-    }
-    requestAnimationFrame(draw);
-  }
-  requestAnimationFrame(draw);
-
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "[") frames = Math.max(1, frames - 1);
-    else if (e.key === "]") frames = Math.min(64, frames + 1);
-    else if (e.key === "-" || e.key === "_") fps = Math.max(1, fps - 1);
-    else if (e.key === "=" || e.key === "+") fps = Math.min(30, fps + 1);
-    else if (e.key === "ArrowLeft")  manual = ((manual < 0 ? 0 : manual - 1) + frames) % frames;
-    else if (e.key === "ArrowRight") manual = ((manual < 0 ? 0 : manual + 1)) % frames;
-    else if (e.key === " ") { manual = -1; paused = !paused; e.preventDefault(); }
-    else if (e.key === "0") { manual = -1; paused = false; }
-  });
-})();
-
-
-
-
-

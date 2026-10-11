@@ -78,6 +78,7 @@ previews importujú `shared/geometry.js`.
 | 4 | Register postáv (`characters/*.js`), validácia z `target` - po jednej postave | stredné | 3–4 |
 | 5 | Háčiky: pride, mesiac, pasca, niť, labyrint, Last Stand | stredné | 2 |
 | 6 | Klientsky register postáv | stredné | 3–5 |
+| 7 | Rozdelenie `client.js` na moduly `public/client/*` + zdieľaný stav | stredné | 4–6 |
 
 ## Pravidlá počas refaktoru
 
@@ -203,6 +204,26 @@ previews importujú `shared/geometry.js`.
       háčiky klientskej postavy (`onEffect(kind, e, ctx)` pre vlastné efekty timeline, `castOverlay`,
       `boardScale` pre pride/moon/gear3 veľkosť, `buttons` pre special/dash/mirror skin a picker) - po jednej
       postave, každý krok overený browser-smoke `--compare`.
+
+## Etapa 7 - stav
+
+Cieľ: `client.js` (5 900 riadkov, ~66 globálnych `let`) rozdeliť na moduly v `public/client/` s explicitnými
+importmi. Bezpečnostná sieť: `npm run lint` (`no-undef` okamžite ukáže každý identifikátor, ktorý presunutý
+kód potrebuje a nemá ho) + `tools/browser-smoke.mjs`. Väzbu sekcie meria „sonda": sekcia sa skopíruje do
+samostatného súboru a ESLint vypíše jej nedefinované identifikátory (počet = koľko závislostí treba dodať).
+
+- [x] **7a - samostatné moduly** (0–3 závislosti): `net.js` (socket, prihlásenie, room browser), `pix.js`
+      (pixel-art ikony, pixelizované emoji), `arena-bg.js` (vrstvy pozadia), `lobby.js` (nastavenie zápasu
+      hostom), `intermission.js` (obrazovka medzi hrami; `me` ide parametrom), `admin.js` (reset roomky),
+      `debug-hope.js` (?hopedebug=1). client.js: 5 899 → ~5 360 riadkov.
+- [x] **7b - stav prehrávania v jednom objekte** `playback.js`: `playGen`, `playing`, `serverWinner`,
+      `serverGameResult`, `gameOverShown`, `finalRoundActive`, `roundBeatCounts`, `ts*` (THE WORLD) - predtým
+      13 globálnych `let` naprieč súborom; teraz ich môžu čítať aj ďalšie moduly.
+- [ ] **7c - stav plánovania** (`myQueue`, `lockedIn`, `golden*Armed`, `lastStand/HopeArmed`, `openPicker`) do
+      `planning.js` - predpoklad pre vyčlenenie Controls/Queue (sonda: 33 a 55 závislostí).
+- [ ] **7d - veľké sekcie**: Timeline prehrávanie (96 závislostí), RAF (77), Sockets (72), Char select (30).
+      Postup ako pri `fx`: modul dostane klientský scope `C` (lenivé gettery), závislosti sa postupne
+      zužujú na importy zo `state`/`playback`/`planning`. Každý krok overiť browser-smoke `--compare`.
 
 ## Rozhodnutia (na schválenie)
 
