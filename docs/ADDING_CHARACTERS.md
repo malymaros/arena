@@ -133,9 +133,11 @@ Tieto musia **vždy sedieť dokopy**, inak sa náhľad rozíde s realitou alebo 
 
 1. **Zóna specialu:** `specialDamageAndHit` (dmg) ↔ `specialZoneHas` (test klona) ↔
    `cellsForSpecialPreview` (klientský náhľad). Zmena v jednom → zmena vo všetkých troch.
-2. **Časovanie animácií:** serverové `*_MS`/`delayMs` konštanty ↔ klientské `*_MS` (`MOVE_MS`,
-   `ATTACK_SWING_MS`…) a `ANIM_SLOW`. Ak sa rozídu, animácia nesedí s timeline.
-3. **`ANIM_SLOW`** je v `engine/constants.js` aj `client.js` — musia byť rovnaké.
+2. **Časovanie animácií:** serverové `*_MS`/`delayMs` konštanty žijú v `shared/timing.js` (engine ich
+   re-exportuje cez `engine/constants.js`). Hodnotu, ktorú potrebuje aj klient, **importuj odtiaľ**
+   (`import { … } from "/shared/timing.js"`) — nikdy ju neduplikuj. Klientské dĺžky animácií (`MOVE_MS`,
+   `ATTACK_SWING_MS`…) musia pokryť `delayMs` framov, inak animácia nesedí s timeline.
+3. **`ANIM_SLOW`** je len v `shared/timing.js` (server aj klient ho importujú).
 4. **Každý nový `pushStateFrame` efekt** musí mať obsluhu na klientovi — inak sa stav „teleportuje"
    bez animácie.
 

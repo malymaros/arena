@@ -3,9 +3,9 @@
 // sa prehrá RAZ v posledných SOLDIER_FIRE_MS, potom soldier_beam = tenký červený lúč + výbuch na cieli.
 // Továreň dostane C = klientský scope (client.js) a vráti háčiky choreografie (popis: public/chars/fx/index.js).
 import { SPECIAL_ANIMS } from "../index.js";
+import { SOLDIER_AIM_MS } from "/shared/timing.js";
 
-// MUSÍ sedieť so serverovým SOLDIER_AIM_MS; trvanie laseru (AIM − FIRE = 2300 ms) s CSS animáciou soldier-aim
-const SOLDIER_AIM_MS   = 2600;
+// trvanie laseru (SOLDIER_AIM_MS zo shared/timing.js − FIRE = 2300 ms) musí sedieť s CSS animáciou soldier-aim
 const SOLDIER_FIRE_MS  = 300;  // výšľah: 3 framy @ SOLDIER_FIRE_FPS, dohrá presne na konci mierenia
 const SOLDIER_FIRE_FPS = 10;
 // lúč: MUSÍ časovo sedieť so serverovým SOLDIER_BEAM_MS (frame drží let lúča, zásah padne po ňom)
