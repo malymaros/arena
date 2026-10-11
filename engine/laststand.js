@@ -5,14 +5,14 @@ import {
   START_HP, MAX_MANA, DEMON_COST, DEMON_DMG, SMALL_DELAY_MS, SPECIAL_REPEAT,
   SPECIAL_BEAT_MS, LS_APPEAR_MS, LS_DRAIN_MS, LS_KILL_MS, LS_REVIVE_MS, LS_RISE_MS,
   LS_SETTLE_MS, LS_B_LEAVE_MS, LS_B_CENTER_MS, LS_B_DRAIN_MS, LS_B_KILL_MS, LH_APPEAR_MS,
-  LH_DRAIN_MS, LH_SETTLE_MS,
+  LH_DRAIN_MS, LH_SETTLE_MS, LAST_STAND_DEAL_MUL, LAST_HOPE_DEAL_MUL,
 } from "./constants.js";
 import * as G from "../shared/geometry.js";
 
 export function lastStandModule(E) {
 // Výstupný násobič dmg: Last Hope ultra mód = 4×, Last Stand buff = 2×, inak 1×.
 // Prijatý dmg sa zaokrúhľuje na floor(½) pri Last Stand aj Last Hope (½ chráni 1-HP Last Hope hráča pred dmg tile).
-function dealMul(slot)      { const p = E.game.players[slot]; return p.lastHopeBuff ? 4 : p.lastStandBuff ? 2 : 1; }
+function dealMul(slot)      { const p = E.game.players[slot]; return p.lastHopeBuff ? LAST_HOPE_DEAL_MUL : p.lastStandBuff ? LAST_STAND_DEAL_MUL : 1; }
 
 function recvDmg(slot, dmg) { const p = E.game.players[slot]; return (p.lastStandBuff || p.lastHopeBuff) ? Math.floor(dmg / 2) : dmg; }
 

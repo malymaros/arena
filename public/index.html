@@ -134,17 +134,18 @@
     </section>
   </main>
 
-  <!-- Controls toolbar -->
+  <!-- Controls toolbar. Tooltipy a cenovky akčných tlačidiel tu zámerne NIE SÚ - dopĺňa ich
+       public/client/balance-ui.js z čísel v shared/balance.js (jediný zdroj balansu). -->
   <div class="controls-row">
     <!-- Last Hope - úvodná akcia NEbuffnutého hráča vo FINAL ROUND (naľavo od golden shield/mirror).
          Vykoná sa pred všetkým ostatným: HP padne na 1, mana sa naplní na 10, hráč dáva 4× dmg do konca kola. -->
-    <button id="last-hope-btn" class="btn act lasthope hidden" title="Last Hope (FINAL ROUND) - lose all HP but 1, refill mana to 10, deal 4× damage for the rest of the round. Resolves before everything else."><img class="lh-ico" src="/assets/last_hope.png" alt="Last Hope" /><span class="cost lh-cost"><span class="pix-ico mini" data-emoji="❤️"></span>→<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+    <button id="last-hope-btn" class="btn act lasthope hidden"><img class="lh-ico" src="/assets/last_hope.png" alt="Last Hope" /><span class="cost lh-cost"><span class="pix-ico mini" data-emoji="❤️"></span>→<span class="pix-ico mini" data-emoji="💧"></span></span></button>
 
     <!-- Golden predťah - jedno tlačidlo naľavo od panela, predelené na 2 polovice (ŠTÍT | MIRROR);
          len pre hráča, ktorý v kole nezačína; rozsvieti sa vždy len zvolená polovica -->
     <div id="golden-btn" class="btn act golden golden-split hidden">
-      <button type="button" class="golden-half shield-half" data-gold="shield" title="Golden Shield (−3 mana) - extra action resolved before the round starts. Available only when you go second."><span class="g-ico pix-ico" data-emoji="🛡️"></span><span class="cost">−3<span class="pix-ico mini" data-emoji="💧"></span></span></button>
-      <button type="button" class="golden-half mirror-half" data-gold="mirror" title="Golden Mirror (−5 mana) - extra action resolved before the round starts; reflects the damage back. Available only when you go second."><span class="g-ico mirror pix-ico" data-emoji="🪞"></span><span class="cost">−5<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+      <button type="button" class="golden-half shield-half" data-gold="shield"><span class="g-ico pix-ico" data-emoji="🛡️"></span><span class="cost"></span></button>
+      <button type="button" class="golden-half mirror-half" data-gold="mirror"><span class="g-ico mirror pix-ico" data-emoji="🪞"></span><span class="cost"></span></button>
     </div>
 
   <div class="controls">
@@ -164,7 +165,7 @@
 
         <!-- Dash - presun až o 2 políčka zvoleným smerom -->
         <div class="move-wrap">
-          <button id="dash-btn" class="btn act dash" title="Dash - move up to 2 cells in a direction (−4 mana)"><span class="pix-ico" data-emoji="🏃"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+          <button id="dash-btn" class="btn act dash"><span class="pix-ico" data-emoji="🏃"></span><span class="cost"></span></button>
           <div id="dash-picker" class="dir-picker hidden">
             <button class="btn arrow up"    data-act="dash:up"    title="Dash Up">↑</button>
             <button class="btn arrow left"  data-act="dash:left"  title="Dash Left">←</button>
@@ -177,7 +178,7 @@
       <div class="act-group" data-label="ATTACK">
         <!-- Attack - otvorí výber smeru streľby -->
         <div class="move-wrap">
-          <button id="attack-btn" class="btn act attack" title="Range Attack - choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)"><span class="pix-ico" data-emoji="🏹"></span><span class="cost">−1<span class="pix-ico mini" data-emoji="💧"></span> ?<span class="pix-ico mini" data-emoji="☠️"></span></span></button>
+          <button id="attack-btn" class="btn act attack"><span class="pix-ico" data-emoji="🏹"></span><span class="cost"></span></button>
           <div id="aim-picker" class="dir-picker hidden">
             <button class="btn arrow up"    data-act="attack:up"    title="Shoot Up">↑</button>
             <button class="btn arrow left"  data-act="attack:left"  title="Shoot Left">←</button>
@@ -194,11 +195,11 @@
         </div>
         <!-- Melee - úder na vlastnej bunke (všetky postavy, bez pickera) -->
         <div class="move-wrap">
-          <button id="melee-btn" class="btn act melee" title="Melee (−4 mana, 8 dmg, hits only an opponent on your cell)"><span class="pix-ico" data-emoji="🗡️"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span> 8<span class="pix-ico mini" data-emoji="☠️"></span></span></button>
+          <button id="melee-btn" class="btn act melee"><span class="pix-ico" data-emoji="🗡️"></span><span class="cost"></span></button>
         </div>
         <!-- Special - Medúza si navyše vyberá smer pohľadu (vľavo/vpravo), ostatní kliknú priamo -->
         <div class="move-wrap">
-          <button id="special-btn" class="btn act special" title="Special (−5 mana)"><span class="pix-ico" data-emoji="✨"></span><span class="cost">−5<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+          <button id="special-btn" class="btn act special"><span class="pix-ico" data-emoji="✨"></span><span class="cost"></span></button>
           <!-- Vojak: mini mapa plochy na výber cieľovej bunky lúča (naplní client.js buildCellPicker) -->
           <div id="cell-picker" class="dir-picker cell-picker hidden"></div>
           <div id="special-picker" class="dir-picker special-picker hidden">
@@ -221,10 +222,10 @@
       </div>
 
       <div class="act-group" data-label="DEFEND">
-        <button class="btn act shield" data-act="shield" title="Shield (−2 mana, blocks all damage of the opponent's next action)"><span class="pix-ico" data-emoji="🛡️"></span><span class="cost">−2<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+        <button class="btn act shield" data-act="shield"><span class="pix-ico" data-emoji="🛡️"></span><span class="cost"></span></button>
         <!-- Mirror - Jotaro tento slot nemá: syncMirrorBtn ho premení na Special 1 (fialový ❔ skin + L/R picker) -->
         <div class="move-wrap">
-          <button id="mirror-btn" class="btn act mirror" data-act="mirror" title="Mirror (−4 mana, reflects all damage of the opponent's next action back at them)"><span class="pix-ico" data-emoji="🪞"></span><span class="cost">−4<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+          <button id="mirror-btn" class="btn act mirror" data-act="mirror"><span class="pix-ico" data-emoji="🪞"></span><span class="cost"></span></button>
           <!-- Jotaro Special 1: smer left/right (Star Platinum udrie na obe diagonály strany) -->
           <div id="s1-picker" class="dir-picker special-picker hidden">
             <button class="btn arrow left"  data-act="special1:left"  title="Star Platinum - Left">←</button>
@@ -234,7 +235,7 @@
       </div>
 
       <div class="act-group" data-label="MANA">
-        <button class="btn act mana" data-act="recharge" title="Recharge (+4 mana)"><span class="pix-ico" data-emoji="🙏"></span><span class="cost">+4<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+        <button class="btn act mana" data-act="recharge"><span class="pix-ico" data-emoji="🙏"></span><span class="cost"></span></button>
       </div>
     </div>
 
@@ -248,13 +249,13 @@
 
     <!-- Golden Mana | Last Stand - jedno tlačidlo rozdelené na 2 polovice (ako golden shield/mirror), vzájomne výlučné. Vykoná sa po konci kola. -->
     <div id="gold-dual-btn" class="btn act golden golden-split hidden">
-      <button type="button" class="golden-half gm-half" data-dual="mana" title="Golden Mana Refill (+6 mana for HP, cost grows each use) - extra action resolved after the round ends."><span class="g-ico pix-ico" data-emoji="🙏"></span><span class="cost gm-gain">+6<span class="pix-ico mini" data-emoji="💧"></span></span><span class="cost gm-hp" id="gm-cost">−1<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
-      <button type="button" class="golden-half ls-half" data-dual="laststand" title="Last Stand (−10 HP) - the demon kills you and revives you at full HP/mana. Next round is your LAST: you deal 2× damage and take ½, but if you don't kill the opponent you die. The demon is shared - only one player can summon it. Locks this gold button for both next round."><img class="ls-ico" src="/assets/last_stand.png" alt="Last Stand" /><span class="cost">−10<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
+      <button type="button" class="golden-half gm-half" data-dual="mana"><span class="g-ico pix-ico" data-emoji="🙏"></span><span class="cost gm-gain"></span><span class="cost gm-hp" id="gm-cost">−1<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
+      <button type="button" class="golden-half ls-half" data-dual="laststand"><img class="ls-ico" src="/assets/last_stand.png" alt="Last Stand" /><span class="cost"></span></button>
     </div>
 
     <!-- Démon útok - len pre buffnutého hráča v poslednom (FINAL) kole, namiesto zamknutého gold dual buttonu.
-         Zaberá jeden z 3 akčných slotov; 10 dmg na všetky políčka okrem toho, na ktorom stojíš. -->
-    <button id="demon-btn" class="btn act demon hidden" title="Demon Attack (−10 mana) - 10 damage to every cell except the one you stand on. Counts as one of your 3 actions; only in your FINAL ROUND."><img class="ls-ico" src="/assets/last_stand.png" alt="Demon" /><span class="cost">−10<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+         Zaberá jeden z 3 akčných slotov; DEMON_DMG na všetky políčka okrem toho, na ktorom stojíš. -->
+    <button id="demon-btn" class="btn act demon hidden"><img class="ls-ico" src="/assets/last_stand.png" alt="Demon" /><span class="cost"></span></button>
   </div>
 
   <!-- Character select - skryté by default, nech pri načítaní nepreblikne pred loginom (JS ho zobrazí pri hre) -->

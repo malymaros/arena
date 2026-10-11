@@ -1,6 +1,8 @@
 // public/chars/naruto.js - klientské dáta postavy: Naruto - tieňový klon.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 import { SPECIAL_FPS } from "./common.js";
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { SPECIAL_COST } from "../../shared/balance.js";
 
 export default {
   key: "naruto",
@@ -18,7 +20,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
   buttons: {
     // žiadny priamy dmg - musí stáť sám, prizve tieňového klona
-    special: { title: "Special (−5 mana) - must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit", cost: "−5{💧} 👥" },
+    special: { title: `Special (−${SPECIAL_COST} mana) - must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit`, cost: `−${SPECIAL_COST}{💧} 👥` },
   },
   // range self - summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
   specialZone: ({ me }) => [[me.x, me.y]],

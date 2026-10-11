@@ -2,7 +2,7 @@
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js): stav hry (E.game) a funkcie
 // ostatných sekcií. Vracia svoje funkcie; engine ich zverejní cez E a destrukturuje pre vlastný kód.
 import {
-  START_HP, MAX_MANA, POWER_TILE_BONUS, SMALL_DELAY_MS,
+  START_HP, MAX_MANA, POWER_TILE_BONUS, SMALL_DELAY_MS, HEAL_TILE_GAIN, IK_DMG, TILE_DMG,
 } from "./constants.js";
 
 export function tilesModule(E) {
@@ -75,7 +75,7 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     if (tile.type === "heal") {
       // heal dlaždica: +1 HP; postava s kitom healTile "full" (Lightning) sa vylieči na plné HP
       const superHeal = E.kitOf(p.char).healTile === "full";
-      const healAmount = superHeal ? START_HP : p.hp + 1;
+      const healAmount = superHeal ? START_HP : p.hp + HEAL_TILE_GAIN;
       const healed = Math.min(START_HP, healAmount) - p.hp;
       p.hp += healed;
       if (healed > 0) {
@@ -102,11 +102,11 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     if (stoned(slot)) continue; // na skamenenú postavu sa tile dmg/IK nevyhodnocuje
     // (kaster labyrintu dostáva tile dmg/IK normálne ako mimo labyrintu - mazeBuff už nedáva imunitu na dlaždice)
     let dmg = 0, tileType = null;
-    if (hasIK(p.x, p.y)) { dmg = 10; tileType = "ik"; }
+    if (hasIK(p.x, p.y)) { dmg = IK_DMG; tileType = "ik"; }
     else if (E.game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) {
       // Fire Wizard už NIE je imunný voči Damage dlaždiciam - dostane bežný 1 dmg;
       // výmenou mu státie na ohnivom políčku rozšíri special o riadky ±1 (viď fireOnDmgTile).
-      dmg = 1; tileType = "dmg";
+      dmg = TILE_DMG; tileType = "dmg";
     }
     if (dmg > 0) {
       const d = E.recvDmg(slot, dmg);
@@ -138,7 +138,7 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       // rovnaká dramaturgia ako pri hráčovom tile zásahu: NAJPRV rozsvieť políčko (vlastný frame),
       // až POTOM kozmetický zásah na klonovi - inak sa blik políčka „stratí" v spoločnom frame
       E.pushStateFrame(tl, [{ kind: "tile_proc", tile: "dmg", cell: [x, y] }], 600);
-      E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [x, y], dmg: 1 }], SMALL_DELAY_MS);
+      E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [x, y], dmg: TILE_DMG }], SMALL_DELAY_MS);
     }
   }
 }

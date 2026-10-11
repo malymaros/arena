@@ -1,11 +1,11 @@
 // Zónový dmg special (fire / lightning / wanderer): zóna zo shared/geometry podľa postavy, 3 nádychy,
 // zásah súpera aj jeho klona v jednom beate (strikeZone). Fire na Damage dlaždici: zóna ±1 riadok
 // a dlaždica sa po nádychoch SKONZUMUJE (aj keď special minul / bol blokovaný).
-import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, SOLDIER_SPECIAL_DMG } from "../constants.js";
+import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, SPECIAL_ZONE_DMG } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 
 // raw dmg zónových speciálov (aj pre odraz pri zásahu klona)
-export const SPECIAL_ZONE_DMG = { fire: 5, lightning: 3, wanderer: 8, escanor: 8, soldier: SOLDIER_SPECIAL_DMG };
+export { SPECIAL_ZONE_DMG }; // zo shared/balance.js (re-export pre staršie importy)
 
 export function zoneSpecial(ctx, slot, tl) {
   const { game } = ctx;

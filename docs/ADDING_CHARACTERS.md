@@ -69,6 +69,9 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
 ## 3. Kontrolný zoznam — čo treba upraviť (podľa súborov)
 
 ### `engine/` (autoritatívna logika; `server.js` sú len sockety)
+- [ ] **Čísla postavy (cena, dmg, bonusy) do `shared/balance.js`** — jediný zdroj balansu; engine ich číta cez
+      `engine/constants.js`, klient ich interpoluje do tooltipov (`${…}`). Nikdy nepíš číslo priamo do textu
+      tlačidla — `test/balance-ui.mjs` to odhalí.
 - [ ] **`CHARS`** v `engine/constants.js` — pridaj kľúč postavy (side-postava: `SIDE_CHARS`). Toto ju
       sprístupní pre `choose_character`, `choose_team` (turnaj) aj validáciu.
 - [ ] **`engine/characters/<postava>.js`** + registrácia v `engine/characters/index.js` — postava sa
@@ -95,7 +98,9 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
       **`meta`** `{ name, dir, dirP2? }`, **`specialAnim`** (efektový sprite specialu), **`headCx`/`headTop`/`headCrop`**,
       `pairShift`, `portraitScale`, **`abilityPreview`** (popis + náhľadová zóna v char-selecte), podľa potreby
       `anims` (nové anim kľúče), `spriteAlias` (chýbajúce súbory), `side`/`vamp`, `teleport*`, `previewCast`.
-- [ ] **`buttons`** — tooltip + cena (`"−5{💧} 8{☠️}"`) special/melee tlačidla, prípadne skin dash/mirror/recharge slotu.
+- [ ] **`buttons`** — tooltip + cena special/melee tlačidla ako šablóna nad `shared/balance.js`
+      (``cost: `−${SPECIAL_COST}{💧} ${MOJA_DMG}{☠️}` ``, import `"../../shared/balance.js"`), prípadne skin
+      dash/mirror/recharge slotu. To isté pre `abilityPreview.dmg`.
 - [ ] **`specialTarget`** (`dir` / `wolf` / `cell` / `trap` / `reach` + `specialReach` / `none`) a **`specialZone`** — náhľad
       zóny zo `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
 - [ ] Podľa potreby kreslenie a plánovanie: `boardFit`, `victoryAnim`, `sizeLevel`, `projectile`, `actionAnims`,
@@ -139,6 +144,8 @@ Tieto musia **vždy sedieť dokopy**, inak sa náhľad rozíde s realitou alebo 
    (`import { … } from "/shared/timing.js"`) — nikdy ju neduplikuj. Klientské dĺžky animácií (`MOVE_MS`,
    `ATTACK_SWING_MS`…) musia pokryť `delayMs` framov, inak animácia nesedí s timeline.
 3. **`ANIM_SLOW`** je len v `shared/timing.js` (server aj klient ho importujú).
+3b. **Čísla balansu** sú len v `shared/balance.js` — engine aj UI texty (tooltipy, cenovky, náhľady) z nich;
+   `test/balance-ui.mjs` stráži, že sa v UI neobjaví natvrdo zapísané číslo.
 4. **Každý nový `pushStateFrame` efekt** musí mať obsluhu na klientovi — inak sa stav „teleportuje"
    bez animácie.
 

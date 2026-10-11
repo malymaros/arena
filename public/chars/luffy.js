@@ -1,6 +1,8 @@
 // public/chars/luffy.js - klientské dáta postavy: Luffy - Gear 3 prepínanie, valivý special; viazaný na p1.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { RECHARGE_GAIN, SPECIAL_COST, LUFFY_SPECIAL_DMG } from "../../shared/balance.js";
 export default {
   key: "luffy",
   // Hidden preview postavy (zatiaľ NEHRATEĽNÉ - karta bez data-char, klik/draft ju ignorujú):
@@ -42,11 +44,11 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, desc: "Recharge switches Gear. Pick a cell and Luffy rolls there to smash whoever stands on it. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge." },
   buttons: {
     // recharge slot = prepínač módu (fialový „???" skin) - doplní manu A prepne mód (aj pri plnej mane)
-    recharge: { skin: "luffy-switch", title: "Switch Gear (Base ↔ Gear 3) - also recharges mana (+4); works even at full mana", cost: '+4{💧}<span class="luffy-swap">⇆</span>' },
+    recharge: { skin: "luffy-switch", title: `Switch Gear (Base ↔ Gear 3) - also recharges mana (+${RECHARGE_GAIN}); works even at full mana`, cost: `+${RECHARGE_GAIN}{💧}<span class="luffy-swap">⇆</span>` },
     // pohyb-a-úder ako šachová figúra: base = dáma (4 dmg), gear3 = veža (8 dmg) - podľa efektívnej formy
     special: (ui) => ui.gear3
-      ? { title: "Special (−5 mana, 8 dmg) - GEAR 3: roll like a ROOK (orthogonal lines) to a chosen cell and strike whoever is on it", cost: "−5{💧} 8{☠️}" }
-      : { title: "Special (−5 mana, 4 dmg) - roll like a QUEEN (any line) to a chosen cell and strike whoever is on it", cost: "−5{💧} 4{☠️}" },
+      ? { title: `Special (−${SPECIAL_COST} mana, ${LUFFY_SPECIAL_DMG.gear3} dmg) - GEAR 3: roll like a ROOK (orthogonal lines) to a chosen cell and strike whoever is on it`, cost: `−${SPECIAL_COST}{💧} ${LUFFY_SPECIAL_DMG.gear3}{☠️}` }
+      : { title: `Special (−${SPECIAL_COST} mana, ${LUFFY_SPECIAL_DMG.base} dmg) - roll like a QUEEN (any line) to a chosen cell and strike whoever is on it`, cost: `−${SPECIAL_COST}{💧} ${LUFFY_SPECIAL_DMG.base}{☠️}` },
   },
   specialTarget: "reach", // mini mapa s bunkami len na platnej línii (dáma / veža)
   // dosiahne special bunku (x,y) z ghost pozície g? Zrkadlí server luffySpecialReaches (dáma base / veža gear3)

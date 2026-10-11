@@ -1,6 +1,8 @@
 // public/chars/medusa.js - klientské dáta postavy: Medusa - smerové skamenenie (bez dmg).
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 import { SPECIAL_FPS } from "./common.js";
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { MELEE_COST, MEDUSA_MELEE_DMG, SPECIAL_COST, STONE_ACTIONS } from "../../shared/balance.js";
 
 export default {
   key: "medusa",
@@ -14,12 +16,12 @@ export default {
   headCrop: { cx: 0.45, cy: 0.48, size: 0.30 }, // namerané z Idle.png (hlava+hady riadky ~51–73)
   pairShift: 80,
   // dmg: null = bez dmg - stats ukážu efekt (effect.num/emoji); zóna Medúzy sa kreslí pre smer doprava
-  abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: "2×", emoji: "🗿" }, desc: "Own cell + everything one way (row ±1). No damage - petrifies: target skips 2 actions" },
+  abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: `${STONE_ACTIONS}×`, emoji: "🗿" }, desc: `Own cell + everything one way (row ±1). No damage - petrifies: target skips ${STONE_ACTIONS} actions` },
   buttons: {
     // širší dosah melee (diagonály) za nižší dmg
-    melee: { title: "Melee (−4 mana, 4 dmg, hits your cell + all diagonal neighbours)", cost: "−4{💧} 4{☠️}" },
+    melee: { title: `Melee (−${MELEE_COST} mana, ${MEDUSA_MELEE_DMG} dmg, hits your cell + all diagonal neighbours)`, cost: `−${MELEE_COST}{💧} ${MEDUSA_MELEE_DMG}{☠️}` },
     // žiadny dmg - skamenenie na 2 akcie (smer sa volí v pickeri)
-    special: { title: "Special (−5 mana) - petrifying gaze: choose a direction; a hit opponent skips their next 2 actions", cost: "−5{💧} 2×🗿" },
+    special: { title: `Special (−${SPECIAL_COST} mana) - petrifying gaze: choose a direction; a hit opponent skips their next ${STONE_ACTIONS} actions`, cost: `−${SPECIAL_COST}{💧} ${STONE_ACTIONS}×🗿` },
   },
   specialTarget: "dir", // smerový special (left/right picker)
   // vlastné políčko + všetko striktne zvoleným smerom v riadkoch ±1

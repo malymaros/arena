@@ -2,7 +2,7 @@
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js): stav hry (E.game) a funkcie
 // ostatných sekcií. Vracia svoje funkcie; engine ich zverejní cez E a destrukturuje pre vlastný kód.
 import {
-  SMALL_DELAY_MS, MIRROR_BEAM_MS, LAB_REVEAL_MS,
+  SMALL_DELAY_MS, MIRROR_BEAM_MS, LAB_REVEAL_MS, MAZE_DEAL_MUL,
 } from "./constants.js";
 
 export function labyrinthModule(E) {
@@ -135,7 +135,7 @@ function redactTimelineFor(mySlot, tl) {
 // 2× VÝSTUPNÝ dmg pre hráča s maze buffom (ten, čo úspešne priamym castom zaklial súpera do labyrintu).
 // Aplikuje sa na raw pred zásahom (resolveStrike) → ak je Minotaurov útok odrazený, doubled dmg sa vráti späť naňho.
 // mazeBuff nezíska mirror-lovec (labyrint cez odraz) ani prekliaty Minotaur → presne cielené na hráča Minotaura.
-function labyrinthMul(slot) { return E.game.players[slot]?.mazeBuff ? 2 : 1; }
+function labyrinthMul(slot) { return E.game.players[slot]?.mazeBuff ? MAZE_DEAL_MUL : 1; }
 
 // akýkoľvek zásah AKCIOU medzi hráčmi ukončí labyrint (oboch pri mirror matchi) - počíta sa aj
 // zablokovaný/odrazený zásah (resolveStrike/applyPetrify/applyLabyrinth sa volajú len keď akcia trafila);

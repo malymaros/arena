@@ -2,6 +2,7 @@
 // Last Stand/Hope, démon), skiny z registra postáv, odoslanie lock_in.
 import * as G from "/shared/geometry.js";
 import { dirPicker, aimPicker, aimPickerDiag, dashPicker, specialPicker, cellPicker, wolfPicker, s1Picker, moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, rechargeBtn, meleeBtn, undoBtn, goldenBtn, goldDualBtn, demonBtn, lastHopeBtn, gmCostEl, connErrorEl, lockBtn } from "/client/dom.js";
+import { BUTTON_TEXT } from "/client/balance-ui.js";
 import { CHAR_BUTTONS, CHAR_LIST, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
 import { pixelizeEmoji, hydratePix, miniPix } from "/client/pix.js";
 import { costHtml } from "/client/hud.js";
@@ -29,13 +30,14 @@ const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, 
 // namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
 // Attack tooltip navyše vysvetlí odraz strely. Volané zo state handlera pri každom snapshote.
 // bežný vzhľad tlačidiel, ktoré postava môže preskinovať (buttons.<slot> v registri)
+// (texty a ceny zo shared/balance.js cez public/client/balance-ui.js)
 export const BTN_BASE = {
-  dash:     { emoji: "🏃", title: "Dash - move up to 2 cells in a direction (−4 mana)", cost: "−4{💧}" },
-  recharge: { emoji: "🙏", title: "Recharge (+4 mana)", cost: "+4{💧}" },
-  mirror:   { emoji: "🪞", title: "Mirror (−4 mana, reflects all damage of the opponent's next action back at them)", cost: "−4{💧}" },
-  melee:    { title: "Melee (−4 mana, 8 dmg, hits only an opponent on your cell)", cost: "−4{💧} 8{☠️}" },
+  dash:     { emoji: "🏃", ...BUTTON_TEXT.dash },
+  recharge: { emoji: "🙏", ...BUTTON_TEXT.recharge },
+  mirror:   { emoji: "🪞", ...BUTTON_TEXT.mirror },
+  melee:    { ...BUTTON_TEXT.melee },
 };
-const ATTACK_TITLE_DEFAULT = "Range Attack - choose a direction (−1 mana, damage by distance: 3/2/1, can't hit your own cell)";
+const ATTACK_TITLE_DEFAULT = BUTTON_TEXT.attack.title;
 // skin tlačidla podľa postavy: def.skin = trieda tlačidla aj jeho pickera + fialová „???" ikona
 // (Vampire/Onryō charge, Jotarov Special 1, Luffyho prepínač gearu); bez skinu bežná ikona/cena/tooltip
 function applyBtnSkin(slot, btn, picker, char) {

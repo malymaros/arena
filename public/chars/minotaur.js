@@ -1,6 +1,8 @@
 // public/chars/minotaur.js - klientské dáta postavy: Minotaur - labyrint na celú dosku.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 import { SPECIAL_FPS } from "./common.js";
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { SPECIAL_COST } from "../../shared/balance.js";
 
 export default {
   key: "minotaur",
@@ -18,7 +20,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands, where you hunt with 2× dmg. Their steps weave a thread; stepping on it reveals your silhouette" },
   buttons: {
     // žiadny dmg - celoplošný labyrint (trvá do vzájomného zásahu)
-    special: { title: "Special (−5 mana) - hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit", cost: "−5{💧} 🌀" },
+    special: { title: `Special (−${SPECIAL_COST} mana) - hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit`, cost: `−${SPECIAL_COST}{💧} 🌀` },
   },
   specialZone: ({ G, board }) => G.allCells(board), // celoplošný (labyrint zasiahne súpera kdekoľvek)
 };

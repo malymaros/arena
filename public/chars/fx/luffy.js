@@ -2,6 +2,7 @@
 // GEAR 3 Giant Pistol (jedna súvislá naťahovacia ruka cez celú choreografiu) a special (guľa / kotúľ
 // so stredovým hero-shotom). Továreň dostane C = klientský scope (client.js) a vráti háčiky choreografie
 // (popis: public/chars/fx/index.js).
+import { LUFFY_SPECIAL_DMG } from "/shared/balance.js";
 
 // Giant Pistol gumená ruka - geometria naladená v public/luffy-tune.html.
 // Body v ZLOMKOCH dlaždice v „smerovom" rámci (x = dopredu k súperovi, y = výška, hore = záporné):
@@ -213,7 +214,7 @@ export default function luffyFx(C) {
     if (img && !img.getAttribute("src").endsWith(src)) img.src = src;
     el.classList.toggle("gear3-max", gear3);
     const dmgEl = el.querySelector(".ca-luffy-dmg");
-    if (dmgEl) { dmgEl.innerHTML = `${gear3 ? 8 : 4}<span class="pix-ico mini" data-emoji="☠️"></span>`; C.hydratePix(dmgEl); }
+    if (dmgEl) { dmgEl.innerHTML = `${LUFFY_SPECIAL_DMG[gear3 ? "gear3" : "base"]}<span class="pix-ico mini" data-emoji="☠️"></span>`; C.hydratePix(dmgEl); }
   }
   function preview({ grid, caster }) {
     const s = { form: "base", last: 0 };

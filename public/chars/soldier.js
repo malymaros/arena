@@ -1,6 +1,8 @@
 // public/chars/soldier.js - klientské dáta postavy: Soldier - snajperský lúč na zvolenú bunku.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 import { SPECIAL_FPS } from "./common.js";
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { SPECIAL_COST, SOLDIER_SPECIAL_DMG } from "../../shared/balance.js";
 
 export default {
   key: "soldier",
@@ -21,10 +23,10 @@ export default {
   headCrop: { cx: 0.46, cy: 0.555, size: 0.22 }, // hlava namerané z Idle.png riadky 62–82 (stred x ≈ 0.46) - telo sa nakláňa doprava, hlava je nad ľavou nohou
   pairShift: 70,
   // Vojak: cieľová bunka je voľba hráča - náhľad ukazuje príkladový cieľ (target), nie odvodenú zónu
-  abilityPreview: { caster: { x: 0, y: 1 }, dmg: 10, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
+  abilityPreview: { caster: { x: 0, y: 1 }, dmg: SOLDIER_SPECIAL_DMG, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
   buttons: {
     // snajperský lúč na zvolenú bunku - súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
-    special: { title: "Special (−5 mana, 10 dmg) - pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it", cost: "−5{💧} 10{☠️}" },
+    special: { title: `Special (−${SPECIAL_COST} mana, ${SOLDIER_SPECIAL_DMG} dmg) - pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it`, cost: `−${SPECIAL_COST}{💧} ${SOLDIER_SPECIAL_DMG}{☠️}` },
   },
   // mini mapa pod tlačidlom; cieľová bunka je súčasť AKCIE (cell) - zóna sa z pozície neodvodzuje
   specialTarget: "cell",

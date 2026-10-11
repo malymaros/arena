@@ -1,9 +1,11 @@
 // public/chars/werewolf.js - klientské dáta postavy: Werewolf - charge v 8 smeroch, dmg podľa fázy mesiaca.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 import { SPECIAL_FPS } from "./common.js";
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { SPECIAL_COST, WOLF_MOON_DMG } from "../../shared/balance.js";
 
-// dmg charge podľa fázy mesiaca - MUSÍ sedieť so serverovým WOLF_MOON_DMG
-export const WOLF_MOON_DMG = [2, 4, 6, 8];
+// dmg charge podľa fázy mesiaca (shared/balance.js) - re-export pre fx/werewolf.js
+export { WOLF_MOON_DMG };
 const moonLvl = (ui) => Math.max(0, Math.min(3, ui.st?.moon || 0));
 
 export default {
@@ -36,8 +38,8 @@ export default {
     special: (ui) => {
       const dmg = WOLF_MOON_DMG[moonLvl(ui)];
       return {
-        title: `Special (−5 mana, ${dmg} dmg by moon phase) - charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`,
-        cost: `−5{💧} ${dmg}{☠️}`,
+        title: `Special (−${SPECIAL_COST} mana, ${dmg} dmg by moon phase) - charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`,
+        cost: `−${SPECIAL_COST}{💧} ${dmg}{☠️}`,
       };
     },
     specialKey: (ui) => String(moonLvl(ui)),

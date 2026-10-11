@@ -1,6 +1,8 @@
 // public/chars/escanor.js - klientské dáta postavy: Escanor - smerové slnko, rozsah podľa Pride.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 import { SPECIAL_FPS } from "./common.js";
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { SPECIAL_COST, SPECIAL_ZONE_DMG } from "../../shared/balance.js";
 
 export default {
   key: "escanor",
@@ -27,10 +29,10 @@ export default {
   pairShift: 80,
   // Escanor: smerový dmg (8); rozsah rastie s Pride levelom (char-select cyklí 0→3 - preview v public/chars/fx/escanor.js;
   // konkrétne zóny neukazuje text, ale cyklený náhľad + pride lev pod mini-doskou)
-  abilityPreview: { caster: { x: 1, y: 1 }, dmg: 8, dir: "right", desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
+  abilityPreview: { caster: { x: 1, y: 1 }, dmg: SPECIAL_ZONE_DMG.escanor, dir: "right", desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
   buttons: {
     // smerový dmg (8); rozsah rastie s pride levelom (veľkosť postavy na ploche = indikátor pride)
-    special: { title: "Special (−5 mana, 8 dmg) - choose a direction (left/right)", cost: "−5{💧} 8{☠️}" },
+    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.escanor} dmg) - choose a direction (left/right)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.escanor}{☠️}` },
   },
   specialTarget: "dir",
   // smerový (left/right) - rozsah podľa pride levelu (kotva mimo plochy = prázdna zóna aj pri pride 3)

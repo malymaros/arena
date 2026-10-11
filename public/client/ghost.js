@@ -6,6 +6,7 @@ import { planning, buttonUi } from "/client/planning.js";
 import { VAMP_CHARS, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
 import { WOLF_DIRS_CLIENT } from "/client/zones.js";
 import { gridEl } from "/client/dom.js";
+import { MAX_MANA, RECHARGE_GAIN, BASIC_COST, MELEE_COST, DASH_COST, SPECIAL_COST, JOTARO_S1_COST, SHIELD_COST, MIRROR_COST, DEMON_COST, GOLDEN_COST, GOLDEN_MIRROR_COST } from "/shared/balance.js";
 
 /* ---------- Ghost - simulácia vlastnej pozície počas naplánovaného kola ---------- */
 // pozícia po každej akcii vo fronte; movy mimo board pozíciu nemenia (zrkadlí server)
@@ -46,9 +47,9 @@ export function ghostCharAt(idx = planning.myQueue.length) {
 // upozornenie „táto akcia nebude mať efekt" pre vlastnú frontu (žltý ⚠ v lište). Simuluje LEN vlastný
 // stav a vlastné naplánované akcie - súperove akcie (drain many Onryō, presun, zásah…) sa NEzarátavajú.
 // Ceny a wall pravidlo MUSIA sedieť so serverovými do* funkciami. Vracia pole dôvodov (null = ok) podľa planning.myQueue.
-const PLAN_MAX_MANA = 10;
-const PLAN_RECHARGE = 4;
-const PLAN_COST = { attack: 1, melee: 4, dash: 4, special: 5, special1: 4, shield: 2, mirror: 4, demon: 10 };
+const PLAN_MAX_MANA = MAX_MANA;
+const PLAN_RECHARGE = RECHARGE_GAIN;
+const PLAN_COST = { attack: BASIC_COST, melee: MELEE_COST, dash: DASH_COST, special: SPECIAL_COST, special1: JOTARO_S1_COST, shield: SHIELD_COST, mirror: MIRROR_COST, demon: DEMON_COST };
 // súper Vampire/Onryō je mirror-imúnny: mirror (aj golden) sa voči jeho dmg správa len ako štít
 // (súper v turnaji nemôže z/do side-postavy swapnúť, takže jeho postava platí celé kolo)
 export function foeMirrorImmune() {
@@ -64,8 +65,8 @@ export function planWarnings() {
   const D4 = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   let mana = mine.mana ?? 0;
   // golden predťah (len nestartér) sa platí pred prvou akciou startera
-  if (planning.goldenArmed && mana >= 3) mana -= 3;
-  else if (planning.goldenMirrorArmed && mana >= 5) mana -= 5;
+  if (planning.goldenArmed && mana >= GOLDEN_COST) mana -= GOLDEN_COST;
+  else if (planning.goldenMirrorArmed && mana >= GOLDEN_MIRROR_COST) mana -= GOLDEN_MIRROR_COST;
   let hasClone = !!mine.clone;      // Naruto: klon sa môže pohnúť/strieľať aj keď Naruto narazí do steny
   for (let i = 0; i < planning.myQueue.length; i++) {
     const a = planning.myQueue[i];
