@@ -219,11 +219,28 @@ samostatného súboru a ESLint vypíše jej nedefinované identifikátory (poče
 - [x] **7b - stav prehrávania v jednom objekte** `playback.js`: `playGen`, `playing`, `serverWinner`,
       `serverGameResult`, `gameOverShown`, `finalRoundActive`, `roundBeatCounts`, `ts*` (THE WORLD) - predtým
       13 globálnych `let` naprieč súborom; teraz ich môžu čítať aj ďalšie moduly.
-- [ ] **7c - stav plánovania** (`myQueue`, `lockedIn`, `golden*Armed`, `lastStand/HopeArmed`, `openPicker`) do
-      `planning.js` - predpoklad pre vyčlenenie Controls/Queue (sonda: 33 a 55 závislostí).
-- [ ] **7d - veľké sekcie**: Timeline prehrávanie (96 závislostí), RAF (77), Sockets (72), Char select (30).
-      Postup ako pri `fx`: modul dostane klientský scope `C` (lenivé gettery), závislosti sa postupne
-      zužujú na importy zo `state`/`playback`/`planning`. Každý krok overiť browser-smoke `--compare`.
+- [x] **7c - stav plánovania** `planning.js`: `myQueue`, `lockedIn`, `golden*Armed`, `lastStand/HopeArmed`,
+      `openPicker` + `buttonUi()` (kontext planUi postavy).
+- [x] **7d - jadro, od ktorého závisia takmer všetky sekcie:**
+      `session.js` - `me`/`isHost`/`isSpectator`/`board`/`state` ako **ES live bindings** (`export let` +
+      settery `setIdentity`/`setSpectator`/`setState`; zmenili sa len 4 priradenia, čítania ostali; ESLint
+      `no-import-assign` stráži, že nikto nepriraďuje do importu). `dom.js` - 64 statických elementov +
+      `TILE_W/TILE_H/GAP` + `cellToPx`. `sprites.js` - `ANIM_DEF`, `charDirFor`/`usesAltColor`,
+      `ensureSpriteMeta`/`drawSprite`, `ACTOR_W/H`. `fx-registry.js` - `CHAR_FX`/`fxAll`/`fxOwnsCenter`,
+      inštaluje sa `initCharFx(C)` (háčiky sa volajú až za behu, takže import pred inicializáciou je bezpečný).
+- [x] **7e - sekcie, ktoré po 7d nemali lokálne závislosti:** `mage-head`, `explosion`, `trap-markers`, `zones`
+      (náhľady zón), `retry`, `action-log`, `ghost`, `actor-layers` (canvasy figúr - pridávajú sa do #actors PRED
+      figúrami z fx registra, poradie vrstiev ostáva; overlaye za `fxAll("init")` zostali v client.js),
+      `demon-sprites`, `char-select` (výber, draft, náhľad špeciálu, stránkovanie, Hidden - 462 riadkov).
+      client.js: 5 899 → 4 225 riadkov. Overenie: browser-smoke `--compare` 0 chýb, assety a UI sonda zhodné;
+      stopa sa líši len v počte zlatých Last Stand aur (známy šum časovaný hodinami).
+      Nástroje (scratchpad, nie v repe): sonda väzby sekcií (ESLint no-undef nad kópiou sekcie) a automatický
+      extraktor (exporty = mená použité inde, importy podľa import riadkov client.js, prerušenie pri lokálnej
+      závislosti) - každý krok kontroluje `npm run lint`.
+- [ ] **7f - zvyšok:** Timeline prehrávanie (~70 lokálnych závislostí), RAF (~40), Sockets + losovanie farieb (~36),
+      Queue + Controls, Facing/umiestnenie, Last Stand vizuál. Spoločný menovateľ: stav figúr (`animState`,
+      `cloneFlinch`, `cloneDead`, `castingNow`, `facingOverride`, `escPrideDisplay`…) - ďalší krok je
+      `actors.js` (objekt stavu figúr + `computeFacing`/`pairShift`/`positionActors`), potom HUD a Queue.
 
 ## Rozhodnutia (na schválenie)
 

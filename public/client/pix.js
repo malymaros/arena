@@ -206,3 +206,7 @@ export function pixelizeEmoji(el, res) {
 export function hydratePix(root = document) {
   root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => pixelizeEmoji(el));
 }
+
+// odznaky Last Stand / Last Hope (lišta kola, záznam akcií)
+export const LS_BADGE_IMG = '<img class="ls-badge" src="/assets/last_stand.png" alt="Last Stand">'; // ikona Last Standu (zmenšenina démona) do lišty/záznamu
+export const LH_BADGE_IMG = '<img class="lh-badge" src="/assets/last_hope.png" alt="Last Hope">'; // ikona Last Hope do lišty
