@@ -96,14 +96,23 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
       `pairShift`, `portraitScale`, **`abilityPreview`** (popis + náhľadová zóna v char-selecte), podľa potreby
       `anims` (nové anim kľúče), `spriteAlias` (chýbajúce súbory), `side`/`vamp`, `teleport*`, `previewCast`.
 - [ ] **`buttons`** — tooltip + cena (`"−5{💧} 8{☠️}"`) special/melee tlačidla, prípadne skin dash/mirror/recharge slotu.
-- [ ] **`specialTarget`** (`dir` / `wolf` / `cell` / `trap` / `luffy` / `none`) a **`specialZone`** — náhľad zóny zo
-      `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
+- [ ] **`specialTarget`** (`dir` / `wolf` / `cell` / `trap` / `reach` + `specialReach` / `none`) a **`specialZone`** — náhľad
+      zóny zo `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
+- [ ] Podľa potreby kreslenie a plánovanie: `boardFit`, `victoryAnim`, `sizeLevel`, `projectile`, `actionAnims`,
+      `planUi`/`attackPicker`/`aimStopsAtFoe`/`buttonBadge`, `mirrorSlot`, `planSpecialWarn` (popis v `index.js`).
 
-### `public/client.js` (render/animácie/vstup — choreografia je zatiaľ tu, register ju postupne preberá)
-- [ ] **Label special tlačidla** (blok `if (specChar === …)` v state handleri, ~riadok 3600) — cost badge
-      + tooltip pre nový special. Pozor: číta sa cez `ghostCharAt()` (turnaj swap).
+### `public/chars/fx/<key>.js` (klientská choreografia — NIE vetvy v `client.js`)
+- [ ] Ak postava potrebuje vlastnú choreografiu, nový modul + riadok v `CHAR_FX_FACTORIES` v `public/chars/fx/index.js`
+      (tam je popis háčikov). Továreň `(C) => háčiky`, `C` = klientský scope (`const C` v `client.js`; chýbajúci
+      getter doplň tam).
+- [ ] **Nové efekty timeline** (`kind: "…"`) autora tejto postavy → háčik `effect(e, frameHold)`; póza malej postavy
+      → `boardAnim`; veľký stredový sprite → `centerCast`/`centerCanvas`/`drawCenter` (vlastný stred: `ownCenter`).
+- [ ] Vlastné HUD prvky → `hud`, náhľad vo výbere → `preview`, karta → `drawCard`, ďalšie figúry na doske
+      (ako Jotarov stand) → `init`/`position`/`drawBoard`/`stateChar`/`resetActors`.
+
+### `public/client.js` (render/animácie/vstup — generický kód)
 - [ ] Ak má special **smer** — pridaj do pickera (ako medusa) a do `actionIcon`/`actionBadgeView` (šípky).
-- [ ] Ak special spúšťa **nové efekty timeline** (`kind: "…"`) — pridaj ich obsluhu v prehrávači timeline
+- [ ] Všeobecný efekt timeline, ktorý nepatrí jednej postave (mechanika), obslúž v prehrávači
       (`schedulePlayTimeline` → `step()` → `for (const e of frame.effects)`).
 
 ### `public/index.html`
