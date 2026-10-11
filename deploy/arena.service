@@ -11,7 +11,7 @@ User=arena
 WorkingDirectory=/home/arena/arena
 # Node počúva na porte 3000, verejne ho vystaví Caddy (HTTPS reverse proxy)
 Environment=PORT=3000
-# Heslo pre admin reset (/admin/reset-all, ?admin=1&key=…). Bez neho je admin reset VYPNUTÝ.
+# Voliteľné heslo pre admin reset (/admin/reset-all, ?admin=1&key=…). Bez neho je admin reset otvorený.
 # Tajné hodnoty nedávaj do repa - na VM ich daj do override: sudo systemctl edit arena
 #   [Service]
 #   Environment=ADMIN_KEY=…

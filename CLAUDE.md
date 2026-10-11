@@ -21,7 +21,7 @@ node tools/difftest.mjs # engine at HEAD vs working tree on identical bot matche
 node tools/browser-smoke.mjs [--compare]  # CLIENT smoke test: headless Chrome/Edge spectates seeded bot matches (+ char-select hovers, a tournament) at 8× time; fails on JS errors / 4xx; --compare also runs HEAD and diffs the set of loaded sprite files
 ```
 
-Environment variables: `PORT` (default 3000), `ADMIN_KEY` (password for admin reset; if unset, admin reset is **disabled**), `PLAYER_KEYS` (comma-separated entry passwords), `FORCE_FIRST_STARTER` (`A`|`B` — pins the otherwise random game-1 starter; used by the tests), `ARENA_SEED` (integer - all game randomness goes through the room's `rand()`, re-seeded at every `startMatch`, so identical inputs give bit-identical timelines; the tests default to `1`). Never call `Math.random` in game logic - use `rand()`.
+Environment variables: `PORT` (default 3000), `ADMIN_KEY` (optional password for admin reset; if unset, reset is **open** — a deliberate owner decision, `?admin=1` is enough), `PLAYER_KEYS` (comma-separated entry passwords), `FORCE_FIRST_STARTER` (`A`|`B` — pins the otherwise random game-1 starter; used by the tests), `ARENA_SEED` (integer - all game randomness goes through the room's `rand()`, re-seeded at every `startMatch`, so identical inputs give bit-identical timelines; the tests default to `1`). Never call `Math.random` in game logic - use `rand()`.
 
 ## Deployment
 
@@ -33,7 +33,7 @@ Production runs on a **Google Cloud Compute Engine VM** at **https://arena.maros
 ```
 ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153 'cd ~/arena && git status --short && git pull --ff-only && npm ci --omit=dev && sudo systemctl restart arena && systemctl is-active arena'
 ```
-`git status` on the VM must be empty (nothing is edited there by hand); use `npm ci`, not `npm install`, so `package-lock.json` stays untouched and the next pull doesn't conflict. Note the old commit first (`git log -1 --oneline`) — rollback = `git checkout <commit> && npm ci --omit=dev && sudo systemctl restart arena`. Verify with `journalctl -u arena -n 20` and an HTTP check of the site. `ADMIN_KEY` is not set on the VM yet → admin reset is disabled in production until it is (`sudo systemctl edit arena`).
+`git status` on the VM must be empty (nothing is edited there by hand); use `npm ci`, not `npm install`, so `package-lock.json` stays untouched and the next pull doesn't conflict. Note the old commit first (`git log -1 --oneline`) — rollback = `git checkout <commit> && npm ci --omit=dev && sudo systemctl restart arena`. Verify with `journalctl -u arena -n 20` and an HTTP check of the site. `ADMIN_KEY` is not set on the VM → admin reset is open in production (owner's choice).
 Live logs: `journalctl -u arena -f`. Caddy config lives at `/etc/caddy/Caddyfile`; restart with `sudo systemctl restart caddy` after edits.
 
 ## Architecture
@@ -112,4 +112,4 @@ Sprite sheets are horizontal strips in `public/assets/<char>/`; frame count is i
 
 ### Admin reset
 
-`GET /admin/reset-all?key=…` or the socket event `admin_reset_all` disconnects both players and recreates the game. Requires `ADMIN_KEY` to be set on the server — without it every admin reset is refused. The client shows a reset button when loaded with `?admin=1` (optionally `&key=…`).
+`GET /admin/reset-all?key=…` or the socket event `admin_reset_all` disconnects both players and recreates the game. Without `ADMIN_KEY` it is open to anyone (owner's deliberate choice — keep it that way unless asked); with `ADMIN_KEY` set the key must match. The client shows a reset button when loaded with `?admin=1` (optionally `&key=…`).
