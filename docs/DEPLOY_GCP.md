@@ -8,7 +8,12 @@ Súbory v repe (`deploy/`): `arena.service`, `Caddyfile`.
 > ### 🟢 Aktuálne nasadenie (produkcia)
 > Hra **beží** na **https://arena.marosmaly.sk** (od 2026-07-20, po migrácii z mŕtveho Oracle — viď `docs/DEPLOY_ORACLE.md`).
 > - **VM:** `instance-20260720-055132`, zóna `us-central1-a`, **Debian 13 (trixie), x86_64** — externá IP `34.134.62.153`
-> - **SSH:** `ssh -i C:\Users\maly\.ssh\gcp_arena.key arena@34.134.62.153` (login user je **`arena`**, nie `ubuntu`)
+> - **GCP projekt:** „My First Project" (`project-51a54139-c05b-4e06-941`) pod **osobným Google účtom vlastníka**
+>   (adresa tu zámerne nie je - repo je verejné). VM v konzole: Compute Engine → VM instances v tomto projekte.
+> - **SSH** (login user je **`arena`**, nie `ubuntu`) - dve cesty, viď [sekcia 2b](#2b-prístup-z-ďalšieho-počítača-gcloud):
+>   - `gcloud compute ssh arena@instance-20260720-055132 --zone us-central1-a --project project-51a54139-c05b-4e06-941`
+>   - alebo OpenSSH s kľúčom, ktorý je v metadátach projektu: `ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153`
+>     (kľúč vytvára `gcloud compute ssh` pri prvom pripojení; pôvodný `gcp_arena.key` je len na pôvodnom PC)
 > - **App:** systemd služba `arena` (`/home/arena/arena`, `PORT=3000`), **Caddy** HTTPS proxy
 > - **Nová verzia (najčastejší úkon):** viď [sekcia 8 – Update](#8-update--prevádzka)
 >
@@ -62,6 +67,23 @@ ssh -i "$env:USERPROFILE\.ssh\gcp_arena.key" arena@<EXTERNAL_IP> "whoami; cat /e
 ```
 
 ---
+
+### 2b. Prístup z ďalšieho počítača (gcloud)
+
+Súkromné SSH kľúče sú viazané na počítač. Na novom PC netreba nič kopírovať - stačí Google Cloud CLI:
+
+```
+winget install Google.CloudSDK
+gcloud auth login                      # prihlás sa Google účtom, pod ktorým je projekt
+gcloud compute ssh arena@instance-20260720-055132 --zone us-central1-a --project project-51a54139-c05b-4e06-941
+```
+
+Prvé `gcloud compute ssh` vygeneruje kľúč `~/.ssh/google_compute_engine` a **pridá ho** do SSH kľúčov projektu
+(existujúce nechá). Odvtedy funguje aj obyčajné `ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153`.
+
+> **Windows:** `gcloud.cmd` je dávkový súbor - dlhší `--command "…"` s úvodzovkami/`$()` rozbije. Na príkazy
+> na VM preto používaj OpenSSH (`ssh -i … arena@34.134.62.153 '…'`) a gcloud len na prvé pripojenie.
+> **Nájsť projekt:** `gcloud projects list` a `gcloud compute instances list --project <ID>` (hľadaj IP `34.134.62.153`).
 
 ## 3. Node + appka
 
@@ -181,11 +203,18 @@ Otvor ju v dvoch prehliadačoch (hra je pre 2 hráčov). Vstup je cez login (men
 
 ## 8. Update / prevádzka
 
-Nasadenie novej verzie po `git push`:
+Nasadenie novej verzie po `git push` (z ľubovoľného PC s prístupom podľa sekcie 2b):
 
 ```
-ssh -i C:\Users\maly\.ssh\gcp_arena.key arena@34.134.62.153 "cd ~/arena && git pull && npm install --omit=dev && sudo systemctl restart arena"
+ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153 'cd ~/arena && git status --short && git pull --ff-only && npm ci --omit=dev && sudo systemctl restart arena && systemctl is-active arena'
 ```
+
+- `git status --short` má byť **prázdne** - na VM sa nič ručne neupravuje. Ak tam niečo je, najprv zisti čo.
+- `npm ci` (nie `npm install`) inštaluje presne podľa `package-lock.json` a lock nemení, takže ďalší `git pull`
+  nenarazí na lokálne zmeny. `node_modules` už nie je v gite (od 2026-10-11).
+- **Overenie:** `journalctl -u arena -n 20` bez chýb, `curl -sI https://arena.marosmaly.sk` → 200, odohraj kolo.
+- **Návrat na predošlú verziu:** `cd ~/arena && git checkout <commit> && npm ci --omit=dev && sudo systemctl restart arena`
+  (potom späť na vetvu: `git checkout main`). Commit pred deployom ukáže `git log -1 --oneline` - zapíš si ho.
 
 Užitočné (na VM):
 

@@ -27,12 +27,13 @@ Environment variables: `PORT` (default 3000), `ADMIN_KEY` (password for admin re
 
 Production runs on a **Google Cloud Compute Engine VM** at **https://arena.marosmaly.sk** (Debian 13, x86_64, IP `34.134.62.153`, zone `us-central1-a`). The app runs as the systemd service `arena` (`/home/arena/arena`, `PORT=3000`, login user **`arena`**), fronted by **Caddy** as an HTTPS reverse proxy (auto Let's Encrypt + transparent Socket.IO WebSocket passthrough). Deploy assets live in `deploy/` (`arena.service`, `Caddyfile`). DNS (A record → VM IP) is managed at **Websupport** (ns1/ns2/ns3.websupport.sk).
 
-**Full step-by-step guide (from scratch + migration): `docs/DEPLOY_GCP.md`.** On GCP the only firewall step is one VPC rule (VM → Edit → Allow HTTP/HTTPS traffic) — no OS iptables gotcha like on Oracle. SSH uses a dedicated metadata key (`gcp_arena.key`, comment `arena` → the Linux username). *(The previous Oracle deploy — now dead — is archived in `docs/DEPLOY_ORACLE.md`; that guide's iptables ordering gotcha only applies to Oracle Ubuntu images.)*
+**Full step-by-step guide (from scratch + migration): `docs/DEPLOY_GCP.md`.** On GCP the only firewall step is one VPC rule (VM → Edit → Allow HTTP/HTTPS traffic) — no OS iptables gotcha like on Oracle. The VM is `instance-20260720-055132` in GCP project "My First Project" (`project-51a54139-c05b-4e06-941`) under the owner's personal Google account. **SSH access from any machine:** `gcloud auth login` (owner logs in) → `gcloud compute ssh arena@instance-20260720-055132 --zone us-central1-a --project project-51a54139-c05b-4e06-941` once (creates `~/.ssh/google_compute_engine` and appends it to the project's SSH keys) → afterwards plain OpenSSH `ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153`. On Windows don't pass long `--command` strings through `gcloud.cmd` (batch quoting breaks them) — use OpenSSH. The original metadata key `gcp_arena.key` exists only on the original PC. *(The previous Oracle deploy — now dead — is archived in `docs/DEPLOY_ORACLE.md`; that guide's iptables ordering gotcha only applies to Oracle Ubuntu images.)*
 
-**Deploy a new version** (after `git push` to `main`):
+**Deploy a new version** (after `git push` to `main`; the user must ask for it — it is outward-facing):
 ```
-ssh -i C:\Users\maly\.ssh\gcp_arena.key arena@34.134.62.153 "cd ~/arena && git pull && npm install --omit=dev && sudo systemctl restart arena"
+ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153 'cd ~/arena && git status --short && git pull --ff-only && npm ci --omit=dev && sudo systemctl restart arena && systemctl is-active arena'
 ```
+`git status` on the VM must be empty (nothing is edited there by hand); use `npm ci`, not `npm install`, so `package-lock.json` stays untouched and the next pull doesn't conflict. Note the old commit first (`git log -1 --oneline`) — rollback = `git checkout <commit> && npm ci --omit=dev && sudo systemctl restart arena`. Verify with `journalctl -u arena -n 20` and an HTTP check of the site. `ADMIN_KEY` is not set on the VM yet → admin reset is disabled in production until it is (`sudo systemctl edit arena`).
 Live logs: `journalctl -u arena -f`. Caddy config lives at `/etc/caddy/Caddyfile`; restart with `sudo systemctl restart caddy` after edits.
 
 ## Architecture
