@@ -2,7 +2,7 @@
 // Dvaja socket boti hrajú náhodné (seedované) zápasy cez reálny server a headless Chrome/Edge ich sleduje
 // ako DIVÁK (prehráva timeline, animácie, efekty postáv). Navyše prejde výber postáv ako hráč (hover každej
 // karty = náhľady specialov, preview karty) a jeden turnajový zápas (HUD hlavy, swap teleporty).
-// Čas v stránke je zrýchlený (--speed, default 8×): setTimeout/setInterval z client.js, performance.now,
+// Čas v stránke je zrýchlený (--speed, default 8×): setTimeout/setInterval z client.js a public/client/*, performance.now,
 // Date.now, rAF timestamp a CSS animácie (CDP Animation.setPlaybackRate).
 //
 // Zbiera: JS výnimky a console.error, zlyhané/4xx požiadavky a MNOŽINU načítaných súborov z /assets
@@ -49,10 +49,11 @@ const MAX_ROUNDS = 8;
 const CONFIG = { format: "single", tilesPerRound: 2, tileWeights: { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 }, timer: "off", tilePreview: true };
 
 /* ---------- prehliadač cez Chrome DevTools Protocol ---------- */
-// zrýchlenie času LEN pre časovače z client.js (socket.io heartbeaty nechávame v reálnom čase)
+// zrýchlenie času LEN pre časovače klienta - /client.js a moduly /client/*.js (socket.io heartbeaty nechávame
+// v reálnom čase)
 const WARP = `(() => {
   const K = ${SPEED};
-  const fromClient = () => /\\/client\\.js/.test(new Error().stack || "");
+  const fromClient = () => /\\/client(\\.js|\\/)/.test(new Error().stack || "");
   const st = window.setTimeout.bind(window), si = window.setInterval.bind(window);
   window.setTimeout = (f, d = 0, ...a) => st(f, fromClient() ? d / K : d, ...a);
   window.setInterval = (f, d = 0, ...a) => si(f, fromClient() ? d / K : d, ...a);

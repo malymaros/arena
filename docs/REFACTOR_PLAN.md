@@ -237,10 +237,26 @@ samostatného súboru a ESLint vypíše jej nedefinované identifikátory (poče
       Nástroje (scratchpad, nie v repe): sonda väzby sekcií (ESLint no-undef nad kópiou sekcie) a automatický
       extraktor (exporty = mená použité inde, importy podľa import riadkov client.js, prerušenie pri lokálnej
       závislosti) - každý krok kontroluje `npm run lint`.
-- [ ] **7f - zvyšok:** Timeline prehrávanie (~70 lokálnych závislostí), RAF (~40), Sockets + losovanie farieb (~36),
-      Queue + Controls, Facing/umiestnenie, Last Stand vizuál. Spoločný menovateľ: stav figúr (`animState`,
-      `cloneFlinch`, `cloneDead`, `castingNow`, `facingOverride`, `escPrideDisplay`…) - ďalší krok je
-      `actors.js` (objekt stavu figúr + `computeFacing`/`pairShift`/`positionActors`), potom HUD a Queue.
+- [x] **7f - zvyšok, client.js je už len vstupný bod (~95 riadkov):**
+      stav figúr `actors.js` (`animState`, `castingNow`, `facingOverride`, klon, pride/moon podržanie… +
+      `resetPoses()`; zdvojený reset v `reset`/`new_game` zjednotený, rovnako `resetPlanning()`), stav Last Stand
+      `last-stand-state.js` (`lastStand.goldenSlot/realActive/banishing/…` namiesto `_ls*`/`_lh*`), `anim`,
+      `placement` (computeFacing/pairShift/positionActors), `teleport`, `center-cast`, `board-fx` (bubliny,
+      projektily, aury, filter figúry), `grid`, `overlays` + `last-stand` + `defense-fx`, `hud`, `queue`,
+      `controls`, `turn-timer`, `the-world`, `phase-ui`, `raf`, `timeline`, `socket-handlers`, `preview-hovers`.
+      **Poradie vrstiev v DOM:** elementy, ktoré sa doteraz pripájali až za figúry z registra fx (`fxAll("init")`) -
+      overlaye Last Stand/Hope, THE WORLD, YOU značka - sa v moduloch len vytvoria a `client.js` ich pripája v
+      pôvodnom poradí. **Cyklické importy** (hud ↔ queue ↔ controls) sú bezpečné: top-level kód modulov len
+      registruje listenery a číta `dom.js`/`sprites.js` (mimo cyklu); kontrolované skriptom na TDZ.
+      **Pozor na side-effect moduly:** modul, z ktorého sa nič neimportuje (napr. `raf.js` - spúšťa slučku), musí
+      ostať importovaný aspoň holým `import "…"` - inak sa nenačíta (lint to nezachytí; zachytila to kontrola
+      dosiahnuteľnosti modulov z client.js).
+      **browser-smoke zrýchľoval len časovače, ktorých stack obsahoval `/client.js`** - po presune do modulov
+      bežala timeline divákovi 1× rýchlosťou a turnajová časť padala na pretekoch s plánovačom novej hry
+      („lock_in: bez ack"). Regex v `WARP` teraz berie aj `/client/*.js`. Overenie: `--compare` 0 chýb, assety
+      a UI sonda zhodné, stopa len so šumom zlatých aur (78 vs. 82).
+      Ďalšie možné kroky (už nie nutné): `timeline.js` (722 r.) rozdeliť podľa druhov efektov; scope `C`
+      nahradiť priamymi importmi v `public/chars/fx/*`.
 
 ## Rozhodnutia (na schválenie)
 

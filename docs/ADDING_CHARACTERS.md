@@ -101,18 +101,19 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
 - [ ] Podľa potreby kreslenie a plánovanie: `boardFit`, `victoryAnim`, `sizeLevel`, `projectile`, `actionAnims`,
       `planUi`/`attackPicker`/`aimStopsAtFoe`/`buttonBadge`, `mirrorSlot`, `planSpecialWarn` (popis v `index.js`).
 
-### `public/chars/fx/<key>.js` (klientská choreografia — NIE vetvy v `client.js`)
+### `public/chars/fx/<key>.js` (klientská choreografia — NIE vetvy v `public/client/*`)
 - [ ] Ak postava potrebuje vlastnú choreografiu, nový modul + riadok v `CHAR_FX_FACTORIES` v `public/chars/fx/index.js`
-      (tam je popis háčikov). Továreň `(C) => háčiky`, `C` = klientský scope (`const C` v `client.js`; chýbajúci
-      getter doplň tam).
+      (tam je popis háčikov). Továreň `(C) => háčiky`, `C` = klientský scope (`const C` v `public/client.js`;
+      chýbajúci getter doplň tam).
 - [ ] **Nové efekty timeline** (`kind: "…"`) autora tejto postavy → háčik `effect(e, frameHold)`; póza malej postavy
       → `boardAnim`; veľký stredový sprite → `centerCast`/`centerCanvas`/`drawCenter` (vlastný stred: `ownCenter`).
 - [ ] Vlastné HUD prvky → `hud`, náhľad vo výbere → `preview`, karta → `drawCard`, ďalšie figúry na doske
       (ako Jotarov stand) → `init`/`position`/`drawBoard`/`stateChar`/`resetActors`.
 
-### `public/client.js` (render/animácie/vstup — generický kód)
-- [ ] Ak má special **smer** — pridaj do pickera (ako medusa) a do `actionIcon`/`actionBadgeView` (šípky).
-- [ ] Všeobecný efekt timeline, ktorý nepatrí jednej postave (mechanika), obslúž v prehrávači
+### `public/client/*` (render/animácie/vstup — generický kód, moduly popísané v CLAUDE.md)
+- [ ] Ak má special **smer** — pridaj do pickera (`controls.js`, ako medusa) a do `actionIcon` (`action-log.js`) /
+      `actionBadgeView` (`queue.js`) (šípky).
+- [ ] Všeobecný efekt timeline, ktorý nepatrí jednej postave (mechanika), obslúž v prehrávači `timeline.js`
       (`schedulePlayTimeline` → `step()` → `for (const e of frame.effects)`).
 
 ### `public/index.html`

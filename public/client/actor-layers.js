@@ -76,3 +76,14 @@ cloneGhost.width = ACTOR_W; cloneGhost.height = ACTOR_H;
 cloneGhost.style.width = ACTOR_W + "px"; cloneGhost.style.height = ACTOR_H + "px";
 cloneGhost.style.display = "none";
 actorsEl.appendChild(cloneGhost);
+
+// YOU značka nad vlastnou figúrou - vytvorí sa tu, ale do #actors ju pripája client.js až po figúrach z registra
+// fx (fxAll("init")), aby leželo nad nimi ako doteraz
+export const youMarker = document.createElement("div");
+youMarker.className = "you-marker";
+youMarker.innerHTML = `<div class="you-marker-bob"><span class="you-tag">YOU</span><span class="you-tip"></span></div>`;
+youMarker.style.display = "none";
+
+// zelená šípka pod round-script lištou - počas animácie ukazuje na práve vykonávaný beat (pripája renderQueue)
+export const qCursor = document.createElement("div");
+qCursor.className = "q-cursor";

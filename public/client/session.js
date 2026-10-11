@@ -15,3 +15,12 @@ export function setSpectator() { isSpectator = true; }
 export function setState(s) { state = s; board = s.board || board; }
 // druhý slot voči mne (null pre diváka)
 export const otherSlot = () => (me === "p1" ? "p2" : me === "p2" ? "p1" : null);
+// víťaz podľa HP v snapshote (draw nenastane - server ukončí hru prvou smrťou; ostáva ako poistka)
+export function computeWinnerFromState(s) {
+  const dead1 = !s?.p1 || s.p1.hp <= 0;
+  const dead2 = !s?.p2 || s.p2.hp <= 0;
+  if (dead1 && dead2) return "draw";
+  if (dead1) return "p2";
+  if (dead2) return "p1";
+  return null;
+}

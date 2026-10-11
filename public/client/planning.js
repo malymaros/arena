@@ -22,6 +22,18 @@ export const planning = {
   openPicker: null,
 };
 
+// nová hra / reset: prázdna fronta, žiadne objednané golden/Last Stand/Last Hope akcie, odomknuté
+// (openPicker nechávame - pickery zatvára closePickers() v client.js, ktorý zároveň skryje ich DOM)
+export function resetPlanning() {
+  planning.myQueue = [];
+  planning.goldenArmed = false;
+  planning.goldenMirrorArmed = false;
+  planning.goldenManaArmed = false;
+  planning.lastStandArmed = false;
+  planning.lastHopeArmed = false;
+  planning.lockedIn = false;
+}
+
 // kontext plánovania pre tlačidlá a pickery (planUi postavy z registra: mód, dosah, odznaky…)
 export function buttonUi() {
   const st = state?.[me];
