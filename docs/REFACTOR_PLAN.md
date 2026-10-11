@@ -196,9 +196,9 @@ previews importujú `shared/geometry.js`.
       klientského scope v `client.js`. Hotové: **Vojak** (mierenie, laser, lúč, výšľah), **Vlkolak** (otočenie,
       `wolfrun`/`wolfstrike`), **Countess/Onryō** (one-shot A-sheety na doske aj v strede cez nový háčik
       `centerCast` a príznak `anim.fromStart`, Onryō výkrik pri teleporte pasce; hover charge číta `VAMP_CHARS`), **Naruto** (anonymizácia vertikály podľa klona),
-      **Luffy - timeline** (forma, Giant Pistol ruka, special guľa/kotúľ + háčik `clearOverlays`). **Luffy - zvyšok:** háčiky `hud` (odznak módu + info) a `preview` (cyklenie base↔gear3 vo výbere), dáta `boardFit`/`victoryAnim`/`previewIdleCaster` (aj Jotaro), `fromStart`/`armCrop` v animáciách, plánovanie `planUi`/`attackPicker`/`aimStopsAtFoe`/`buttonBadge`/`specialReach` (picker `"reach"`) - v client.js ostali len vetvy podľa druhu efektu (`luffy_*`). Overenie: browser-smoke `--compare` 0 chýb, sonda 52/52, assety zhodné; stopa sa
+      **Luffy - timeline** (forma, Giant Pistol ruka, special guľa/kotúľ + háčik `clearOverlays`). **Luffy - zvyšok:** háčiky `hud` (odznak módu + info) a `preview` (cyklenie base↔gear3 vo výbere), dáta `boardFit`/`victoryAnim`/`previewIdleCaster` (aj Jotaro), `fromStart`/`armCrop` v animáciách, plánovanie `planUi`/`attackPicker`/`aimStopsAtFoe`/`buttonBadge`/`specialReach` (picker `"reach"`) - v client.js ostali len vetvy podľa druhu efektu (`luffy_*`). **Jotaro - stand Star Platinum** (`fx/jotaro.js`): canvas, summon/Dead_P, výmena pozícií pri útoku, blip pri pohybe, stredový pár; nové háčiky `init`/`position`/`drawBoard`/`stateChar`/`resetActors` (volané na každom module), `moved`/`bodyShift`, `spawnCenter` a `ownCenter` (generický stred aj `casting` póza sa vynechajú); dáta `mirrorSlot`. THE WORLD (pauza, menace) ostáva v client.js - mechanika enginu. Overenie: browser-smoke `--compare` 0 chýb, sonda 52/52, assety zhodné; stopa sa
       líši len v počte `charge-aura.gold` (±2 - Last Stand aura v raf je časovaná hodinami, šum). Ďalej:
-      Jotaro, Escanor.
+      Escanor.
 - [ ] **6b - choreografia do registra (pôvodný návrh).** V `client.js` ostáva ~155 vetiev podľa mien
       (najviac escanor 33, jotaro 30, luffy 23, countess/onre 24, werewolf 14, soldier 12, medusa 10). Návrh:
       háčiky klientskej postavy (`onEffect(kind, e, ctx)` pre vlastné efekty timeline, `castOverlay`,

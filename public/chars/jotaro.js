@@ -6,6 +6,7 @@ export default {
   key: "jotaro",
   meta: { name: "Jotaro",  dir: "jotaro", dirP2: "jotaro" },
   side: "p2",
+  mirrorSlot: "special1", // mirror slot = Special 1 (Star Platinum) - picker L/R, „použité" podľa special1
   specialAnim: { file: "Special_2_P.png",  fps: SPECIAL_FPS, loop: true }, // Star Platinum úder (stred castu; F5 doladí per special1/2 + THE WORLD)
   victoryAnim: { file: "Idle.png", fps: 6, loop: true }, // výhra vedie stand Star Platinum, telo ostáva v idle
   // figúra cez ~0.78 framu (mágovia ~0.52) → menší fill; pásy majú rôznu výšku framu (Idle/Attack/Special 144,

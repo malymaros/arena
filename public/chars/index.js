@@ -6,6 +6,7 @@
 //   key            interný kľúč (= serverový char)
 //   meta           { name, dir, dirP2? } - zobrazované meno, priečinok spritov v public/assets/ a natívna p2 paleta
 //                  (bez dirP2 kreslí p2 cez CSS alt-color filter)
+//   mirrorSlot     "special1" - akcia v mirror slote (zrkadlo enginu kit.mirrorSlot; Jotaro: Special 1, L/R picker)
 //   side           "p1" | "p2" - postava viazaná na stranu (zrkadlo serverového SIDE_CHARS); v turnaji draftovateľná,
 //                  swap do/z nej zakázaný
 //   vamp           1 - vamp kit (charge v dash slote, pasca, mirror-imunita) - podmnožina side (Jotaro nie)
