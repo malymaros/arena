@@ -10,11 +10,15 @@ Ktorý zvuk je čí výber, je evidované priamo v registri.
 | **register** (udalosť → súbor, hlasitosť, status, poznámka) + zdroje a licencie | `public/sounds/manifest.js` |
 | knižnica kandidátov (stiahnuté balíky, každý s licenciou) | `public/sounds/lib/<balík>/` |
 | vlastné súbory vlastníka | `public/sounds/custom/` |
-| **KEDY** čo zaznie (timeline efekty → kľúče, fáza hry → hudba) | `public/client/sound-map.js` |
+| **KEDY** čo zaznie - čistá logika (timeline efekt → kľúč, okno akcie), Node aj prehliadač | `public/sounds/events.js` |
+| napojenie na hru (volá events.js → sound.js, fáza hry → hudba) | `public/client/sound-map.js` |
+| **okná** udalostí zmerané z enginu (ako dlho hra na udalosti stojí) | `public/sounds/windows.json` ← `npm run sounds:windows` |
 | prehrávanie (Web Audio, variácie, panoráma, hudba s prelínaním, nastavenia) | `public/client/sound.js` |
 | tlačidlo 🔊 v hre (mute, master/hudba/efekty, kláves **M**) + zvuky klikov | `public/client/sound-ui.js` |
 | výber a skúšanie zvukov | **`/sound-lab.html`** |
 | kontrola registra (súbory existujú, zdroj+licencia, status, žiadny chýbajúci kľúč) | `test/sounds.mjs` (súčasť `npm test`) |
+| unit testy mapovania | `test/sound-events.mjs` |
+| okná sedia s enginom | `node tools/sound-windows.mjs --check` (súčasť `npm test`) |
 | prehľad: čo je default a čo picked, zdroje | `npm run sounds` |
 
 ## Status v registri
@@ -41,7 +45,7 @@ Vlastný súbor (napríklad nahraté vytie pre vlkolaka) nahraj do `public/sound
 
 1. Do `SOUNDS` v manifeste pridaj kľúč so `status: "default"` a poznámkou, kedy zaznie.
 2. Spusti ho:
-   - timeline efekt zo servera: pridaj ho do mapy `DIRECT` v `sound-map.js`;
+   - timeline efekt zo servera: pridaj ho do mapy `DIRECT` v `public/sounds/events.js` a spusti `npm run sounds:windows`;
    - opakujúce sa efekty (let strely, beaty castu) pridaj aj do `ONCE_PER_RUN`;
    - UI moment: zavolaj `sfx("kľúč")`.
 3. Variant pre postavu: kľúč `<udalosť>.<char>` (napríklad `special.werewolf`) prebije všeobecný `<udalosť>`.
@@ -50,6 +54,15 @@ Vlastný súbor (napríklad nahraté vytie pre vlkolaka) nahraj do `public/sound
 Nový balík do knižnice: rozbaľ ho do `public/sounds/lib/<balík>/` aj s licenciou a doplň `SOUND_SOURCES`
 (názov, autor, URL, licencia). Test zlyhá, ak balík v `SOUND_SOURCES` chýba.
 **Len licencie, ktoré dovoľujú použitie v hre** (CC0 je ideálne; CC-BY si vyžaduje kredit v `SOUND_SOURCES` a v README).
+
+## Okná (cieľová dĺžka zvuku)
+
+Lab pri každej udalosti ukazuje ⏱ **okno v hre**, teda ako dlho hra na tej udalosti stojí, kým ide ďalej.
+Nie je to odhad: `tools/sound-windows.mjs` odohrá seedované zápasy botov všetkých dvojíc postáv priamo na engine
+a každý frame prejde tou istou logikou (`events.js`), ktorá v hre zvuk spúšťa. Pri súboroch ukazuje dĺžku
+(zelená = zmestí sa, oranžová = prečnieva do ďalšej akcie).
+**Keď sa zmení časovanie hry** (`shared/timing.js`) alebo mapovanie, `npm test` zlyhá, kým nespustíš `npm run sounds:windows`.
+Zvukové balíky čas hry nemenia ani nenavrhujú.
 
 ## Pravidlá
 

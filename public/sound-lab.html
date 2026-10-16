@@ -78,7 +78,16 @@
 
 <script type="module">
 import { SOUNDS, SOUND_SOURCES } from "/sounds/manifest.js";
-import { playFile, sfx, entryFor, getOverrides, setOverride, clearOverrides, getSettings, setSettings } from "/client/sound.js";
+import { playFile, sfx, entryFor, getOverrides, setOverride, clearOverrides, getSettings, setSettings, fileDuration } from "/client/sound.js";
+
+// okná z hry (tools/sound-windows.mjs): ako dlho hra na danej udalosti stojí, kým ide ďalej
+const WINDOWS = await fetch("/sounds/windows.json").then(r => r.json()).catch(() => ({}));
+function winText(k) {
+  const w = WINDOWS[k];
+  if (!w) return "";
+  const v = w.values;
+  return v.length > 1 ? `${v[0]}–${v[v.length - 1]} ms (zvyčajne ${w.med})` : `${w.med} ms`;
+}
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -121,7 +130,7 @@ function renderEvents() {
       const e = entryFor(k), st = statusOf(k);
       html += `<div class="ev${k === selected ? " sel" : ""}" data-k="${esc(k)}">
         <button class="play" data-play="${esc(k)}" title="Prehrať">▶</button>
-        <span class="k">${esc(k)}<span class="note">${esc(SOUNDS[k].note || "")}</span></span>
+        <span class="k">${esc(k)}<span class="note">${esc(SOUNDS[k].note || "")}${winText(k) ? ` · ⏱ ${winText(k)}` : ""}</span></span>
         <span class="badge ${st}">${st}</span>
         <span class="files">${e.files.length ? e.files.map(short).map(esc).join(", ") : "<i>ticho</i>"}</span></div>`;
     }
@@ -156,8 +165,9 @@ function renderEditor() {
   $("editor").innerHTML = `
     <div><b class="k">${esc(selected)}</b> <span class="badge ${statusOf(selected)}">${statusOf(selected)}</span></div>
     <div class="hint">${esc(src.note || "")}</div>
+    <div class="hint">${winText(selected) ? `⏱ okno v hre: <b>${winText(selected)}</b> - dlhší zvuk prečnieva do ďalšej akcie` : "⏱ okno v hre: nemerané (UI / hudba / zriedkavá udalosť)"}</div>
     <div class="hint">V registri: ${src.files.length ? src.files.map(short).map(esc).join(", ") : "ticho"} (vol ${src.vol})</div>
-    <div class="chosen">${draft.files.map((f, i) => `<span class="chip" title="${esc(f)}">${esc(short(f))}<button data-play-f="${esc(f)}">▶</button><button data-rm="${i}">✕</button></span>`).join("") || '<span class="hint">ticho (žiadny súbor)</span>'}</div>
+    <div class="chosen">${draft.files.map((f, i) => `<span class="chip" title="${esc(f)}">${esc(short(f))} <small class="dur" data-dur="${esc(f)}"></small><button data-play-f="${esc(f)}">▶</button><button data-rm="${i}">✕</button></span>`).join("") || '<span class="hint">ticho (žiadny súbor)</span>'}</div>
     <div class="hint">Viac súborov = pri každom prehratí náhodne jeden (variácie). Pridaj z knižnice „+".</div>
     <div class="row">Hlasitosť <input type="range" id="evol" min="0" max="1" step="0.05" value="${draft.vol}" /> <span id="evolv">${draft.vol}</span></div>
     <div class="row">
@@ -166,6 +176,15 @@ function renderEditor() {
       <button id="silence">Ticho</button>
       <button id="revert">Späť na register</button>
     </div>`;
+  // dĺžky súborov vs okno: zelená = zmestí sa, oranžová = prečnieva
+  const w = WINDOWS[selected];
+  for (const el of $("editor").querySelectorAll("[data-dur]")) {
+    fileDuration(el.dataset.dur).then(ms => {
+      if (ms == null) { el.textContent = "?"; return; }
+      el.textContent = `${ms} ms`;
+      if (w) el.style.color = ms <= w.med * 1.1 ? "#8fe39a" : "#ffb347";
+    });
+  }
 }
 $("editor").addEventListener("input", (ev) => { if (ev.target.id === "evol") { draft.vol = Number(ev.target.value); $("evolv").textContent = draft.vol; } });
 $("editor").addEventListener("click", (ev) => {

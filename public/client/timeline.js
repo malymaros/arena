@@ -251,7 +251,7 @@ export function schedulePlayTimeline(timeline) {
 
     const beforeP1 = prev?.p1 || state.p1;
     const beforeP2 = prev?.p2 || state.p2;
-    soundForFrame(frame, { p1: beforeP1, p2: beforeP2 });
+    soundForFrame(timeline, i - 1, { p1: beforeP1, p2: beforeP2 });
 
     state.p1 = frame.p1; state.p2 = frame.p2;
     state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending;

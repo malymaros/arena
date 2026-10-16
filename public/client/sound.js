@@ -124,6 +124,12 @@ export function playFile(file, vol = 1, { pan = 0, rate = 1 } = {}) {
   });
 }
 
+// dĺžka súboru v ms (dekódovaný buffer; null = nedá sa načítať) - Sound Lab ju porovnáva s oknom z hry
+export function fileDuration(file) {
+  if (!ensureCtx()) return Promise.resolve(null);
+  return loadBuffer(file).then(buf => (buf ? Math.round(buf.duration * 1000) : null));
+}
+
 /* ---------- hudba ---------- */
 let currentMusicKey = null;
 let musicEl = null;      // práve hrajúci <audio>

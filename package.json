@@ -5,11 +5,12 @@
     "scripts": {
         "start": "node server.js",
         "lint": "eslint .",
-        "test": "node test/balance-ui.mjs && node test/sounds.mjs && node test/engine-scenarios.mjs && node test/game-test.mjs",
+        "test": "node test/balance-ui.mjs && node test/sounds.mjs && node test/sound-events.mjs && node tools/sound-windows.mjs --check && node test/engine-scenarios.mjs && node test/game-test.mjs",
         "golden": "node test/golden.mjs",
         "golden:update": "node test/golden.mjs --update",
         "sim": "node tools/simulate.mjs",
-        "sounds": "node tools/sounds-report.mjs"
+        "sounds": "node tools/sounds-report.mjs",
+        "sounds:windows": "node tools/sound-windows.mjs"
     },
     "dependencies": {
         "express": "^4.19.2",

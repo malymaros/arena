@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { SOUNDS, SOUND_SOURCES } from "../public/sounds/manifest.js";
+import { PLAYED_KEYS } from "../public/sounds/events.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const soundsDir = path.join(root, "public", "sounds");
@@ -28,19 +29,15 @@ for (const pack of fs.readdirSync(path.join(soundsDir, "lib"))) {
   if (pack.startsWith("kenney-")) check(fs.existsSync(path.join(soundsDir, "lib", pack, "License.txt")), `lib/${pack}: chýba License.txt`);
 }
 
-// kľúče prehrávané klientom: literály sfx("…") / setMusic("…") a hodnoty mapy DIRECT v sound-map.js
-const used = new Set();
+// kľúče prehrávané klientom: všetko, čo môže vydať mapovanie timeline (events.js PLAYED_KEYS) + literály
+// sfx("…") / setMusic("…") v UI kóde
+const used = new Set(PLAYED_KEYS);
 const clientDir = path.join(root, "public", "client");
 for (const f of fs.readdirSync(clientDir).filter(f => f.endsWith(".js"))) {
   const src = fs.readFileSync(path.join(clientDir, f), "utf8");
   for (const m of src.matchAll(/\b(?:sfx|setMusic)\(\s*"([a-z0-9_.]+)"/g)) used.add(m[1]);
   for (const m of src.matchAll(/\bsfx\([^;\n]*?\?\s*"([a-z0-9_.]+)"\s*:\s*"([a-z0-9_.]+)"/g)) { used.add(m[1]); used.add(m[2]); } // sfx(a ? "x" : "y")
 }
-const mapSrc = fs.readFileSync(path.join(clientDir, "sound-map.js"), "utf8");
-const direct = mapSrc.match(/const DIRECT = \{([\s\S]*?)\n\};/)?.[1] || "";
-check(direct.length > 0, "sound-map.js: blok DIRECT nenájdený");
-for (const m of direct.matchAll(/:\s*"([a-z0-9_.]+)"/g)) used.add(m[1]);
-for (const t of ["dmg", "heal", "mana", "ik"]) used.add(`tile.${t}`);
 for (const k of used) check(k in SOUNDS, `kľúč "${k}" sa prehráva, ale chýba v manifest.js`);
 
 console.log(`sounds: ${passes} PASS, ${fails} FAIL`);

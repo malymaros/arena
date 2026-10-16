@@ -1,0 +1,2644 @@
+{
+ "attack": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.countess": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.escanor": {
+  "med": 432,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.fire": {
+  "med": 432,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.jotaro": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.lightning": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.luffy": {
+  "med": 432,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.medusa": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.minotaur": {
+  "med": 432,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.naruto": {
+  "med": 432,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.onre": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.soldier": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.wanderer": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack.werewolf": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "attack_whiff": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "block.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "clone_born": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "clone_born.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "clone_die": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "clone_die.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "clone_hit": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "clone_hit.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "clone_summon": {
+  "med": 2340,
+  "values": [
+   2340
+  ]
+ },
+ "clone_summon.naruto": {
+  "med": 2340,
+  "values": [
+   2340
+  ]
+ },
+ "dash": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.escanor": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.fire": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.jotaro": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.lightning": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.luffy": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.medusa": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.minotaur": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.naruto": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.soldier": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.wanderer": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "dash.werewolf": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "demon_attack": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.escanor": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.fire": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.lightning": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.minotaur": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.naruto": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.onre": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.werewolf": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_summon": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "demon_summon.escanor": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "demon_summon.fire": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "demon_summon.lightning": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "demon_summon.minotaur": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "demon_summon.naruto": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "demon_summon.onre": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "demon_summon.werewolf": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "golden_mana": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mana.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_mirror.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "golden_shield.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "heal.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "hit_heavy.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "invalid.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_reveal": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.countess": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.fire": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.jotaro": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.lightning": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.medusa": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.minotaur": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.naruto": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.soldier": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.wanderer": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.werewolf": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "last_hope": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_hope.jotaro": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_hope.lightning": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_hope.luffy": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_hope.werewolf": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.countess": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.escanor": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.fire": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.jotaro": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.lightning": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.luffy": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.medusa": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.minotaur": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.naruto": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.onre": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.soldier": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.wanderer": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand.werewolf": {
+  "med": 1000,
+  "values": [
+   1000
+  ]
+ },
+ "last_stand_banish": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.countess": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.escanor": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.fire": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.jotaro": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.lightning": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.luffy": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.medusa": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.minotaur": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.naruto": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.onre": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.soldier": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.wanderer": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_banish.werewolf": {
+  "med": 1500,
+  "values": [
+   1500
+  ]
+ },
+ "last_stand_kill": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.countess": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.escanor": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.fire": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.jotaro": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.lightning": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.luffy": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.medusa": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.minotaur": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.naruto": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.onre": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.soldier": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.wanderer": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill.werewolf": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.countess": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.escanor": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.fire": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.jotaro": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.lightning": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.luffy": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.medusa": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.minotaur": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.naruto": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.onre": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.soldier": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.wanderer": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_revive.werewolf": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "luffy_ball_form": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "luffy_ball_form.luffy": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "luffy_chomp": {
+  "med": 612,
+  "values": [
+   612
+  ]
+ },
+ "luffy_chomp.luffy": {
+  "med": 612,
+  "values": [
+   612
+  ]
+ },
+ "luffy_explode": {
+  "med": 612,
+  "values": [
+   612
+  ]
+ },
+ "luffy_explode.luffy": {
+  "med": 612,
+  "values": [
+   612
+  ]
+ },
+ "luffy_gp": {
+  "med": 648,
+  "values": [
+   576,
+   648,
+   1080
+  ]
+ },
+ "luffy_gp.luffy": {
+  "med": 648,
+  "values": [
+   576,
+   648,
+   1080
+  ]
+ },
+ "luffy_pull": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "luffy_pull.luffy": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "luffy_roll": {
+  "med": 1260,
+  "values": [
+   612,
+   1260
+  ]
+ },
+ "luffy_roll.luffy": {
+  "med": 1260,
+  "values": [
+   612,
+   1260
+  ]
+ },
+ "mana_drain": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mana_drain.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "melee": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.escanor": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.fire": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.jotaro": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.lightning": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.luffy": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.medusa": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.minotaur": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.naruto": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.onre": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.soldier": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.wanderer": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "melee.werewolf": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "mirror": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.lightning": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.medusa": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.soldier": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.wanderer": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.werewolf": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror_on": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "mirror_on.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "move": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.countess": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.escanor": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.fire": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.jotaro": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.lightning": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.luffy": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.medusa": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.minotaur": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.naruto": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.onre": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.soldier": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.wanderer": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "move.werewolf": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "petrify": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "petrify.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge": {
+  "med": 1080,
+  "values": [
+   1080,
+   1260
+  ]
+ },
+ "recharge.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.luffy": {
+  "med": 1260,
+  "values": [
+   1080,
+   1260
+  ]
+ },
+ "recharge.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "recharge.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "shield.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "soldier_beam": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "soldier_beam.soldier": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "special": {
+  "med": 4860,
+  "values": [
+   2160,
+   2600,
+   2833,
+   4625,
+   4860
+  ]
+ },
+ "special.countess": {
+  "med": 2833,
+  "values": [
+   2833
+  ]
+ },
+ "special.escanor": {
+  "med": 4625,
+  "values": [
+   4625
+  ]
+ },
+ "special.fire": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "special.lightning": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "special.medusa": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "special.minotaur": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "special.naruto": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "special.onre": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "special.soldier": {
+  "med": 2600,
+  "values": [
+   2600
+  ]
+ },
+ "special.wanderer": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "special.werewolf": {
+  "med": 2160,
+  "values": [
+   2160
+  ]
+ },
+ "special1": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "special1.jotaro": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "stoned": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "stoned.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "thread_mark": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "thread_mark.minotaur": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "tile.dmg": {
+  "med": 600,
+  "values": [
+   600
+  ]
+ },
+ "tile.heal": {
+  "med": 600,
+  "values": [
+   600
+  ]
+ },
+ "tile.ik": {
+  "med": 600,
+  "values": [
+   600
+  ]
+ },
+ "tile.mana": {
+  "med": 600,
+  "values": [
+   600
+  ]
+ },
+ "tile_consume": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "tile_consume.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "timestop_end": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "timestop_end.jotaro": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "timestop_start": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "timestop_start.jotaro": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "trap_break": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "trap_break.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "trap_break.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "trap_set": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "trap_set.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "trap_set.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "unpetrify": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "unpetrify.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "vamp_charge": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "vamp_charge.countess": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "vamp_charge.onre": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "vamp_heal_cast": {
+  "med": 810,
+  "values": [
+   810
+  ]
+ },
+ "vamp_heal_cast.countess": {
+  "med": 810,
+  "values": [
+   810
+  ]
+ },
+ "vamp_strike": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "vamp_strike.countess": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "vamp_strike.onre": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "wall_bump": {
+  "med": 1440,
+  "values": [
+   1080,
+   1440
+  ]
+ },
+ "wall_bump.countess": {
+  "med": 1440,
+  "values": [
+   1080,
+   1440
+  ]
+ },
+ "wall_bump.escanor": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.fire": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.jotaro": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.lightning": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.luffy": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.medusa": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.minotaur": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.naruto": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.onre": {
+  "med": 1440,
+  "values": [
+   1080,
+   1440
+  ]
+ },
+ "wall_bump.soldier": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.wanderer": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wall_bump.werewolf": {
+  "med": 1440,
+  "values": [
+   1080,
+   1440
+  ]
+ },
+ "wanderer_no_regen": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "wanderer_no_regen.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "wolf_charge": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wolf_charge.werewolf": {
+  "med": 1440,
+  "values": [
+   1440
+  ]
+ },
+ "wolf_strike": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ },
+ "wolf_strike.werewolf": {
+  "med": 900,
+  "values": [
+   900
+  ]
+ }
+}
