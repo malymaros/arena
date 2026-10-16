@@ -49,7 +49,7 @@ function installed() {
 // ACTIVE z vygenerovaného index.js (čítané ako text - index.js mimo repa by Node nenačítal ako ES modul)
 async function currentActive() {
   if (!fs.existsSync(INDEX)) return null;
-  const m = fs.readFileSync(INDEX, "utf8").match(/^export const ACTIVE = (.*);$/m);
+  const m = fs.readFileSync(INDEX, "utf8").match(/^export const ACTIVE = (.*?);?$/m);
   return m ? JSON.parse(m[1]) : null;
 }
 function writeIndex(active) {

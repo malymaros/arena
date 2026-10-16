@@ -116,6 +116,9 @@ const okSizes = () => ({ "pack.json": 100, "sounds/a.ogg": 1000, "sounds/b.wav":
   check(/ACTIVE = \{"id":"test-pack","version":1\}/.test(idx1), "index.js: aktívny balík", idx1);
   check(tool("install", z1).status !== 0, "install: existujúca verzia sa neprepíše");
   const z2 = zipFile("v2.zip", { ...okPack(), version: 2 }, files);
+  // index.js s CRLF (Git na Windows) - aktívny balík sa musí stále prečítať
+  const idxPath = path.join(root, "index.js");
+  fs.writeFileSync(idxPath, fs.readFileSync(idxPath, "utf8").replace(/\r?\n/g, "\r\n"));
   check(tool("install", z2).status === 0, "install v2 bez --activate");
   check(/ACTIVE = \{"id":"test-pack","version":1\}/.test(fs.readFileSync(path.join(root, "index.js"), "utf8")), "install bez --activate nechá aktívnu verziu");
   check(tool("activate", "test-pack@2").status === 0 && /"version":2\}/.test(fs.readFileSync(path.join(root, "index.js"), "utf8")), "activate v2");
