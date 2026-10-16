@@ -11,8 +11,8 @@ import { FIT_MODES } from "./fit.js";
 
 export const PACK_FORMAT = 1;
 export const AUDIO_EXT = ["ogg", "mp3", "wav", "webm"];
-export const MAX_FILE_BYTES = 2 * 1024 * 1024;
-export const MAX_PACK_BYTES = 20 * 1024 * 1024;
+export const MAX_FILE_BYTES = 8 * 1024 * 1024;  // hudobná skladba má bežne 2–5 MB
+export const MAX_PACK_BYTES = 40 * 1024 * 1024;
 export const WINDOW_TOLERANCE = 0.1; // ±10 % posun okna = upozornenie
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const PATH_RE = /^sounds\/[A-Za-z0-9._\-/]+$/;

@@ -28,9 +28,14 @@
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 18px 0 6px; }
   .tabs { display: flex; gap: 6px; align-items: center; margin: 4px 0 8px; flex-wrap: wrap; }
   .tabs button.on { background: #3a3420; border-color: var(--gold); }
-  .ev { display: grid; grid-template-columns: 30px 190px 78px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+  .ev { display: grid; grid-template-columns: 30px 64px 190px 78px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
   .ev:hover { background: #20242c; }
   .ev.sel { background: #2b2a1d; outline: 1px solid var(--gold); }
+  .ev.changed { background: #2a2410; }
+  .ev .chg { padding: 3px 8px; font-size: 12px; border-color: var(--gold); }
+  .state { padding: 4px 10px; border-radius: 6px; font-weight: 600; }
+  .state.clean { color: var(--green); background: #16301a; }
+  .state.dirty { color: #1a1300; background: var(--orange); }
   .ev.inherited .files { font-style: italic; opacity: .6; }
   .k { font-family: ui-monospace, monospace; }
   .ev .files { color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -39,6 +44,7 @@
   .badge.default { background: #2c3a52; color: #9cc0ff; }
   .badge.picked { background: #1f4223; color: var(--green); }
   .badge.draft { background: #5a4410; color: #ffd76a; }
+  .badge.packed { background: #3a2f52; color: #cdb8ff; }
   .badge.shared { background: #2a2f39; color: var(--dim); }
   .editor { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   .chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; min-height: 26px; }
@@ -69,14 +75,14 @@
     <input type="text" id="m-author" placeholder="autor" title="Autor" />
     <span class="stats" id="m-version"></span>
   </div>
-  <span class="stats" id="stats"></span>
+  <span id="state" class="state"></span>
   <span class="spacer"></span>
   <label class="toggle" title="Koncept hrá v hre v TOMTO prehliadači (po obnovení stránky hry)"><input type="checkbox" id="preview" /> Vyskúšať v hre</label>
   <label>SFX <input type="range" id="vol" min="0" max="1" step="0.05" /></label>
   <button id="stop-music">■ Hudba</button>
   <button id="import">Načítať balík…</button>
-  <button id="export" class="primary">Stiahnuť balík</button>
-  <button id="reset">Nový koncept</button>
+  <button id="export" class="primary">💾 Uložiť balík</button>
+  <button id="reset">Začať odznova</button>
   <input type="file" id="import-file" accept=".zip" hidden />
 </header>
 <main>
@@ -89,7 +95,7 @@
     <div id="list"></div>
   </section>
   <section>
-    <div class="editor" id="editor"><p class="hint">Vyber udalosť vľavo. Zmeny sa ukladajú do <b>konceptu</b> v tomto prehliadači; „Stiahnuť balík“ z neho urobí zip. Do hry ho nasadí vlastník servera (<code>tools/sound-pack.mjs install</code>).</p></div>
+    <div class="editor" id="editor"><p class="hint">Pri zvuku vľavo stlač <b>Zmeniť</b>. Každá zmena sa ukladá hneď (v tomto prehliadači); prvou zmenou vznikne nový balík. <b>💾 Uložiť balík</b> ho stiahne ako zip - do hry ho nasadí vlastník servera.</p></div>
     <h2>Knižnica</h2>
     <div class="drop" id="drop">Pretiahni sem vlastné zvuky (ogg / mp3 / wav / webm) alebo <button id="upload-btn">vyber súbory…</button><input type="file" id="upload" accept=".ogg,.mp3,.wav,.webm,audio/*" multiple hidden /></div>
     <div class="lib-tools">
@@ -121,8 +127,27 @@ const WINDOWS = await fetch("/sounds/windows.json").then(r => r.json()).catch(()
 const CHAR_BASE = ["attack", "attack_whiff", "melee", "move", "dash", "wall_bump", "recharge", "special", "shield", "mirror_on", "block", "mirror", "hit", "hit_heavy", "death", "invalid", "pass"];
 
 /* ---------- koncept ---------- */
-const NEW_DRAFT = () => ({ meta: { id: "moj-balik", name: "Môj balík", author: "", version: 1 }, entries: {} });
+// meta.basedOn = z čoho koncept vychádza; fresh = ešte bez zmeny (prvá zmena založí NOVÝ balík s generickým
+// názvom); dirty = zmeny od posledného uloženia; changed = kľúče zmenené oproti basedOn
+const DEFAULT_BASE = "Predvolené zvuky hry";
+const NEW_DRAFT = () => ({ meta: { id: "moj-balik", name: "Môj balík", author: "", version: 1, basedOn: DEFAULT_BASE, fresh: true, dirty: false, changed: [] }, entries: {} });
 let draft = (await loadDraft().catch(() => null)) || NEW_DRAFT();
+{ // koncept zo staršej verzie labu
+  const m = draft.meta, n = Object.keys(draft.entries).length;
+  m.basedOn ??= DEFAULT_BASE; m.changed ??= Object.keys(draft.entries); m.fresh ??= n === 0; m.dirty ??= n > 0;
+}
+function stamp() {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  return { id: `balik-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`,
+           name: `Balík ${d.getDate()}.${d.getMonth() + 1}. ${p(d.getHours())}:${p(d.getMinutes())}` };
+}
+// každá zmena zvuku: prvá založí nový balík (generický názov, verzia 1), každá označí koncept ako neuložený
+function markChanged(key) {
+  const m = draft.meta;
+  if (m.fresh) { const st = stamp(); Object.assign(m, { id: st.id, name: st.name, version: 1, fresh: false }); toast(`Prvá zmena - vznikol nový balík „${st.name}“ (pôvodný „${m.basedOn}“ ostáva nezmenený).`); }
+  if (!m.changed.includes(key)) m.changed.push(key);
+  m.dirty = true;
+}
 const blobUrls = new Map(); // cesta v balíku → object URL nahratého súboru
 for (const p of await listBlobPaths().catch(() => [])) blobUrls.set(p, URL.createObjectURL(await getBlob(p)));
 // jednorazová migrácia starých prepisov z localStorage (pred konceptom balíka)
@@ -170,9 +195,11 @@ setDraftLayer(draft.entries, urlOf);
 function renderMeta() {
   $("m-name").value = draft.meta.name; $("m-id").value = draft.meta.id; $("m-author").value = draft.meta.author;
   $("m-version").textContent = `v${draft.meta.version}`;
-  const n = Object.keys(draft.entries).length;
-  const picked = Object.values(SOUNDS).filter(e => e.status === "picked").length;
-  $("stats").textContent = `koncept: ${n} zmien · register: ${picked} picked / ${KEYS.size - picked} default`;
+  const m = draft.meta, n = m.changed.length, st = $("state");
+  const zm = `${n} ${n === 1 ? "zmena" : n > 1 && n < 5 ? "zmeny" : "zmien"}`;
+  if (m.fresh) { st.className = "state clean"; st.textContent = `▶ ${m.basedOn} · bez zmien`; }
+  else if (m.dirty) { st.className = "state dirty"; st.textContent = `✎ ${m.name} · ${zm} oproti „${m.basedOn}“ · NEULOŽENÉ`; }
+  else { st.className = "state clean"; st.textContent = `✓ ${m.name} v${m.version - 1} uložený · ${zm} oproti „${m.basedOn}“`; }
 }
 for (const f of ["name", "id", "author"]) $(`m-${f}`).addEventListener("change", (ev) => { draft.meta[f] = ev.target.value.trim(); persist(); });
 $("preview").checked = isPreviewOn();
@@ -196,13 +223,15 @@ function badge(k) {
   const e = effective(k);
   if (!e) return `<span class="badge shared">—</span>`;
   if (e.inherited) return `<span class="badge shared">spoločný</span>`;
-  return e.src === "draft" ? `<span class="badge draft">koncept</span>` : `<span class="badge ${e.src}">${e.src}</span>`;
+  if (e.src === "draft") return draft.meta.changed.includes(k) ? `<span class="badge draft">zmenené</span>` : `<span class="badge packed">z balíka</span>`;
+  return `<span class="badge ${e.src}">${e.src}</span>`;
 }
 function row(k, label, note) {
   const e = effective(k);
   const files = e ? (e.files.length ? e.files.map(short).map(esc).join(", ") : "<i>ticho</i>") : "";
-  return `<div class="ev${k === selected ? " sel" : ""}${e?.inherited ? " inherited" : ""}" data-k="${esc(k)}">
+  return `<div class="ev${k === selected ? " sel" : ""}${e?.inherited ? " inherited" : ""}${draft.meta.changed.includes(k) ? " changed" : ""}" data-k="${esc(k)}">
     <button class="play" data-play="${esc(k)}" title="Prehrať">▶</button>
+    <button class="chg" data-edit="${esc(k)}" title="Zmeniť tento zvuk">Zmeniť</button>
     <span class="k">${esc(label)}<span class="note">${esc(note || "")}${winText(k) ? ` · ⏱ ${winText(k)}` : ""}</span></span>
     ${badge(k)}<span class="files">${files}</span></div>`;
 }
@@ -232,6 +261,7 @@ $("list").addEventListener("click", (ev) => {
   if (p) { ev.stopPropagation(); playKey(p.dataset.play); return; }
   const r = ev.target.closest(".ev");
   if (r) select(r.dataset.k);
+  if (ev.target.closest("[data-edit]")) $("editor").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 function playKey(k) {
   const e = effective(k);
@@ -271,14 +301,13 @@ function renderEditor() {
     <div class="hint">${w ? `⏱ okno v hre: <b>${winText(selected)}</b>` : "⏱ okno v hre: nemerané (UI / hudba / zriedkavá udalosť)"}</div>
     <div class="hint">${e?.inherited ? `Teraz dedí spoločný zvuk „${esc(baseOf(selected))}“.` : reg ? `V registri: ${reg.files.length ? reg.files.map(short).map(esc).join(", ") : "ticho"} (${reg.status})` : ""}</div>
     <div class="chosen">${edit.files.map((f, i) => `<span class="chip" title="${esc(f)}">${esc(short(f))} <small data-dur="${esc(f)}"></small><button class="p" data-play-f="${esc(f)}">▶</button><button data-rm="${i}">✕</button></span>`).join("") || '<span class="hint">ticho (žiadny súbor)</span>'}</div>
-    <div class="hint">Viac súborov = pri každom prehratí náhodne jeden (variácie). Pridaj z knižnice „+“.</div>
+    <div class="hint">Zvuk pridáš z knižnice dole cez „+“ (viac súborov = pri každom prehratí náhodne jeden). <b>Každá zmena sa ukladá hneď.</b></div>
     <div class="row">Keď je zvuk dlhší ako okno:
       <select id="efit">${[["keep", "nechať doznieť celý"], ["fade", "stíšiť na konci okna"], ["fit", "zrýchliť na okno (max ±15 %, inak stíšiť)"]]
         .map(([v, t]) => `<option value="${v}"${edit.fit === v ? " selected" : ""}>${t}</option>`).join("")}</select></div>
     <div class="row">Hlasitosť <input type="range" id="evol" min="0" max="1" step="0.05" value="${edit.vol}" /> <span id="evolv">${edit.vol}</span></div>
     <div class="row">
       <button id="try">▶ Skúsiť</button>
-      <button id="apply" class="primary">Uložiť do konceptu</button>
       <button id="silence">Ticho</button>
       <button id="drop-entry" ${draft.entries[selected] ? "" : "disabled"}>${ch ? "Späť na spoločný / register" : "Späť na register"}</button>
     </div>`;
@@ -290,16 +319,24 @@ function renderEditor() {
     });
   }
 }
+// zmena v editore = hneď do konceptu
+async function commit() {
+  draft.entries[selected] = { files: [...edit.files], vol: edit.vol, fit: edit.fit };
+  markChanged(selected);
+  await persist();
+}
 $("editor").addEventListener("input", (ev) => { if (ev.target.id === "evol") { edit.vol = Number(ev.target.value); $("evolv").textContent = edit.vol; } });
-$("editor").addEventListener("change", (ev) => { if (ev.target.id === "efit") edit.fit = ev.target.value; });
+$("editor").addEventListener("change", (ev) => {
+  if (ev.target.id === "efit") { edit.fit = ev.target.value; commit(); }
+  if (ev.target.id === "evol") commit();
+});
 $("editor").addEventListener("click", async (ev) => {
   const t = ev.target;
   if (t.dataset.playF) return playAny(t.dataset.playF, edit.vol, selected, edit.fit);
-  if (t.dataset.rm) { edit.files.splice(Number(t.dataset.rm), 1); renderEditor(); renderLib(); return; }
+  if (t.dataset.rm) { edit.files.splice(Number(t.dataset.rm), 1); await commit(); return; }
   if (t.id === "try" && edit.files.length) return playAny(edit.files[Math.floor(Math.random() * edit.files.length)], edit.vol, selected, edit.fit);
-  if (t.id === "silence") { edit.files = []; renderEditor(); renderLib(); return; }
-  if (t.id === "apply") { draft.entries[selected] = { files: [...edit.files], vol: edit.vol, fit: edit.fit }; await persist(); toast("Uložené do konceptu."); }
-  if (t.id === "drop-entry") { delete draft.entries[selected]; await persist(); select(selected); }
+  if (t.id === "silence") { edit.files = []; await commit(); return; }
+  if (t.id === "drop-entry") { delete draft.entries[selected]; markChanged(selected); await persist(); select(selected); }
 });
 
 /* ---------- knižnica ---------- */
@@ -312,7 +349,7 @@ async function loadLibrary() {
   const cur = $("pack").value;
   $("pack").innerHTML = `<option value="">všetky balíky</option>` + Object.keys(library).sort().map(p =>
     `<option value="${esc(p)}">${esc(p)} (${library[p].length})${SOUND_SOURCES[p] ? " – " + esc(SOUND_SOURCES[p].license) : ""}</option>`).join("");
-  $("pack").value = cur;
+  $("pack").value = library[cur]?.length ? cur : ""; // prázdna skupina (napr. po „Začať odznova“) → všetky
   renderLib();
 }
 const packOfPath = (p) => (p.startsWith("sounds/lib/") ? p.split("/")[2] : blobUrls.has(p) ? "nahraté (koncept)" : "custom");
@@ -331,7 +368,7 @@ $("q").oninput = renderLib;
 $("lib").addEventListener("click", (ev) => {
   const t = ev.target;
   if (t.dataset.playF) return playAny(t.dataset.playF, edit?.vol ?? 1, selected, edit?.fit);
-  if (t.dataset.add && edit && !edit.files.includes(t.dataset.add)) { edit.files.push(t.dataset.add); renderEditor(); renderLib(); }
+  if (t.dataset.add && edit && !edit.files.includes(t.dataset.add)) { edit.files.push(t.dataset.add); commit(); }
 });
 
 /* ---------- nahratie vlastných súborov ---------- */
@@ -387,6 +424,7 @@ async function buildPack() {
   return { pack, zip, report };
 }
 $("export").onclick = async () => {
+  if (draft.meta.fresh) { toast("Zatiaľ si nič nezmenil - pri zvuku stlač „Zmeniť“."); return; }
   let res;
   try { res = await buildPack(); } catch (e) { toast(`Export zrušený: ${e.message}`); return; }
   if (!res.zip) { showReport("Balík sa nedá stiahnuť", res.report, []); return; }
@@ -395,6 +433,7 @@ $("export").onclick = async () => {
   a.download = `${res.pack.id}-v${res.pack.version}.zip`;
   a.click();
   draft.meta.version++; // ďalšie zmeny budú ďalšia verzia
+  draft.meta.dirty = false;
   await persist();
   toast(`Stiahnuté: ${a.download}`);
 };
@@ -414,7 +453,7 @@ async function importZip(bytes) {
       await putBlob(name, blob);
       blobUrls.set(name, URL.createObjectURL(blob));
     }
-    draft = { meta: { id: pack.id, name: pack.name, author: pack.author || "", version: pack.version + 1 }, entries: report.pack.entries };
+    draft = { meta: { id: pack.id, name: pack.name, author: pack.author || "", version: pack.version + 1, basedOn: `${pack.name} v${pack.version}`, fresh: true, dirty: false, changed: [] }, entries: report.pack.entries };
     await persist(); await loadLibrary();
     toast("Balík načítaný - pokračuj v úprave.");
   };
@@ -431,7 +470,7 @@ $("import-file").onchange = async (ev) => {
     res.report.level === "incompatible" ? [] : [["Načítať do konceptu (prepíše aktuálny)", res.load]]);
 };
 async function resetDraft() { await clearDraft(); blobUrls.forEach(u => URL.revokeObjectURL(u)); blobUrls.clear(); draft = NEW_DRAFT(); await persist(); await loadLibrary(); }
-$("reset").onclick = () => showReport("Nový koncept", { level: "warnings", errors: [], warnings: ["Zahodí všetky zmeny a nahraté súbory v tomto prehliadači. Ak ich chceš zachovať, najprv „Stiahnuť balík“."], notes: [] },
+$("reset").onclick = () => showReport("Začať odznova", { level: "warnings", errors: [], warnings: ["Zahodí všetky zmeny a nahraté súbory v tomto prehliadači a vráti predvolené zvuky hry. Ak ich chceš zachovať, najprv „💾 Uložiť balík“."], notes: [] },
   [["Zahodiť a začať odznova", resetDraft]]);
 
 function showReport(title, rep, actions) {
@@ -448,11 +487,15 @@ function showReport(title, rep, actions) {
   $("dlg-actions").appendChild(c);
   $("dlg").showModal();
 }
+// hlásenia pod sebou (viac naraz sa neprekrýva)
+const toasts = document.createElement("div");
+Object.assign(toasts.style, { position: "fixed", bottom: "18px", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", gap: "6px", alignItems: "center", zIndex: 10 });
+document.body.appendChild(toasts);
 function toast(msg) {
   const t = document.createElement("div");
   t.textContent = msg;
-  Object.assign(t.style, { position: "fixed", bottom: "18px", left: "50%", transform: "translateX(-50%)", background: "#2b2a1d", border: "1px solid var(--gold)", padding: "8px 14px", borderRadius: "8px", zIndex: 10 });
-  document.body.appendChild(t);
+  Object.assign(t.style, { background: "#2b2a1d", border: "1px solid var(--gold)", padding: "8px 14px", borderRadius: "8px" });
+  toasts.appendChild(t);
   setTimeout(() => t.remove(), 3500);
 }
 

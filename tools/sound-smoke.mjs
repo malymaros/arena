@@ -99,6 +99,26 @@ try {
   const layer = await ev(`import("/client/sound.js").then(async m => { await m.soundReady; return [m.entryFor("hit.naruto")?.layer, m.entryFor("special")?.layer, m.entryFor("hit")?.layer]; })`);
   check(JSON.stringify(layer) === JSON.stringify(["draft", "draft", "base"]), "hra hrá koncept nad základom", JSON.stringify(layer));
   await ev(`localStorage.setItem("arena.soundPreview", "0")`);
+  await send("Page.navigate", { url: `${URL0}/sound-lab.html` }); await sleep(2500);
+  console.log("lab - zmena cez UI:");
+  await ev(`window.__soundLab.resetDraft()`);
+  const fresh = await ev(`document.getElementById("state").className + "|" + document.getElementById("state").textContent`);
+  check(/clean/.test(fresh) && /bez zmien/.test(fresh), "na začiatku: predvolené zvuky bez zmien", fresh);
+  await ev(`document.querySelector('[data-edit="hit"]').click()`); await sleep(300);
+  await ev(`document.getElementById("q").value = "zap2"; document.getElementById("q").dispatchEvent(new Event("input")); document.querySelector("#lib [data-add]").click()`); await sleep(500);
+  const dirty = await ev(`JSON.stringify({ st: document.getElementById("state").className + "|" + document.getElementById("state").textContent,
+    meta: window.__soundLab.getDraft().meta, row: document.querySelector('.ev[data-k="hit"]').className, badge: document.querySelector('.ev[data-k="hit"] .badge').textContent })`);
+  const d = JSON.parse(dirty);
+  check(/dirty/.test(d.st) && /NEULOŽENÉ/.test(d.st) && /1 zmena/.test(d.st), "po zmene: hneď uložené do konceptu, stav NEULOŽENÉ", d.st);
+  check(/^Balík /.test(d.meta.name) && /^balik-\d{8}-\d{4}$/.test(d.meta.id) && d.meta.version === 1, "prvá zmena založí nový balík s generickým názvom", JSON.stringify(d.meta));
+  check(/changed/.test(d.row) && d.badge === "zmenené", "riadok označený ako zmenený");
+  await ev(`document.getElementById("export").click()`); await sleep(1500);
+  const saved = await ev(`document.getElementById("state").className + "|" + document.getElementById("state").textContent`);
+  check(/clean/.test(saved) && /uložený/.test(saved), "po uložení: stav uložené", saved);
+  await send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
+  const shot = (await send("Page.captureScreenshot")).result?.data;
+  if (shot && process.env.SOUND_SMOKE_SHOT) fs.writeFileSync(process.env.SOUND_SMOKE_SHOT, Buffer.from(shot, "base64"));
+
   check(net.bad.length === 0, "žiadne zlyhané požiadavky na zvuky", net.bad.join(", "));
   check(errs.length === 0, "žiadne JS chyby", errs.join(" | "));
   ws.close();

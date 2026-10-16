@@ -26,15 +26,17 @@ Zvuky sa robia v **Sound Labe** (`/sound-lab.html`) ako **zvukový balík**, ted
 
 1. Otvor `/sound-lab.html` (lokálne `http://localhost:3000/sound-lab.html` alebo na živom webe; server nič neukladá).
 2. Vpravo hore vyplň **názov**, **id** a **autora** balíka.
-3. **Všetky udalosti** alebo **Podľa postavy**: klik na riadok otvorí editor.
+3. **Všetky udalosti** alebo **Podľa postavy**: pri zvuku stlač **Zmeniť** (▶ ho prehrá).
    - ⏱ **okno v hre** ukazuje, ako dlho hra na tej udalosti stojí. Dĺžky súborov sú zelené, ak sa zmestia, a oranžové, ak prečnievajú.
    - Pohľad **Podľa postavy** ukazuje všetky zvuky jednej postavy. Šedé „spoločný“ znamená, že hrá rovnaký zvuk ako ostatné postavy.
      Keď jej priradíš vlastný, vznikne kľúč `<udalosť>.<postava>` (napríklad `hit.naruto` = Narutov hlas pri zásahu).
-4. Z **knižnice** pridávaš zvuky cez „+“. Vlastné súbory (ogg/mp3/wav/webm, max 2 MB) **pretiahneš** do poľa nad knižnicou.
+4. Z **knižnice** pridávaš zvuky cez „+“. Vlastné súbory (ogg/mp3/wav/webm, max 8 MB) **pretiahneš** do poľa nad knižnicou.
    Viac súborov pri jednej udalosti = pri každom prehratí náhodne jeden.
-5. Nastav hlasitosť a režim **„Keď je zvuk dlhší ako okno“** a stlač **Uložiť do konceptu**. Koncept prežije refresh aj zatvorenie okna.
+5. Nastav hlasitosť a režim **„Keď je zvuk dlhší ako okno“**. **Každá zmena sa uloží hneď** do konceptu, ktorý prežije refresh aj zatvorenie okna.
+   Prvou zmenou vznikne **nový balík** s generickým názvom (napríklad „Balík 16.10. 14:32“). Pôvodný ostáva nezmenený.
+   Hore je stále vidieť stav: *▶ bez zmien* / *✎ N zmien oproti „…“ · NEULOŽENÉ* / *✓ uložený*. Zmenené zvuky majú v zozname štítok **zmenené**.
 6. **Vyskúšať v hre**: zapni prepínač a obnov stránku hry. Hra potom v tomto prehliadači hrá tvoj koncept.
-7. **Stiahnuť balík** uloží `<id>-v<verzia>.zip`. Verzia konceptu sa potom zvýši o 1.
+7. **💾 Uložiť balík** stiahne `<id>-v<verzia>.zip`. Ďalšie zmeny sú ďalšia verzia toho istého balíka. **Začať odznova** vráti predvolené zvuky.
    **Načítať balík…** otvorí zip (svoj alebo cudzí) a ukáže report kompatibility. Potom môžeš v balíku pokračovať.
 
 ## Ako nasadiť balík (len vlastník servera)
