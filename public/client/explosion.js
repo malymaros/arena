@@ -2,11 +2,14 @@
 // volajú ho aj moduly fx (C.spawnExplosionAt).
 import { charDirFor, ensureSpriteMeta, drawSprite } from "/client/sprites.js";
 import { cellToPx, TILE_H, TILE_W, actorsEl } from "/client/dom.js";
+import { board } from "/client/session.js";
+import { sfx } from "/client/sound.js";
 
 /* ---------- výbuch (Vojakov Explosion.png): dopad snajperského lúča aj koniec letu granátu ---------- */
 // prehrá sa raz na bunke (lúč a mierenie: public/chars/fx/soldier.js)
 export function spawnExplosionAt(cell, slot, sizeMul = 1.4, fps = 12) {
   if (!Array.isArray(cell)) return;
+  sfx("explosion", { pan: board.w > 1 ? (cell[0] / (board.w - 1) * 2 - 1) * 0.6 : 0 });
   const dir = charDirFor("soldier", slot);
   const { left, top } = cellToPx(cell[0], cell[1]);
   const size = Math.round(TILE_H * sizeMul);

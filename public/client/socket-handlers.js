@@ -26,6 +26,8 @@ import { enterTimestopMode, tsOverlaySet } from "/client/the-world.js";
 import { CHAR_BUTTONS } from "/chars/index.js";
 import { hydratePix, pixelizeEmoji } from "/client/pix.js";
 import { ghostCharAt } from "/client/ghost.js";
+import { sfx } from "/client/sound.js";
+import { syncMusic } from "/client/sound-map.js";
 
 /* ---------- Sockets ---------- */
 // you_are nesie slot (ľavá/pravá rola, fixná na celú sériu: host=p1) aj či som host
@@ -50,6 +52,7 @@ socket.on("color_roll", (info) => {
   crResultEl.classList.add("hidden");
   crResultEl.innerHTML = "";
   // 4 celé otáčky + dobeh na cieľovú farbu ± rozptyl (len vizuálny - výsledok je daný)
+  sfx("ui.color_roll");
   const target = (white ? 270 : 90) + (Math.random() * 40 - 20);
   crArrowEl.getAnimations().forEach(a => a.cancel());
   const spin = crArrowEl.animate(
@@ -128,6 +131,7 @@ socket.on("state", (s) => {
   }
   // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
   if (!s.timeline) playback.finalRoundActive = !!s.goldLocked;
+  syncMusic(s, playback.finalRoundActive);
 
   // arena
   if (s.arena && s.arena !== arenaEl.dataset.key) {

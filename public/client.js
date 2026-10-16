@@ -13,6 +13,7 @@ import "/client/retry.js";
 import "/client/raf.js";              // hlavná slučka kreslenia
 import "/client/admin.js";            // ?admin=1 → tlačidlo reset roomky
 import "/client/debug-hope.js";       // ?hopedebug=1 → náhľad hope sprite
+import "/client/sound-ui.js";         // tlačidlo 🔊 + UI zvuky klikov
 import { actors } from "/client/actors.js";
 import { initCharFx, fxAll } from "/client/fx-registry.js";
 import { gridEl, actorsEl, TILE_W, TILE_H, GAP, cellToPx } from "/client/dom.js";

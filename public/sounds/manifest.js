@@ -1,0 +1,153 @@
+// public/sounds/manifest.js - REGISTER ZVUKOV: herná udalosť → zvukový súbor(y). Jediný zdroj pravdy o tom,
+// čo hrá kedy, odkiaľ súbor je a kto ho vybral. Čisté dáta (importovateľné aj v Node - test/sounds.mjs, tools/sounds-report.mjs).
+//
+// Položka:  "kľúč": { files: [...], vol, status, note? }
+//   files  - cesty relatívne k /sounds/ (viac súborov = náhodná variácia pri každom prehratí; [] = ticho)
+//   vol    - hlasitosť 0–1 (násobí sa hlasitosťou efektov/hudby z nastavení)
+//   status - "default" = dohľadal Claude (zatiaľ len odhad podľa názvu súboru, nikto ho nepočul v hre)
+//            "picked"  = vybral vlastník (tvorivé rozhodnutie - bez pýtania NEMENIŤ)
+//   note   - voliteľná poznámka (prečo / čo ešte chýba)
+//
+// Kľúče postáv: "<udalosť>.<char>" prebíja všeobecné "<udalosť>" (napr. "special.fire" pred "special").
+// Zdroj súboru sa odvodí z priečinka: lib/<balík>/ → SOUND_SOURCES[<balík>], custom/ → vlastné súbory.
+// Výber a skúšanie: /sound-lab.html (prehrá knižnicu, priradí, exportuje zmeny sem). Workflow: docs/SOUNDS.md.
+
+export const SOUND_SOURCES = {
+  "kenney-impact-sounds":    { title: "Impact Sounds",    author: "Kenney", url: "https://kenney.nl/assets/impact-sounds",    license: "CC0 1.0" },
+  "kenney-interface-sounds": { title: "Interface Sounds", author: "Kenney", url: "https://kenney.nl/assets/interface-sounds", license: "CC0 1.0" },
+  "kenney-rpg-audio":        { title: "RPG Audio",        author: "Kenney", url: "https://kenney.nl/assets/rpg-audio",        license: "CC0 1.0" },
+  "kenney-sci-fi-sounds":    { title: "Sci-fi Sounds",    author: "Kenney", url: "https://kenney.nl/assets/sci-fi-sounds",    license: "CC0 1.0" },
+  "kenney-digital-audio":    { title: "Digital Audio",    author: "Kenney", url: "https://kenney.nl/assets/digital-audio",    license: "CC0 1.0" },
+  "kenney-music-jingles":    { title: "Music Jingles",    author: "Kenney", url: "https://kenney.nl/assets/music-jingles",    license: "CC0 1.0" },
+  "cynicmusic":              { title: "Battle Theme A / Town Theme RPG", author: "cynicmusic.com",
+                               url: "https://opengameart.org/content/battle-theme-a", license: "CC0 1.0" },
+  "custom":                  { title: "Vlastné súbory vlastníka", author: "—", url: "", license: "vlastné" },
+};
+
+const IMP = "lib/kenney-impact-sounds/";
+const UI  = "lib/kenney-interface-sounds/";
+const RPG = "lib/kenney-rpg-audio/";
+const SCI = "lib/kenney-sci-fi-sounds/";
+const DIG = "lib/kenney-digital-audio/";
+const JIN = "lib/kenney-music-jingles/";
+const MUS = "lib/cynicmusic/";
+const vars = (base, n, ext = ".ogg") => Array.from({ length: n }, (_, i) => `${base}${String(i).padStart(3, "0")}${ext}`);
+
+export const SOUNDS = {
+  /* ---------- hudba (slučka) ---------- */
+  "music.menu":   { files: [MUS + "cynic-town-theme.mp3"],     vol: 0.45, status: "default", note: "lobby, výber postavy, draft" },
+  "music.battle": { files: [MUS + "cynic-battle-theme-a.mp3"], vol: 0.40, status: "default", note: "hra (obe postavy zvolené)" },
+  "music.final":  { files: [],                                 vol: 0.40, status: "default", note: "FINAL ROUND (Last Stand) - prázdne = hrá ďalej music.battle" },
+
+  /* ---------- koniec hry ---------- */
+  "game.win":   { files: [JIN + "jingles_NES00.ogg"], vol: 0.7, status: "default" },
+  "game.lose":  { files: [JIN + "jingles_NES09.ogg"], vol: 0.7, status: "default" },
+  "death":      { files: [IMP + "impactBell_heavy_002.ogg"], vol: 0.6, status: "default", note: "porazený padá" },
+
+  /* ---------- UI ---------- */
+  "ui.click":       { files: [UI + "click_002.ogg"],        vol: 0.35, status: "default", note: "každé tlačidlo" },
+  "ui.lock_in":     { files: [UI + "confirmation_002.ogg"], vol: 0.6,  status: "default" },
+  "ui.pick":        { files: [UI + "select_003.ogg"],       vol: 0.6,  status: "default", note: "voľba postavy" },
+  "ui.timer_tick":  { files: [UI + "tick_002.ogg"],         vol: 0.5,  status: "default", note: "posledných 5 s ťahu" },
+  "ui.color_roll":  { files: [UI + "scroll_003.ogg"],       vol: 0.5,  status: "default", note: "roztočenie yin-yang šípky" },
+  "round.start":    { files: [JIN + "jingles_HIT03.ogg"],   vol: 0.5,  status: "default", note: "banner ROUND N" },
+  "round.final":    { files: [JIN + "jingles_STEEL05.ogg"], vol: 0.6,  status: "default", note: "banner FINAL ROUND" },
+
+  /* ---------- pohyb ---------- */
+  "move":      { files: vars(IMP + "footstep_concrete_", 5), vol: 0.5, status: "default" },
+  "dash":      { files: [RPG + "cloth1.ogg", RPG + "cloth2.ogg", RPG + "cloth3.ogg", RPG + "cloth4.ogg"], vol: 0.7, status: "default" },
+  "wall_bump": { files: vars(IMP + "impactSoft_medium_", 5), vol: 0.5, status: "default", note: "akcia do steny" },
+  "teleport":  { files: [DIG + "phaseJump3.ogg"], vol: 0.5, status: "default", note: "turnajový swap, teleport pasce" },
+
+  /* ---------- útoky ---------- */
+  "attack":         { files: vars(SCI + "laserSmall_", 5), vol: 0.45, status: "default", note: "výstrel basic strely" },
+  "attack.soldier": { files: vars(IMP + "impactMetal_light_", 5), vol: 0.5, status: "default", note: "hod granátu" },
+  "attack_whiff":   { files: [RPG + "knifeSlice.ogg"], vol: 0.5, status: "default", note: "strela mimo hraciu plochu" },
+  "melee":          { files: vars(IMP + "impactPunch_medium_", 5), vol: 0.6, status: "default", note: "švih/úder melee" },
+  "explosion":      { files: vars(SCI + "explosionCrunch_", 5), vol: 0.5, status: "default", note: "výbuch granátu / sniper zásahu" },
+
+  /* ---------- zásahy a obrany ---------- */
+  "hit":         { files: vars(IMP + "impactPunch_heavy_", 5), vol: 0.6, status: "default", note: "zásah do HP (< 8 dmg)" },
+  "hit_heavy":   { files: [SCI + "lowFrequency_explosion_000.ogg"], vol: 0.6, status: "default", note: "zásah ≥ 8 dmg" },
+  "block":       { files: vars(IMP + "impactMetal_heavy_", 5), vol: 0.55, status: "default", note: "štít zablokoval" },
+  "mirror":      { files: [IMP + "impactBell_heavy_001.ogg"], vol: 0.55, status: "default", note: "zrkadlo odrazilo" },
+  "shield":      { files: [SCI + "forceField_000.ogg"], vol: 0.5, status: "default", note: "aktivácia štítu" },
+  "mirror_on":   { files: [UI + "glass_003.ogg"], vol: 0.6, status: "default", note: "aktivácia zrkadla" },
+  "golden_shield": { files: [SCI + "forceField_002.ogg"], vol: 0.6, status: "default" },
+  "golden_mirror": { files: [UI + "glass_005.ogg"], vol: 0.7, status: "default" },
+
+  /* ---------- mana, HP, stav ---------- */
+  "recharge":    { files: [DIG + "powerUp2.ogg"], vol: 0.45, status: "default" },
+  "golden_mana": { files: [DIG + "powerUp8.ogg"], vol: 0.5, status: "default" },
+  "pass":        { files: [UI + "question_002.ogg"], vol: 0.5, status: "default", note: "💭 THINKING" },
+  "invalid":     { files: [UI + "error_002.ogg"], vol: 0.45, status: "default", note: "prečiarknutá akcia (chýba mana / blok)" },
+  "heal":        { files: [DIG + "powerUp5.ogg"], vol: 0.5, status: "default", note: "liečenie (Vampire bonus)" },
+  "mana_drain":  { files: [DIG + "phaserDown1.ogg"], vol: 0.5, status: "default", note: "Onryō bonus" },
+  "petrify":     { files: vars(IMP + "impactMining_", 5), vol: 0.6, status: "default" },
+  "unpetrify":   { files: vars(IMP + "impactGlass_light_", 5), vol: 0.5, status: "default", note: "kameň sa rozpadne" },
+
+  /* ---------- dlaždice ---------- */
+  "tile.dmg":     { files: vars(IMP + "impactSoft_heavy_", 5), vol: 0.45, status: "default" },
+  "tile.heal":    { files: [DIG + "powerUp5.ogg"], vol: 0.5, status: "default" },
+  "tile.mana":    { files: [DIG + "phaserUp3.ogg"], vol: 0.5, status: "default" },
+  "tile.ik":      { files: [SCI + "lowFrequency_explosion_001.ogg"], vol: 0.6, status: "default" },
+  "tile_consume": { files: [UI + "drop_002.ogg"], vol: 0.5, status: "default", note: "Fire/power tile spotrebovaná" },
+
+  /* ---------- statusy a mechaniky ---------- */
+  "labyrinth":      { files: [SCI + "doorClose_000.ogg"], vol: 0.6, status: "default", note: "kliatba labyrintu" },
+  "labyrinth_end":  { files: [SCI + "doorOpen_001.ogg"], vol: 0.6, status: "default", note: "ESCAPED" },
+  "clone_summon":   { files: [DIG + "phaseJump1.ogg"], vol: 0.5, status: "default" },
+  "clone_die":      { files: [DIG + "phaserDown2.ogg"], vol: 0.5, status: "default", note: "puf klona" },
+  "trap_set":       { files: [RPG + "metalLatch.ogg"], vol: 0.6, status: "default", note: "počuje len majiteľ (súperovi je efekt odfiltrovaný)" },
+  "trap_trigger":   { files: [UI + "glitch_002.ogg"], vol: 0.6, status: "default" },
+  "trap_break":     { files: vars(IMP + "impactGlass_medium_", 5), vol: 0.5, status: "default" },
+  "timestop_start": { files: [DIG + "lowDown.ogg"], vol: 0.7, status: "default", note: "THE WORLD" },
+  "timestop_end":   { files: [DIG + "highUp.ogg"], vol: 0.7, status: "default" },
+  "demon_summon":   { files: [SCI + "lowFrequency_explosion_000.ogg"], vol: 0.7, status: "default", note: "Last Stand démon" },
+  "last_stand":     { files: [JIN + "jingles_STEEL10.ogg"], vol: 0.6, status: "default", note: "pakt Last Stand" },
+  "last_hope":      { files: [DIG + "powerUp11.ogg"], vol: 0.6, status: "default" },
+
+  /* ---------- zatiaľ ticho (udalosť je napojená, čaká na výber vlastníka) ---------- */
+  "demon_attack":      { files: [], vol: 0.7, status: "default", note: "útok démona (Last Stand)" },
+  "last_stand_kill":   { files: [], vol: 0.7, status: "default", note: "smrť z paktu / banish" },
+  "last_stand_revive": { files: [], vol: 0.7, status: "default", note: "oživenie po pakte" },
+  "last_stand_banish": { files: [], vol: 0.7, status: "default", note: "duch opúšťa postavu (banish)" },
+  "stoned":            { files: [], vol: 0.5, status: "default", note: "skamenený preskakuje akciu" },
+  "labyrinth_reveal":  { files: [], vol: 0.6, status: "default", note: "skrytý súper sa zjaví pred zásahom" },
+  "thread_mark":       { files: [], vol: 0.5, status: "default", note: "stretnutie na Ariadninej niti" },
+  "clone_born":        { files: [], vol: 0.5, status: "default", note: "klon sa zrodil (po summone)" },
+  "clone_hit":         { files: [], vol: 0.4, status: "default", note: "dmg dlaždica na klonovi" },
+  "teleport_in":       { files: [], vol: 0.5, status: "default", note: "objavenie (swap / pasca)" },
+  "vamp_heal_cast":    { files: [], vol: 0.5, status: "default", note: "Countess liečivé beaty" },
+  "luffy_ball_form":   { files: [], vol: 0.6, status: "default", note: "Luffy premena na guľu" },
+  "wanderer_no_regen": { files: [], vol: 0.5, status: "default", note: "Wanderer prišiel o regeneráciu" },
+
+  /* ---------- specialy (cast) - kľúč special.<char> ---------- */
+  "special":           { files: [DIG + "zap1.ogg"], vol: 0.5, status: "default", note: "fallback pre postavu bez vlastného" },
+  "special.fire":      { files: [SCI + "explosionCrunch_000.ogg"], vol: 0.55, status: "default" },
+  "special.lightning": { files: [SCI + "laserLarge_000.ogg"], vol: 0.55, status: "default" },
+  "special.wanderer":  { files: [DIG + "phaserDown3.ogg"], vol: 0.55, status: "default" },
+  "special.medusa":    { files: [UI + "glitch_001.ogg"], vol: 0.6, status: "default" },
+  "special.minotaur":  { files: [SCI + "doorClose_002.ogg"], vol: 0.6, status: "default" },
+  "special.naruto":    { files: [RPG + "bookFlip2.ogg"], vol: 0.6, status: "default", note: "pečate rúk" },
+  "special.escanor":   { files: [SCI + "laserLarge_003.ogg"], vol: 0.6, status: "default", note: "Cruel Sun" },
+  "special.soldier":   { files: [DIG + "tone1.ogg"], vol: 0.4, status: "default", note: "zamierenie (laser)" },
+  "special.werewolf":  { files: [DIG + "lowRandom.ogg"], vol: 0.55, status: "default", note: "chýba vytie - kandidát na vlastný súbor" },
+  "special.countess":  { files: [DIG + "phaserDown1.ogg"], vol: 0.5, status: "default" },
+  "special.onre":      { files: [UI + "glitch_003.ogg"], vol: 0.6, status: "default" },
+  "special.jotaro":    { files: [IMP + "impactPunch_heavy_002.ogg"], vol: 0.6, status: "default", note: "Special 2 (THE WORLD má timestop_start)" },
+  "special.luffy":     { files: [RPG + "creak1.ogg"], vol: 0.6, status: "default" },
+
+  /* ---------- akcie konkrétnych postáv ---------- */
+  "soldier_beam":  { files: [SCI + "laserLarge_004.ogg"], vol: 0.6, status: "default", note: "sniper výstrel" },
+  "wolf_charge":   { files: vars(IMP + "footstep_grass_", 5), vol: 0.6, status: "default" },
+  "wolf_strike":   { files: [IMP + "impactPunch_heavy_004.ogg"], vol: 0.7, status: "default" },
+  "vamp_charge":   { files: [RPG + "cloth4.ogg"], vol: 0.6, status: "default" },
+  "vamp_strike":   { files: [RPG + "knifeSlice2.ogg"], vol: 0.6, status: "default" },
+  "special1":      { files: vars(IMP + "impactPunch_heavy_", 5), vol: 0.6, status: "default", note: "Jotaro Special 1 (ORA)" },
+  "luffy_pull":    { files: [RPG + "creak2.ogg"], vol: 0.6, status: "default", note: "gumové natiahnutie" },
+  "luffy_gp":      { files: [RPG + "creak3.ogg"], vol: 0.6, status: "default", note: "Gear 3 nádych" },
+  "luffy_roll":    { files: vars(IMP + "impactWood_medium_", 5), vol: 0.5, status: "default" },
+  "luffy_explode": { files: [SCI + "explosionCrunch_002.ogg"], vol: 0.6, status: "default" },
+  "luffy_chomp":   { files: [RPG + "chop.ogg"], vol: 0.6, status: "default" },
+};

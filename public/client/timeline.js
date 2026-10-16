@@ -29,6 +29,8 @@ import { playTeleportExplosion } from "/client/teleport.js";
 import { lastStand } from "/client/last-stand-state.js";
 import { deathBehind } from "/client/overlays.js";
 import { DEATH_SEQ } from "/client/demon-sprites.js";
+import { sfx, setMusic } from "/client/sound.js";
+import { soundForFrame, soundTimelineStart, syncMusic } from "/client/sound-map.js";
 
 /* ---------- GameOver sekvencia ---------- */
 function showGameOverSequence(winner) {
@@ -47,12 +49,15 @@ function showGameOverSequence(winner) {
     let afterDeathWait = 300;
     if (winner !== "draw" && loser) {
       setAnim(loser, "dead", 1200);
+      sfx("death", { char: state?.[loser]?.char, pan: loser === "p1" ? -0.4 : 0.4 });
       afterDeathWait = 1300; // trvanie death + malý buffer
     }
 
     setTimeout(() => {
       // verdikt namiesto ROUND n v hud-turn - hlavné okno nič neprekrýva
       let verdict, cls;
+      setMusic(null); // séria rozhodnutá - hudba stíchne, zaznie znelka
+      sfx(me && winner !== me && winner !== "draw" ? "game.lose" : "game.win");
       if (winner === "draw")        { verdict = "TIE"; cls = "tie"; }
       else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
       else if (me)                  { verdict = "LOSER!"; cls = "lose"; }
@@ -84,7 +89,8 @@ function playGameEndAnim(winner, after) {
   const waitAttack = Math.max(0, lastEnd - now);
   setTimeout(() => {
     let afterDeathWait = 300;
-    if (winner !== "draw" && loser) { setAnim(loser, "dead", 1200); afterDeathWait = 1300; }
+    if (winner !== "draw" && loser) { setAnim(loser, "dead", 1200); afterDeathWait = 1300; sfx("death", { char: state?.[loser]?.char, pan: loser === "p1" ? -0.4 : 0.4 }); }
+    sfx(me && winner !== me && winner !== "draw" ? "game.lose" : "game.win");
     actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
     clearCharOverlays();
     if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
@@ -97,6 +103,8 @@ function playNewRoundTransition(nextTurn, done) {
   if (!roundBannerEl) { setTimeout(done, NEW_ROUND_MS); return; }
   // ak ďalšie kolo je buffnuté (Last Stand) → „FINAL ROUND" + veľký démon tile (červený okraj) pod nápisom
   const final = !!state?.goldLocked;
+  sfx(final ? "round.final" : "round.start");
+  syncMusic(state, final);
   if (final) {
     roundBannerEl.innerHTML = 'FINAL ROUND<span class="rb-demon"><img src="/assets/last_stand.png" alt="" /></span>';
     playback.finalRoundActive = true; // text hore sa prepne až teraz (s bannerom)
@@ -135,6 +143,7 @@ export function schedulePlayTimeline(timeline) {
   actors.escPrideDisplay = { p1: null, p2: null }; // zruš prípadné podržanie starej veľkosti z minulého kola
   actors.escPrideDisplayChar = { p1: null, p2: null };
 
+  soundTimelineStart();
   const first = timeline[0];
   // levelová veľkosť (Escanor pride / Vlkolakova fáza mesiaca) pred kolom - na konci prehrávania porovnáme
   // s novou hodnotou → float (lev ▲▼ / nová fáza mesiaca)
@@ -242,6 +251,7 @@ export function schedulePlayTimeline(timeline) {
 
     const beforeP1 = prev?.p1 || state.p1;
     const beforeP2 = prev?.p2 || state.p2;
+    soundForFrame(frame, { p1: beforeP1, p2: beforeP2 });
 
     state.p1 = frame.p1; state.p2 = frame.p2;
     state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending;

@@ -6,6 +6,7 @@ import { playback } from "/client/playback.js";
 import { uiLocked, emitLockIn, closePickers } from "/client/controls.js";
 import { planning } from "/client/planning.js";
 import { renderQueue } from "/client/queue.js";
+import { sfx } from "/client/sound.js";
 
 /* ---------- Turn timer (server-riadený displej + auto-lock) ---------- */
 // server posiela zostávajúci čas (event `turn_timer` aj `state.timerMs`), takže displej sedí so serverom
@@ -16,6 +17,7 @@ let serverTimerEndsAt = 0; // performance.now()-based deadline zo servera (0 = b
 const TDEBUG = new URLSearchParams(location.search).has("tdebug");
 export const tlog = (...a) => { if (TDEBUG) console.log("[timer]", ...a); };
 let _lastPlanning = null;
+let lastTickSec = null; // posledná zobrazená sekunda (tik zaznie raz za sekundu)
 
 export function setServerTimer(ms) {
   serverTimerEndsAt = (ms == null) ? 0 : performance.now() + ms;
@@ -46,7 +48,10 @@ export function tickTurnTimer(now) {
   const remain = Math.max(0, serverTimerEndsAt - now);
   turnTimerEl.classList.remove("hidden");
   turnTimerEl.classList.toggle("below-status", state?.config?.timer === "quickdraw"); // pod „OPPONENT IS READY"
-  turnTimerEl.textContent = `⏱ ${Math.ceil(remain / 1000)}`;
+  const secs = Math.ceil(remain / 1000);
+  if (secs !== lastTickSec && secs > 0 && secs <= 5) sfx("ui.timer_tick"); // posledných 5 s tiká
+  lastTickSec = secs;
+  turnTimerEl.textContent = `⏱ ${secs}`;
   turnTimerEl.classList.toggle("urgent", remain <= 5000);
   if (remain <= 0) { serverTimerEndsAt = 0; autoLockTimeout(); }
 }

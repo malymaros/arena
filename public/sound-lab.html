@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arena – Sound Lab</title>
+<style>
+  :root { --bg:#14161b; --panel:#1d2027; --line:#2c313b; --text:#e6e6e6; --dim:#8a919e; --gold:#d4a017; --green:#4caf50; --blue:#4a90e2; --red:#e05555; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px; background: #0f1115; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; margin: 0 12px 0 0; }
+  header .stats { color: var(--dim); }
+  header .spacer { flex: 1; }
+  button { background: #2a2f39; color: var(--text); border: 1px solid #3a404c; border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit; }
+  button:hover { background: #343a46; }
+  button.primary { background: #6b5410; border-color: var(--gold); }
+  button.play { width: 30px; padding: 4px 0; }
+  main { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0; height: calc(100vh - 52px); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; height: auto; } }
+  section { overflow: auto; padding: 10px 16px 40px; }
+  section + section { border-left: 1px solid var(--line); }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 18px 0 6px; }
+  .ev { display: grid; grid-template-columns: 30px 170px 70px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+  .ev:hover { background: #20242c; }
+  .ev.sel { background: #2b2a1d; outline: 1px solid var(--gold); }
+  .ev .k { font-family: ui-monospace, monospace; }
+  .ev .files { color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev .note { display: block; color: #6f7684; font-size: 11px; }
+  .badge { font-size: 10px; padding: 2px 6px; border-radius: 10px; text-align: center; text-transform: uppercase; }
+  .badge.default { background: #2c3a52; color: #9cc0ff; }
+  .badge.picked { background: #1f4223; color: #8fe39a; }
+  .badge.override { background: #5a4410; color: #ffd76a; }
+  .editor { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .editor .chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; min-height: 26px; }
+  .chip { display: inline-flex; gap: 4px; align-items: center; background: #2a2f39; border-radius: 12px; padding: 2px 4px 2px 8px; font-size: 11px; font-family: ui-monospace, monospace; }
+  .chip button { padding: 0 6px; border: 0; background: none; color: var(--red); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .lib-tools { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  input[type=search], select { background: #0f1115; color: var(--text); border: 1px solid #3a404c; border-radius: 6px; padding: 5px 8px; font: inherit; }
+  input[type=search] { flex: 1; min-width: 140px; }
+  .lib { display: grid; grid-template-columns: 30px 1fr auto; gap: 4px 8px; align-items: center; }
+  .lib .f { font-family: ui-monospace, monospace; font-size: 12px; overflow-wrap: anywhere; }
+  .lib .f small { color: var(--dim); }
+  .lib .f.in { color: var(--gold); }
+  .hint { color: var(--dim); font-size: 12px; }
+  textarea { width: 100%; height: 220px; background: #0f1115; color: #cfe; border: 1px solid #3a404c; border-radius: 6px; font: 12px ui-monospace, monospace; padding: 8px; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; width: min(820px, 92vw); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔊 Sound Lab</h1>
+  <span class="stats" id="stats"></span>
+  <span class="spacer"></span>
+  <label>SFX <input type="range" id="vol" min="0" max="1" step="0.05" /></label>
+  <button id="stop-music">■ Stop hudba</button>
+  <button id="export" class="primary">Export zmien</button>
+  <button id="clear">Zrušiť všetky prepisy</button>
+</header>
+<main>
+  <section id="events"></section>
+  <section>
+    <div class="editor" id="editor"><p class="hint">Vyber udalosť vľavo. Prepis platí hneď aj v hre (v tomto prehliadači) - natrvalo ho zapíše až Export → <code>public/sounds/manifest.js</code>.</p></div>
+    <h2>Knižnica</h2>
+    <div class="lib-tools">
+      <select id="pack"></select>
+      <input type="search" id="q" placeholder="hľadaj (napr. punch, laser, glass…)" />
+    </div>
+    <div class="lib" id="lib"></div>
+  </section>
+</main>
+<dialog id="dlg">
+  <p>Skopíruj do <code>public/sounds/manifest.js</code> (nahraď rovnaké kľúče) - alebo to pošli Claudovi. Status <b>picked</b> = tvoja voľba.</p>
+  <textarea id="out" readonly></textarea>
+  <div class="row"><button id="copy" class="primary">Kopírovať</button><button id="close">Zavrieť</button></div>
+</dialog>
+
+<script type="module">
+import { SOUNDS, SOUND_SOURCES } from "/sounds/manifest.js";
+import { playFile, sfx, entryFor, getOverrides, setOverride, clearOverrides, getSettings, setSettings } from "/client/sound.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const packOf = (f) => (f.startsWith("custom/") ? "custom" : f.split("/")[1]);
+const short = (f) => f.split("/").pop();
+let library = {};
+let selected = null;
+let draft = null; // { files, vol } rozpracovaný výber pre `selected`
+
+/* ---------- hudba (dlhé súbory - <audio>, nie Web Audio buffer) ---------- */
+let musicEl = null;
+function playAny(file, vol = 1) {
+  if (/\.mp3$/i.test(file) || file.includes("cynicmusic/")) {
+    musicEl?.pause();
+    musicEl = new Audio(`/sounds/${file}`);
+    musicEl.volume = Math.min(1, vol * getSettings().music * getSettings().master);
+    musicEl.play();
+  } else playFile(file, vol);
+}
+$("stop-music").onclick = () => musicEl?.pause();
+
+/* ---------- zoznam udalostí ---------- */
+const GROUPS = [
+  ["Hudba", k => k.startsWith("music.")], ["Koniec hry", k => k.startsWith("game.") || k === "death"],
+  ["UI a kolo", k => k.startsWith("ui.") || k.startsWith("round.")], ["Specialy postáv", k => k.startsWith("special.") || k === "special"],
+  ["Dlaždice", k => k.startsWith("tile")], ["Boj a mechaniky", () => true],
+];
+function statusOf(k) { return getOverrides()[k] ? "override" : (SOUNDS[k]?.status || "default"); }
+function renderEvents() {
+  const ov = getOverrides();
+  const keys = Object.keys(SOUNDS);
+  const done = new Set();
+  let html = "";
+  for (const [name, test] of GROUPS) {
+    const ks = keys.filter(k => !done.has(k) && test(k));
+    ks.forEach(k => done.add(k));
+    if (!ks.length) continue;
+    html += `<h2>${name}</h2>`;
+    for (const k of ks) {
+      const e = entryFor(k), st = statusOf(k);
+      html += `<div class="ev${k === selected ? " sel" : ""}" data-k="${esc(k)}">
+        <button class="play" data-play="${esc(k)}" title="Prehrať">▶</button>
+        <span class="k">${esc(k)}<span class="note">${esc(SOUNDS[k].note || "")}</span></span>
+        <span class="badge ${st}">${st}</span>
+        <span class="files">${e.files.length ? e.files.map(short).map(esc).join(", ") : "<i>ticho</i>"}</span></div>`;
+    }
+  }
+  $("events").innerHTML = html;
+  const all = keys.length, picked = keys.filter(k => SOUNDS[k].status === "picked").length;
+  $("stats").textContent = `${all} udalostí · ${picked} picked · ${all - picked} default · ${Object.keys(ov).length} neuložených prepisov`;
+}
+$("events").addEventListener("click", (ev) => {
+  const p = ev.target.closest("[data-play]");
+  if (p) { ev.stopPropagation(); playEvent(p.dataset.play); return; }
+  const row = ev.target.closest(".ev");
+  if (row) select(row.dataset.k);
+});
+function playEvent(k) {
+  const e = entryFor(k);
+  if (!e.files.length) return;
+  const f = e.files[Math.floor(Math.random() * e.files.length)];
+  if (k.startsWith("music.")) playAny(f, e.vol); else playFile(f, e.vol);
+}
+
+/* ---------- editor vybranej udalosti ---------- */
+function select(k) {
+  selected = k;
+  const e = entryFor(k);
+  draft = { files: [...e.files], vol: e.vol ?? 1 };
+  renderEvents(); renderEditor(); renderLib();
+}
+function renderEditor() {
+  if (!selected) return;
+  const src = SOUNDS[selected];
+  $("editor").innerHTML = `
+    <div><b class="k">${esc(selected)}</b> <span class="badge ${statusOf(selected)}">${statusOf(selected)}</span></div>
+    <div class="hint">${esc(src.note || "")}</div>
+    <div class="hint">V registri: ${src.files.length ? src.files.map(short).map(esc).join(", ") : "ticho"} (vol ${src.vol})</div>
+    <div class="chosen">${draft.files.map((f, i) => `<span class="chip" title="${esc(f)}">${esc(short(f))}<button data-play-f="${esc(f)}">▶</button><button data-rm="${i}">✕</button></span>`).join("") || '<span class="hint">ticho (žiadny súbor)</span>'}</div>
+    <div class="hint">Viac súborov = pri každom prehratí náhodne jeden (variácie). Pridaj z knižnice „+".</div>
+    <div class="row">Hlasitosť <input type="range" id="evol" min="0" max="1" step="0.05" value="${draft.vol}" /> <span id="evolv">${draft.vol}</span></div>
+    <div class="row">
+      <button id="try">▶ Skúsiť</button>
+      <button id="apply" class="primary">Použiť (prepis)</button>
+      <button id="silence">Ticho</button>
+      <button id="revert">Späť na register</button>
+    </div>`;
+}
+$("editor").addEventListener("input", (ev) => { if (ev.target.id === "evol") { draft.vol = Number(ev.target.value); $("evolv").textContent = draft.vol; } });
+$("editor").addEventListener("click", (ev) => {
+  const t = ev.target;
+  if (t.dataset.playF) return playAny(t.dataset.playF, draft.vol);
+  if (t.dataset.rm) { draft.files.splice(Number(t.dataset.rm), 1); renderEditor(); renderLib(); return; }
+  if (t.id === "try" && draft.files.length) return playAny(draft.files[Math.floor(Math.random() * draft.files.length)], draft.vol);
+  if (t.id === "apply") { setOverride(selected, { ...SOUNDS[selected], files: [...draft.files], vol: draft.vol, status: "picked" }); renderEvents(); renderEditor(); }
+  if (t.id === "silence") { draft.files = []; renderEditor(); renderLib(); }
+  if (t.id === "revert") { setOverride(selected, null); select(selected); }
+});
+
+/* ---------- knižnica ---------- */
+async function loadLibrary() {
+  library = await (await fetch("/sounds/lib-index.json")).json();
+  $("pack").innerHTML = `<option value="">všetky balíky</option>` + Object.keys(library).sort().map(p =>
+    `<option value="${esc(p)}">${esc(p)} (${library[p].length}) – ${esc(SOUND_SOURCES[p]?.license || "?")}</option>`).join("");
+  renderLib();
+}
+function renderLib() {
+  const pack = $("pack").value, q = $("q").value.trim().toLowerCase();
+  const files = (pack ? library[pack] || [] : Object.values(library).flat()).filter(f => !q || f.toLowerCase().includes(q));
+  const inDraft = new Set(draft?.files || []);
+  $("lib").innerHTML = files.slice(0, 600).map(f => `
+    <button class="play" data-play-f="${esc(f)}">▶</button>
+    <span class="f${inDraft.has(f) ? " in" : ""}">${esc(short(f))} <small>${esc(packOf(f))}</small></span>
+    <button data-add="${esc(f)}" ${selected ? "" : "disabled"}>${inDraft.has(f) ? "✓" : "+"}</button>`).join("")
+    + (files.length > 600 ? `<p class="hint">…a ďalších ${files.length - 600}, spresni hľadanie</p>` : "");
+}
+$("pack").onchange = renderLib;
+$("q").oninput = renderLib;
+$("lib").addEventListener("click", (ev) => {
+  const t = ev.target;
+  if (t.dataset.playF) return playAny(t.dataset.playF, draft?.vol ?? 1);
+  if (t.dataset.add && draft && !draft.files.includes(t.dataset.add)) { draft.files.push(t.dataset.add); renderEditor(); renderLib(); }
+});
+
+/* ---------- export ---------- */
+$("export").onclick = () => {
+  const ov = getOverrides();
+  const lines = Object.entries(ov).map(([k, e]) =>
+    `  ${JSON.stringify(k)}: { files: ${JSON.stringify(e.files)}, vol: ${e.vol}, status: "picked"${SOUNDS[k]?.note ? `, note: ${JSON.stringify(SOUNDS[k].note)}` : ""} },`);
+  $("out").value = lines.length ? lines.join("\n") : "// žiadne prepisy - najprv v editore stlač „Použiť (prepis)“";
+  $("dlg").showModal();
+};
+$("copy").onclick = () => { navigator.clipboard?.writeText($("out").value); $("copy").textContent = "Skopírované ✓"; setTimeout(() => ($("copy").textContent = "Kopírovať"), 1500); };
+$("close").onclick = () => $("dlg").close();
+$("clear").onclick = () => { if (confirm("Zrušiť všetky neuložené prepisy?")) { clearOverrides(); if (selected) select(selected); else renderEvents(); } };
+
+$("vol").value = getSettings().sfx;
+$("vol").oninput = (ev) => setSettings({ sfx: Number(ev.target.value) });
+window.addEventListener("keydown", (ev) => { if (ev.key === " " && selected && ev.target === document.body) { ev.preventDefault(); sfx(selected); } });
+
+renderEvents();
+loadLibrary();
+</script>
+</body>
+</html>

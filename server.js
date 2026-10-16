@@ -4,6 +4,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { createEngine } from "./engine/game.js";
 
@@ -27,13 +28,33 @@ app.use(express.static(path.join(__dirname, "public"), {
   etag: true,
   lastModified: true,
   setHeaders: (res, filePath) => {
-    if (/[\\/](assets|arenas)[\\/]/.test(filePath)) {
+    if (/[\\/](assets|arenas|sounds[\\/]lib)[\\/]/.test(filePath)) {
       res.setHeader("Cache-Control", "public, max-age=3600");
     } else {
       res.setHeader("Cache-Control", "no-cache");
     }
   },
 }));
+// zoznam zvukovej knižnice pre /sound-lab.html (public/sounds/lib/<balík>/*, public/sounds/custom/*) - čítaný
+// živo, aby nový súbor v knižnici netreba nikde registrovať
+app.get("/sounds/lib-index.json", (req, res) => {
+  const root = path.join(__dirname, "public", "sounds");
+  const out = {};
+  for (const dir of ["lib", "custom"]) {
+    const base = path.join(root, dir);
+    if (!fs.existsSync(base)) continue;
+    const walk = (rel) => {
+      for (const ent of fs.readdirSync(path.join(base, rel), { withFileTypes: true })) {
+        const r = rel ? `${rel}/${ent.name}` : ent.name;
+        if (ent.isDirectory()) walk(r);
+        else if (/\.(ogg|mp3|wav)$/i.test(ent.name)) (out[dir === "custom" ? "custom" : r.split("/")[0]] ||= []).push(`${dir}/${r}`);
+      }
+    };
+    walk("");
+  }
+  res.setHeader("Cache-Control", "no-cache");
+  res.json(out);
+});
 // zdieľaná herná geometria (shared/geometry.js) - ten istý ES modul importuje engine aj client.js;
 // je to kód, takže vždy revalidácia cez ETag (po deployi sa hneď natiahne nová verzia)
 app.use("/shared", express.static(path.join(__dirname, "shared"), {
