@@ -46,6 +46,10 @@ try {
   });
   const send = (method, params = {}) => new Promise(res => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
   const ev = async (expr) => { const r = await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true }); return r.result?.exceptionDetails ? { error: r.result.exceptionDetails.exception?.description } : r.result?.result?.value; };
+  const mouse = async (css) => {
+    const r = JSON.parse(await ev(`(() => { const e = document.querySelector(${JSON.stringify(css)}); e.scrollIntoView({ block: "center" }); const q = e.getBoundingClientRect(); return JSON.stringify({ x: q.x + q.width / 2, y: q.y + q.height / 2 }); })()`));
+    for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: r.x, y: r.y, button: "left", clickCount: 1 });
+  };
   const click = async () => { for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: 700, y: 450, button: "left", clickCount: 1 }); };
   await send("Runtime.enable"); await send("Network.enable"); await send("Page.enable");
 
@@ -104,7 +108,7 @@ try {
   await ev(`window.__soundLab.resetDraft()`);
   const fresh = await ev(`document.getElementById("state").className + "|" + document.getElementById("state").textContent`);
   check(/clean/.test(fresh) && /bez zmien/.test(fresh), "na začiatku: predvolené zvuky bez zmien", fresh);
-  await ev(`document.querySelector('[data-edit="hit"]').click()`); await sleep(300);
+  await ev(`document.querySelector('.ev[data-k="hit"] .k').click()`); await sleep(300);
   await ev(`document.getElementById("q").value = "zap2"; document.getElementById("q").dispatchEvent(new Event("input")); document.querySelector("#lib [data-add]").click()`); await sleep(500);
   const dirty = await ev(`JSON.stringify({ st: document.getElementById("state").className + "|" + document.getElementById("state").textContent,
     meta: window.__soundLab.getDraft().meta, row: document.querySelector('.ev[data-k="hit"]').className, badge: document.querySelector('.ev[data-k="hit"] .badge').textContent })`);
@@ -112,6 +116,15 @@ try {
   check(/dirty/.test(d.st) && /NEULOŽENÉ/.test(d.st) && /1 zmena/.test(d.st), "po zmene: hneď uložené do konceptu, stav NEULOŽENÉ", d.st);
   check(/^Balík /.test(d.meta.name) && /^balik-\d{8}-\d{4}$/.test(d.meta.id) && d.meta.version === 1, "prvá zmena založí nový balík s generickým názvom", JSON.stringify(d.meta));
   check(/changed/.test(d.row) && d.badge === "zmenené", "riadok označený ako zmenený");
+  check(/Meníš: hit/.test(await ev(`document.querySelector("#editor .title").textContent`)), "editor ukazuje, čo meníš");
+  const btnState = () => ev(`document.querySelector('.ev[data-k="music.menu"] [data-play]').textContent`);
+  await mouse('.ev[data-k="music.menu"] [data-play]'); await sleep(600);
+  const playing = await btnState();
+  await mouse("#stop"); await sleep(300);
+  check(playing === "■" && (await btnState()) === "▶", "▶ prepne na ■ a Stop zvuk zastaví", playing);
+  await mouse('.ev[data-k="music.menu"] [data-play]'); await sleep(600);
+  await mouse('.ev[data-k="music.menu"] [data-play]'); await sleep(300);
+  check((await btnState()) === "▶", "druhý klik na ■ zastaví");
   await ev(`document.getElementById("export").click()`); await sleep(1500);
   const saved = await ev(`document.getElementById("state").className + "|" + document.getElementById("state").textContent`);
   check(/clean/.test(saved) && /uložený/.test(saved), "po uložení: stav uložené", saved);

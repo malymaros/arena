@@ -28,11 +28,10 @@
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 18px 0 6px; }
   .tabs { display: flex; gap: 6px; align-items: center; margin: 4px 0 8px; flex-wrap: wrap; }
   .tabs button.on { background: #3a3420; border-color: var(--gold); }
-  .ev { display: grid; grid-template-columns: 30px 64px 190px 78px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+  .ev { display: grid; grid-template-columns: 30px 190px 78px 1fr; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
   .ev:hover { background: #20242c; }
   .ev.sel { background: #2b2a1d; outline: 1px solid var(--gold); }
   .ev.changed { background: #2a2410; }
-  .ev .chg { padding: 3px 8px; font-size: 12px; border-color: var(--gold); }
   .state { padding: 4px 10px; border-radius: 6px; font-weight: 600; }
   .state.clean { color: var(--green); background: #16301a; }
   .state.dirty { color: #1a1300; background: var(--orange); }
@@ -46,7 +45,11 @@
   .badge.draft { background: #5a4410; color: #ffd76a; }
   .badge.packed { background: #3a2f52; color: #cdb8ff; }
   .badge.shared { background: #2a2f39; color: var(--dim); }
-  .editor { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .editor { position: sticky; top: -10px; z-index: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 8px 18px rgba(0,0,0,.45); }
+  .editor .title { font-size: 15px; margin-bottom: 4px; }
+  .editor.flash { animation: flash 0.9s ease-out; }
+  @keyframes flash { 0% { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold); } 100% { border-color: var(--line); box-shadow: 0 8px 18px rgba(0,0,0,.45); } }
+  button.play.on { background: #6b5410; border-color: var(--gold); }
   .chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; min-height: 26px; }
   .chip { display: inline-flex; gap: 4px; align-items: center; background: #2a2f39; border-radius: 12px; padding: 2px 4px 2px 8px; font-size: 11px; font-family: ui-monospace, monospace; }
   .chip button { padding: 0 6px; border: 0; background: none; color: var(--red); }
@@ -79,7 +82,7 @@
   <span class="spacer"></span>
   <label class="toggle" title="Koncept hrá v hre v TOMTO prehliadači (po obnovení stránky hry)"><input type="checkbox" id="preview" /> Vyskúšať v hre</label>
   <label>SFX <input type="range" id="vol" min="0" max="1" step="0.05" /></label>
-  <button id="stop-music">■ Hudba</button>
+  <button id="stop" title="Zastaví všetko, čo hrá (aj kláves Esc)">■ Stop</button>
   <button id="import">Načítať balík…</button>
   <button id="export" class="primary">💾 Uložiť balík</button>
   <button id="reset">Začať odznova</button>
@@ -95,7 +98,7 @@
     <div id="list"></div>
   </section>
   <section>
-    <div class="editor" id="editor"><p class="hint">Pri zvuku vľavo stlač <b>Zmeniť</b>. Každá zmena sa ukladá hneď (v tomto prehliadači); prvou zmenou vznikne nový balík. <b>💾 Uložiť balík</b> ho stiahne ako zip - do hry ho nasadí vlastník servera.</p></div>
+    <div class="editor" id="editor"><p class="hint">Klikni vľavo na zvuk, ktorý chceš zmeniť - jeho úprava sa zobrazí tu. Každá zmena sa ukladá hneď (v tomto prehliadači); prvou zmenou vznikne nový balík. <b>💾 Uložiť balík</b> ho stiahne ako zip - do hry ho nasadí vlastník servera.</p></div>
     <h2>Knižnica</h2>
     <div class="drop" id="drop">Pretiahni sem vlastné zvuky (ogg / mp3 / wav / webm) alebo <button id="upload-btn">vyber súbory…</button><input type="file" id="upload" accept=".ogg,.mp3,.wav,.webm,audio/*" multiple hidden /></div>
     <div class="lib-tools">
@@ -113,7 +116,7 @@ import { defaultFit } from "/sounds/fit.js";
 import { PACK_FORMAT, compatReport, safePath } from "/sounds/pack.js";
 import { writeZip, readZip } from "/sounds/zip.js";
 import { loadDraft, saveDraft, putBlob, getBlob, listBlobPaths, clearDraft, isPreviewOn, setPreview } from "/sounds/draft-store.js";
-import { playUrl, sfx, urlDuration, forgetUrl, getSettings, setSettings, setDraftLayer } from "/client/sound.js";
+import { playUrl, stopAllSfx, sfx, urlDuration, forgetUrl, getSettings, setSettings, setDraftLayer } from "/client/sound.js";
 import { CHAR_LIST } from "/chars/index.js";
 
 const $ = (id) => document.getElementById(id);
@@ -229,9 +232,8 @@ function badge(k) {
 function row(k, label, note) {
   const e = effective(k);
   const files = e ? (e.files.length ? e.files.map(short).map(esc).join(", ") : "<i>ticho</i>") : "";
-  return `<div class="ev${k === selected ? " sel" : ""}${e?.inherited ? " inherited" : ""}${draft.meta.changed.includes(k) ? " changed" : ""}" data-k="${esc(k)}">
+  return `<div title="Klikni a zmeň tento zvuk" class="ev${k === selected ? " sel" : ""}${e?.inherited ? " inherited" : ""}${draft.meta.changed.includes(k) ? " changed" : ""}" data-k="${esc(k)}">
     <button class="play" data-play="${esc(k)}" title="Prehrať">▶</button>
-    <button class="chg" data-edit="${esc(k)}" title="Zmeniť tento zvuk">Zmeniť</button>
     <span class="k">${esc(label)}<span class="note">${esc(note || "")}${winText(k) ? ` · ⏱ ${winText(k)}` : ""}</span></span>
     ${badge(k)}<span class="files">${files}</span></div>`;
 }
@@ -258,35 +260,52 @@ function renderList() {
 }
 $("list").addEventListener("click", (ev) => {
   const p = ev.target.closest("[data-play]");
-  if (p) { ev.stopPropagation(); playKey(p.dataset.play); return; }
+  if (p) { ev.stopPropagation(); playKey(p.dataset.play, p); return; }
   const r = ev.target.closest(".ev");
   if (r) select(r.dataset.k);
-  if (ev.target.closest("[data-edit]")) $("editor").scrollIntoView({ behavior: "smooth", block: "start" });
 });
-function playKey(k) {
+function playKey(k, btn) {
   const e = effective(k);
   if (!e?.files.length) return;
-  playAny(e.files[Math.floor(Math.random() * e.files.length)], e.vol, k, e.fit);
+  playAny(e.files[Math.floor(Math.random() * e.files.length)], e.vol, k, e.fit, btn);
 }
 
 /* ---------- prehrávanie ---------- */
-let musicEl = null;
-function playAny(p, vol = 1, key = null, fit = null) {
+// naraz hrá najviac jeden zvuk: nový najprv zastaví predošlý; ▶ práve hrajúceho (svieti ■) ho zastaví
+let musicEl = null, playingBtn = null;
+function stopEverything() {
+  stopAllSfx();
+  if (musicEl) { musicEl.pause(); musicEl = null; }
+  if (playingBtn) { playingBtn.textContent = "▶"; playingBtn.classList.remove("on"); playingBtn = null; }
+}
+async function playAny(p, vol = 1, key = null, fit = null, btn = null) {
+  if (btn && btn === playingBtn) { stopEverything(); return; }
+  stopEverything();
+  if (btn) { btn.textContent = "■"; btn.classList.add("on"); playingBtn = btn; }
+  const done = () => { if (btn && playingBtn === btn) { btn.textContent = "▶"; btn.classList.remove("on"); playingBtn = null; } };
   if (key?.startsWith("music.") || /\.mp3$/i.test(p)) {
-    musicEl?.pause();
     musicEl = new Audio(urlOf(p));
     musicEl.volume = Math.min(1, vol * getSettings().music * getSettings().master);
-    musicEl.play();
+    musicEl.onended = done;
+    musicEl.play().catch(done);
     return;
   }
-  playUrl(urlOf(p), vol, key ? { windowMs: winOf(key)?.med ?? null, fit: fit || defaultFit(baseOf(key)) } : {});
+  const h = await playUrl(urlOf(p), vol, key ? { windowMs: winOf(key)?.med ?? null, fit: fit || defaultFit(baseOf(key)) } : {});
+  if (h) h.ended.then(done); else done();
 }
-$("stop-music").onclick = () => musicEl?.pause();
+$("stop").onclick = stopEverything;
+window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") stopEverything(); });
 window.addEventListener("keydown", (ev) => { if (ev.key === " " && selected && ev.target === document.body) { ev.preventDefault(); sfx(baseOf(selected), { char: charOfKey(selected), windowMs: winOf(selected)?.med }); } });
 
 /* ---------- editor ---------- */
 function select(k) {
+  const changedSel = selected !== k;
   selected = k;
+  if (changedSel) { // editor je prilepený hore v pravom stĺpci - krátko zablikne, aby bolo jasné, že sa prepol
+    const ed = $("editor");
+    ed.classList.remove("flash"); void ed.offsetWidth; ed.classList.add("flash");
+    if (ed.getBoundingClientRect().top > innerHeight || ed.getBoundingClientRect().bottom < 0) ed.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   const e = effective(k);
   edit = { files: [...(e?.files || [])], vol: e?.vol ?? 1, fit: e?.fit || defaultFit(baseOf(k)) };
   renderAll();
@@ -296,7 +315,7 @@ function renderEditor() {
   const e = effective(selected), w = winOf(selected), ch = charOfKey(selected);
   const reg = SOUNDS[selected] || null;
   $("editor").innerHTML = `
-    <div><b class="k">${esc(selected)}</b> ${badge(selected)} ${ch ? `<span class="hint">· len pre ${esc(CHARS.find(c => c.key === ch).name)}</span>` : ""}</div>
+    <div class="title">Meníš: <b class="k">${esc(selected)}</b> ${badge(selected)} ${ch ? `<span class="hint">· len pre ${esc(CHARS.find(c => c.key === ch).name)}</span>` : ""}</div>
     <div class="hint">${esc(reg?.note || SOUNDS[baseOf(selected)]?.note || "")}</div>
     <div class="hint">${w ? `⏱ okno v hre: <b>${winText(selected)}</b>` : "⏱ okno v hre: nemerané (UI / hudba / zriedkavá udalosť)"}</div>
     <div class="hint">${e?.inherited ? `Teraz dedí spoločný zvuk „${esc(baseOf(selected))}“.` : reg ? `V registri: ${reg.files.length ? reg.files.map(short).map(esc).join(", ") : "ticho"} (${reg.status})` : ""}</div>
@@ -332,9 +351,9 @@ $("editor").addEventListener("change", (ev) => {
 });
 $("editor").addEventListener("click", async (ev) => {
   const t = ev.target;
-  if (t.dataset.playF) return playAny(t.dataset.playF, edit.vol, selected, edit.fit);
+  if (t.dataset.playF) return playAny(t.dataset.playF, edit.vol, selected, edit.fit, t);
   if (t.dataset.rm) { edit.files.splice(Number(t.dataset.rm), 1); await commit(); return; }
-  if (t.id === "try" && edit.files.length) return playAny(edit.files[Math.floor(Math.random() * edit.files.length)], edit.vol, selected, edit.fit);
+  if (t.id === "try" && edit.files.length) return playAny(edit.files[Math.floor(Math.random() * edit.files.length)], edit.vol, selected, edit.fit, t);
   if (t.id === "silence") { edit.files = []; await commit(); return; }
   if (t.id === "drop-entry") { delete draft.entries[selected]; markChanged(selected); await persist(); select(selected); }
 });
@@ -367,7 +386,7 @@ $("pack").onchange = renderLib;
 $("q").oninput = renderLib;
 $("lib").addEventListener("click", (ev) => {
   const t = ev.target;
-  if (t.dataset.playF) return playAny(t.dataset.playF, edit?.vol ?? 1, selected, edit?.fit);
+  if (t.dataset.playF) return playAny(t.dataset.playF, edit?.vol ?? 1, selected, edit?.fit, t);
   if (t.dataset.add && edit && !edit.files.includes(t.dataset.add)) { edit.files.push(t.dataset.add); commit(); }
 });
 
@@ -424,7 +443,7 @@ async function buildPack() {
   return { pack, zip, report };
 }
 $("export").onclick = async () => {
-  if (draft.meta.fresh) { toast("Zatiaľ si nič nezmenil - pri zvuku stlač „Zmeniť“."); return; }
+  if (draft.meta.fresh) { toast("Zatiaľ si nič nezmenil - klikni na zvuk vľavo a zmeň ho."); return; }
   let res;
   try { res = await buildPack(); } catch (e) { toast(`Export zrušený: ${e.message}`); return; }
   if (!res.zip) { showReport("Balík sa nedá stiahnuť", res.report, []); return; }

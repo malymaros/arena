@@ -138,12 +138,15 @@ export function sfx(key, { char = null, pan = 0, volume = 1, windowMs = null } =
   playUrl(url, (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k) });
 }
 
+const activeSources = new Set(); // práve hrajúce efekty (stopAllSfx - Sound Lab „Stop“)
+
 // nízkoúrovňové prehratie (lab ním skúša knižnicu); hlasitosť = vol × efekty × master
+// → Promise<{ stop(), ended: Promise }> | null (súbor sa nedá načítať)
 export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit = "keep" } = {}) {
-  if (!ensureCtx()) return;
+  if (!ensureCtx()) return Promise.resolve(null);
   if (!unlocked) unlock();
-  loadBuffer(url).then(buf => {
-    if (!buf) return;
+  return loadBuffer(url).then(buf => {
+    if (!buf) return null;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const plan = fitPlan(buf.duration * 1000 / rate, windowMs, fit);
@@ -165,7 +168,15 @@ export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit 
     node.connect(sfxBus);
     src.start(t0);
     if (plan.playMs != null) src.stop(t0 + plan.playMs / 1000);
+    activeSources.add(src);
+    const ended = new Promise(res => { src.onended = () => { activeSources.delete(src); res(); }; });
+    return { stop: () => { try { src.stop(); } catch { /* už dohral */ } }, ended };
   });
+}
+// zastaví všetky práve hrajúce efekty (hudbu nie)
+export function stopAllSfx() {
+  for (const src of activeSources) { try { src.stop(); } catch { /* už dohral */ } }
+  activeSources.clear();
 }
 // súbor z /sounds/ (cesta ako v registri)
 export function playFile(file, vol = 1, opts = {}) { playUrl(`/sounds/${file}`, vol, opts); }

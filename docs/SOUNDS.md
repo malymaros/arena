@@ -26,7 +26,7 @@ Zvuky sa robia v **Sound Labe** (`/sound-lab.html`) ako **zvukový balík**, ted
 
 1. Otvor `/sound-lab.html` (lokálne `http://localhost:3000/sound-lab.html` alebo na živom webe; server nič neukladá).
 2. Vpravo hore vyplň **názov**, **id** a **autora** balíka.
-3. **Všetky udalosti** alebo **Podľa postavy**: pri zvuku stlač **Zmeniť** (▶ ho prehrá).
+3. **Všetky udalosti** alebo **Podľa postavy**: klikni na zvuk a jeho úprava sa ukáže napravo (▶ ho prehrá, znova ▶ / **■ Stop** / **Esc** ho zastaví).
    - ⏱ **okno v hre** ukazuje, ako dlho hra na tej udalosti stojí. Dĺžky súborov sú zelené, ak sa zmestia, a oranžové, ak prečnievajú.
    - Pohľad **Podľa postavy** ukazuje všetky zvuky jednej postavy. Šedé „spoločný“ znamená, že hrá rovnaký zvuk ako ostatné postavy.
      Keď jej priradíš vlastný, vznikne kľúč `<udalosť>.<postava>` (napríklad `hit.naruto` = Narutov hlas pri zásahu).
