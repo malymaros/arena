@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { SOUNDS, SOUND_SOURCES } from "../public/sounds/manifest.js";
 import { PLAYED_KEYS } from "../public/sounds/events.js";
+import { FIT_MODES } from "../public/sounds/fit.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const soundsDir = path.join(root, "public", "sounds");
@@ -17,6 +18,7 @@ for (const [key, e] of Object.entries(SOUNDS)) {
   check(Array.isArray(e.files), `${key}: files musí byť pole`);
   check(e.status === "default" || e.status === "picked", `${key}: status "${e.status}" (default|picked)`);
   check(typeof e.vol === "number" && e.vol >= 0 && e.vol <= 1, `${key}: vol mimo 0–1`);
+  check(e.fit === undefined || FIT_MODES.includes(e.fit), `${key}: fit "${e.fit}" (${FIT_MODES.join("|")})`);
   for (const f of e.files || []) {
     check(fs.existsSync(path.join(soundsDir, f)), `${key}: súbor neexistuje: ${f}`);
     check(f.startsWith("lib/") || f.startsWith("custom/"), `${key}: súbor musí byť v lib/ alebo custom/: ${f}`);

@@ -61,6 +61,10 @@ Lab pri každej udalosti ukazuje ⏱ **okno v hre**, teda ako dlho hra na tej ud
 Nie je to odhad: `tools/sound-windows.mjs` odohrá seedované zápasy botov všetkých dvojíc postáv priamo na engine
 a každý frame prejde tou istou logikou (`events.js`), ktorá v hre zvuk spúšťa. Pri súboroch ukazuje dĺžku
 (zelená = zmestí sa, oranžová = prečnieva do ďalšej akcie).
+**Prispôsobenie oknu** (`public/sounds/fit.js`, pole `fit` v registri, v labe „Keď je zvuk dlhší ako okno“):
+`keep` = dohrá celý (nárazy, UI), `fade` = na konci okna sa stíši (casty, lety, kroky), `fit` = zrýchli/spomalí sa
+presne na okno, ak stačí ±15 % (inak `fade`). Kratší zvuk sa nikdy nenaťahuje. Bez `fit` platí `defaultFit(kľúč)`.
+
 **Keď sa zmení časovanie hry** (`shared/timing.js`) alebo mapovanie, `npm test` zlyhá, kým nespustíš `npm run sounds:windows`.
 Zvukové balíky čas hry nemenia ani nenavrhujú.
 

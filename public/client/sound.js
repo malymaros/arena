@@ -4,6 +4,7 @@
 // public/sounds/manifest.js). Bez závislostí na hernom stave - importuje ho aj sound-lab.
 // ČO hrá KEDY je v public/client/sound-map.js; ktorý SÚBOR v public/sounds/manifest.js.
 import { SOUNDS } from "/sounds/manifest.js";
+import { fitPlan, defaultFit } from "/sounds/fit.js";
 
 const SETTINGS_KEY = "arena.sound";
 const OVERRIDES_KEY = "arena.soundOverrides";
@@ -86,8 +87,9 @@ for (const ev of ["pointerdown", "keydown", "touchstart"]) window.addEventListen
 
 const lastPlayed = new Map(); // kľúč → čas (poistka proti zdvojeniu toho istého zvuku v jednom momente)
 
-// prehraj efekt `key` (s kľúčom postavy `char`), `pan` -1 (vľavo) … 1 (vpravo)
-export function sfx(key, { char = null, pan = 0, volume = 1 } = {}) {
+// prehraj efekt `key` (s kľúčom postavy `char`), `pan` -1 (vľavo) … 1 (vpravo); `windowMs` = okno akcie
+// (events.js) - zvuk sa mu prispôsobí podľa režimu fit položky (fit.js)
+export function sfx(key, { char = null, pan = 0, volume = 1, windowMs = null } = {}) {
   if (settings.muted || !unlocked) return;
   const k = resolveKey(key, char);
   if (!k) return;
@@ -99,20 +101,27 @@ export function sfx(key, { char = null, pan = 0, volume = 1 } = {}) {
   if (!files.length) return;
   const file = files[Math.floor(Math.random() * files.length)];
   const jitter = /^(game|round|music)\./.test(k) ? 0 : 0.04; // jemná zmena výšky - opakované kroky neznejú ako stroj
-  playFile(file, (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter });
+  playFile(file, (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k) });
 }
 
 // nízkoúrovňové prehratie súboru (lab ním skúša knižnicu); hlasitosť = vol × efekty × master
-export function playFile(file, vol = 1, { pan = 0, rate = 1 } = {}) {
+export function playFile(file, vol = 1, { pan = 0, rate = 1, windowMs = null, fit = "keep" } = {}) {
   if (!ensureCtx()) return;
   if (!unlocked) unlock();
   loadBuffer(file).then(buf => {
     if (!buf) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.playbackRate.value = rate;
+    const plan = fitPlan(buf.duration * 1000 / rate, windowMs, fit);
+    src.playbackRate.value = rate * plan.rate;
     const g = ctx.createGain();
-    g.gain.value = Math.max(0, vol) * settings.sfx * settings.master;
+    const level = Math.max(0, vol) * settings.sfx * settings.master;
+    g.gain.value = level;
+    const t0 = ctx.currentTime;
+    if (plan.fadeAtMs != null) {
+      g.gain.setValueAtTime(level, t0 + plan.fadeAtMs / 1000);
+      g.gain.linearRampToValueAtTime(0, t0 + plan.playMs / 1000);
+    }
     let node = src.connect(g);
     if (ctx.createStereoPanner && pan) {
       const p = ctx.createStereoPanner();
@@ -120,7 +129,8 @@ export function playFile(file, vol = 1, { pan = 0, rate = 1 } = {}) {
       node = node.connect(p);
     }
     node.connect(sfxBus);
-    src.start();
+    src.start(t0);
+    if (plan.playMs != null) src.stop(t0 + plan.playMs / 1000);
   });
 }
 

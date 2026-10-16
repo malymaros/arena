@@ -78,6 +78,7 @@
 
 <script type="module">
 import { SOUNDS, SOUND_SOURCES } from "/sounds/manifest.js";
+import { defaultFit } from "/sounds/fit.js";
 import { playFile, sfx, entryFor, getOverrides, setOverride, clearOverrides, getSettings, setSettings, fileDuration } from "/client/sound.js";
 
 // okná z hry (tools/sound-windows.mjs): ako dlho hra na danej udalosti stojí, kým ide ďalej
@@ -156,7 +157,7 @@ function playEvent(k) {
 function select(k) {
   selected = k;
   const e = entryFor(k);
-  draft = { files: [...e.files], vol: e.vol ?? 1 };
+  draft = { files: [...e.files], vol: e.vol ?? 1, fit: e.fit || defaultFit(k) };
   renderEvents(); renderEditor(); renderLib();
 }
 function renderEditor() {
@@ -169,6 +170,11 @@ function renderEditor() {
     <div class="hint">V registri: ${src.files.length ? src.files.map(short).map(esc).join(", ") : "ticho"} (vol ${src.vol})</div>
     <div class="chosen">${draft.files.map((f, i) => `<span class="chip" title="${esc(f)}">${esc(short(f))} <small class="dur" data-dur="${esc(f)}"></small><button data-play-f="${esc(f)}">▶</button><button data-rm="${i}">✕</button></span>`).join("") || '<span class="hint">ticho (žiadny súbor)</span>'}</div>
     <div class="hint">Viac súborov = pri každom prehratí náhodne jeden (variácie). Pridaj z knižnice „+".</div>
+    <div class="row">Keď je zvuk dlhší ako okno:
+      <select id="efit">
+        ${[["keep", "nechať doznieť celý"], ["fade", "stíšiť na konci okna"], ["fit", "zrýchliť na okno (max ±15 %, inak stíšiť)"]]
+          .map(([v, t]) => `<option value="${v}"${draft.fit === v ? " selected" : ""}>${t}</option>`).join("")}
+      </select></div>
     <div class="row">Hlasitosť <input type="range" id="evol" min="0" max="1" step="0.05" value="${draft.vol}" /> <span id="evolv">${draft.vol}</span></div>
     <div class="row">
       <button id="try">▶ Skúsiť</button>
@@ -187,12 +193,17 @@ function renderEditor() {
   }
 }
 $("editor").addEventListener("input", (ev) => { if (ev.target.id === "evol") { draft.vol = Number(ev.target.value); $("evolv").textContent = draft.vol; } });
+$("editor").addEventListener("change", (ev) => { if (ev.target.id === "efit") draft.fit = ev.target.value; });
 $("editor").addEventListener("click", (ev) => {
   const t = ev.target;
   if (t.dataset.playF) return playAny(t.dataset.playF, draft.vol);
   if (t.dataset.rm) { draft.files.splice(Number(t.dataset.rm), 1); renderEditor(); renderLib(); return; }
-  if (t.id === "try" && draft.files.length) return playAny(draft.files[Math.floor(Math.random() * draft.files.length)], draft.vol);
-  if (t.id === "apply") { setOverride(selected, { ...SOUNDS[selected], files: [...draft.files], vol: draft.vol, status: "picked" }); renderEvents(); renderEditor(); }
+  if (t.id === "try" && draft.files.length) { // skúška aj s prispôsobením na typické okno z hry
+    const f = draft.files[Math.floor(Math.random() * draft.files.length)];
+    if (selected.startsWith("music.")) return playAny(f, draft.vol);
+    return playFile(f, draft.vol, { windowMs: WINDOWS[selected]?.med ?? null, fit: draft.fit });
+  }
+  if (t.id === "apply") { setOverride(selected, { ...SOUNDS[selected], files: [...draft.files], vol: draft.vol, fit: draft.fit, status: "picked" }); renderEvents(); renderEditor(); }
   if (t.id === "silence") { draft.files = []; renderEditor(); renderLib(); }
   if (t.id === "revert") { setOverride(selected, null); select(selected); }
 });
@@ -226,7 +237,7 @@ $("lib").addEventListener("click", (ev) => {
 $("export").onclick = () => {
   const ov = getOverrides();
   const lines = Object.entries(ov).map(([k, e]) =>
-    `  ${JSON.stringify(k)}: { files: ${JSON.stringify(e.files)}, vol: ${e.vol}, status: "picked"${SOUNDS[k]?.note ? `, note: ${JSON.stringify(SOUNDS[k].note)}` : ""} },`);
+    `  ${JSON.stringify(k)}: { files: ${JSON.stringify(e.files)}, vol: ${e.vol}${e.fit ? `, fit: ${JSON.stringify(e.fit)}` : ""}, status: "picked"${SOUNDS[k]?.note ? `, note: ${JSON.stringify(SOUNDS[k].note)}` : ""} },`);
   $("out").value = lines.length ? lines.join("\n") : "// žiadne prepisy - najprv v editore stlač „Použiť (prepis)“";
   $("dlg").showModal();
 };
