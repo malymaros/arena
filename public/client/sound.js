@@ -7,6 +7,7 @@
 // Bez závislostí na hernom stave - importuje ho aj sound-lab. ČO hrá KEDY: public/sounds/events.js.
 import { SOUNDS } from "/sounds/manifest.js";
 import { fitPlan, defaultFit } from "/sounds/fit.js";
+import { trimOf, loopXfade } from "/sounds/trim.js";
 import { loadDraft, draftUrlResolver, isPreviewOn } from "/sounds/draft-store.js";
 
 const SETTINGS_KEY = "arena.sound";
@@ -29,10 +30,12 @@ export function setSettings(patch) {
 export function onSettingsChange(fn) { listeners.add(fn); }
 
 /* ---------- vrstvy ---------- */
-// vrstva = { name, entries: { kľúč: { ...položka, urls: [...] } } }
+// vrstva = { name, entries: { kľúč: { ...položka, urls: [...], trims: [[začiatok, koniec] | null, ...] } } }
 const layerOf = (name, entries, toUrl) => ({
   name,
-  entries: Object.fromEntries(Object.entries(entries || {}).map(([k, e]) => [k, { ...e, urls: (e.files || []).map(toUrl) }])),
+  entries: Object.fromEntries(Object.entries(entries || {}).map(([k, e]) => [k, {
+    ...e, urls: (e.files || []).map(toUrl), trims: (e.files || []).map(f => trimOf(e, f)),
+  }])),
 });
 const layers = { base: layerOf("base", SOUNDS, f => `/sounds/${f}`), pack: null, draft: null };
 let activePack = null; // { id, version, name } nainštalovaného aktívneho balíka
@@ -115,7 +118,7 @@ function unlock() {
   unlocked = true;
   ctx.resume?.();
   soundReady.then(preloadAll);
-  if (currentMusicKey) startMusicEl(true);
+  if (currentMusicKey && !music) startMusicEl();
 }
 for (const ev of ["pointerdown", "keydown", "touchstart"]) window.addEventListener(ev, unlock, { capture: true, passive: true });
 
@@ -133,23 +136,26 @@ export function sfx(key, { char = null, pan = 0, volume = 1, windowMs = null } =
   const e = entryFor(k);
   const urls = e?.urls || [];
   if (!urls.length) return;
-  const url = urls[Math.floor(Math.random() * urls.length)];
+  const i = Math.floor(Math.random() * urls.length);
   const jitter = /^(game|round|music)\./.test(k) ? 0 : 0.04; // jemná zmena výšky - opakované kroky neznejú ako stroj
-  playUrl(url, (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k) });
+  playUrl(urls[i], (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k), trim: e.trims?.[i] });
 }
 
 const activeSources = new Set(); // práve hrajúce efekty (stopAllSfx - Sound Lab „Stop“)
 
 // nízkoúrovňové prehratie (lab ním skúša knižnicu); hlasitosť = vol × efekty × master
 // → Promise<{ stop(), ended: Promise }> | null (súbor sa nedá načítať)
-export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit = "keep" } = {}) {
+// trim = [začiatokMs, koniecMs] - prehrá len hlavnú časť súboru (trim.js)
+export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit = "keep", trim = null } = {}) {
   if (!ensureCtx()) return Promise.resolve(null);
   if (!unlocked) unlock();
   return loadBuffer(url).then(buf => {
     if (!buf) return null;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    const plan = fitPlan(buf.duration * 1000 / rate, windowMs, fit);
+    const offMs = trim ? Math.min(trim[0], buf.duration * 1000) : 0;
+    const partMs = (trim ? Math.min(trim[1], buf.duration * 1000) : buf.duration * 1000) - offMs; // dĺžka úseku v čase súboru
+    const plan = fitPlan(partMs / rate, windowMs, fit);
     src.playbackRate.value = rate * plan.rate;
     const g = ctx.createGain();
     const level = Math.max(0, vol) * settings.sfx * settings.master;
@@ -166,8 +172,9 @@ export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit 
       node = node.connect(p);
     }
     node.connect(sfxBus);
-    src.start(t0);
-    if (plan.playMs != null) src.stop(t0 + plan.playMs / 1000);
+    const realMs = plan.playMs ?? partMs / (rate * plan.rate); // reálne trvanie prehrávania
+    src.start(t0, offMs / 1000);
+    src.stop(t0 + realMs / 1000);
     activeSources.add(src);
     const ended = new Promise(res => { src.onended = () => { activeSources.delete(src); res(); }; });
     return { stop: () => { try { src.stop(); } catch { /* už dohral */ } }, ended };
@@ -186,13 +193,18 @@ export function urlDuration(url) {
   if (!ensureCtx()) return Promise.resolve(null);
   return loadBuffer(url).then(buf => (buf ? Math.round(buf.duration * 1000) : null));
 }
+// dekódovaný zvuk (Sound Lab z neho počíta orezanie - trim.js); null = nedá sa načítať
+export function urlBuffer(url) {
+  if (!ensureCtx()) return Promise.resolve(null);
+  return loadBuffer(url);
+}
 // zabudni dekódovaný buffer (lab po zmene obsahu nahraného súboru pod rovnakou cestou)
 export function forgetUrl(url) { buffers.delete(url); }
 
 /* ---------- hudba ---------- */
 let currentMusicKey = null;
 let currentMusicUrl = null;
-let musicEl = null;      // práve hrajúci <audio>
+let music = null;        // práve hrajúca slučka (loopPlayer)
 const FADE_MS = 900;
 
 function musicTargetVolume() {
@@ -202,29 +214,67 @@ function musicTargetVolume() {
 function fade(el, to, ms, done) {
   const from = el.volume, t0 = performance.now();
   const tick = () => {
-    const k = Math.min(1, (performance.now() - t0) / ms);
+    const k = ms > 0 ? Math.min(1, (performance.now() - t0) / ms) : 1;
     el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
     if (k < 1) el._fadeRaf = requestAnimationFrame(tick); else done?.();
   };
   cancelAnimationFrame(el._fadeRaf);
   tick();
 }
-function stopMusicEl() {
-  const el = musicEl;
-  musicEl = null;
-  currentMusicUrl = null;
-  if (el) fade(el, 0, FADE_MS, () => { el.pause(); el.src = ""; });
+// slučka hudby: hrá úsek [trim začiatok, trim koniec] (bez trim celý súbor) a LOOP_XFADE pred koncom spustí
+// druhý prehrávač od začiatku úseku a oba prelínia - skladba nestíchne ani neskočí (aj keď má tichý koniec
+// alebo mp3 medzeru). fromMs = odkiaľ začať prvé prehratie (lab: kúsok pred koncom = počuť prechod).
+export function playMusicLoop(url, trim, volume, { fadeInMs = FADE_MS, fromMs = null } = {}) {
+  let alive = true, vol = volume;
+  const startMs = trim?.[0] || 0;
+  const spawn = (atMs, fadeMs) => {
+    const el = new Audio(url);
+    el.preload = "auto";
+    el.volume = fadeMs ? 0 : vol;
+    const go = () => {
+      el.currentTime = atMs / 1000;
+      el.play().catch(() => { /* autoplay zablokovaný - spustí sa pri ďalšom geste */ });
+      if (fadeMs) fade(el, vol, fadeMs);
+    };
+    if (el.readyState >= 1) go(); else el.addEventListener("loadedmetadata", go, { once: true });
+    return el;
+  };
+  let cur = spawn(fromMs ?? startMs, fadeInMs);
+  const timer = setInterval(() => {
+    if (!alive || !cur.duration || cur.paused) return;
+    const endMs = Math.min(trim?.[1] ?? Infinity, cur.duration * 1000);
+    const xf = loopXfade(endMs - startMs);
+    if (!cur._handoff && cur.currentTime * 1000 >= endMs - xf) {
+      cur._handoff = true;
+      const old = cur;
+      cur = spawn(startMs, xf);
+      fade(old, 0, xf, () => { old.pause(); old.src = ""; });
+    }
+  }, 50);
+  return {
+    url,
+    stop(ms = FADE_MS) {
+      alive = false;
+      clearInterval(timer);
+      const el = cur;
+      fade(el, 0, ms, () => { el.pause(); el.src = ""; });
+    },
+    setVolume(v) { vol = v; cancelAnimationFrame(cur._fadeRaf); cur.volume = Math.max(0, Math.min(1, v)); },
+    position() { return Math.round(cur.currentTime * 1000); }, // ms v súbore (lab, test slučky)
+  };
 }
-function startMusicEl(fadeIn) {
-  const urls = entryFor(currentMusicKey)?.urls || [];
+function stopMusicEl() {
+  music?.stop(FADE_MS);
+  music = null;
+  currentMusicUrl = null;
+}
+function startMusicEl() {
+  const e = entryFor(currentMusicKey);
+  const urls = e?.urls || [];
   if (!urls.length || !unlocked) return;
-  currentMusicUrl = urls[Math.floor(Math.random() * urls.length)];
-  const el = new Audio(currentMusicUrl);
-  el.loop = true;
-  el.volume = fadeIn ? 0 : musicTargetVolume();
-  el.play().catch(() => { /* autoplay zablokovaný - spustí sa pri ďalšom geste */ });
-  musicEl = el;
-  if (fadeIn) fade(el, musicTargetVolume(), FADE_MS);
+  const i = Math.floor(Math.random() * urls.length);
+  currentMusicUrl = urls[i];
+  music = playMusicLoop(urls[i], e.trims?.[i], musicTargetVolume());
 }
 // prepni hudbu na `key` (null = ticho); `fallback` sa použije, ak `key` nemá súbory (napr. music.final → music.battle)
 export function setMusic(key, fallback = null) {
@@ -232,7 +282,7 @@ export function setMusic(key, fallback = null) {
   if (key === currentMusicKey) return;
   stopMusicEl();
   currentMusicKey = key;
-  if (key) startMusicEl(true);
+  if (key) startMusicEl();
 }
 // vrstvy sa zmenili (načítaný balík / koncept) - ak aktuálna hudba má teraz iný súbor, prelínaj na nový
 function restartMusicIfChanged() {
@@ -244,6 +294,4 @@ function restartMusicIfChanged() {
   currentMusicKey = null;
   setMusic(k);
 }
-function applyMusicVolume() {
-  if (musicEl) { cancelAnimationFrame(musicEl._fadeRaf); musicEl.volume = musicTargetVolume(); }
-}
+function applyMusicVolume() { music?.setVolume(musicTargetVolume()); }

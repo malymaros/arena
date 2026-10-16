@@ -52,6 +52,8 @@ try {
   };
   const click = async () => { for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: 700, y: 450, button: "left", clickCount: 1 }); };
   await send("Runtime.enable"); await send("Network.enable"); await send("Page.enable");
+  // „Uložiť balík“ v teste nesmie nič stiahnuť do priečinka Stiahnuté používateľa
+  await send("Page.setDownloadBehavior", { behavior: "deny" });
 
   console.log("hra:");
   await send("Page.navigate", { url: `${URL0}/` }); await sleep(2500);
@@ -80,7 +82,7 @@ try {
     v.setUint32(24, 44100, true); v.setUint32(28, 88200, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
     await L.addFiles([new File([b], "Môj Úder.wav", { type: "audio/wav" })]);
     const d = L.getDraft();
-    d.entries["hit.naruto"] = { files: ["sounds/custom/moj-uder.wav"], vol: 0.7, fit: "keep" };
+    d.entries["hit.naruto"] = { files: ["sounds/custom/moj-uder.wav"], vol: 0.7, fit: "keep", trim: { "sounds/custom/moj-uder.wav": [50, 150] } };
     d.entries["special"] = { files: ["sounds/lib/kenney-digital-audio/zap2.ogg"], vol: 0.5, fit: "fade" };
     const built = await L.buildPack();
     if (!built.zip) return { error: JSON.stringify(built.report) };
@@ -89,7 +91,7 @@ try {
     const imp = await L.importZip(built.zip);
     await imp.load();
     const after = L.getDraft();
-    const strip = (es) => JSON.stringify(Object.fromEntries(Object.entries(es).map(([k, e]) => [k, { files: e.files, vol: e.vol, fit: e.fit }])));
+    const strip = (es) => JSON.stringify(Object.fromEntries(Object.entries(es).map(([k, e]) => [k, { files: e.files, vol: e.vol, fit: e.fit, trim: e.trim }])));
     return { level: built.report.level, files: built.pack.credits, same: strip(JSON.parse(before)) === strip(after.entries), version: after.meta.version, madeFor: built.pack.entries.special.madeForMs };
   })()`);
   check(rt && !rt.error && rt.level !== "incompatible", "export balíka (report kompatibility)", JSON.stringify(rt));
@@ -100,8 +102,8 @@ try {
   console.log("vyskúšať v hre:");
   await ev(`localStorage.setItem("arena.soundPreview", "1")`);
   await send("Page.navigate", { url: `${URL0}/` }); await sleep(2500);
-  const layer = await ev(`import("/client/sound.js").then(async m => { await m.soundReady; return [m.entryFor("hit.naruto")?.layer, m.entryFor("special")?.layer, m.entryFor("hit")?.layer]; })`);
-  check(JSON.stringify(layer) === JSON.stringify(["draft", "draft", "base"]), "hra hrá koncept nad základom", JSON.stringify(layer));
+  const layer = await ev(`import("/client/sound.js").then(async m => { await m.soundReady; return [m.entryFor("hit.naruto")?.layer, m.entryFor("special")?.layer, m.entryFor("hit")?.layer, m.entryFor("hit.naruto")?.trims?.[0]?.join("-")]; })`);
+  check(JSON.stringify(layer) === JSON.stringify(["draft", "draft", "base", "50-150"]), "hra hrá koncept nad základom", JSON.stringify(layer));
   await ev(`localStorage.setItem("arena.soundPreview", "0")`);
   await send("Page.navigate", { url: `${URL0}/sound-lab.html` }); await sleep(2500);
   console.log("lab - zmena cez UI:");
@@ -132,6 +134,17 @@ try {
   const shot = (await send("Page.captureScreenshot")).result?.data;
   if (shot && process.env.SOUND_SMOKE_SHOT) fs.writeFileSync(process.env.SOUND_SMOKE_SHOT, Buffer.from(shot, "base64"));
 
+  console.log("hudba:");
+  // slučka v úseku [440, 8000] ms (prelínanie 1,5 s → odovzdanie v 6500), štart v 5500 → po 2 s už hrá od začiatku
+  const loop = await ev(`(async () => {
+    const m = await import("/client/sound.js");
+    const h = m.playMusicLoop("/sounds/lib/cynicmusic/cynic-town-theme.mp3", [440, 8000], 0.5, { fadeInMs: 0, fromMs: 5500 });
+    await new Promise(r => setTimeout(r, 400)); const before = h.position();
+    await new Promise(r => setTimeout(r, 1600)); const after = h.position();
+    h.stop(0); return JSON.stringify({ before, after });
+  })()`);
+  const lp = JSON.parse(loop || "{}");
+  check(lp.before >= 5500 && lp.before < 6500 && lp.after >= 440 && lp.after < 3000, "slučka hudby prejde z konca úseku na jeho začiatok", loop);
   check(net.bad.length === 0, "žiadne zlyhané požiadavky na zvuky", net.bad.join(", "));
   check(errs.length === 0, "žiadne JS chyby", errs.join(" | "));
   ws.close();

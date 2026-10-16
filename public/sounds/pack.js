@@ -30,6 +30,18 @@ export function safePath(f) {
     && AUDIO_EXT.includes(f.split(".").pop().toLowerCase());
 }
 
+// trim: { "<súbor položky>": [startMs, endMs] } (trim.js) - len súbory položky, 0 ≤ začiatok < koniec
+export function trimErrors(key, e) {
+  if (e.trim === undefined) return [];
+  if (!e.trim || typeof e.trim !== "object" || Array.isArray(e.trim)) return [`${key}: trim musí byť objekt { súbor: [začiatok, koniec] }`];
+  const out = [];
+  for (const [f, t] of Object.entries(e.trim)) {
+    if (!(e.files || []).includes(f)) out.push(`${key}: trim pre súbor ${f}, ktorý položka nemá`);
+    else if (!Array.isArray(t) || t.length !== 2 || !t.every(Number.isFinite) || t[0] < 0 || t[1] <= t[0]) out.push(`${key}: trim ${f} musí byť [začiatok ≥ 0, koniec > začiatok] v ms`);
+  }
+  return out;
+}
+
 // preloží kľúče balíka zo staršej soundApi na `api` podľa KEY_MIGRATIONS → { pack (kópia), notes }
 export function migratePack(pack, api, migrations) {
   const out = { ...pack, entries: { ...(pack.entries || {}) } };
@@ -76,6 +88,7 @@ export function validatePack(pack, fileSizes, { keys, chars, api }) {
     }
     if (typeof e.vol !== "number" || e.vol < 0 || e.vol > 1) errors.push(`${key}: vol mimo 0–1`);
     if (e.fit !== undefined && !FIT_MODES.includes(e.fit)) errors.push(`${key}: fit "${e.fit}"`);
+    errors.push(...trimErrors(key, e));
   }
   let total = 0;
   for (const [name, size] of sizes) {

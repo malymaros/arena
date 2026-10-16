@@ -54,6 +54,10 @@
   .chip { display: inline-flex; gap: 4px; align-items: center; background: #2a2f39; border-radius: 12px; padding: 2px 4px 2px 8px; font-size: 11px; font-family: ui-monospace, monospace; }
   .chip button { padding: 0 6px; border: 0; background: none; color: var(--red); }
   .chip button.p { color: var(--gold); }
+  .chip button.t { color: var(--text); }
+  .chip.trimmed { outline: 1px solid #6b5410; }
+  .trimbox { background: #15171c; border: 1px solid #3a404c; border-radius: 8px; padding: 8px 10px; margin: 6px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .trimbox input[type=number] { width: 80px; background: #0f1115; color: var(--text); border: 1px solid #3a404c; border-radius: 6px; padding: 3px 6px; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
   .lib-tools { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
   .lib-tools input[type=search] { flex: 1; min-width: 140px; }
@@ -116,7 +120,8 @@ import { defaultFit } from "/sounds/fit.js";
 import { PACK_FORMAT, compatReport, safePath } from "/sounds/pack.js";
 import { writeZip, readZip } from "/sounds/zip.js";
 import { loadDraft, saveDraft, putBlob, getBlob, listBlobPaths, clearDraft, isPreviewOn, setPreview } from "/sounds/draft-store.js";
-import { playUrl, stopAllSfx, sfx, urlDuration, forgetUrl, getSettings, setSettings, setDraftLayer } from "/client/sound.js";
+import { playUrl, stopAllSfx, playMusicLoop, urlBuffer, sfx, urlDuration, forgetUrl, getSettings, setSettings, setDraftLayer } from "/client/sound.js";
+import { envelope, detectTrim, loopXfade } from "/sounds/trim.js";
 import { CHAR_LIST } from "/chars/index.js";
 
 const $ = (id) => document.getElementById(id);
@@ -177,7 +182,11 @@ function winText(k) {
 // vlastná položka kľúča: koncept > register (cesty v tvare balíka); null = nemá vlastnú
 function own(k) {
   if (draft.entries[k]) return { ...draft.entries[k], src: "draft" };
-  if (SOUNDS[k]) return { ...SOUNDS[k], files: SOUNDS[k].files.map(libToPack), src: SOUNDS[k].status };
+  if (SOUNDS[k]) {
+    const r = SOUNDS[k];
+    const trim = r.trim ? Object.fromEntries(Object.entries(r.trim).map(([f, t]) => [libToPack(f), t])) : undefined;
+    return { ...r, files: r.files.map(libToPack), trim, src: r.status };
+  }
   return null;
 }
 // čo naozaj zaznie (kľúč postavy bez vlastnej položky dedí spoločnú)
@@ -267,30 +276,29 @@ $("list").addEventListener("click", (ev) => {
 function playKey(k, btn) {
   const e = effective(k);
   if (!e?.files.length) return;
-  playAny(e.files[Math.floor(Math.random() * e.files.length)], e.vol, k, e.fit, btn);
+  const f = e.files[Math.floor(Math.random() * e.files.length)];
+  playAny(f, { vol: e.vol, key: k, fit: e.fit, btn, trim: e.trim?.[f] });
 }
 
 /* ---------- prehrávanie ---------- */
 // naraz hrá najviac jeden zvuk: nový najprv zastaví predošlý; ▶ práve hrajúceho (svieti ■) ho zastaví
-let musicEl = null, playingBtn = null;
+let musicLoop = null, playingBtn = null;
 function stopEverything() {
   stopAllSfx();
-  if (musicEl) { musicEl.pause(); musicEl = null; }
+  if (musicLoop) { musicLoop.stop(150); musicLoop = null; }
   if (playingBtn) { playingBtn.textContent = "▶"; playingBtn.classList.remove("on"); playingBtn = null; }
 }
-async function playAny(p, vol = 1, key = null, fit = null, btn = null) {
+// hudba hrá ako v hre: slučka v orezanom úseku s prelínaním (fromMs = začať kúsok pred koncom → počuť prechod)
+async function playAny(p, { vol = 1, key = null, fit = null, btn = null, trim = null, fromMs = null } = {}) {
   if (btn && btn === playingBtn) { stopEverything(); return; }
   stopEverything();
   if (btn) { btn.textContent = "■"; btn.classList.add("on"); playingBtn = btn; }
   const done = () => { if (btn && playingBtn === btn) { btn.textContent = "▶"; btn.classList.remove("on"); playingBtn = null; } };
   if (key?.startsWith("music.") || /\.mp3$/i.test(p)) {
-    musicEl = new Audio(urlOf(p));
-    musicEl.volume = Math.min(1, vol * getSettings().music * getSettings().master);
-    musicEl.onended = done;
-    musicEl.play().catch(done);
+    musicLoop = playMusicLoop(urlOf(p), trim, Math.min(1, vol * getSettings().music * getSettings().master), { fadeInMs: 0, fromMs });
     return;
   }
-  const h = await playUrl(urlOf(p), vol, key ? { windowMs: winOf(key)?.med ?? null, fit: fit || defaultFit(baseOf(key)) } : {});
+  const h = await playUrl(urlOf(p), vol, { trim, ...(key ? { windowMs: winOf(key)?.med ?? null, fit: fit || defaultFit(baseOf(key)) } : {}) });
   if (h) h.ended.then(done); else done();
 }
 $("stop").onclick = stopEverything;
@@ -298,6 +306,17 @@ window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") stopEveryt
 window.addEventListener("keydown", (ev) => { if (ev.key === " " && selected && ev.target === document.body) { ev.preventDefault(); sfx(baseOf(selected), { char: charOfKey(selected), windowMs: winOf(selected)?.med }); } });
 
 /* ---------- editor ---------- */
+let trimOpen = null; // súbor, ktorého orezanie (✂) je práve otvorené
+const sec = (ms) => (ms / 1000).toFixed(2).replace(".", ",");
+const isMusic = (k, f) => k?.startsWith("music.") || /\.mp3$/i.test(f || "");
+// automatické orezanie hlavnej časti (bez tichého/slabého úvodu a konca); null = netreba
+async function autoTrim(path) {
+  const buf = await urlBuffer(urlOf(path));
+  if (!buf) return null;
+  const durMs = buf.duration * 1000;
+  const t = detectTrim(envelope(buf.getChannelData(0), buf.sampleRate), durMs);
+  return t && (t.startMs > 30 || t.endMs < durMs - 100) ? [t.startMs, t.endMs] : null;
+}
 function select(k) {
   const changedSel = selected !== k;
   selected = k;
@@ -307,7 +326,8 @@ function select(k) {
     if (ed.getBoundingClientRect().top > innerHeight || ed.getBoundingClientRect().bottom < 0) ed.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   const e = effective(k);
-  edit = { files: [...(e?.files || [])], vol: e?.vol ?? 1, fit: e?.fit || defaultFit(baseOf(k)) };
+  edit = { files: [...(e?.files || [])], vol: e?.vol ?? 1, fit: e?.fit || defaultFit(baseOf(k)), trim: { ...(e?.trim || {}) } };
+  if (changedSel) trimOpen = null;
   renderAll();
 }
 function renderEditor() {
@@ -319,7 +339,14 @@ function renderEditor() {
     <div class="hint">${esc(reg?.note || SOUNDS[baseOf(selected)]?.note || "")}</div>
     <div class="hint">${w ? `⏱ okno v hre: <b>${winText(selected)}</b>` : "⏱ okno v hre: nemerané (UI / hudba / zriedkavá udalosť)"}</div>
     <div class="hint">${e?.inherited ? `Teraz dedí spoločný zvuk „${esc(baseOf(selected))}“.` : reg ? `V registri: ${reg.files.length ? reg.files.map(short).map(esc).join(", ") : "ticho"} (${reg.status})` : ""}</div>
-    <div class="chosen">${edit.files.map((f, i) => `<span class="chip" title="${esc(f)}">${esc(short(f))} <small data-dur="${esc(f)}"></small><button class="p" data-play-f="${esc(f)}">▶</button><button data-rm="${i}">✕</button></span>`).join("") || '<span class="hint">ticho (žiadny súbor)</span>'}</div>
+    <div class="chosen">${edit.files.map((f, i) => { const t = edit.trim[f]; return `<span class="chip${t ? " trimmed" : ""}" title="${esc(f)}">${esc(short(f))} <small data-dur="${esc(f)}"></small><button class="p" data-play-f="${esc(f)}">▶</button><button class="t" data-trim="${esc(f)}" title="Orezať - začiatok a koniec">✂${t ? ` ${sec(t[0])}–${sec(t[1])} s` : ""}</button><button data-rm="${i}">✕</button></span>`; }).join("") || '<span class="hint">ticho (žiadny súbor)</span>'}</div>
+    ${trimOpen && edit.files.includes(trimOpen) ? `<div class="trimbox">✂ <b>${esc(short(trimOpen))}</b>
+      začiatok <input type="number" id="t-start" min="0" step="10" value="${edit.trim[trimOpen]?.[0] ?? 0}" /> ms ·
+      koniec <input type="number" id="t-end" min="0" step="10" value="${edit.trim[trimOpen]?.[1] ?? ""}" placeholder="celý" /> ms
+      <button id="t-play">▶ Od začiatku</button>
+      ${isMusic(selected, trimOpen) ? '<button id="t-loop" title="Začne kúsok pred koncom - počuť, ako sa koniec prelínia so začiatkom">▶ Prechod slučky</button>' : ""}
+      <button id="t-auto" title="Nájde hlavnú časť - bez tichého/slabého úvodu a konca">Auto</button>
+      <button id="t-full">Celé</button></div>` : ""}
     <div class="hint">Zvuk pridáš z knižnice dole cez „+“ (viac súborov = pri každom prehratí náhodne jeden). <b>Každá zmena sa ukladá hneď.</b></div>
     <div class="row">Keď je zvuk dlhší ako okno:
       <select id="efit">${[["keep", "nechať doznieť celý"], ["fade", "stíšiť na konci okna"], ["fit", "zrýchliť na okno (max ±15 %, inak stíšiť)"]]
@@ -333,14 +360,16 @@ function renderEditor() {
   for (const el of $("editor").querySelectorAll("[data-dur]")) {
     urlDuration(urlOf(el.dataset.dur)).then(ms => {
       if (ms == null) { el.textContent = "?"; return; }
-      el.textContent = `${ms} ms`;
-      if (w) el.style.color = ms <= w.med * 1.1 ? "var(--green)" : "var(--orange)";
+      const t = edit.trim[el.dataset.dur], len = t ? Math.min(t[1], ms) - t[0] : ms;
+      el.textContent = t ? `${len} ms (z ${ms})` : `${ms} ms`;
+      if (w) el.style.color = len <= w.med * 1.1 ? "var(--green)" : "var(--orange)";
     });
   }
 }
 // zmena v editore = hneď do konceptu
 async function commit() {
-  draft.entries[selected] = { files: [...edit.files], vol: edit.vol, fit: edit.fit };
+  const trim = Object.fromEntries(Object.entries(edit.trim).filter(([f, t]) => edit.files.includes(f) && t));
+  draft.entries[selected] = { files: [...edit.files], vol: edit.vol, fit: edit.fit, ...(Object.keys(trim).length ? { trim } : {}) };
   markChanged(selected);
   await persist();
 }
@@ -348,12 +377,28 @@ $("editor").addEventListener("input", (ev) => { if (ev.target.id === "evol") { e
 $("editor").addEventListener("change", (ev) => {
   if (ev.target.id === "efit") { edit.fit = ev.target.value; commit(); }
   if (ev.target.id === "evol") commit();
+  if (ev.target.id === "t-start" || ev.target.id === "t-end") {
+    urlDuration(urlOf(trimOpen)).then(dur => {
+      const a = Math.max(0, Math.round(Number($("t-start").value) || 0));
+      const b = Math.min(dur ?? Infinity, Math.round(Number($("t-end").value) || dur || 0));
+      if (b > a) edit.trim[trimOpen] = [a, b]; else toast("Koniec musí byť za začiatkom.");
+      commit();
+    });
+  }
 });
 $("editor").addEventListener("click", async (ev) => {
   const t = ev.target;
-  if (t.dataset.playF) return playAny(t.dataset.playF, edit.vol, selected, edit.fit, t);
+  if (t.dataset.playF) return playAny(t.dataset.playF, { vol: edit.vol, key: selected, fit: edit.fit, btn: t, trim: edit.trim[t.dataset.playF] });
+  if (t.dataset.trim) { trimOpen = trimOpen === t.dataset.trim ? null : t.dataset.trim; renderEditor(); return; }
   if (t.dataset.rm) { edit.files.splice(Number(t.dataset.rm), 1); await commit(); return; }
-  if (t.id === "try" && edit.files.length) return playAny(edit.files[Math.floor(Math.random() * edit.files.length)], edit.vol, selected, edit.fit, t);
+  if (t.id === "try" && edit.files.length) { const f = edit.files[Math.floor(Math.random() * edit.files.length)]; return playAny(f, { vol: edit.vol, key: selected, fit: edit.fit, btn: t, trim: edit.trim[f] }); }
+  if (t.id === "t-play") return playAny(trimOpen, { vol: edit.vol, key: selected, fit: "keep", btn: t, trim: edit.trim[trimOpen] });
+  if (t.id === "t-loop") {
+    const dur = await urlDuration(urlOf(trimOpen)), tr = edit.trim[trimOpen] || [0, dur];
+    return playAny(trimOpen, { vol: edit.vol, key: selected, btn: t, trim: edit.trim[trimOpen], fromMs: Math.max(tr[0], tr[1] - loopXfade(tr[1] - tr[0]) - 4000) });
+  }
+  if (t.id === "t-auto") { const a = await autoTrim(trimOpen); if (a) edit.trim[trimOpen] = a; else { delete edit.trim[trimOpen]; toast("Zvuk nemá tichý úvod ani koniec - hrá celý."); } await commit(); return; }
+  if (t.id === "t-full") { delete edit.trim[trimOpen]; await commit(); return; }
   if (t.id === "silence") { edit.files = []; await commit(); return; }
   if (t.id === "drop-entry") { delete draft.entries[selected]; markChanged(selected); await persist(); select(selected); }
 });
@@ -384,10 +429,16 @@ function renderLib() {
 }
 $("pack").onchange = renderLib;
 $("q").oninput = renderLib;
-$("lib").addEventListener("click", (ev) => {
+$("lib").addEventListener("click", async (ev) => {
   const t = ev.target;
-  if (t.dataset.playF) return playAny(t.dataset.playF, edit?.vol ?? 1, selected, edit?.fit, t);
-  if (t.dataset.add && edit && !edit.files.includes(t.dataset.add)) { edit.files.push(t.dataset.add); commit(); }
+  if (t.dataset.playF) return playAny(t.dataset.playF, { vol: edit?.vol ?? 1, key: selected, fit: edit?.fit, btn: t });
+  if (t.dataset.add && edit && !edit.files.includes(t.dataset.add)) {
+    const f = t.dataset.add;
+    edit.files.push(f);
+    const a = await autoTrim(f); // hra hneď počuť hlavnú časť - tichý úvod/koniec preč (✂ sa dá zmeniť)
+    if (a) { edit.trim[f] = a; toast(`${short(f)}: orezané ticho - hrá ${sec(a[0])}–${sec(a[1])} s (zmeníš cez ✂)`); }
+    commit();
+  }
 });
 
 /* ---------- nahratie vlastných súborov ---------- */
@@ -422,7 +473,7 @@ async function buildPack() {
   const entries = {}, files = new Map();
   for (const [k, e] of Object.entries(draft.entries)) {
     const madeForMs = winOf(k)?.med;
-    entries[k] = { files: e.files, vol: e.vol, fit: e.fit, ...(madeForMs ? { madeForMs } : {}) };
+    entries[k] = { files: e.files, vol: e.vol, fit: e.fit, ...(e.trim ? { trim: e.trim } : {}), ...(madeForMs ? { madeForMs } : {}) };
     for (const p of e.files) files.set(p, null);
   }
   for (const p of files.keys()) {

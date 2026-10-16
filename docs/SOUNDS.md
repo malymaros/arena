@@ -13,6 +13,7 @@ Zvuky sa robia v **Sound Labe** (`/sound-lab.html`) ako **zvukový balík**, ted
 | **KEDY** čo zaznie: čistá logika (timeline efekt → kľúč, okno akcie), Node aj prehliadač | `public/sounds/events.js` |
 | **okná** udalostí zmerané z enginu (ako dlho hra na udalosti stojí) | `public/sounds/windows.json` ← `npm run sounds:windows` |
 | prispôsobenie zvuku oknu (`keep` / `fade` / `fit`) | `public/sounds/fit.js` |
+| orezanie na hlavnú časť (automatické nájdenie, prelínanie slučky hudby) | `public/sounds/trim.js` |
 | formát balíka: validácia, migrácia, report kompatibility | `public/sounds/pack.js` |
 | zip bez závislostí (zápis store, čítanie store + deflate, CRC) | `public/sounds/zip.js` |
 | koncept balíka v prehliadači (IndexedDB) + „Vyskúšať v hre“ | `public/sounds/draft-store.js` |
@@ -78,6 +79,15 @@ Kratší zvuk sa nikdy nenaťahuje. Bez `fit` platí `defaultFit(kľúč)`.
 **Keď sa zmení časovanie hry** (`shared/timing.js`) alebo mapovanie, `npm test` zlyhá, kým nespustíš `npm run sounds:windows`.
 Balíky potom report označí upozornením na posunuté okno.
 
+## Orezanie a slučka hudby
+
+Každý súbor v položke môže mať **orezanie** `trim: { "<súbor>": [začiatokMs, koniecMs] }`:
+- **efekt** začne rovno hlavnou časťou a skončí na konci úseku;
+- **hudba** sa opakuje len v úseku a posledných ~1,5 s (pri krátkom úseku tretina) sa **prelínia so začiatkom**. Skladba tak nestíchne ani neskočí, aj keď má tichý alebo doznievajúci koniec.
+
+V labe sa orezanie nastaví **automaticky pri pridaní súboru**: hlavná časť je hlasitosť nad 5 % maxima, s malou rezervou.
+Pri súbore ho zmeníš cez **✂**: začiatok a koniec v ms, **Auto**, **Celé**, **▶ Od začiatku** a pri hudbe **▶ Prechod slučky** (začne kúsok pred koncom, aby bolo počuť prelínanie).
+
 ## Register: `default` vs `picked`
 
 - **`default`** - dohľadal Claude. Je to len odhad podľa názvu súboru, nikto ho v hre ešte nepočul.
@@ -104,6 +114,7 @@ Nový balík do knižnice: rozbaľ ho do `public/sounds/lib/<balík>/` aj s lice
 | `test/sound-events.mjs` | mapovanie timeline → udalosti (raz za beh, move/dash, skrytý súper, prahy, okná) |
 | `node tools/sound-windows.mjs --check` | okná sedia s aktuálnym enginom |
 | `test/sound-fit.mjs` | prispôsobenie oknu |
+| `test/sound-trim.mjs` | orezanie (detekcia hlavnej časti, prelínanie slučky, validácia `trim`) |
 | `test/sound-pack.mjs` | zip, validácia, migrácia, report, snímka kľúčov API, inštalátor |
 | `node tools/sound-pack.mjs check` | nainštalované balíky sú platné voči aktuálnej hre |
 | `node tools/sound-smoke.mjs` (manuálne) | reálny prehliadač: odomknutie zvuku, lab nahratie → export → import, „Vyskúšať v hre“ |
