@@ -1,83 +1,123 @@
-# Zvuky a hudba
+# Zvuky, hudba a zvukové balíky
 
-Tvorivé rozhodnutia o zvuku robí **vlastník**. Claude dohľadáva voľne dostupné kandidátov a stará sa o techniku.
-Ktorý zvuk je čí výber, je evidované priamo v registri.
+O tom, ako hra znie, rozhoduje **vlastník**. Claude dohľadáva voľne dostupných kandidátov a stará sa o techniku.
+Zvuky sa robia v **Sound Labe** (`/sound-lab.html`) ako **zvukový balík**, teda zip. Vytvoriť a stiahnuť si ho môže ktokoľvek.
+**Do hry ho nasadí len vlastník servera.** Balík **nemení ani nenavrhuje časovanie hry**: zvuk sa prispôsobuje hre, nie naopak.
 
 ## Kde čo je
 
 | čo | kde |
 |---|---|
-| **register** (udalosť → súbor, hlasitosť, status, poznámka) + zdroje a licencie | `public/sounds/manifest.js` |
-| knižnica kandidátov (stiahnuté balíky, každý s licenciou) | `public/sounds/lib/<balík>/` |
-| vlastné súbory vlastníka | `public/sounds/custom/` |
-| **KEDY** čo zaznie - čistá logika (timeline efekt → kľúč, okno akcie), Node aj prehliadač | `public/sounds/events.js` |
-| napojenie na hru (volá events.js → sound.js, fáza hry → hudba) | `public/client/sound-map.js` |
+| **register** = základný zvuk každej udalosti (súbor, hlasitosť, `fit`, status, poznámka) + zdroje a licencie + `SOUND_API_VERSION`/`KEY_MIGRATIONS` | `public/sounds/manifest.js` |
+| knižnica kandidátov (stiahnuté CC0 balíky, každý s licenciou) | `public/sounds/lib/<balík>/` |
+| **KEDY** čo zaznie: čistá logika (timeline efekt → kľúč, okno akcie), Node aj prehliadač | `public/sounds/events.js` |
 | **okná** udalostí zmerané z enginu (ako dlho hra na udalosti stojí) | `public/sounds/windows.json` ← `npm run sounds:windows` |
-| prehrávanie (Web Audio, variácie, panoráma, hudba s prelínaním, nastavenia) | `public/client/sound.js` |
+| prispôsobenie zvuku oknu (`keep` / `fade` / `fit`) | `public/sounds/fit.js` |
+| formát balíka: validácia, migrácia, report kompatibility | `public/sounds/pack.js` |
+| zip bez závislostí (zápis store, čítanie store + deflate, CRC) | `public/sounds/zip.js` |
+| koncept balíka v prehliadači (IndexedDB) + „Vyskúšať v hre“ | `public/sounds/draft-store.js` |
+| nainštalované balíky + aktívny (generované, neupravovať ručne) | `public/sounds/packs/index.js`, `public/sounds/packs/<id>/<verzia>/` |
+| prehrávač: vrstvy základ → aktívny balík → koncept, Web Audio, hudba | `public/client/sound.js` |
+| napojenie na hru (timeline → events.js → sound.js, fáza hry → hudba) | `public/client/sound-map.js` |
 | tlačidlo 🔊 v hre (mute, master/hudba/efekty, kláves **M**) + zvuky klikov | `public/client/sound-ui.js` |
-| výber a skúšanie zvukov | **`/sound-lab.html`** |
-| kontrola registra (súbory existujú, zdroj+licencia, status, žiadny chýbajúci kľúč) | `test/sounds.mjs` (súčasť `npm test`) |
-| unit testy mapovania | `test/sound-events.mjs` |
-| okná sedia s enginom | `node tools/sound-windows.mjs --check` (súčasť `npm test`) |
-| prehľad: čo je default a čo picked, zdroje | `npm run sounds` |
+| editor balíka | **`/sound-lab.html`** |
 
-## Status v registri
+## Ako vytvoriť balík (ktokoľvek)
+
+1. Otvor `/sound-lab.html` (lokálne `http://localhost:3000/sound-lab.html` alebo na živom webe; server nič neukladá).
+2. Vpravo hore vyplň **názov**, **id** a **autora** balíka.
+3. **Všetky udalosti** alebo **Podľa postavy**: klik na riadok otvorí editor.
+   - ⏱ **okno v hre** ukazuje, ako dlho hra na tej udalosti stojí. Dĺžky súborov sú zelené, ak sa zmestia, a oranžové, ak prečnievajú.
+   - Pohľad **Podľa postavy** ukazuje všetky zvuky jednej postavy. Šedé „spoločný“ znamená, že hrá rovnaký zvuk ako ostatné postavy.
+     Keď jej priradíš vlastný, vznikne kľúč `<udalosť>.<postava>` (napríklad `hit.naruto` = Narutov hlas pri zásahu).
+4. Z **knižnice** pridávaš zvuky cez „+“. Vlastné súbory (ogg/mp3/wav/webm, max 2 MB) **pretiahneš** do poľa nad knižnicou.
+   Viac súborov pri jednej udalosti = pri každom prehratí náhodne jeden.
+5. Nastav hlasitosť a režim **„Keď je zvuk dlhší ako okno“** a stlač **Uložiť do konceptu**. Koncept prežije refresh aj zatvorenie okna.
+6. **Vyskúšať v hre**: zapni prepínač a obnov stránku hry. Hra potom v tomto prehliadači hrá tvoj koncept.
+7. **Stiahnuť balík** uloží `<id>-v<verzia>.zip`. Verzia konceptu sa potom zvýši o 1.
+   **Načítať balík…** otvorí zip (svoj alebo cudzí) a ukáže report kompatibility. Potom môžeš v balíku pokračovať.
+
+## Ako nasadiť balík (len vlastník servera)
+
+```
+node tools/sound-pack.mjs install ~/Downloads/moj-balik-v3.zip --activate
+npm test                       # balíky sa kontrolujú aj v teste
+git add public/sounds/packs && git commit -m "Zvukový balík moj-balik v3"
+# deploy podľa CLAUDE.md
+```
+`node tools/sound-pack.mjs activate moj-balik@2` vráti staršiu verziu (staré verzie ostávajú nainštalované).
+`node tools/sound-pack.mjs check` a `node tools/sound-pack.mjs report` vypíšu stav. Na serveri nie je žiadny upload, balík ide do hry len cez git.
+
+## Verzie a kompatibilita
+
+Balík (`pack.json`) nesie tri nezávislé verzie:
+
+| čo | pri nesúlade |
+|---|---|
+| `format` (schéma `pack.json`, `PACK_FORMAT` v `pack.js`) | novší formát sa odmietne („aktualizuj hru“) |
+| `soundApi` (sada udalostí, `SOUND_API_VERSION` v manifeste) | staršie kľúče sa preložia cez `KEY_MIGRATIONS`, zrušené vypadnú s poznámkou, novšie API sa odmietne |
+| `madeForMs` pri každej položke (okno v čase tvorby) | ak sa okno v hre posunie o viac ako 10 %, príde upozornenie. Zvuk hrá ďalej a prispôsobí sa cez `fit` |
+
+Report má tri úrovne: **ok**, **upozornenia** (balík funguje) alebo **nekompatibilný** (nedá sa načítať ani nainštalovať).
+
+**Pravidlo pre vývoj:** premenovanie alebo zrušenie udalosti znamená zvýšiť `SOUND_API_VERSION`, doplniť `KEY_MIGRATIONS[nová] = { "starý": "nový" | null }`
+a spustiť `node test/sound-pack.mjs --snapshot`. Test zlyhá, ak kľúč zmizne bez migrácie. Pridanie udalosti verziu nemení.
+
+## Okná a prispôsobenie zvuku
+
+Okno nie je odhad. `tools/sound-windows.mjs` odohrá seedované zápasy botov všetkých dvojíc postáv priamo na engine
+a každý frame prejde tou istou logikou (`events.js`), ktorá v hre zvuk spúšťa.
+Režimy `fit`:
+- `keep` dohrá celý zvuk (nárazy, UI);
+- `fade` sa na konci okna stíši (casty, lety, kroky);
+- `fit` zrýchli alebo spomalí zvuk presne na okno, ak stačí ±15 % (inak `fade`).
+
+Kratší zvuk sa nikdy nenaťahuje. Bez `fit` platí `defaultFit(kľúč)`.
+**Keď sa zmení časovanie hry** (`shared/timing.js`) alebo mapovanie, `npm test` zlyhá, kým nespustíš `npm run sounds:windows`.
+Balíky potom report označí upozornením na posunuté okno.
+
+## Register: `default` vs `picked`
 
 - **`default`** - dohľadal Claude. Je to len odhad podľa názvu súboru, nikto ho v hre ešte nepočul.
 - **`picked`** - vybral vlastník. **Claude ho bez výslovnej žiadosti nemení.**
 
-Prázdne `files: []` znamená vedomé ticho. Pri `picked` je to rozhodnutie, nie chyba.
-
-## Ako vybrať zvuk (workflow vlastníka)
-
-1. Spusti server a otvor `http://localhost:3000/sound-lab.html`.
-2. Vľavo sú udalosti. ▶ prehrá aktuálny zvuk, klik na riadok otvorí editor.
-3. Vpravo je knižnica. Filtruješ podľa balíka a hľadáš (`punch`, `laser`, `glass`…). Cez ▶ si zvuk vypočuješ, cez **+** ho pridáš k udalosti.
-   Ak pridáš viac súborov, pri každom prehratí sa náhodne vyberie jeden (variácie, napríklad kroky).
-4. Nastav hlasitosť a stlač **Použiť (prepis)**. Prepis sa uloží do `localStorage` tohto prehliadača
-   a **hneď platí aj v hre**, takže si ho vyskúšaš v ozajstnom zápase.
-5. **Export zmien** vygeneruje riadky so `status: "picked"`. Vlož ich do `public/sounds/manifest.js`
-   (nahradia rovnaké kľúče) alebo ich pošli Claudovi. Potom stlač **Zrušiť všetky prepisy**.
-
-Vlastný súbor (napríklad nahraté vytie pre vlkolaka) nahraj do `public/sounds/custom/`. Lab ho po obnovení stránky ponúkne v balíku `custom`.
+Prázdne `files: []` znamená vedomé ticho. `npm run sounds` vypíše, čo je ešte default.
 
 ## Ako pridať novú udalosť (vývoj)
 
 1. Do `SOUNDS` v manifeste pridaj kľúč so `status: "default"` a poznámkou, kedy zaznie.
 2. Spusti ho:
-   - timeline efekt zo servera: pridaj ho do mapy `DIRECT` v `public/sounds/events.js` a spusti `npm run sounds:windows`;
-   - opakujúce sa efekty (let strely, beaty castu) pridaj aj do `ONCE_PER_RUN`;
+   - timeline efekt: pridaj ho do `DIRECT` v `events.js` (opakujúci sa efekt aj do `ONCE_PER_RUN`) a spusti `npm run sounds:windows`;
    - UI moment: zavolaj `sfx("kľúč")`.
-3. Variant pre postavu: kľúč `<udalosť>.<char>` (napríklad `special.werewolf`) prebije všeobecný `<udalosť>`.
-4. `npm test` (`test/sounds.mjs`) zlyhá, ak klient prehráva kľúč, ktorý v registri chýba.
+3. `node test/sound-pack.mjs --snapshot` (aktualizuje snímku kľúčov aktuálnej verzie API).
 
-Nový balík do knižnice: rozbaľ ho do `public/sounds/lib/<balík>/` aj s licenciou a doplň `SOUND_SOURCES`
-(názov, autor, URL, licencia). Test zlyhá, ak balík v `SOUND_SOURCES` chýba.
-**Len licencie, ktoré dovoľujú použitie v hre** (CC0 je ideálne; CC-BY si vyžaduje kredit v `SOUND_SOURCES` a v README).
+Nový balík do knižnice: rozbaľ ho do `public/sounds/lib/<balík>/` aj s licenciou a doplň `SOUND_SOURCES`.
+**Len licencie, ktoré dovoľujú použitie v hre** (CC0 ideálne; CC-BY si vyžaduje kredit).
 
-## Okná (cieľová dĺžka zvuku)
+## Testy
 
-Lab pri každej udalosti ukazuje ⏱ **okno v hre**, teda ako dlho hra na tej udalosti stojí, kým ide ďalej.
-Nie je to odhad: `tools/sound-windows.mjs` odohrá seedované zápasy botov všetkých dvojíc postáv priamo na engine
-a každý frame prejde tou istou logikou (`events.js`), ktorá v hre zvuk spúšťa. Pri súboroch ukazuje dĺžku
-(zelená = zmestí sa, oranžová = prečnieva do ďalšej akcie).
-**Prispôsobenie oknu** (`public/sounds/fit.js`, pole `fit` v registri, v labe „Keď je zvuk dlhší ako okno“):
-`keep` = dohrá celý (nárazy, UI), `fade` = na konci okna sa stíši (casty, lety, kroky), `fit` = zrýchli/spomalí sa
-presne na okno, ak stačí ±15 % (inak `fade`). Kratší zvuk sa nikdy nenaťahuje. Bez `fit` platí `defaultFit(kľúč)`.
+| test | čo overuje |
+|---|---|
+| `test/sounds.mjs` | register: súbory existujú, zdroj + licencia, status, `fit`; každý prehrávaný kľúč je v registri |
+| `test/sound-events.mjs` | mapovanie timeline → udalosti (raz za beh, move/dash, skrytý súper, prahy, okná) |
+| `node tools/sound-windows.mjs --check` | okná sedia s aktuálnym enginom |
+| `test/sound-fit.mjs` | prispôsobenie oknu |
+| `test/sound-pack.mjs` | zip, validácia, migrácia, report, snímka kľúčov API, inštalátor |
+| `node tools/sound-pack.mjs check` | nainštalované balíky sú platné voči aktuálnej hre |
+| `node tools/sound-smoke.mjs` (manuálne) | reálny prehliadač: odomknutie zvuku, lab nahratie → export → import, „Vyskúšať v hre“ |
 
-**Keď sa zmení časovanie hry** (`shared/timing.js`) alebo mapovanie, `npm test` zlyhá, kým nespustíš `npm run sounds:windows`.
-Zvukové balíky čas hry nemenia ani nenavrhujú.
+Všetko okrem `sound-smoke` beží v `npm test` (aj v CI). Zvuk je čisto klientský, `npm run golden` sa nemení.
 
 ## Pravidlá
 
-- Zvuk je čisto klientský. Server ani engine o ňom nevedia, `npm run golden` sa nemení.
-- Redakcia platí automaticky: čo server klientovi zamaskoval (labyrint, súperova pasca), to nezaznie
-  (zvuk sa nesmie stať únikom informácie, preto **nikdy nehraj zvuk zo stavu, ktorý hráč nevidí**).
-- Prehliadač pustí zvuk až po prvom geste (klik, kláves). Hudba sa vtedy rozbehne sama.
-- Hudba: lobby, výber postavy a draft hrajú `music.menu`, hra `music.battle`, FINAL ROUND `music.final`
-  (ak je prázdne, hrá ďalej battle). Koniec série hudbu stíši a zaznie `game.win`/`game.lose`.
+- Server ani engine o zvuku nevedia.
+- Redakcia platí automaticky: čo server klientovi zamaskoval (labyrint, súperova pasca), to nezaznie.
+  **Nikdy nehraj zvuk zo stavu, ktorý hráč nevidí.**
+- Prehliadač pustí zvuk až po prvom geste. Hudba sa vtedy rozbehne sama.
+- Hudba: lobby, výber a draft hrajú `music.menu`, hra `music.battle`, FINAL ROUND `music.final` (ak je prázdne, hrá ďalej battle).
+  Koniec série hudbu stíši a zaznie `game.win`/`game.lose`.
 
-## Zdroje (aktuálne v knižnici)
+## Zdroje knižnice
 
 - **Kenney.nl** - Impact Sounds, Interface Sounds, RPG Audio, Sci-fi Sounds, Digital Audio, Music Jingles - **CC0 1.0**
   (zo Sci-fi balíka sú vynechané dlhé motorové slučky).

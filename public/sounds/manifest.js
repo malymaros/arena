@@ -12,6 +12,13 @@
 // Zdroj súboru sa odvodí z priečinka: lib/<balík>/ → SOUND_SOURCES[<balík>], custom/ → vlastné súbory.
 // Výber a skúšanie: /sound-lab.html (prehrá knižnicu, priradí, exportuje zmeny sem). Workflow: docs/SOUNDS.md.
 
+// verzia SADY UDALOSTÍ (kľúčov). Premenovanie / zrušenie kľúča = zvýš verziu a doplň KEY_MIGRATIONS
+// { <nová verzia>: { "starý.kľúč": "nový.kľúč" | null (zrušený) } } - staršie balíky sa tak preložia.
+// test/sound-pack.mjs drží snímku kľúčov každej verzie (test/fixtures/sound-api-<n>.json) a zmenu bez
+// zvýšenia verzie odmietne.
+export const SOUND_API_VERSION = 1;
+export const KEY_MIGRATIONS = {};
+
 export const SOUND_SOURCES = {
   "kenney-impact-sounds":    { title: "Impact Sounds",    author: "Kenney", url: "https://kenney.nl/assets/impact-sounds",    license: "CC0 1.0" },
   "kenney-interface-sounds": { title: "Interface Sounds", author: "Kenney", url: "https://kenney.nl/assets/interface-sounds", license: "CC0 1.0" },
