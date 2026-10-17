@@ -55,6 +55,7 @@ export const SOUNDS = {
   "ui.click":       { files: [UI + "click_002.ogg"],        vol: 0.35, status: "default", note: "každé tlačidlo" },
   "ui.lock_in":     { files: [UI + "confirmation_002.ogg"], vol: 0.6,  status: "default" },
   "ui.pick":        { files: [UI + "select_003.ogg"],       vol: 0.6,  status: "default", note: "voľba postavy" },
+  "ui.hover_char":  { files: [],                            vol: 0.8,  status: "default", note: "myš nad kartou postavy - hlas mena (ui.hover_char.<postava>); prázdne = ticho" },
   "ui.timer_tick":  { files: [UI + "tick_002.ogg"],         vol: 0.5,  status: "default", note: "posledných 5 s ťahu" },
   "ui.color_roll":  { files: [UI + "scroll_003.ogg"],       vol: 0.5,  status: "default", note: "roztočenie yin-yang šípky" },
   "round.start":    { files: [JIN + "jingles_HIT03.ogg"],   vol: 0.5,  status: "default", note: "banner ROUND N" },
@@ -157,4 +158,23 @@ export const SOUNDS = {
   "luffy_roll":    { files: vars(IMP + "impactWood_medium_", 5), vol: 0.5, status: "default" },
   "luffy_explode": { files: [SCI + "explosionCrunch_002.ogg"], vol: 0.6, status: "default" },
   "luffy_chomp":   { files: [RPG + "chop.ogg"], vol: 0.6, status: "default" },
+
+  /* ---------- HLAS postavy (samostatná vrstva popri efekte, raz na začiatku akcie) - kľúč voice.<akcia>.<postava> ---------- */
+  "voice.attack":  { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku basic strely; prázdne = ticho" },
+  "voice.melee":   { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku melee (raz, efekt úderu ide zvlášť pri každom švihu); prázdne = ticho" },
+  "voice.special": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku špeciálu; prázdne = ticho" },
+
+  /* ---------- hlasy mágov (vlastník, 17.10.) - custom/mages/<postava>-<intro|range|melee|special>.mp3 ---------- */
+  "ui.hover_char.fire": { files: ["custom/mages/fire-intro.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/fire-intro.mp3": [120,1120] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
+  "voice.attack.fire": { files: ["custom/mages/fire-range.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/fire-range.mp3": [200,980] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
+  "voice.melee.fire": { files: ["custom/mages/fire-melee.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/fire-melee.mp3": [220,3880] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu)" },
+  "voice.special.fire": { files: ["custom/mages/fire-special.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/fire-special.mp3": [20,3240] }, status: "picked", note: "hlas na začiatku špeciálu" },
+  "ui.hover_char.lightning": { files: ["custom/mages/lightning-intro.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/lightning-intro.mp3": [60,1320] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
+  "voice.attack.lightning": { files: ["custom/mages/lightning-range.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/lightning-range.mp3": [80,1240] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
+  "voice.melee.lightning": { files: ["custom/mages/lightning-melee.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/lightning-melee.mp3": [20,3380] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu)" },
+  "voice.special.lightning": { files: ["custom/mages/lightning-special.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/lightning-special.mp3": [60,3260] }, status: "picked", note: "hlas na začiatku špeciálu" },
+  "ui.hover_char.wanderer": { files: ["custom/mages/wanderer-intro.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/wanderer-intro.mp3": [40,1980] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
+  "voice.attack.wanderer": { files: ["custom/mages/wanderer-range.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/wanderer-range.mp3": [0,1800] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
+  "voice.melee.wanderer": { files: ["custom/mages/wanderer-melee.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/wanderer-melee.mp3": [20,3440] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu); orezané pred „bend over…“ (fráza 3 od 3,86 s)" },
+  "voice.special.wanderer": { files: ["custom/mages/wanderer-special.mp3"], vol: 0.9, fit: "keep", trim: { "custom/mages/wanderer-special.mp3": [40,5780] }, status: "picked", note: "hlas na začiatku špeciálu" },
 };

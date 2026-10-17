@@ -2517,6 +2517,285 @@
    900
   ]
  },
+ "voice.attack": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.countess": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.escanor": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.fire": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.jotaro": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.lightning": {
+  "med": 1080,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.luffy": {
+  "med": 432,
+  "values": [
+   432,
+   864,
+   1296
+  ]
+ },
+ "voice.attack.medusa": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.minotaur": {
+  "med": 1080,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.naruto": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.onre": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.soldier": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.wanderer": {
+  "med": 1080,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.attack.werewolf": {
+  "med": 864,
+  "values": [
+   432,
+   864,
+   1080,
+   1296
+  ]
+ },
+ "voice.melee": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.escanor": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.fire": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.jotaro": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.lightning": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.luffy": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.medusa": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.minotaur": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.naruto": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.onre": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.soldier": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.wanderer": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.melee.werewolf": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special": {
+  "med": 4860,
+  "values": [
+   2160,
+   2600,
+   2833,
+   4625,
+   4860
+  ]
+ },
+ "voice.special.countess": {
+  "med": 2833,
+  "values": [
+   2833
+  ]
+ },
+ "voice.special.escanor": {
+  "med": 4625,
+  "values": [
+   4625
+  ]
+ },
+ "voice.special.fire": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special.lightning": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special.medusa": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special.minotaur": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special.naruto": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special.onre": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special.soldier": {
+  "med": 2600,
+  "values": [
+   2600
+  ]
+ },
+ "voice.special.wanderer": {
+  "med": 4860,
+  "values": [
+   4860
+  ]
+ },
+ "voice.special.werewolf": {
+  "med": 2160,
+  "values": [
+   2160
+  ]
+ },
  "wall_bump": {
   "med": 1440,
   "values": [

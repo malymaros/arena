@@ -95,6 +95,13 @@ Pri súbore ho zmeníš cez **✂**: začiatok a koniec v ms, **Auto**, **Celé*
 
 Prázdne `files: []` znamená vedomé ticho. `npm run sounds` vypíše, čo je ešte default.
 
+## Hlas postavy vs. efekt
+
+Hlas je **samostatná vrstva** popri zvuku efektu (`VOICE` v `events.js`): `voice.attack` / `voice.melee` / `voice.special`
+(kľúč postavy `voice.melee.fire`) zaznie **raz na začiatku akcie** a jeho okno je celá akcia. Efekt ide zvlášť:
+`melee` znie pri **každom z 3 švihov**, `attack`/`special` raz za beh. `voice.attack` pokrýva aj strelu mimo plochy.
+Narutov klon hlas nemá. Hlas mena pri výbere postavy = `ui.hover_char.<postava>`. Základ je ticho (`files: []`).
+
 ## Ako pridať novú udalosť (vývoj)
 
 1. Do `SOUNDS` v manifeste pridaj kľúč so `status: "default"` a poznámkou, kedy zaznie.

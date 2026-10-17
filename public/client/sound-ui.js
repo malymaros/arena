@@ -21,11 +21,46 @@ setMusic("music.menu");
 const toggle = wrap.querySelector(".snd-toggle");
 const panel = wrap.querySelector(".snd-panel");
 
+// pixel-art reproduktor 16×13: b = teleso, w = vlny, x = krížik (stlmené); každý znak = jeden <rect>
+const SPEAKER = [
+  "................",
+  "................",
+  "......b.........",
+  ".....bb....w....",
+  "....bbb.....w...",
+  ".bbbbbb..w...w..",
+  ".bbbbbb...w..w..",
+  ".bbbbbb...w..w..",
+  ".bbbbbb...w..w..",
+  ".bbbbbb..w...w..",
+  "....bbb.....w...",
+  ".....bb....w....",
+  "......b.........",
+];
+const MUTED_X = ["x...x", ".x.x.", "..x..", ".x.x.", "x...x"];
+function speakerSvg(muted) {
+  let rects = "";
+  SPEAKER.forEach((row, y) => {
+    let r = row;
+    if (muted) {
+      r = r.replace(/w/g, ".");
+      const xr = MUTED_X[y - 5];
+      if (xr) r = r.slice(0, 9) + xr + r.slice(14);
+    }
+    [...r].forEach((c, x) => {
+      if (c !== ".") rects += `<rect x="${x}" y="${y + 1}" width="1" height="1" class="px-${c}"/>`;
+    });
+  });
+  return `<svg viewBox="0 0 16 15" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+}
+
 function render(s = getSettings()) {
-  toggle.textContent = s.muted || s.master === 0 ? "🔇" : "🔊";
+  const muted = s.muted || s.master === 0;
+  toggle.innerHTML = speakerSvg(muted);
+  toggle.classList.toggle("is-muted", muted);
   for (const inp of wrap.querySelectorAll("input")) {
     if (inp.type === "checkbox") inp.checked = !!s[inp.dataset.k];
-    else inp.value = s[inp.dataset.k];
+    else { inp.value = s[inp.dataset.k]; inp.style.setProperty("--pct", `${inp.value * 100}%`); }
   }
 }
 render();
@@ -35,6 +70,7 @@ toggle.addEventListener("click", () => panel.classList.toggle("hidden"));
 wrap.addEventListener("input", (ev) => {
   const inp = ev.target;
   if (!inp.dataset.k) return;
+  if (inp.type === "range") inp.style.setProperty("--pct", `${inp.value * 100}%`);
   setSettings({ [inp.dataset.k]: inp.type === "checkbox" ? inp.checked : Number(inp.value) });
 });
 // pustenie posuvníka efektov zahrá ukážku (nech je počuť, ako hlasno to je)

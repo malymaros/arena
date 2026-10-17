@@ -132,7 +132,7 @@ const CHAR_KEYS = CHARS.map(c => c.key);
 const KEYS = new Set(Object.keys(SOUNDS));
 const WINDOWS = await fetch("/sounds/windows.json").then(r => r.json()).catch(() => ({}));
 // udalosti, ktoré môže mať KAŽDÁ postava vlastné (+ tie, čo okná z hry pre postavu namerali)
-const CHAR_BASE = ["attack", "attack_whiff", "melee", "move", "dash", "wall_bump", "recharge", "special", "shield", "mirror_on", "block", "mirror", "hit", "hit_heavy", "death", "invalid", "pass"];
+const CHAR_BASE = ["attack", "attack_whiff", "melee", "move", "dash", "wall_bump", "recharge", "special", "shield", "mirror_on", "block", "mirror", "hit", "hit_heavy", "death", "invalid", "pass", "ui.hover_char", "voice.attack", "voice.melee", "voice.special"];
 
 /* ---------- koncept ---------- */
 // meta.basedOn = z čoho koncept vychádza; fresh = ešte bez zmeny (prvá zmena založí NOVÝ balík s generickým
@@ -261,7 +261,7 @@ function renderList() {
     }
   } else {
     const measured = Object.keys(WINDOWS).filter(k => charOfKey(k) === selChar).map(baseOf);
-    const bases = [...new Set([...CHAR_BASE, ...measured])].filter(b => KEYS.has(b) && !b.startsWith("music.") && !b.startsWith("ui."));
+    const bases = [...new Set([...CHAR_BASE, ...measured])].filter(b => KEYS.has(b) && !b.startsWith("music.") && (!b.startsWith("ui.") || CHAR_BASE.includes(b)));
     html += `<p class="hint">Zvuky postavy <b>${esc(CHARS.find(c => c.key === selChar).name)}</b>. Šedé „spoločný“ = hrá rovnaký zvuk ako ostatné postavy; klikni a priraď jej vlastný.</p>`;
     html += bases.map(b => row(`${b}.${selChar}`, b, SOUNDS[b]?.note)).join("");
   }

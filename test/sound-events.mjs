@@ -9,12 +9,14 @@ function check(cond, label, detail = "") {
 }
 const P1 = { x: 0, y: 1, char: "fire" }, P2 = { x: 3, y: 1, char: "naruto" };
 const fr = (effects, delayMs = 100, p1 = P1, p2 = P2) => ({ p1, p2, effects, delayMs });
-// prehrá celú timeline ako klient (before = predošlý frame) a vráti udalosti po frame-och
-function play(timeline) {
+// prehrá celú timeline ako klient (before = predošlý frame) a vráti udalosti po frame-och;
+// hlasy (voice.*) sú samostatná vrstva - bez { voice: true } ich vynechá (testy efektov ich neriešia)
+const noVoice = (evs) => evs.filter(e => !e.key.startsWith("voice."));
+function play(timeline, { voice = false } = {}) {
   const tr = newTracker();
   const out = [];
   for (let i = 1; i < timeline.length; i++) out.push(eventsForFrame(timeline, i, { p1: timeline[i - 1].p1, p2: timeline[i - 1].p2 }, tr));
-  return out;
+  return voice ? out : out.map(noVoice);
 }
 const keys = (evs) => evs.map(e => e.key);
 
@@ -39,13 +41,28 @@ const keys = (evs) => evs.map(e => e.key);
   check(ev[2].length === 1, "nový beh po prerušení zaznie znova");
 }
 
+/* hlas: raz na začiatku akcie, efekt úderu melee pri každom zo 3 švihov; klon hlas nemá */
+{
+  const m = { kind: "melee", from: "p1", cells: [[0, 1]] };
+  const ev = play([fr([]), fr([m], 1620), fr([m], 1620), fr([m], 1620)], { voice: true });
+  check(keys(ev[0]).join() === "voice.melee,melee", "hlas melee + prvý švih", keys(ev[0]).join());
+  check(keys(ev[1]).join() === "melee" && keys(ev[2]).join() === "melee", "ďalšie švihy: len efekt, bez hlasu");
+  check(ev[0][0].windowMs === 4860 && ev[0][0].char === "fire", "hlas: okno = celá akcia, char postavy", String(ev[0][0].windowMs));
+  const s = { kind: "special", from: "p1" };
+  const sp = play([fr([]), fr([s], 900), fr([s], 900), fr([s], 900)], { voice: true });
+  check(keys(sp[0]).join() === "voice.special,special" && sp[1].length === 0 && sp[2].length === 0, "special: hlas aj efekt raz", keys(sp[0]).join());
+  const c = (clone) => ({ kind: "charge", from: "p2", dir: "left", cell: [2, 1], clone });
+  check(keys(play([fr([]), fr([c(false), c(true)])], { voice: true })[0]).filter(k => k === "voice.attack").length === 1, "klonova strela nemá vlastný hlas");
+  check(keys(play([fr([]), fr([{ kind: "attack_swing", from: "p1", dir: "left", offboard: true }])], { voice: true })[0]).join() === "voice.attack,attack_whiff", "strela mimo plochy: hlas strely");
+}
+
 /* resetTracker: nová timeline začína bez behu z minulej */
 {
   const tr = newTracker();
   const tl = [fr([]), fr([{ kind: "special", from: "p1" }])];
   eventsForFrame(tl, 1, {}, tr);
   resetTracker(tr);
-  check(eventsForFrame(tl, 1, {}, tr).length === 1, "resetTracker: special zaznie v novej timeline");
+  check(noVoice(eventsForFrame(tl, 1, {}, tr)).length === 1, "resetTracker: special zaznie v novej timeline");
 }
 
 /* pohyb: move vs dash podľa ohlásenej akcie; skrytý súper (x null) ticho; vlastný presun bez kroku */

@@ -10,6 +10,7 @@ import { CHAR_FX } from "/client/fx-registry.js";
 import { DEATH_DIR, DEATH_ANIM } from "/client/demon-sprites.js";
 import { SPECIAL_FPS } from "/chars/common.js";
 import { socket } from "/client/net.js";
+import { sfx } from "/client/sound.js";
 import { cellsForSpecialPreview } from "/client/zones.js";
 
 /* ---------- Char select (preview) ---------- */
@@ -295,12 +296,15 @@ function clearAbilityPreview() {
   abilityFx?.close(); abilityFx = null;
   charAbilityEl?.classList.add("hidden");
 }
+let hoverVoice = null; // práve hrajúci hlas mena - ďalšia karta ho utne, nech sa mená neprekrývajú
 selEl.querySelectorAll(".char-card").forEach(card => {
   // preview karty Hidden stránky (Luffy/Jotaro) nemajú data-char na karte (neklikateľné) - kľúč nesie canvas
   const key = card.dataset.char || card.querySelector("canvas.char-canvas")?.dataset.char;
   if (!key) return; // placeholder "Coming soon"
   card.addEventListener("mouseenter", () => {
     if (isMageDead(key)) return; // mŕtvy mág nemá náhľad špeciálu
+    hoverVoice?.then(h => h?.stop());
+    hoverVoice = sfx("ui.hover_char", { char: key });
     renderAbilityPreview(key);
   });
 });

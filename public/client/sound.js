@@ -138,7 +138,7 @@ export function sfx(key, { char = null, pan = 0, volume = 1, windowMs = null } =
   if (!urls.length) return;
   const i = Math.floor(Math.random() * urls.length);
   const jitter = /^(game|round|music)\./.test(k) ? 0 : 0.04; // jemná zmena výšky - opakované kroky neznejú ako stroj
-  playUrl(urls[i], (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k), trim: e.trims?.[i] });
+  return playUrl(urls[i], (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k), trim: e.trims?.[i] });
 }
 
 const activeSources = new Set(); // práve hrajúce efekty (stopAllSfx - Sound Lab „Stop“)
@@ -211,14 +211,20 @@ function musicTargetVolume() {
   const e = entryFor(currentMusicKey);
   return settings.muted ? 0 : (e?.vol ?? 1) * settings.music * settings.master;
 }
-function fade(el, to, ms, done) {
+// fade ide cez časovač, NIE requestAnimationFrame: ten v skrytej karte stojí - prelínanie slučky by zamrzlo
+// a nová slučka by ostala potichu. Krivka "in"/"out" = rovnaký výkon (sin/cos) - pri prelínaní konca so
+// začiatkom nevznikne prepad hlasitosti v strede (lineárne prelínanie dvoch rôznych úsekov je o ~3 dB tichšie).
+function fade(el, to, ms, done, curve = "linear") {
   const from = el.volume, t0 = performance.now();
+  const shape = curve === "in" ? (k) => Math.sin(k * Math.PI / 2)
+    : curve === "out" ? (k) => 1 - Math.cos(k * Math.PI / 2)
+    : (k) => k;
   const tick = () => {
     const k = ms > 0 ? Math.min(1, (performance.now() - t0) / ms) : 1;
-    el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
-    if (k < 1) el._fadeRaf = requestAnimationFrame(tick); else done?.();
+    el.volume = Math.max(0, Math.min(1, from + (to - from) * shape(k)));
+    if (k < 1) el._fadeT = setTimeout(tick, 25); else done?.();
   };
-  cancelAnimationFrame(el._fadeRaf);
+  clearTimeout(el._fadeT);
   tick();
 }
 // slučka hudby: hrá úsek [trim začiatok, trim koniec] (bez trim celý súbor) a LOOP_XFADE pred koncom spustí
@@ -227,16 +233,18 @@ function fade(el, to, ms, done) {
 export function playMusicLoop(url, trim, volume, { fadeInMs = FADE_MS, fromMs = null } = {}) {
   let alive = true, vol = volume;
   const startMs = trim?.[0] || 0;
-  const spawn = (atMs, fadeMs) => {
+  const spawn = (atMs, fadeMs, curve) => {
     const el = new Audio(url);
     el.preload = "auto";
     el.volume = fadeMs ? 0 : vol;
     const go = () => {
       el.currentTime = atMs / 1000;
       el.play().catch(() => { /* autoplay zablokovaný - spustí sa pri ďalšom geste */ });
-      if (fadeMs) fade(el, vol, fadeMs);
+      if (fadeMs) fade(el, vol, fadeMs, null, curve);
     };
     if (el.readyState >= 1) go(); else el.addEventListener("loadedmetadata", go, { once: true });
+    // poistka: ak súbor dobehol bez odovzdania (časovač prišiel neskoro), hneď pokračuj od začiatku úseku
+    el.addEventListener("ended", () => { if (alive && el === cur) cur = spawn(startMs, 0); });
     return el;
   };
   let cur = spawn(fromMs ?? startMs, fadeInMs);
@@ -247,8 +255,10 @@ export function playMusicLoop(url, trim, volume, { fadeInMs = FADE_MS, fromMs = 
     if (!cur._handoff && cur.currentTime * 1000 >= endMs - xf) {
       cur._handoff = true;
       const old = cur;
-      cur = spawn(startMs, xf);
-      fade(old, 0, xf, () => { old.pause(); old.src = ""; });
+      // zvyšok do konca úseku (časovač mohol prísť neskoro) - nový prehrávač naberá rovnako dlho
+      const left = Math.max(50, endMs - old.currentTime * 1000);
+      cur = spawn(startMs, left, "in");
+      fade(old, 0, left, () => { old.pause(); old.src = ""; }, "out");
     }
   }, 50);
   return {
@@ -259,7 +269,7 @@ export function playMusicLoop(url, trim, volume, { fadeInMs = FADE_MS, fromMs = 
       const el = cur;
       fade(el, 0, ms, () => { el.pause(); el.src = ""; });
     },
-    setVolume(v) { vol = v; cancelAnimationFrame(cur._fadeRaf); cur.volume = Math.max(0, Math.min(1, v)); },
+    setVolume(v) { vol = v; clearTimeout(cur._fadeT); cur.volume = Math.max(0, Math.min(1, v)); },
     position() { return Math.round(cur.currentTime * 1000); }, // ms v súbore (lab, test slučky)
   };
 }
