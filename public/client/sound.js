@@ -113,7 +113,8 @@ function preloadAll() {
 // prehliadač pustí zvuk až po interakcii používateľa - prvé gesto odomkne kontext aj odloženú hudbu
 let unlocked = false;
 function unlock() {
-  if (unlocked) return;
+  // kontext môže ostať uspatý, ak prvé gesto prehliadač neuznal → každé ďalšie gesto ho skúsi zobudiť
+  if (unlocked) { if (ctx?.state === "suspended") ctx.resume?.(); return; }
   if (!ensureCtx()) return;
   unlocked = true;
   ctx.resume?.();
@@ -230,6 +231,10 @@ function fade(el, to, ms, done, curve = "linear") {
 // slučka hudby: hrá úsek [trim začiatok, trim koniec] (bez trim celý súbor) a LOOP_XFADE pred koncom spustí
 // druhý prehrávač od začiatku úseku a oba prelínia - skladba nestíchne ani neskočí (aj keď má tichý koniec
 // alebo mp3 medzeru). fromMs = odkiaľ začať prvé prehratie (lab: kúsok pred koncom = počuť prechod).
+function retryOnGesture(fn) {
+  const go = () => { for (const ev of ["pointerdown", "keydown", "touchstart"]) window.removeEventListener(ev, go, true); fn(); };
+  for (const ev of ["pointerdown", "keydown", "touchstart"]) window.addEventListener(ev, go, { capture: true, passive: true });
+}
 export function playMusicLoop(url, trim, volume, { fadeInMs = FADE_MS, fromMs = null } = {}) {
   let alive = true, vol = volume;
   const startMs = trim?.[0] || 0;
@@ -239,7 +244,8 @@ export function playMusicLoop(url, trim, volume, { fadeInMs = FADE_MS, fromMs = 
     el.volume = fadeMs ? 0 : vol;
     const go = () => {
       el.currentTime = atMs / 1000;
-      el.play().catch(() => { /* autoplay zablokovaný - spustí sa pri ďalšom geste */ });
+      // autoplay zablokovaný (prvé gesto prehliadač neuznal, napr. Shift/Esc) → skús znova pri ďalšom geste
+      el.play().catch(() => retryOnGesture(() => { if (alive && el === cur && el.paused) el.play().catch(() => {}); }));
       if (fadeMs) fade(el, vol, fadeMs, null, curve);
     };
     if (el.readyState >= 1) go(); else el.addEventListener("loadedmetadata", go, { once: true });
