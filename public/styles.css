@@ -1502,6 +1502,10 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 /* quick-draw: časovač beží až keď súper locklne -> daj ho pod hlášku „OPPONENT IS READY" s medzerou */
 .turn-timer.below-status{ top: 172px; }
 .turn-timer.urgent{ color: #ff6b6b; animation: timer-pulse .5s steps(2) infinite; }
+/* som locknutý, súper ešte nie → jeho zostávajúci čas: tlmený, s popisom, bez pulzu (tlak je na ňom, nie na mne) */
+.turn-timer.opp-time{ color: #9aa3ad; font-size: 16px; }
+.turn-timer.opp-time.urgent{ color: #d98a8a; animation: none; }
+.turn-timer .tt-who{ display: block; margin-top: 6px; font-size: 8px; letter-spacing: 1px; color: #8a929b; }
 @keyframes timer-pulse{ 50%{ transform: translateX(-50%) scale(1.12); } }
 
 /* „ROUND N" animácia medzi kolami - round-script ostane vidieť, kým dobehne */

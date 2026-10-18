@@ -6,6 +6,7 @@ import { planning, buttonUi } from "/client/planning.js";
 import { VAMP_CHARS, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
 import { WOLF_DIRS_CLIENT } from "/client/zones.js";
 import { gridEl } from "/client/dom.js";
+import { playback } from "/client/playback.js";
 import { MAX_MANA, RECHARGE_GAIN, BASIC_COST, MELEE_COST, DASH_COST, SPECIAL_COST, JOTARO_S1_COST, SHIELD_COST, MIRROR_COST, DEMON_COST, GOLDEN_COST, GOLDEN_MIRROR_COST } from "/shared/balance.js";
 
 /* ---------- Ghost - simulácia vlastnej pozície počas naplánovaného kola ---------- */
@@ -56,6 +57,7 @@ export function foeMirrorImmune() {
   return !!VAMP_CHARS[state?.[me === "p1" ? "p2" : "p1"]?.char];
 }
 export const MIRROR_IMMUNE_WARN = "Opponent is immune to mirrors - it only blocks like a shield (no reflect)";
+export const LAST_DEFENSE_WARN = "Last action of the round - no opponent action follows, the defense expires unused";
 export function planWarnings() {
   const out = planning.myQueue.map(() => null);
   const mine = state?.[me];
@@ -81,6 +83,11 @@ export function planWarnings() {
       if (!def?.planRechargeAlwaysUseful && mana >= PLAN_MAX_MANA) out[i] = "Mana will already be full - recharge has no effect";
       mana = Math.min(PLAN_MAX_MANA, mana + PLAN_RECHARGE);
       continue;
+    }
+    // obrana kryje súperovu NASLEDUJÚCU akciu; nestartérova 3. akcia je posledná v kole (gold fáza beží až
+    // po zániku obrán vo finishRound) → shield/mirror tam nemá čo kryť, mana prepadne
+    if ((a.type === "shield" || a.type === "mirror") && i === 2 && state?.starter !== me && !playback.tsPlanning) {
+      out[i] = LAST_DEFENSE_WARN; continue;
     }
     if (a.type === "mirror" && foeMirrorImmune()) { out[i] = MIRROR_IMMUNE_WARN; continue; }
     if (a.type === "special" && def?.planClone) { hasClone = true; continue; }
