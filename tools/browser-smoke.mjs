@@ -230,15 +230,23 @@ async function runAgainst(root, label) {
   await br.send("Page.addScriptToEvaluateOnNewDocument", { source: WARP });
   // nová identita (arenaId v storage by inak prevzala miesto z predošlej roomky)
   // storage je per-origin: najprv otvor cieľový server, vyčisti ho a načítaj znova (z about:blank by clear nič nezmazal)
+  // podmienka v stránke (výraz) - čaká, kým platí; inak zrozumiteľná chyba (nie tichý no-op ?.click())
+  const waitPage = async (expr, ms, what) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { if (await br.evaluate(`!!(${expr})`) === true) return; await sleep(100); }
+    throw new Error("timeout: " + what);
+  };
   const login = async (name, at = url) => {
     await br.send("Page.navigate", { url: at });
     await sleep(1000);
     await br.evaluate(`try { localStorage.clear(); sessionStorage.clear(); } catch {}`);
     await br.send("Page.navigate", { url: at });
-    await sleep(1500);
+    // formulár odošli až keď ho ukázal net.js (vtedy už má submit handler) - skôr by ho prehliadač odoslal
+    // natívne (GET ?username=…) a stránka by sa znova načítala neprihlásená
+    await waitPage(`!document.getElementById("login")?.classList.contains("hidden")`, 10000, `login formulár (${name})`);
     await br.evaluate(`(() => { document.getElementById("login-name").value = "${name}"; document.getElementById("login-pass").value = "${PASS}";
       document.getElementById("login-form").requestSubmit(); })()`);
-    await sleep(800);
+    await waitPage(`!document.getElementById("rooms")?.classList.contains("hidden")`, 10000, `room-browser po logine (${name})`);
   };
   const log = (s) => console.log(`[${label}] ${s}`);
   viewerIdle = async () => {
@@ -271,8 +279,10 @@ async function runAgainst(root, label) {
       const host = await connect(at, "hostbot");
       host.sock.emit("create_room");
       await login("viewer", at);
-      await br.evaluate(`document.querySelector(".room-btn.join")?.click()`);
-      await sleep(600);
+      await waitPage(`document.querySelector(".room-btn.join")`, 5000, `${side}: tlačidlo Join`);
+      await br.evaluate(`document.querySelector(".room-btn.join").click()`);
+      await waitPage(`document.getElementById("rooms")?.classList.contains("hidden")`, 5000, `${side}: usadenie v roomke`);
+      await sleep(300);
       let first = true;
       for (const ch of chars) {
         if (!first) { host.sock.emit("retry"); await sleep(200); }
@@ -321,7 +331,8 @@ async function runAgainst(root, label) {
     await waitFor(() => c1.slot && c2.slot, 5000, "seats");
     await login("watcher");
     await br.evaluate(`window.__startFxTrace()`);
-    await br.evaluate(`document.querySelector(".room-btn.spectate")?.click()`);
+    await waitPage(`document.querySelector(".room-btn.spectate")`, 5000, "tlačidlo Spectate");
+    await br.evaluate(`document.querySelector(".room-btn.spectate").click()`);
     await sleep(800);
     let idx = 0;
     for (const [a, b] of MATCHES) {
