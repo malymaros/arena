@@ -163,6 +163,7 @@ export const SOUNDS = {
   "voice.attack":  { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku basic strely; prázdne = ticho" },
   "voice.melee":   { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku melee (raz, efekt úderu ide zvlášť pri každom švihu); prázdne = ticho" },
   "voice.special": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku špeciálu; prázdne = ticho" },
+  "voice.special2": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 2 (Jotaro po THE WORLD); prázdne = ticho" },
 
   /* ---------- hlasy mágov (vlastník, 17.10.) - custom/mages/<postava>-<intro|range|melee|special>.mp3 ---------- */
   "ui.hover_char.fire": { files: ["custom/mages/fire-intro.mp3"], vol: 0.88, fit: "keep", trim: { "custom/mages/fire-intro.mp3": [120,1120] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
@@ -202,5 +203,19 @@ export const SOUNDS = {
   "voice.attack.werewolf": { files: ["custom/mages/werewolf-range.mp3"], vol: 1, fit: "keep", trim: { "custom/mages/werewolf-range.mp3": [60,1520] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
   "voice.melee.werewolf": { files: ["custom/mages/werewolf-melee.mp3"], vol: 1, fit: "keep", trim: { "custom/mages/werewolf-melee.mp3": [160,5120] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu)" },
   "voice.special.werewolf": { files: ["custom/mages/werewolf-special.mp3"], vol: 0.89, fit: "keep", trim: { "custom/mages/werewolf-special.mp3": [40,5500] }, status: "picked", note: "hlas na začiatku špeciálu" },
+  /* ---------- hlasy Jotaro / Onryō (onre) / Vampire (countess) (vlastník, 18.10.) - rovnaká schéma ---------- */
+  "ui.hover_char.jotaro": { files: ["custom/mages/jotaro-intro.mp3"], vol: 0.43, fit: "keep", trim: { "custom/mages/jotaro-intro.mp3": [80,1400] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
+  "voice.attack.jotaro": { files: ["custom/mages/jotaro-range.mp3"], vol: 0.3, fit: "keep", trim: { "custom/mages/jotaro-range.mp3": [80,1160] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
+  "voice.melee.jotaro": { files: ["custom/mages/jotaro-melee.mp3"], vol: 0.19, fit: "keep", trim: { "custom/mages/jotaro-melee.mp3": [80,4650] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu)" },
+  "voice.special.jotaro": { files: ["custom/mages/jotaro-special.mp3"], vol: 0.22, fit: "keep", trim: { "custom/mages/jotaro-special.mp3": [40,2042] }, status: "picked", note: "hlas THE WORLD (timestop_start)" },
+  "voice.special2.jotaro": { files: ["custom/mages/jotaro-special2.mp3"], vol: 0.28, fit: "keep", trim: { "custom/mages/jotaro-special2.mp3": [80,2640] }, status: "picked", note: "hlas na začiatku Special 2 (po THE WORLD nahrádza special)" },
+  "ui.hover_char.onre": { files: ["custom/mages/onre-intro.mp3"], vol: 1, fit: "keep", trim: { "custom/mages/onre-intro.mp3": [20,1160] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
+  "voice.attack.onre": { files: ["custom/mages/onre-range.mp3"], vol: 0.49, fit: "keep", trim: { "custom/mages/onre-range.mp3": [0,1180] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
+  "voice.melee.onre": { files: ["custom/mages/onre-melee.mp3"], vol: 1, fit: "keep", trim: { "custom/mages/onre-melee.mp3": [0,1520] }, status: "picked", note: "hlas melee (raz, nie pri každom švihu) aj pri údere pasce" },
+  "voice.special.onre": { files: ["custom/mages/onre-special.mp3"], vol: 0.72, fit: "keep", trim: { "custom/mages/onre-special.mp3": [0,5440] }, status: "picked", note: "hlas na začiatku špeciálu" },
+  "ui.hover_char.countess": { files: ["custom/mages/countess-intro.mp3"], vol: 1, fit: "keep", trim: { "custom/mages/countess-intro.mp3": [0,1000] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
+  "voice.attack.countess": { files: ["custom/mages/countess-range.mp3"], vol: 0.58, fit: "keep", trim: { "custom/mages/countess-range.mp3": [40,920] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
+  "voice.melee.countess": { files: ["custom/mages/countess-melee.mp3"], vol: 1, fit: "keep", trim: { "custom/mages/countess-melee.mp3": [0,2420] }, status: "picked", note: "hlas melee na vlastnej bunke aj pri údere pasce" },
+  "voice.special.countess": { files: ["custom/mages/countess-special.mp3"], vol: 1, fit: "keep", trim: { "custom/mages/countess-special.mp3": [0,1540] }, status: "picked", note: "hlas na začiatku špeciálu" },
   "voice.special.wanderer": { files: ["custom/mages/wanderer-special.mp3"], vol: 0.78, fit: "keep", trim: { "custom/mages/wanderer-special.mp3": [40,5780] }, status: "picked", note: "hlas na začiatku špeciálu" },
 };

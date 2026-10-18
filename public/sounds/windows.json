@@ -2645,7 +2645,14 @@
  "voice.melee": {
   "med": 4860,
   "values": [
+   2700,
    4860
+  ]
+ },
+ "voice.melee.countess": {
+  "med": 2700,
+  "values": [
+   2700
   ]
  },
  "voice.melee.escanor": {
@@ -2723,6 +2730,7 @@
  "voice.special": {
   "med": 4860,
   "values": [
+   900,
    2160,
    2600,
    2833,
@@ -2746,6 +2754,12 @@
   "med": 4860,
   "values": [
    4860
+  ]
+ },
+ "voice.special.jotaro": {
+  "med": 900,
+  "values": [
+   900
   ]
  },
  "voice.special.lightning": {

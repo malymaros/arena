@@ -56,6 +56,25 @@ const keys = (evs) => evs.map(e => e.key);
   check(keys(play([fr([]), fr([{ kind: "attack_swing", from: "p1", dir: "left", offboard: true }])], { voice: true })[0]).join() === "voice.attack,attack_whiff", "strela mimo plochy: hlas strely");
 }
 
+/* hlasy so špecialitou: Jotaro THE WORLD / Special 2, úder Vampire/Onryō (pasca, melee, ale nie po charge) */
+{
+  const J = { x: 3, y: 1, char: "jotaro" }, V = { x: 0, y: 1, char: "countess" };
+  const voices = (tl) => play(tl, { voice: true }).flat().filter(e => e.key.startsWith("voice.")).map(e => `${e.key}:${e.char}`);
+  check(voices([fr([], 100, P1, J), fr([{ kind: "timestop_start", from: "p2", cells: [] }], 900, P1, J)]).join() === "voice.special:jotaro",
+    "THE WORLD (timestop_start) → hlas špeciálu Jotara");
+  check(voices([fr([], 100, P1, J), fr([{ kind: "special", from: "p2", dir: "left", cells: [[2, 1]] }], 900, P1, J)]).join() === "voice.special2:jotaro",
+    "Jotarov special (Special 2) → voice.special2");
+  check(voices([fr([]), fr([{ kind: "special", from: "p1", cells: [] }])]).join() === "voice.special:fire", "special iných postáv ostáva voice.special");
+  const strike = { kind: "vamp_strike", from: "p1", cell: [2, 1], anim: "va1" };
+  const trap = [fr([], 100, V), fr([{ kind: "trap_trigger", from: "p1", cell: [2, 1] }], 100, V), fr([{ kind: "trap_tp_out", from: "p1" }], 300, V),
+    fr([{ kind: "trap_tp_in", from: "p1" }], 300, V), fr([strike], 700, V)];
+  check(voices(trap).join() === "voice.melee:countess", "úder pasce → hlas melee", voices(trap).join());
+  check(voices([fr([], 100, V), fr([strike], 700, V), fr([strike], 700, V), fr([strike], 700, V)]).join() === "voice.melee:countess",
+    "Vampirino melee (3× vamp_strike) → hlas melee raz");
+  check(voices([fr([], 100, V), fr([{ kind: "vamp_charge", from: "p1", dir: "right" }], 400, V), fr([strike], 700, V)]).length === 0,
+    "úder po charge hlas melee nemá");
+}
+
 /* resetTracker: nová timeline začína bez behu z minulej */
 {
   const tr = newTracker();
