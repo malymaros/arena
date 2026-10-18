@@ -28,11 +28,14 @@ export function stopTurnTimer() {
   turnTimerEl.classList.add("hidden");
   turnTimerEl.classList.remove("urgent", "below-status");
 }
-// tik (volaný z raf): odpočet zobraz len počas plánovania; pri vypršaní auto-lockne
+// tik (volaný z raf): odpočet zobraz počas plánovania; pri vypršaní auto-lockne. Keď som už locknutý a súper
+// ešte nie, odpočet ostane - ukazuje, koľko času má ešte súper (bez tikania a bez auto-locku)
 export function tickTurnTimer(now) {
-  const mine = state?.[me];
-  const planning = !!serverTimerEndsAt && !playback.playing && !playback.gameOverShown && state?.phase === "playing"
-    && !isSpectator && mine?.char && state?.[otherSlot()]?.char && !mine.locked;
+  const mine = state?.[me], opp = state?.[otherSlot()];
+  const active = !!serverTimerEndsAt && !playback.playing && !playback.gameOverShown && state?.phase === "playing"
+    && !isSpectator && mine?.char && opp?.char;
+  const planning = active && !mine.locked;
+  const waitingOpp = active && mine.locked && !opp.locked;
   if (TDEBUG && planning !== _lastPlanning) {
     _lastPlanning = planning;
     tlog(`planning=${planning}`, {
@@ -40,15 +43,23 @@ export function tickTurnTimer(now) {
       isSpectator, me, mineChar: mine?.char, otherChar: state?.[otherSlot()]?.char, mineLocked: mine?.locked,
     });
   }
-  if (!planning) {
+  if (!planning && !waitingOpp) {
     turnTimerEl.classList.add("hidden");
-    turnTimerEl.classList.remove("urgent", "below-status");
+    turnTimerEl.classList.remove("urgent", "below-status", "opp-time");
     return;
   }
   const remain = Math.max(0, serverTimerEndsAt - now);
-  turnTimerEl.classList.remove("hidden");
-  turnTimerEl.classList.toggle("below-status", state?.config?.timer === "quickdraw"); // pod „OPPONENT IS READY"
   const secs = Math.ceil(remain / 1000);
+  turnTimerEl.classList.remove("hidden");
+  // quickdraw: pod hláškou „OPPONENT IS READY" / „LOCKED - WAITING FOR OPPONENT" (hud.js ju v ňom ukazuje)
+  turnTimerEl.classList.toggle("below-status", state?.config?.timer === "quickdraw");
+  turnTimerEl.classList.toggle("opp-time", waitingOpp);
+  if (waitingOpp) {
+    turnTimerEl.classList.toggle("urgent", remain <= 5000);
+    turnTimerEl.innerHTML = `⏱ ${secs}<span class="tt-who">OPPONENT</span>`;
+    lastTickSec = null;
+    return;
+  }
   if (secs !== lastTickSec && secs > 0 && secs <= 5) sfx("ui.timer_tick"); // posledných 5 s tiká
   lastTickSec = secs;
   turnTimerEl.textContent = `⏱ ${secs}`;
