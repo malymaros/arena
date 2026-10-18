@@ -1,0 +1,10 @@
+# Caddy reverse proxy — automaticky vybaví Let's Encrypt HTTPS certifikát
+# a transparentne prehodí WebSocket spojenia (Socket.IO) na Node appku.
+#
+# A záznam pre arena.marosmaly.sk musí ukazovať na verejnú IP tejto VM.
+# Caddy si Let's Encrypt cert vytiahne sám pri štarte.
+
+arena.marosmaly.sk {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+}

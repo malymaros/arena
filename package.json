@@ -3,11 +3,23 @@
     "version": "0.1.0",
     "type": "module",
     "scripts": {
-      "start": "node server.js"
+        "start": "node server.js",
+        "lint": "eslint .",
+        "test": "node test/balance-ui.mjs && node test/sounds.mjs && node test/sound-events.mjs && node test/sound-fit.mjs && node test/sound-trim.mjs && node test/sound-pack.mjs && node tools/sound-pack.mjs check && node tools/sound-windows.mjs --check && node test/engine-scenarios.mjs && node test/game-test.mjs",
+        "golden": "node test/golden.mjs",
+        "golden:update": "node test/golden.mjs --update",
+        "sim": "node tools/simulate.mjs",
+        "sounds": "node tools/sounds-report.mjs",
+        "sounds:windows": "node tools/sound-windows.mjs"
     },
     "dependencies": {
-      "express": "^4.19.2",
-      "socket.io": "^4.7.5"
+        "express": "^4.19.2",
+        "pngjs": "^7.0.0",
+        "socket.io": "^4.7.5"
+    },
+    "devDependencies": {
+        "eslint": "^9.39.5",
+        "globals": "^17.13.0",
+        "socket.io-client": "^4.8.3"
     }
-  }
-  
+}

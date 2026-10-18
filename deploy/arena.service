@@ -1,0 +1,27 @@
+[Unit]
+# systemd služba pre arena hru — beží ako node server.js, auto-reštart po páde/reboote
+Description=Arena wizard duel (Express + Socket.IO)
+After=network.target
+
+[Service]
+Type=simple
+# Používateľ, pod ktorým appka beží. Na GCP VM (Debian) je to účet "arena"
+# (odvodený z comentu SSH kľúča); na starej Oracle Ubuntu VM to bol "ubuntu".
+User=arena
+WorkingDirectory=/home/arena/arena
+# Node počúva na porte 3000, verejne ho vystaví Caddy (HTTPS reverse proxy)
+Environment=PORT=3000
+# Voliteľné heslo pre admin reset (/admin/reset-all, ?admin=1&key=…). Bez neho je admin reset otvorený.
+# Tajné hodnoty nedávaj do repa - na VM ich daj do override: sudo systemctl edit arena
+#   [Service]
+#   Environment=ADMIN_KEY=…
+#   Environment=PLAYER_KEYS=…
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+# Základné bezpečnostné obmedzenia
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

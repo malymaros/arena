@@ -1,0 +1,84 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Head cropper</title><style>
+  body{background:#1b1d22;color:#eee;margin:0;padding:20px;font-family:system-ui,sans-serif}
+  h1{font-size:18px;margin:0 0 4px} .hint{opacity:.7;font-size:13px;margin:0 0 18px}
+  .row{display:flex;gap:28px;flex-wrap:wrap}
+  .mage{background:#24262c;border:1px solid #333;border-radius:8px;padding:14px}
+  .mage h2{margin:0 0 8px;font-size:15px;text-transform:capitalize}
+  .stage{display:flex;gap:16px;align-items:flex-start}
+  canvas.big{background:#0c0e12;box-shadow:inset 0 0 0 1px #000;image-rendering:pixelated;cursor:crosshair;touch-action:none}
+  .prev{display:flex;flex-direction:column;align-items:center;gap:6px}
+  canvas.preview{background:#0c0e12;border-radius:10px;box-shadow:0 0 0 2px #000;image-rendering:pixelated;width:96px;height:96px}
+  .sliders{margin-top:10px;display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13px}
+  .sliders input[type=range]{width:220px}
+  textarea{width:100%;height:130px;margin-top:18px;background:#0c0e12;color:#7fe08a;border:1px solid #333;border-radius:6px;font-family:monospace;font-size:13px;padding:10px}
+  button{background:#2e7d32;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;margin-top:8px}
+</style></head><body>
+<h1>Mage head cropper</h1>
+<p class="hint">Ťahaj myšou po veľkom náhľade = stred výrezu; posuvník <b>size</b> = veľkosť štvorca. Výrez sa animuje vpravo (idle). Skopíruj JSON dole a pošli ho späť.</p>
+<div class="row" id="row"></div>
+<textarea id="out" readonly></textarea>
+<button onclick="navigator.clipboard.writeText(document.getElementById('out').value)">Kopírovať JSON</button>
+<script>
+const CHARS=["fire","lightning","wanderer"];
+const IDLE_FPS=6, SCALE=3;
+// štartové hodnoty (rovnaké ako v client.js HEAD_CROP)
+const cfg={fire:{cx:0.40,cy:0.55,size:0.26},lightning:{cx:0.41,cy:0.58,size:0.26},wanderer:{cx:0.47,cy:0.56,size:0.27}};
+const metas={};
+function load(char){return new Promise(res=>{const img=new Image();img.onload=()=>{
+  const frames=Math.max(1,Math.round(img.naturalWidth/img.naturalHeight));
+  res({img,frames,fw:Math.round(img.naturalWidth/frames),fh:img.naturalHeight});};
+  img.src=`/assets/${char}/Idle.png`;});}
+
+const ui={};
+const row=document.getElementById("row");
+for(const char of CHARS){
+  const el=document.createElement("div");el.className="mage";
+  el.innerHTML=`<h2>${char}</h2>
+    <div class="stage">
+      <canvas class="big"></canvas>
+      <div class="prev"><div>náhľad 96px</div><canvas class="preview" width="52" height="52"></canvas></div>
+    </div>
+    <div class="sliders">
+      <label>cx</label><input type="range" min="0" max="1" step="0.005" data-k="cx"><span data-v="cx"></span>
+      <label>cy</label><input type="range" min="0" max="1" step="0.005" data-k="cy"><span data-v="cy"></span>
+      <label>size</label><input type="range" min="0.2" max="1" step="0.005" data-k="size"><span data-v="size"></span>
+    </div>`;
+  row.appendChild(el);
+  ui[char]={big:el.querySelector(".big"),prev:el.querySelector(".preview"),sliders:el.querySelectorAll("input[type=range]"),vals:el.querySelectorAll("[data-v]")};
+  ui[char].sliders.forEach(s=>{s.value=cfg[char][s.dataset.k];s.addEventListener("input",()=>{cfg[char][s.dataset.k]=parseFloat(s.value);syncOut();});});
+  // ťahanie stredu myšou
+  const big=ui[char].big;
+  let drag=false;
+  const setFromEvent=(e)=>{const r=big.getBoundingClientRect();const m=metas[char];if(!m)return;
+    cfg[char].cx=Math.max(0,Math.min(1,(e.clientX-r.left)/(m.fw*SCALE)));
+    cfg[char].cy=Math.max(0,Math.min(1,(e.clientY-r.top)/(m.fh*SCALE)));syncSliders(char);syncOut();};
+  big.addEventListener("pointerdown",e=>{drag=true;big.setPointerCapture(e.pointerId);setFromEvent(e);});
+  big.addEventListener("pointermove",e=>{if(drag)setFromEvent(e);});
+  big.addEventListener("pointerup",()=>drag=false);
+}
+function syncSliders(char){ui[char].sliders.forEach(s=>s.value=cfg[char][s.dataset.k]);}
+function syncOut(){
+  for(const char of CHARS)ui[char].vals.forEach(v=>{v.textContent=cfg[char][v.dataset.v].toFixed(3);});
+  const lines=CHARS.map(c=>`  ${c.padEnd(9)} { cx: ${cfg[c].cx.toFixed(3)}, cy: ${cfg[c].cy.toFixed(3)}, size: ${cfg[c].size.toFixed(3)} },`);
+  document.getElementById("out").value="const HEAD_CROP = {\n"+lines.join("\n")+"\n};";
+}
+(async()=>{for(const c of CHARS){metas[c]=await load(c);ui[c].big.width=metas[c].fw*SCALE;ui[c].big.height=metas[c].fh*SCALE;}
+syncOut();
+function frame(now){
+  for(const char of CHARS){const m=metas[char];if(!m)continue;const c=cfg[char];
+    const idx=Math.floor((now/(1000/IDLE_FPS))%m.frames);
+    // veľký náhľad + výrez rám
+    const bg=ui[char].big.getContext("2d");bg.imageSmoothingEnabled=false;bg.clearRect(0,0,ui[char].big.width,ui[char].big.height);
+    bg.drawImage(m.img,idx*m.fw,0,m.fw,m.fh,0,0,m.fw*SCALE,m.fh*SCALE);
+    const side=m.fh*c.size;let sx=m.fw*c.cx-side/2,sy=m.fh*c.cy-side/2;
+    sx=Math.max(0,Math.min(m.fw-side,sx));sy=Math.max(0,Math.min(m.fh-side,sy));
+    bg.strokeStyle="#2ecc71";bg.lineWidth=2;bg.strokeRect(sx*SCALE,sy*SCALE,side*SCALE,side*SCALE);
+    bg.strokeStyle="rgba(46,204,113,.5)";bg.beginPath();bg.moveTo((sx+side/2)*SCALE,sy*SCALE);bg.lineTo((sx+side/2)*SCALE,(sy+side)*SCALE);bg.moveTo(sx*SCALE,(sy+side/2)*SCALE);bg.lineTo((sx+side)*SCALE,(sy+side/2)*SCALE);bg.stroke();
+    // náhľad orezu (animovaný)
+    const pv=ui[char].prev.getContext("2d");pv.imageSmoothingEnabled=false;pv.clearRect(0,0,52,52);
+    pv.drawImage(m.img,idx*m.fw+sx,sy,side,side,0,0,52,52);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);})();
+</script></body></html>

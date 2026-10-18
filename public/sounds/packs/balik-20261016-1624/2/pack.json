@@ -1,0 +1,115 @@
+{
+ "format": 1,
+ "id": "balik-20261016-1624",
+ "name": "Balík 16.10. 16:24",
+ "author": "",
+ "version": 2,
+ "created": "2026-10-16",
+ "soundApi": 1,
+ "entries": {
+  "music.menu": {
+   "files": [
+    "sounds/custom/time-flows-ever-onward.mp3"
+   ],
+   "vol": 0.45,
+   "fit": "fade",
+   "trim": {
+    "sounds/custom/time-flows-ever-onward.mp3": [
+     440,
+     132220
+    ]
+   }
+  },
+  "music.final": {
+   "files": [
+    "sounds/custom/knife-to-the-throat.mp3"
+   ],
+   "vol": 0.4,
+   "fit": "fade",
+   "trim": {
+    "sounds/custom/knife-to-the-throat.mp3": [
+     440,
+     118720
+    ]
+   }
+  },
+  "music.battle": {
+   "files": [
+    "sounds/custom/dragon-smasher.mp3"
+   ],
+   "vol": 0.4,
+   "fit": "fade",
+   "trim": {
+    "sounds/custom/dragon-smasher.mp3": [
+     400,
+     110500
+    ]
+   }
+  },
+  "game.win": {
+   "files": [
+    "sounds/custom/you-win-normalized.mp3"
+   ],
+   "vol": 1,
+   "fit": "keep",
+   "trim": {
+    "sounds/custom/you-win-normalized.mp3": [
+     460,
+     1640
+    ]
+   }
+  },
+  "game.lose": {
+   "files": [
+    "sounds/custom/you-lose-normalized.mp3"
+   ],
+   "vol": 1,
+   "fit": "keep",
+   "trim": {
+    "sounds/custom/you-lose-normalized.mp3": [
+     160,
+     1340
+    ]
+   }
+  },
+  "death": {
+   "files": [
+    "sounds/custom/ryu-ko-normalized.mp3"
+   ],
+   "vol": 1,
+   "fit": "keep",
+   "trim": {
+    "sounds/custom/ryu-ko-normalized.mp3": [
+     1140,
+     4320
+    ]
+   }
+  }
+ },
+ "credits": {
+  "sounds/custom/time-flows-ever-onward.mp3": {
+   "own": true,
+   "author": ""
+  },
+  "sounds/custom/knife-to-the-throat.mp3": {
+   "own": true,
+   "author": ""
+  },
+  "sounds/custom/dragon-smasher.mp3": {
+   "own": true,
+   "author": ""
+  },
+  "sounds/custom/you-win-normalized.mp3": {
+   "own": true,
+   "author": ""
+  },
+  "sounds/custom/you-lose-normalized.mp3": {
+   "own": true,
+   "author": ""
+  },
+  "sounds/custom/ryu-ko-normalized.mp3": {
+   "own": true,
+   "author": ""
+  }
+ }
+}

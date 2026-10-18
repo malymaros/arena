@@ -1,0 +1,97 @@
+{
+  "pair": ["fire","fire"],
+  "start": {"p1":{"slot":"p1","x":0,"y":1,"hp":10,"mana":6,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":0,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":false},"p2":{"slot":"p2","x":3,"y":1,"hp":10,"mana":6,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":0,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":false},"tiles":[]},
+  "rounds": [
+    {
+      "q1": [{"type":"shield","dir":"up_right"},{"type":"recharge"},{"type":"special","dir":"down_right"}],
+      "q2": [{"type":"special","dir":"down_left"},{"type":"melee","dir":"left"},{"type":"shield","dir":"right"}],
+      "p1view": [
+        [
+          {"phase":"playing","config":{"format":"single","tilesPerRound":2,"tileWeights":{"dmg":36,"heal":15,"mana":15,"ik":4,"power":15,"block":15},"timer":"off","tilePreview":true,"colorPref":"random"},"series":{"gameIndex":1,"needed":1,"format":"single","winsP1":0,"winsP2":0},"names":{"p1":"goldena","p2":"goldenb"},"awaitingOpponent":false,"timestop":null,"board":{"w":4,"h":3},"p1":{"slot":"p1","x":0,"y":1,"hp":10,"mana":6,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":0,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":true},"p2":{"slot":"p2","x":3,"y":1,"hp":10,"mana":6,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":0,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":true},"arena":"bridge","turn":1,"starter":"p1","timerMs":null,"goldLocked":false,"tiles":[],"iks":[],"pending":{"ikMoves":[],"spawns":[{"x":0,"y":0,"type":"mana"},{"x":3,"y":2,"type":"mana"}]},"roster":null,"rosterReady":null,"mageDead":null,"rosterHp":null,"rosterMana":null,"effects":[],"delayMs":10},
+          {"effects":[{"kind":"beat_empty","from":"p2","beat":"gpre"}],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"shield","dir":"up_right","to":null}}],"delayMs":250},
+          {"p1":{"~":{"mana":4,"shield":true}},"effects":[{"kind":"shield","from":"p1"}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p2","action":{"type":"special","dir":"down_left","to":null}}],"delayMs":250},
+          {"p2":{"~":{"mana":1}},"effects":[{"kind":"special","from":"p2"}],"delayMs":1620},
+          {"effects":[{"kind":"special","from":"p2"}],"delayMs":1620},
+          {"effects":[{"kind":"special","from":"p2"}],"delayMs":1620},
+          {"effects":[{"kind":"block","target":"p1","gold":false}],"delayMs":1080},
+          {"p1":{"~":{"shield":false}},"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"recharge","dir":null,"to":null}}],"delayMs":250},
+          {"p1":{"~":{"mana":8}},"effects":[{"kind":"recharge","from":"p1","cells":[[0,1]],"amount":4}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p2","action":{"type":"melee","dir":"left","to":null}}],"delayMs":250},
+          {"effects":[{"kind":"invalid","target":"p2","reason":"mana"}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"special","dir":"down_right","to":null}}],"delayMs":250},
+          {"p1":{"~":{"mana":3}},"effects":[{"kind":"special","from":"p1"}],"delayMs":1620},
+          {"effects":[{"kind":"special","from":"p1"}],"delayMs":1620},
+          {"effects":[{"kind":"special","from":"p1"}],"delayMs":1620},
+          {"p2":{"~":{"hp":5}},"effects":[{"kind":"hit","target":"p2","dmg":5}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p2","action":{"type":"shield","dir":"right","to":null}}],"delayMs":250},
+          {"effects":[{"kind":"invalid","target":"p2","reason":"mana"}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"beat_empty","from":"p1","beat":"gmana"}],"delayMs":630},
+          {"effects":[{"kind":"beat_empty","from":"p2","beat":"gmana"}],"delayMs":630},
+          {"turn":2,"starter":"p2","tiles":[{"x":0,"y":0,"type":"mana"},{"x":3,"y":2,"type":"mana"}],"pending":{"ikMoves":[],"spawns":[{"x":3,"y":0,"type":"block"},{"x":0,"y":2,"type":"mana"}]},"effects":[],"delayMs":10}
+        ]
+      ],
+      "p2view": "same"
+    },
+    {
+      "q1": [{"type":"special"},{"type":"recharge","dir":"right","cell":{"x":0,"y":0}},{"type":"melee","dir":"up","cell":{"x":0,"y":2}},{"type":"golden_mana"}],
+      "q2": [{"type":"dash","dir":"up","cell":{"x":1,"y":2}},{"type":"move","dir":"left"},{"type":"melee","dir":"up_right","cell":{"x":3,"y":1}},{"type":"golden_mana"}],
+      "p1view": [
+        [
+          {"phase":"playing","config":{"format":"single","tilesPerRound":2,"tileWeights":{"dmg":36,"heal":15,"mana":15,"ik":4,"power":15,"block":15},"timer":"off","tilePreview":true,"colorPref":"random"},"series":{"gameIndex":1,"needed":1,"format":"single","winsP1":0,"winsP2":0},"names":{"p1":"goldena","p2":"goldenb"},"awaitingOpponent":false,"timestop":null,"board":{"w":4,"h":3},"p1":{"slot":"p1","x":0,"y":1,"hp":10,"mana":3,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":0,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":true},"p2":{"slot":"p2","x":3,"y":1,"hp":5,"mana":1,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":0,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":true},"arena":"bridge","turn":2,"starter":"p2","timerMs":null,"goldLocked":false,"tiles":[{"x":0,"y":0,"type":"mana"},{"x":3,"y":2,"type":"mana"}],"iks":[],"pending":{"ikMoves":[],"spawns":[{"x":3,"y":0,"type":"block"},{"x":0,"y":2,"type":"mana"}]},"roster":null,"rosterReady":null,"mageDead":null,"rosterHp":null,"rosterMana":null,"effects":[],"delayMs":10},
+          {"effects":[{"kind":"beat_empty","from":"p1","beat":"gpre"}],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p2","action":{"type":"dash","dir":"up","to":null}}],"delayMs":250},
+          {"effects":[{"kind":"invalid","target":"p2","reason":"mana"}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"special","dir":null,"to":null}}],"delayMs":250},
+          {"effects":[{"kind":"invalid","target":"p1","reason":"mana"}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p2","action":{"type":"move","dir":"left","to":null}}],"delayMs":250},
+          {"p2":{"~":{"x":2}},"effects":[],"delayMs":1440},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"recharge","dir":"right","to":null}}],"delayMs":250},
+          {"p1":{"~":{"mana":7}},"effects":[{"kind":"recharge","from":"p1","cells":[[0,1]],"amount":4}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p2","action":{"type":"melee","dir":"up_right","to":null}}],"delayMs":250},
+          {"effects":[{"kind":"invalid","target":"p2","reason":"mana"}],"delayMs":1080},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"melee","dir":"up","to":null}}],"delayMs":250},
+          {"p1":{"~":{"mana":3}},"effects":[{"kind":"melee","from":"p1","cells":[[0,1]]}],"delayMs":1620},
+          {"effects":[{"kind":"melee","from":"p1","cells":[[0,1]]}],"delayMs":1620},
+          {"effects":[{"kind":"melee","from":"p1","cells":[[0,1]]}],"delayMs":1620},
+          {"effects":[],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p2","action":{"type":"golden_mana","dir":null}}],"delayMs":250},
+          {"p2":{"~":{"hp":4,"mana":7,"manaRefills":1}},"effects":[{"kind":"golden_mana","from":"p2","hpCost":1,"gained":6}],"delayMs":1080},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"golden_mana","dir":null}}],"delayMs":250},
+          {"p1":{"~":{"hp":9,"mana":9,"manaRefills":1}},"effects":[{"kind":"golden_mana","from":"p1","hpCost":1,"gained":6}],"delayMs":1080},
+          {"turn":3,"starter":"p1","tiles":[{"x":0,"y":0,"type":"mana"},{"x":3,"y":2,"type":"mana"},{"x":3,"y":0,"type":"block"},{"x":0,"y":2,"type":"mana"}],"pending":{"ikMoves":[],"spawns":[{"x":2,"y":2,"type":"heal"},{"x":1,"y":1,"type":"heal"}]},"effects":[],"delayMs":10}
+        ]
+      ],
+      "p2view": "same"
+    },
+    {
+      "q1": [{"type":"special"},{"type":"shield","dir":"up_left"},{"type":"recharge","dir":"left"}],
+      "q2": [{"type":"special","dir":"up_right"},{"type":"melee","dir":"up_right","cell":{"x":1,"y":0}},{"type":"recharge"}],
+      "p1view": [
+        [
+          {"phase":"playing","config":{"format":"single","tilesPerRound":2,"tileWeights":{"dmg":36,"heal":15,"mana":15,"ik":4,"power":15,"block":15},"timer":"off","tilePreview":true,"colorPref":"random"},"series":{"gameIndex":1,"needed":1,"format":"single","winsP1":0,"winsP2":0},"names":{"p1":"goldena","p2":"goldenb"},"awaitingOpponent":false,"timestop":null,"board":{"w":4,"h":3},"p1":{"slot":"p1","x":0,"y":1,"hp":9,"mana":9,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":1,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":true},"p2":{"slot":"p2","x":2,"y":1,"hp":4,"mana":7,"char":"fire","stone":0,"pride":0,"moon":0,"worldUsed":false,"form":"base","labyrinth":false,"labReveal":false,"thread":[],"threadMark":null,"clone":null,"trap":null,"shield":false,"shieldGold":false,"mirror":false,"mirrorGold":false,"manaRefills":1,"lastStandBuff":false,"lastHopeBuff":false,"down":false,"locked":true},"arena":"bridge","turn":3,"starter":"p1","timerMs":null,"goldLocked":false,"tiles":[{"x":0,"y":0,"type":"mana"},{"x":3,"y":2,"type":"mana"},{"x":3,"y":0,"type":"block"},{"x":0,"y":2,"type":"mana"}],"iks":[],"pending":{"ikMoves":[],"spawns":[{"x":2,"y":2,"type":"heal"},{"x":1,"y":1,"type":"heal"}]},"roster":null,"rosterReady":null,"mageDead":null,"rosterHp":null,"rosterMana":null,"effects":[],"delayMs":10},
+          {"effects":[{"kind":"beat_empty","from":"p2","beat":"gpre"}],"delayMs":630},
+          {"effects":[{"kind":"action","from":"p1","action":{"type":"special","dir":null,"to":null}}],"delayMs":250},
+          {"p1":{"~":{"mana":4}},"effects":[{"kind":"special","from":"p1"}],"delayMs":1620},
+          {"effects":[{"kind":"special","from":"p1"}],"delayMs":1620},
+          {"effects":[{"kind":"special","from":"p1"}],"delayMs":1620},
+          {"p2":{"~":{"hp":0}},"effects":[{"kind":"hit","target":"p2","dmg":5}],"delayMs":1080}
+        ]
+      ],
+      "p2view": "same"
+    }
+  ],
+  "final": {"result":{"gameWinner":"p1","series":{"gameIndex":1,"needed":1,"format":"single","winsP1":1,"winsP2":0},"matchOver":true},"p1hp":9,"p2hp":0}
+}

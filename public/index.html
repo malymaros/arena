@@ -3,28 +3,117 @@
 <head>
   <meta charset="UTF-8" />
   <title>Arena</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <!-- Arena background layers -->
   <div id="arena" class="arena"></div>
 
-    <!-- Stred: kolo a začínajúci hráč -->
-    <div class="hud hud-turn" id="hud-turn"></div>
+    <!-- Stred: kolo -->
+    <div class="hud-turn" id="hud-turn"></div>
+    <!-- Odpočet času na ťah -->
+    <div id="turn-timer" class="turn-timer hidden"></div>
+    <!-- Indikácia čakania na ťah - kto je locknutý a na koho sa čaká -->
+    <div id="turn-status" class="turn-status hidden"></div>
+    <!-- „ROUND N" animácia medzi kolami (round-script ostane vidieť, kým dobehne) -->
+    <div id="round-banner" class="round-banner hidden"></div>
 
-    <!-- Vľavo hore: P1 -->
+    <!-- Vľavo: P1 -->
     <div class="hud hud-box hud-p1" id="hud-p1">
-    <div class="hud-title">P1</div>
-    <div class="hud-line hp">HP: <span id="p1-hp">-</span></div>
-    <div class="hud-line mana">Mana: <span id="p1-mana">-</span></div>
+      <span class="starter-flag" id="flag-p1" title="Starts this round">
+        <span class="flag-label">1<sup>st</sup></span>
+        <svg viewBox="0 0 100 110" shape-rendering="crispEdges" aria-hidden="true">
+          <!-- zlatý hrot žrde -->
+          <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
+          <!-- žrď -->
+          <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
+          <!-- látka - plochá zelená so zúbkovaným swallowtail zárezom -->
+          <polygon fill="#2e7d32" stroke="#1b5e20" stroke-width="3" points="
+            16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
+            78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
+          <!-- pixel shading: svetlý pás hore, tmavý dole -->
+          <rect x="18" y="12" width="74" height="4" fill="#66bb6a"/>
+          <rect x="18" y="44" width="74" height="4" fill="#1b5e20"/>
+        </svg>
+      </span>
+      <canvas class="hud-char" id="hud-char-p1" width="160" height="160"></canvas>
+      <!-- Escanor: pride level (ikona + číslo) vľavo od postavy, rozsah abilitky (minimapka) vpravo -->
+      <div class="pride-badge hidden" id="pride-p1"><img src="/assets/pride_lion_0.png" alt="Pride" /><span class="pride-num">0</span></div>
+      <div class="pride-range hidden" id="prange-p1"></div>
+      <!-- Vlkolak: fáza mesiaca (ikona bez čísla) vľavo od postavy, dmg specialu pri danej fáze vpravo -->
+      <div class="moon-badge hidden" id="moon-p1"><img src="/assets/moon_0.png" alt="Moon" /></div>
+      <div class="moon-dmg hidden" id="mdmg-p1"></div>
+      <!-- Luffy: odznak módu (Base / Gear 3) vľavo od postavy (ako mesiac) -->
+      <div class="luffy-badge hidden" id="luffy-p1"><img src="/assets/luffy/base.png" alt="Mode" /></div>
+      <!-- Luffy: info o basic (šípky diag/orto) a speciali (šípky dáma/veža + dmg) vpravo od postavy -->
+      <div class="luffy-info hidden" id="luffy-info-p1">
+        <div class="li-row"><img class="li-arrows li-spec" alt=""><span class="li-dmg"></span></div>
+      </div>
+      <div class="hud-stats">
+        <div class="hud-stat">
+          <span class="bar-label" title="HP"><span class="ico ico-hp pix-ico" data-pix="heart"></span><span class="bar-num hp-num">–</span></span>
+          <div class="bar hp-bar" id="p1-hp"></div>
+        </div>
+        <div class="hud-stat">
+          <span class="bar-label" title="Mana"><span class="ico pix-ico" data-pix="drop"></span><span class="bar-num mana-num">–</span></span>
+          <div class="bar mana-bar" id="p1-mana"></div>
+        </div>
+      </div>
+      <div class="series-crowns hidden" id="crowns-p1" title="Games won"></div>
+      <div class="action-log" id="log-p1"></div>
+      <!-- labyrint: bludisko prekryje CELÝ widget súpera (jediné, čo o ňom hráč počas labyrintu vidí) -->
+      <img class="maze-cover" src="/assets/minotaur/labyrint.png" alt="" />
     </div>
 
-    <!-- Vpravo hore: P2 -->
+    <!-- Vpravo: P2 -->
     <div class="hud hud-box hud-p2" id="hud-p2">
-    <div class="hud-title">P2</div>
-    <div class="hud-line hp">HP: <span id="p2-hp">-</span></div>
-    <div class="hud-line mana">Mana: <span id="p2-mana">-</span></div>
+      <span class="starter-flag" id="flag-p2" title="Starts this round">
+        <span class="flag-label">1<sup>st</sup></span>
+        <svg viewBox="0 0 100 110" shape-rendering="crispEdges" aria-hidden="true">
+          <!-- zlatý hrot žrde -->
+          <rect x="5" y="0" width="12" height="8" fill="#d4a017" stroke="#715a00" stroke-width="2"/>
+          <!-- žrď -->
+          <rect x="8" y="8" width="6" height="98" fill="#6d4c41" stroke="#3e2723" stroke-width="2"/>
+          <!-- látka - plochá zelená so zúbkovaným swallowtail zárezom -->
+          <polygon fill="#2e7d32" stroke="#1b5e20" stroke-width="3" points="
+            16,10 94,10 94,14 90,14 90,18 86,18 86,22 82,22 82,26 78,26
+            78,34 82,34 82,38 86,38 86,42 90,42 90,46 94,46 94,50 16,50"/>
+          <!-- pixel shading: svetlý pás hore, tmavý dole -->
+          <rect x="18" y="12" width="74" height="4" fill="#66bb6a"/>
+          <rect x="18" y="44" width="74" height="4" fill="#1b5e20"/>
+        </svg>
+      </span>
+      <canvas class="hud-char" id="hud-char-p2" width="160" height="160"></canvas>
+      <!-- Escanor: pride level (ikona + číslo) vľavo od postavy, rozsah abilitky (minimapka) vpravo -->
+      <div class="pride-badge hidden" id="pride-p2"><img src="/assets/pride_lion_0.png" alt="Pride" /><span class="pride-num">0</span></div>
+      <div class="pride-range hidden" id="prange-p2"></div>
+      <!-- Vlkolak: fáza mesiaca (ikona bez čísla) vľavo od postavy, dmg specialu pri danej fáze vpravo -->
+      <div class="moon-badge hidden" id="moon-p2"><img src="/assets/moon_0.png" alt="Moon" /></div>
+      <div class="moon-dmg hidden" id="mdmg-p2"></div>
+      <!-- Luffy: odznak módu (Base / Gear 3) -->
+      <div class="luffy-badge hidden" id="luffy-p2"><img src="/assets/luffy/base.png" alt="Mode" /></div>
+      <div class="luffy-info hidden" id="luffy-info-p2">
+        <div class="li-row"><img class="li-arrows li-spec" alt=""><span class="li-dmg"></span></div>
+      </div>
+      <div class="hud-stats">
+        <div class="hud-stat">
+          <span class="bar-label" title="HP"><span class="ico ico-hp pix-ico" data-pix="heart"></span><span class="bar-num hp-num">–</span></span>
+          <div class="bar hp-bar" id="p2-hp"></div>
+        </div>
+        <div class="hud-stat">
+          <span class="bar-label" title="Mana"><span class="ico pix-ico" data-pix="drop"></span><span class="bar-num mana-num">–</span></span>
+          <div class="bar mana-bar" id="p2-mana"></div>
+        </div>
+      </div>
+      <div class="series-crowns hidden" id="crowns-p2" title="Games won"></div>
+      <div class="action-log" id="log-p2"></div>
+      <!-- labyrint: bludisko prekryje CELÝ widget súpera (jediné, čo o ňom hráč počas labyrintu vidí) -->
+      <img class="maze-cover" src="/assets/minotaur/labyrint.png" alt="" />
     </div>
 
   <main class="stage">
@@ -45,56 +134,417 @@
     </section>
   </main>
 
-  <!-- Controls toolbar -->
+  <!-- Controls toolbar. Tooltipy a cenovky akčných tlačidiel tu zámerne NIE SÚ - dopĺňa ich
+       public/client/balance-ui.js z čísel v shared/balance.js (jediný zdroj balansu). -->
+  <div class="controls-row">
+    <!-- Last Hope - úvodná akcia NEbuffnutého hráča vo FINAL ROUND (naľavo od golden shield/mirror).
+         Vykoná sa pred všetkým ostatným: HP padne na 1, mana sa naplní na 10, hráč dáva 4× dmg do konca kola. -->
+    <button id="last-hope-btn" class="btn act lasthope hidden"><img class="lh-ico" src="/assets/last_hope.png" alt="Last Hope" /><span class="cost lh-cost"><span class="pix-ico mini" data-emoji="❤️"></span>→<span class="pix-ico mini" data-emoji="💧"></span></span></button>
+
+    <!-- Golden predťah - jedno tlačidlo naľavo od panela, predelené na 2 polovice (ŠTÍT | MIRROR);
+         len pre hráča, ktorý v kole nezačína; rozsvieti sa vždy len zvolená polovica -->
+    <div id="golden-btn" class="btn act golden golden-split hidden">
+      <button type="button" class="golden-half shield-half" data-gold="shield"><span class="g-ico pix-ico" data-emoji="🛡️"></span><span class="cost"></span></button>
+      <button type="button" class="golden-half mirror-half" data-gold="mirror"><span class="g-ico mirror pix-ico" data-emoji="🪞"></span><span class="cost"></span></button>
+    </div>
+
   <div class="controls">
-    <div class="move-grid">
-      <button class="btn arrow" data-act="move:up"    title="Move Up">↑</button>
-      <div class="h">
-        <button class="btn arrow" data-act="move:left"  title="Move Left">←</button>
-        <button class="btn arrow" data-act="move:right" title="Move Right">→</button>
-      </div>
-      <button class="btn arrow" data-act="move:down"  title="Move Down">↓</button>
-    </div>
-
     <div class="actions">
-      <!-- Recharge (BLUE) — vrátené tlačidlo -->
-      <button class="btn mana" data-act="recharge" title="+2 mana">Recharge (+2💧)</button>
+      <!-- skupiny akcií - label so „zátvorkou" nad sekciou -->
+      <div class="act-group" data-label="MOVE">
+        <!-- Move - otvorí výber smeru -->
+        <div class="move-wrap">
+          <button id="move-btn" class="btn act move" title="Move - choose a direction"><span class="pix-ico" data-emoji="🚶"></span></button>
+          <div id="dir-picker" class="dir-picker hidden">
+            <button class="btn arrow up"    data-act="move:up"    title="Move Up">↑</button>
+            <button class="btn arrow left"  data-act="move:left"  title="Move Left">←</button>
+            <button class="btn arrow right" data-act="move:right" title="Move Right">→</button>
+            <button class="btn arrow down"  data-act="move:down"  title="Move Down">↓</button>
+          </div>
+        </div>
 
-      <!-- Basic (RED) -->
-      <button class="btn attack" data-act="attack" title="Basic Attack (−1 mana, 1 dmg)">Basic (−1💧, 1☠️)</button>
+        <!-- Dash - presun až o 2 políčka zvoleným smerom -->
+        <div class="move-wrap">
+          <button id="dash-btn" class="btn act dash"><span class="pix-ico" data-emoji="🏃"></span><span class="cost"></span></button>
+          <div id="dash-picker" class="dir-picker hidden">
+            <button class="btn arrow up"    data-act="dash:up"    title="Dash Up">↑</button>
+            <button class="btn arrow left"  data-act="dash:left"  title="Dash Left">←</button>
+            <button class="btn arrow right" data-act="dash:right" title="Dash Right">→</button>
+            <button class="btn arrow down"  data-act="dash:down"  title="Dash Down">↓</button>
+          </div>
+        </div>
+      </div>
 
-      <!-- Special (PURPLE) — hover náhľad -->
-      <button id="special-btn" class="btn special" data-act="special" title="Special (−5 mana)">Special (−5💧)</button>
+      <div class="act-group" data-label="ATTACK">
+        <!-- Attack - otvorí výber smeru streľby -->
+        <div class="move-wrap">
+          <button id="attack-btn" class="btn act attack"><span class="pix-ico" data-emoji="🏹"></span><span class="cost"></span></button>
+          <div id="aim-picker" class="dir-picker hidden">
+            <button class="btn arrow up"    data-act="attack:up"    title="Shoot Up">↑</button>
+            <button class="btn arrow left"  data-act="attack:left"  title="Shoot Left">←</button>
+            <button class="btn arrow right" data-act="attack:right" title="Shoot Right">→</button>
+            <button class="btn arrow down"  data-act="attack:down"  title="Shoot Down">↓</button>
+          </div>
+          <!-- Countess/Onre: diagonálny basic - 4 diagonálne smery namiesto ortogonálnych -->
+          <div id="aim-picker-diag" class="dir-picker diag-picker hidden">
+            <button class="btn arrow ul" data-act="attack:up_left"    title="Shoot Up-Left">↖</button>
+            <button class="btn arrow ur" data-act="attack:up_right"   title="Shoot Up-Right">↗</button>
+            <button class="btn arrow dl" data-act="attack:down_left"  title="Shoot Down-Left">↙</button>
+            <button class="btn arrow dr" data-act="attack:down_right" title="Shoot Down-Right">↘</button>
+          </div>
+        </div>
+        <!-- Melee - úder na vlastnej bunke (všetky postavy, bez pickera) -->
+        <div class="move-wrap">
+          <button id="melee-btn" class="btn act melee"><span class="pix-ico" data-emoji="🗡️"></span><span class="cost"></span></button>
+        </div>
+        <!-- Special - Medúza si navyše vyberá smer pohľadu (vľavo/vpravo), ostatní kliknú priamo -->
+        <div class="move-wrap">
+          <button id="special-btn" class="btn act special"><span class="pix-ico" data-emoji="✨"></span><span class="cost"></span></button>
+          <!-- Vojak: mini mapa plochy na výber cieľovej bunky lúča (naplní client.js buildCellPicker) -->
+          <div id="cell-picker" class="dir-picker cell-picker hidden"></div>
+          <div id="special-picker" class="dir-picker special-picker hidden">
+            <button class="btn arrow left"  data-act="special:left"  title="Gaze Left">←</button>
+            <button class="btn arrow right" data-act="special:right" title="Gaze Right">→</button>
+          </div>
+          <!-- Vlkolak: charge - 8 smerov (aj diagonály) v 3×3 mriežke -->
+          <div id="wolf-picker" class="dir-picker wolf-picker hidden">
+            <button class="btn arrow ul" data-act="special:up_left"    title="Charge Up-Left">↖</button>
+            <button class="btn arrow up" data-act="special:up"         title="Charge Up">↑</button>
+            <button class="btn arrow ur" data-act="special:up_right"   title="Charge Up-Right">↗</button>
+            <button class="btn arrow left"  data-act="special:left"    title="Charge Left">←</button>
+            <span class="wolf-center" aria-hidden="true"></span>
+            <button class="btn arrow right" data-act="special:right"   title="Charge Right">→</button>
+            <button class="btn arrow dl" data-act="special:down_left"  title="Charge Down-Left">↙</button>
+            <button class="btn arrow down" data-act="special:down"     title="Charge Down">↓</button>
+            <button class="btn arrow dr" data-act="special:down_right" title="Charge Down-Right">↘</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="act-group" data-label="DEFEND">
+        <button class="btn act shield" data-act="shield"><span class="pix-ico" data-emoji="🛡️"></span><span class="cost"></span></button>
+        <!-- Mirror - Jotaro tento slot nemá: syncMirrorBtn ho premení na Special 1 (fialový ❔ skin + L/R picker) -->
+        <div class="move-wrap">
+          <button id="mirror-btn" class="btn act mirror" data-act="mirror"><span class="pix-ico" data-emoji="🪞"></span><span class="cost"></span></button>
+          <!-- Jotaro Special 1: smer left/right (Star Platinum udrie na obe diagonály strany) -->
+          <div id="s1-picker" class="dir-picker special-picker hidden">
+            <button class="btn arrow left"  data-act="special1:left"  title="Star Platinum - Left">←</button>
+            <button class="btn arrow right" data-act="special1:right" title="Star Platinum - Right">→</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="act-group" data-label="MANA">
+        <button class="btn act mana" data-act="recharge"><span class="pix-ico" data-emoji="🙏"></span><span class="cost"></span></button>
+      </div>
     </div>
+
+    <div class="divider"></div>
 
     <div class="meta">
-      <button id="undo" class="btn secondary">Undo</button>
+      <button id="undo" class="btn secondary" title="Undo - removes the last queued action">↩</button>
       <button id="lock" class="btn btn-lock">LOCK IN</button>
     </div>
   </div>
 
-  <!-- Character select -->
-  <div id="char-select" class="char-select">
-    <div class="char-card" data-char="fire">
-      <canvas class="char-canvas" width="160" height="160" data-char="fire"></canvas>
-      <div class="char-name">Fire Wizard</div>
+    <!-- Golden Mana | Last Stand - jedno tlačidlo rozdelené na 2 polovice (ako golden shield/mirror), vzájomne výlučné. Vykoná sa po konci kola. -->
+    <div id="gold-dual-btn" class="btn act golden golden-split hidden">
+      <button type="button" class="golden-half gm-half" data-dual="mana"><span class="g-ico pix-ico" data-emoji="🙏"></span><span class="cost gm-gain"></span><span class="cost gm-hp" id="gm-cost">−1<span class="pix-ico mini" data-emoji="❤️"></span></span></button>
+      <button type="button" class="golden-half ls-half" data-dual="laststand"><img class="ls-ico" src="/assets/last_stand.png" alt="Last Stand" /><span class="cost"></span></button>
     </div>
-    <div class="char-card" data-char="lightning">
-      <canvas class="char-canvas" width="160" height="160" data-char="lightning"></canvas>
-      <div class="char-name">Lightning Mage</div>
+
+    <!-- Démon útok - len pre buffnutého hráča v poslednom (FINAL) kole, namiesto zamknutého gold dual buttonu.
+         Zaberá jeden z 3 akčných slotov; DEMON_DMG na všetky políčka okrem toho, na ktorom stojíš. -->
+    <button id="demon-btn" class="btn act demon hidden"><img class="ls-ico" src="/assets/last_stand.png" alt="Demon" /><span class="cost"></span></button>
+  </div>
+
+  <!-- Character select - skryté by default, nech pri načítaní nepreblikne pred loginom (JS ho zobrazí pri hre) -->
+  <div id="char-select" class="char-select hidden">
+    <!-- výber postáv je stránkovaný: str. 0 = základní magovia, str. 1 = experimentálne postavy -->
+    <div class="char-page-title" id="char-page-title">Mages</div>
+    <div class="char-pager">
+      <!-- tooltipy šípok priebežne prepisuje client.js na názov cieľovej stránky -->
+      <button id="char-page-prev" class="char-arrow off" title="Experimental">&#9664;</button>
+      <!-- str. 0 = nové postavy (vľavo od mágov): Escanor + 2× coming soon; Escanor sa zatiaľ nedá zvoliť -->
+      <div class="char-cards hidden" data-page="0">
+        <div class="char-card" data-char="escanor">
+          <canvas class="char-canvas" width="220" height="240" data-char="escanor"></canvas>
+          <div class="char-stats hidden" data-char="escanor"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Escanor</div>
+        </div>
+        <div class="char-card" data-char="soldier">
+          <canvas class="char-canvas" width="220" height="240" data-char="soldier"></canvas>
+          <div class="char-stats hidden" data-char="soldier"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Soldier</div>
+        </div>
+        <div class="char-card" data-char="werewolf">
+          <canvas class="char-canvas" width="220" height="240" data-char="werewolf"></canvas>
+          <div class="char-stats hidden" data-char="werewolf"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Werewolf</div>
+        </div>
+      </div>
+      <div class="char-cards" data-page="1">
+        <div class="char-card" data-char="fire">
+          <canvas class="char-canvas" width="220" height="240" data-char="fire"></canvas>
+          <div class="char-stats hidden" data-char="fire"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Fire Wizard</div>
+        </div>
+        <div class="char-card" data-char="lightning">
+          <canvas class="char-canvas" width="220" height="240" data-char="lightning"></canvas>
+          <div class="char-stats hidden" data-char="lightning"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Lightning Mage</div>
+        </div>
+        <div class="char-card" data-char="wanderer">
+          <canvas class="char-canvas" width="220" height="240" data-char="wanderer"></canvas>
+          <div class="char-stats hidden" data-char="wanderer"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Wanderer Magician</div>
+        </div>
+      </div>
+      <div class="char-cards hidden" data-page="2">
+        <div class="char-card" data-char="medusa">
+          <canvas class="char-canvas" width="220" height="240" data-char="medusa"></canvas>
+          <div class="char-stats hidden" data-char="medusa"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Medusa</div>
+        </div>
+        <div class="char-card" data-char="minotaur">
+          <canvas class="char-canvas" width="220" height="240" data-char="minotaur"></canvas>
+          <div class="char-stats hidden" data-char="minotaur"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Minotaur</div>
+        </div>
+        <div class="char-card" data-char="naruto">
+          <canvas class="char-canvas" width="220" height="240" data-char="naruto"></canvas>
+          <div class="char-stats hidden" data-char="naruto"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Naruto</div>
+        </div>
+      </div>
+      <!-- skrytá stránka „Hidden" - easter egg: nie je v CHAR_PAGES (šípky sa na ňu nedostanú),
+           otvára ju len runa v ľavom hornom rohu (#hidden-rune); pravá šípka z nej vracia na str. 0 -->
+      <div class="char-cards hidden" data-page="hidden">
+        <!-- nové postavy sú viazané na STRANU hráča: P1 vidí LEN Countess Vampire, P2 LEN Onre
+             (karta druhej strany je skrytá cez CSS podľa #char-select.p2-side + data-side).
+             Hrateľné len v single/bo3 - v turnaji sa na Hidden stránku nedá dostať (runeActive). -->
+        <div class="char-card hidden-char" data-char="countess" data-side="p1">
+          <canvas class="char-canvas" width="220" height="240" data-char="countess"></canvas>
+          <div class="char-stats hidden" data-char="countess"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Vampire</div>
+        </div>
+        <div class="char-card hidden-char" data-char="onre" data-side="p2">
+          <canvas class="char-canvas" width="220" height="240" data-char="onre"></canvas>
+          <div class="char-stats hidden" data-char="onre"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Onryō</div>
+        </div>
+        <!-- Jotaro (JJBA, stand Star Platinum) - HRATEĽNÝ, viazaný na P2 ako Onryō -->
+        <div class="char-card hidden-char" data-char="jotaro" data-side="p2">
+          <canvas class="char-canvas" width="220" height="240" data-char="jotaro"></canvas>
+          <div class="char-stats hidden" data-char="jotaro"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Jotaro</div>
+        </div>
+        <!-- Luffy (One Piece) - HRATEĽNÝ (WIP), viazaný na P1 ako Vampire. WIP páska ostáva,
+             kým nebude hotový (base/gear3 módy, gear3 pull, chess special). -->
+        <div class="char-card hidden-char" data-char="luffy" data-side="p1">
+          <canvas class="char-canvas" width="220" height="240" data-char="luffy"></canvas>
+          <div class="char-stats hidden" data-char="luffy"><span class="char-hp"></span><span class="char-mana"></span></div>
+          <div class="char-name">Luffy</div>
+          <!-- rozpracovaná postava - diagonálna WIP páska v pravom hornom rohu (ostáva do dokončenia) -->
+          <div class="wip-ribbon">WIP</div>
+        </div>
+        <div class="char-card soon"><div class="soon-mark">???</div><div class="char-name">Coming soon</div></div>
+      </div>
+      <button id="char-page-next" class="char-arrow" title="Experimental">&#9654;</button>
     </div>
-    <div class="char-card" data-char="wanderer">
-      <canvas class="char-canvas" width="160" height="160" data-char="wanderer"></canvas>
-      <div class="char-name">Wanderer Magician</div>
+    <!-- turnajový draft: potvrdenie tímu 3 postáv - viditeľné len v team-mode (fáza team_select) -->
+    <div class="team-bar">
+      <button id="team-confirm" class="team-confirm" disabled>PICK YOUR TEAM (0/3)</button>
+    </div>
+    <!-- náhľad špeciálnej abilitky mága, na ktorom je kurzor -->
+    <div id="char-ability" class="char-ability hidden">
+      <div class="ca-title" id="ca-title"></div>
+      <div class="ca-grid" id="ca-grid"></div>
+      <!-- pride/moon riadok - vždy prítomný fixný slot (nech centrovanie panelu neskáče podľa postavy);
+           vnútri sa pride (Escanor) a moon (Vlkolak) prepínajú cez .hidden, prázdny slot drží výšku -->
+      <div class="ca-extra">
+        <!-- Escanor: pride level pod mini-doskou - lev + číslo ako v HUD widgete, cyklí spolu s náhľadom zóny -->
+        <div class="ca-pride hidden" id="ca-pride"><img src="/assets/pride_lion_0.png" alt="Pride" /><span class="pride-num">0</span></div>
+        <!-- Vlkolak: fáza mesiaca + dmg pod mini-doskou - cyklí 0→3 (naplní client.js syncCaMoon) -->
+        <div class="ca-moon hidden" id="ca-moon"><img src="/assets/moon_0.png" alt="Moon" /><span class="ca-moon-dmg"></span></div>
+        <!-- Luffy: mód (base/gear3) + dmg pod mini-doskou - cyklí base↔gear3 spolu so zónou (naplní syncCaLuffy) -->
+        <div class="ca-luffy hidden" id="ca-luffy"><img src="/assets/luffy/base.png" alt="Gear" /><span class="ca-luffy-dmg"></span></div>
+      </div>
+      <div class="ca-text" id="ca-text"></div>
+      <div class="ca-stats" id="ca-stats"></div>
     </div>
   </div>
 
-  <!-- Game over -->
-  <div id="gameover" class="gameover hidden">
-    <div class="go-box">
-      <div id="go-text" class="go-text">GAME OVER</div>
-      <button id="retry" class="retry">Retry</button>
+  <!-- Easter egg: runa (kľúčová dierka) v ľavom hornom rohu - client.js jej riadi opacity podľa
+       vzdialenosti kurzora od rohu; klik spustí glitch prechod na skrytú stránku postáv „Hidden" -->
+  <div id="hidden-rune" class="hidden-rune" title="???" aria-hidden="true">
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="2.5"/>
+      <path d="M10 12 L7.5 21 L16.5 21 L14 12 Z" fill="currentColor"/>
+    </svg>
+  </div>
+
+  <!-- Losovanie farieb po nastavení zápasu - točiaca sa strelka na yin-yang kruhu skončí na farbe hráča.
+       Pridelenie urobil server ešte pred animáciou (p1 = biely vľavo a začína, p2 = čierny vpravo). -->
+  <div id="color-roll" class="color-roll hidden">
+    <div class="cr-title">DRAWING SIDES…</div>
+    <div class="cr-wheel">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <!-- čierny podklad + biela polovica vľavo s klasickým yin-yang esíčkom + bodky -->
+        <circle cx="100" cy="100" r="97" fill="#16171b"/>
+        <path d="M100,197 A97,97 0 0 1 100,3 A48.5,48.5 0 0 1 100,100 A48.5,48.5 0 0 0 100,197 Z" fill="#f1f1ec"/>
+        <circle cx="100" cy="51.5" r="15" fill="#16171b"/>
+        <circle cx="100" cy="148.5" r="15" fill="#f1f1ec"/>
+        <circle cx="100" cy="100" r="97" fill="none" stroke="#000" stroke-width="5"/>
+      </svg>
+      <div class="cr-arrow" id="cr-arrow">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <polygon points="100,16 88,44 112,44" fill="#ffb300" stroke="#000" stroke-width="4"/>
+          <rect x="96" y="42" width="8" height="62" fill="#ffb300" stroke="#000" stroke-width="3"/>
+        </svg>
+      </div>
+      <div class="cr-knob"></div>
     </div>
+    <div class="cr-result hidden" id="cr-result"></div>
+  </div>
+
+  <!-- Tretí a ďalší pripojený hráč - hra je plná, len informačná hláška -->
+  <div id="spectator" class="spectator hidden">Game in progress…</div>
+
+  <!-- Chyba spojenia pri odosielaní ťahu - server nepotvrdil prijatie, treba potvrdiť znova -->
+  <div id="conn-error" class="conn-error hidden">
+    ⚠ Move could not be delivered (connection error). Check your network and <b>lock in your move again</b>.
+  </div>
+
+  <!-- Úvodná obrazovka - nastavenia zápasu (vidí len host = prvý pripojený) -->
+  <div id="lobby" class="lobby hidden">
+    <div class="lobby-card">
+      <h1 class="lobby-title">ARENA</h1>
+      <p class="lobby-sub">Match setup</p>
+
+      <div class="lobby-section">
+        <div class="lobby-label">FORMAT</div>
+        <div class="opt-row" id="lobby-format">
+          <button class="opt" data-val="single">Single</button>
+          <button class="opt active" data-val="bo3">Best of 3</button>
+          <button class="opt" data-val="tournament">Tournament</button>
+        </div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">SPECIAL TILES PER ROUND</div>
+        <div class="opt-row" id="lobby-tiles-count">
+          <button class="opt active" data-val="1">1</button>
+          <button class="opt" data-val="2">2</button>
+          <button class="opt" data-val="3">3</button>
+        </div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">TILE CHANCE (must total 100%)</div>
+        <div class="weights" id="lobby-weights">
+          <label class="weight"><span class="w-ico pix-ico" data-pix="flame"></span>Damage
+            <input type="number" min="0" max="100" step="5" data-key="dmg" value="75"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="heart"></span>Heal
+            <input type="number" min="0" max="100" step="5" data-key="heal" value="5"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="drop"></span>Mana
+            <input type="number" min="0" max="100" step="5" data-key="mana" value="5"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="skull"></span>Insta-kill
+            <input type="number" min="0" max="100" step="5" data-key="ik" value="5"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="sword"></span>Power
+            <input type="number" min="0" max="100" step="5" data-key="power" value="5"><span class="pct">%</span></label>
+          <label class="weight"><span class="w-ico pix-ico" data-pix="shieldx"></span>Def-blocker
+            <input type="number" min="0" max="100" step="5" data-key="block" value="5"><span class="pct">%</span></label>
+        </div>
+        <div class="weights-sum" id="lobby-weights-sum">Total: 100%</div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">YOUR COLOR</div>
+        <div class="opt-row" id="lobby-color">
+          <button class="opt active" data-val="random">Random</button>
+          <button class="opt" data-val="white">⚪ White</button>
+          <button class="opt" data-val="black">⚫ Black</button>
+        </div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">NEXT-ROUND TILE PREVIEW</div>
+        <div class="opt-row" id="lobby-preview">
+          <button class="opt active" data-val="on">On</button>
+          <button class="opt" data-val="off">Off</button>
+        </div>
+      </div>
+
+      <div class="lobby-section">
+        <div class="lobby-label">TURN TIMER</div>
+        <div class="opt-row" id="lobby-timer">
+          <button class="opt active" data-val="off">Off</button>
+          <button class="opt" data-val="30">30s</button>
+          <button class="opt" data-val="60">60s</button>
+          <button class="opt" data-val="120">120s</button>
+          <button class="opt" data-val="quickdraw">60s after lock</button>
+        </div>
+      </div>
+
+      <button id="lobby-start" class="lobby-start">START</button>
+    </div>
+  </div>
+
+  <!-- Druhý hráč čaká, kým host nastaví zápas -->
+  <div id="lobby-wait" class="lobby-wait hidden">Waiting for host to set up the match…</div>
+
+  <!-- Host stlačil START, no druhý hráč ešte nie je v roomke -->
+  <div id="host-wait" class="lobby-wait hidden">Waiting for the second player…</div>
+
+  <!-- Turnajový draft: tím potvrdený, čaká sa na súperov výber -->
+  <div id="team-wait" class="lobby-wait hidden">TEAM LOCKED<br />Waiting for opponent's team…</div>
+
+  <!-- Medzihra medzi hrami série -->
+  <div id="intermission" class="intermission hidden">
+    <div class="intermission-box">
+      <div class="im-title" id="im-title"></div>
+      <div class="im-crowns">
+        <div class="im-col"><div class="im-side" id="im-crowns-l"></div><div class="im-who" id="im-who-l"></div></div>
+        <div class="im-vs">VS</div>
+        <div class="im-col"><div class="im-side" id="im-crowns-r"></div><div class="im-who" id="im-who-r"></div></div>
+      </div>
+      <div class="im-next" id="im-next"></div>
+    </div>
+  </div>
+
+  <!-- Game over - verdikt sa píše do hud-turn, tu je len Play again v strede -->
+  <div id="gameover" class="gameover hidden">
+    <div class="go-buttons">
+      <button id="retry" class="retry">Play again?</button>
+      <button id="leave-room" class="retry leave">Leave the room</button>
+    </div>
+  </div>
+
+  <!-- Room browser - po logine; zatiaľ 1 roomka (create / join / spectate) -->
+  <div id="rooms" class="rooms hidden">
+    <div class="rooms-card">
+      <h1 class="rooms-title">ARENA</h1>
+      <div id="rooms-list" class="rooms-list"></div>
+    </div>
+  </div>
+
+  <!-- Prihlásenie - meno + heslo (brána pred pripojením); ostane skryté, kým JS nerozhodne -->
+  <div id="login" class="login hidden">
+    <form id="login-form" class="login-card">
+      <h1 class="login-title">ARENA</h1>
+      <label class="login-field">
+        <span class="login-label">NAME</span>
+        <input id="login-name" name="username" type="text" maxlength="8" autocapitalize="off"
+               autocomplete="username" spellcheck="false" placeholder="max 8 letters a–z" />
+      </label>
+      <label class="login-field">
+        <span class="login-label">PASSWORD</span>
+        <input id="login-pass" name="password" type="password" autocomplete="current-password" placeholder="password from admin" />
+      </label>
+      <div id="login-error" class="login-error hidden"></div>
+      <button type="submit" class="login-btn">ENTER</button>
+    </form>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
