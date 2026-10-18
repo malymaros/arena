@@ -8,6 +8,9 @@
 // Tri osi verzií: format (schéma súboru) · soundApi (sada kľúčov, KEY_MIGRATIONS) · madeForMs (okno v čase
 // tvorby vs windows.json). Balík NEMENÍ časovanie hry - pri posunutom okne len upozorní.
 import { FIT_MODES } from "./fit.js";
+// najvyššia hlasitosť položky: nad 1 = zosilnenie (Web Audio gain) pre tichšie nahrávky, aby sa dali vyrovnať
+// s ostatnými (tools/voice-loudness.mjs); hudbu prehrávač aj tak obmedzí na 1 (HTMLAudio volume)
+export const MAX_VOL = 2;
 
 export const PACK_FORMAT = 1;
 export const AUDIO_EXT = ["ogg", "mp3", "wav", "webm"];
@@ -86,7 +89,7 @@ export function validatePack(pack, fileSizes, { keys, chars, api }) {
       if (!sizes.has(f)) errors.push(`${key}: súbor ${f} v balíku chýba`);
       used.add(f);
     }
-    if (typeof e.vol !== "number" || e.vol < 0 || e.vol > 1) errors.push(`${key}: vol mimo 0–1`);
+    if (typeof e.vol !== "number" || e.vol < 0 || e.vol > MAX_VOL) errors.push(`${key}: vol mimo 0–${MAX_VOL}`);
     if (e.fit !== undefined && !FIT_MODES.includes(e.fit)) errors.push(`${key}: fit "${e.fit}"`);
     errors.push(...trimErrors(key, e));
   }

@@ -10,7 +10,7 @@ import os from "os";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { writeZip, readZip, crc32 } from "../public/sounds/zip.js";
-import { validatePack, migratePack, compatReport, keyAllowed, safePath, PACK_FORMAT, MAX_FILE_BYTES } from "../public/sounds/pack.js";
+import { validatePack, migratePack, compatReport, keyAllowed, safePath, PACK_FORMAT, MAX_FILE_BYTES, MAX_VOL } from "../public/sounds/pack.js";
 import { SOUNDS, SOUND_API_VERSION, KEY_MIGRATIONS } from "../public/sounds/manifest.js";
 import { CHAR_LIST } from "../public/chars/index.js";
 
@@ -69,7 +69,8 @@ const okSizes = () => ({ "pack.json": 100, "sounds/a.ogg": 1000, "sounds/b.wav":
   check(errOf(p => { p.entries.hit.files = ["sounds/../../server.js"]; }).errors.length > 0, "cesta s .. → chyba");
   check(errOf(p => { p.entries.hit.files = ["sounds/chyba.ogg"]; }).errors.some(e => e.includes("chýba")), "chýbajúci súbor → chyba");
   check(errOf(p => { p.entries["nieco.nove"] = { files: [], vol: 1 }; }).warnings.some(w => w.includes("nieco.nove")), "neznámy kľúč → upozornenie, nie chyba");
-  check(errOf(p => { p.entries.hit.vol = 2; }).errors.length > 0, "vol mimo 0–1 → chyba");
+  check(errOf(p => { p.entries.hit.vol = MAX_VOL + 0.5; }).errors.length > 0, "vol nad MAX_VOL → chyba");
+  check(errOf(p => { p.entries.hit.vol = MAX_VOL; }).errors.length === 0, "vol = MAX_VOL (zosilnenie) je povolený");
   check(errOf(p => { p.entries.hit.fit = "stretch"; }).errors.length > 0, "neznámy fit → chyba");
   check(errOf(p => { p.id = "Zlé ID!"; }).errors.length > 0, "zlé id → chyba");
   check(errOf(() => {}, { ...okSizes(), "sounds/a.ogg": MAX_FILE_BYTES + 1 }).errors.some(e => e.includes("limit")), "privelký súbor → chyba");
