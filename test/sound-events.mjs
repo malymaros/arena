@@ -71,8 +71,13 @@ const keys = (evs) => evs.map(e => e.key);
   check(voices(trap).join() === "voice.melee:countess", "úder pasce → hlas melee", voices(trap).join());
   check(voices([fr([], 100, V), fr([strike], 700, V), fr([strike], 700, V), fr([strike], 700, V)]).join() === "voice.melee:countess",
     "Vampirino melee (3× vamp_strike) → hlas melee raz");
-  check(voices([fr([], 100, V), fr([{ kind: "vamp_charge", from: "p1", dir: "right" }], 400, V), fr([strike], 700, V)]).length === 0,
-    "úder po charge hlas melee nemá");
+  check(voices([fr([], 100, V), fr([{ kind: "vamp_charge", from: "p1", dir: "right" }], 400, V), fr([strike], 700, V)]).join() === "voice.melee:countess",
+    "úder po charge (slot dashu) → hlas melee");
+  check(voices([fr([], 100, V), fr([{ kind: "vamp_charge", from: "p1", dir: "right" }], 400, V)]).length === 0,
+    "charge bez terča (len presun) hlas nemá");
+  check(voices([fr([], 100, P1, J), fr([{ kind: "special1", from: "p2", dir: "left", cells: [[2, 0], [2, 2]] }], 900, P1, J)]).join() === "voice.melee:jotaro",
+    "Jotarov Special 1 (slot mirroru) → hlas melee");
+  check(voices([fr([]), fr([{ kind: "special1", from: "p1", dir: "left", cells: [] }])]).length === 0, "special1 inej postavy hlas nemá");
 }
 
 /* resetTracker: nová timeline začína bez behu z minulej */
