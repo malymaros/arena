@@ -85,7 +85,9 @@ socket.on("spectator", () => {
   if (controls) controls.style.display = "none";
 });
 
-socket.on("reset", () => {
+// úplný reset herného UI (plánovaná fronta, golden/Last Stand voľby, game-over stavy, figúry): server ho
+// pošle pri retry; volá sa aj pri návrate na room-browser - nová roomka nesmie zdediť ťahy z poslednej hry
+function resetGameUi() {
   playback.playGen++;        // zruš prípadné bežiace prehrávanie
   playback.playing = false;
   hideConnError();
@@ -118,7 +120,11 @@ socket.on("reset", () => {
   // char-select / lobby riadi applyPhaseUI z nasledujúceho state eventu
   renderGrid({}, []);
   renderHUD();
-});
+}
+socket.on("reset", resetGameUi);
+// room-browser (opustil som roomku / skončila) - „rooms" dostáva len socket mimo roomky, takže reset
+// nikdy nezasiahne rozohranú hru; ďalšia roomka tak začne s prázdnou frontou (nie s ťahmi z poslednej hry)
+socket.on("rooms", resetGameUi);
 
 socket.on("state", (s) => {
   tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing: playback.playing });

@@ -29,7 +29,7 @@ import { playTeleportExplosion } from "/client/teleport.js";
 import { lastStand } from "/client/last-stand-state.js";
 import { deathBehind } from "/client/overlays.js";
 import { DEATH_SEQ } from "/client/demon-sprites.js";
-import { sfx, setMusic } from "/client/sound.js";
+import { sfx, setMusic, musicKey } from "/client/sound.js";
 import { soundForFrame, soundTimelineStart, syncMusic } from "/client/sound-map.js";
 
 /* ---------- GameOver sekvencia ---------- */
@@ -57,7 +57,10 @@ function showGameOverSequence(winner) {
       // verdikt namiesto ROUND n v hud-turn - hlavné okno nič neprekrýva
       let verdict, cls;
       setMusic(null); // séria rozhodnutá - hudba stíchne, zaznie znelka
-      sfx(me && winner !== me && winner !== "draw" ? "game.lose" : "game.win");
+      const jingle = sfx(me && winner !== me && winner !== "draw" ? "game.lose" : "game.win");
+      // po doznení znelky sa vráti hudba z lobby (game-over obrazovka nemá byť v tichu); ak už medzitým
+      // niečo hudbu prepol (retry → nová hra), neprepisuj to
+      Promise.resolve(jingle).then(h => h?.ended).then(() => { if (musicKey() === null) setMusic("music.menu"); });
       if (winner === "draw")        { verdict = "TIE"; cls = "tie"; }
       else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
       else if (me)                  { verdict = "LOSER!"; cls = "lose"; }

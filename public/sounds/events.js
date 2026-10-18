@@ -41,8 +41,8 @@ export const VOICE = {
   timestop_start: "voice.special", vamp_strike: "voice.melee",
 };
 // postava, pre ktorú efekt znamená iný hlas: Jotarov `special` je vždy Special 2 (THE WORLD má timestop_start),
-// jeho Special 1 (útok v slote mirroru) hrá hlas melee
-export const VOICE_BY_CHAR = { jotaro: { special: "voice.special2", special1: "voice.melee" } };
+// jeho Special 1 (útok v slote mirroru) hrá tiež hlas Special 2
+export const VOICE_BY_CHAR = { jotaro: { special: "voice.special2", special1: "voice.special2" } };
 // frame s týmto efektom nesie vlastný zvuk presunu - zmena pozície v ňom nie je krok/dash
 export const OWN_LOCO = new Set(["wolf_charge", "vamp_charge", "luffy_pull", "luffy_roll", "trap_tp_in", "trap_tp_out", "teleport_in"]);
 export const HIT_HEAVY_DMG = 8;
