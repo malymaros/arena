@@ -145,6 +145,20 @@ try {
   })()`);
   const lp = JSON.parse(loop || "{}");
   check(lp.before >= 5500 && lp.before < 6500 && lp.after >= 440 && lp.after < 3000, "slučka hudby prejde z konca úseku na jeho začiatok", loop);
+  // strážca: pauza zvonka (systém, klávesy médií) nesmie hudbu natrvalo zastaviť
+  const guard = await ev(`(async () => {
+    const m = await import("/client/sound.js");
+    const els = [], P = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () { if (!els.includes(this)) els.push(this); return P.call(this); };
+    const h = m.playMusicLoop("/sounds/lib/cynicmusic/cynic-town-theme.mp3", [440, 60000], 0.5, { fadeInMs: 0 });
+    await new Promise(r => setTimeout(r, 800));
+    const el = els.at(-1); el.pause();
+    await new Promise(r => setTimeout(r, 1500));
+    const playing = els.some(e => !e.paused);
+    h.stop(0); HTMLMediaElement.prototype.play = P;
+    return playing;
+  })()`);
+  check(guard === true, "hudba sa po pauze zvonka sama rozbehne", String(guard));
   check(net.bad.length === 0, "žiadne zlyhané požiadavky na zvuky", net.bad.join(", "));
   check(errs.length === 0, "žiadne JS chyby", errs.join(" | "));
   ws.close();
