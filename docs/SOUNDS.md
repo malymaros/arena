@@ -102,6 +102,14 @@ Hlas je **samostatná vrstva** popri zvuku efektu (`VOICE` v `events.js`): `voic
 `melee` znie pri **každom z 3 švihov**, `attack`/`special` raz za beh. `voice.attack` pokrýva aj strelu mimo plochy.
 Narutov klon hlas nemá. Hlas mena pri výbere postavy = `ui.hover_char.<postava>`. Základ je ticho (`files: []`).
 
+Výnimky (`VOICE` / `VOICE_BY_CHAR`): Jotarov THE WORLD (`timestop_start`) → `voice.special`, jeho Special 2 (efekt
+`special`) → `voice.special2`, Special 1 (slot mirroru) → `voice.melee`; úder Vampire/Onryō `vamp_strike` (melee na
+vlastnej bunke, úder po charge, úder pasce) → `voice.melee`.
+
+**Hlasitosť hlasov:** `node tools/voice-loudness.mjs --write` premeria všetky hlasy (`custom/` nahrávky) v **LUFS**
+(EBU R128, v úseku `trim`) a nastaví `vol` na cieľ **−18 LUFS** s rezervou vrcholu −1 dBFS (`vol` najviac 2 =
+zosilnenie tichej nahrávky). Spusti ho po každom pridaní/výmene nahrávky hlasu; bez `--write` len vypíše tabuľku.
+
 ## Ako pridať novú udalosť (vývoj)
 
 1. Do `SOUNDS` v manifeste pridaj kľúč so `status: "default"` a poznámkou, kedy zaznie.

@@ -34,14 +34,15 @@ export const DIRECT = {
 export const ONCE_PER_RUN = new Set(["charge", "special", "wolf_charge", "vamp_charge", "luffy_roll"]);
 // HLAS postavy - samostatná vrstva popri zvuku efektu: zaznie RAZ na začiatku akcie (prvý frame behu),
 // aj keď efekt sa opakuje (3 švihy melee); okno = celý beh. Len skutočná postava, nie Narutov klon.
-// THE WORLD (Jotaro) nie je efekt `special`, ale `timestop_start` → hlas špeciálu. vamp_strike = úder Vampire/Onryō:
-// pasca a Vampirino melee na vlastnej bunke → hlas melee (úder po charge nie - pred ním je vamp_charge, viď nižšie).
+// THE WORLD (Jotaro) nie je efekt `special`, ale `timestop_start` → hlas špeciálu. vamp_strike = úder Vampire/Onryō
+// (melee na vlastnej bunke, úder po charge v slote dashu, úder pasce) → hlas melee.
 export const VOICE = {
   charge: "voice.attack", attack_swing: "voice.attack", melee: "voice.melee", special: "voice.special",
   timestop_start: "voice.special", vamp_strike: "voice.melee",
 };
-// postava, pre ktorú efekt znamená iný hlas: Jotarov `special` je vždy Special 2 (THE WORLD má timestop_start)
-export const VOICE_BY_CHAR = { jotaro: { special: "voice.special2" } };
+// postava, pre ktorú efekt znamená iný hlas: Jotarov `special` je vždy Special 2 (THE WORLD má timestop_start),
+// jeho Special 1 (útok v slote mirroru) hrá hlas melee
+export const VOICE_BY_CHAR = { jotaro: { special: "voice.special2", special1: "voice.melee" } };
 // frame s týmto efektom nesie vlastný zvuk presunu - zmena pozície v ňom nie je krok/dash
 export const OWN_LOCO = new Set(["wolf_charge", "vamp_charge", "luffy_pull", "luffy_roll", "trap_tp_in", "trap_tp_out", "teleport_in"]);
 export const HIT_HEAVY_DMG = 8;
@@ -101,11 +102,9 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
     const id = runId(e, slot);
     const firstOfRun = !tr.prevRun.has(id);
     run.add(id);
-    const afterCharge = e.kind === "vamp_strike"
-      && (timeline[i - 1]?.effects || []).some(p => p.kind === "vamp_charge" && p.from === slot);
-    if (VOICE[e.kind] && firstOfRun && !e.clone && !afterCharge) {
-      const char = charOf(slot);
-      const voiceKey = VOICE_BY_CHAR[char]?.[e.kind] || VOICE[e.kind];
+    const char = charOf(slot);
+    const voiceKey = VOICE_BY_CHAR[char]?.[e.kind] || VOICE[e.kind];
+    if (voiceKey && firstOfRun && !e.clone) {
       out.push({ key: voiceKey, char, pan: panOf(e), windowMs: runWindow(timeline, i, id) });
     }
     if (ONCE_PER_RUN.has(e.kind)) {

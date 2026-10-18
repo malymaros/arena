@@ -2645,6 +2645,8 @@
  "voice.melee": {
   "med": 4860,
   "values": [
+   900,
+   1620,
    2700,
    4860
   ]
@@ -2652,6 +2654,7 @@
  "voice.melee.countess": {
   "med": 2700,
   "values": [
+   900,
    2700
   ]
  },
@@ -2670,6 +2673,7 @@
  "voice.melee.jotaro": {
   "med": 4860,
   "values": [
+   1620,
    4860
   ]
  },
@@ -2706,6 +2710,7 @@
  "voice.melee.onre": {
   "med": 4860,
   "values": [
+   900,
    4860
   ]
  },
