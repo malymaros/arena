@@ -2646,7 +2646,6 @@
   "med": 4860,
   "values": [
    900,
-   1620,
    2700,
    4860
   ]
@@ -2673,7 +2672,6 @@
  "voice.melee.jotaro": {
   "med": 4860,
   "values": [
-   1620,
    4860
   ]
  },
@@ -2813,6 +2811,18 @@
   "med": 2160,
   "values": [
    2160
+  ]
+ },
+ "voice.special2": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "voice.special2.jotaro": {
+  "med": 1620,
+  "values": [
+   1620
   ]
  },
  "wall_bump": {

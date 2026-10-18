@@ -392,6 +392,8 @@ function startMusicEl() {
   currentMusicUrl = urls[i];
   music = playMusicLoop(urls[i], e.trims?.[i], musicTargetVolume());
 }
+// kľúč práve nastavenej hudby (null = ticho)
+export function musicKey() { return currentMusicKey; }
 // prepni hudbu na `key` (null = ticho); `fallback` sa použije, ak `key` nemá súbory (napr. music.final → music.battle)
 export function setMusic(key, fallback = null) {
   if (key && !(entryFor(key)?.urls || []).length) key = fallback;

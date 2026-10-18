@@ -103,7 +103,7 @@ Hlas je **samostatná vrstva** popri zvuku efektu (`VOICE` v `events.js`): `voic
 Narutov klon hlas nemá. Hlas mena pri výbere postavy = `ui.hover_char.<postava>`. Základ je ticho (`files: []`).
 
 Výnimky (`VOICE` / `VOICE_BY_CHAR`): Jotarov THE WORLD (`timestop_start`) → `voice.special`, jeho Special 2 (efekt
-`special`) → `voice.special2`, Special 1 (slot mirroru) → `voice.melee`; úder Vampire/Onryō `vamp_strike` (melee na
+`special`) → `voice.special2`, Special 1 (slot mirroru) → tiež `voice.special2`; úder Vampire/Onryō `vamp_strike` (melee na
 vlastnej bunke, úder po charge, úder pasce) → `voice.melee`.
 
 **Hlasitosť hlasov:** `node tools/voice-loudness.mjs --write` premeria všetky hlasy (`custom/` nahrávky) v **LUFS**
