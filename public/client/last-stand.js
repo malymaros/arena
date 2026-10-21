@@ -7,6 +7,7 @@ import { ACTOR_W, ACTOR_H } from "/client/sprites.js";
 import { HEAD_CX } from "/chars/index.js";
 import { deathFog, deathCenter, hopeFog, hopeCenter, deathBehind } from "/client/overlays.js";
 import { DEATH_SEQ } from "/client/demon-sprites.js";
+import { appSize } from "/client/viewport.js";
 
 /* ---------- Last Stand - vizuál (démon v strede + za postavou, golden stav); riadené serverom cez timeline ---------- */
 
@@ -49,7 +50,7 @@ function pinOnFinish(el, anim, styles) {
 }
 
 export function lsCenterAppear() {
-  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  const { w, h } = appSize(), cx = w / 2, cy = h / 2;
   deathCenter.getAnimations().forEach(a => a.cancel());
   deathCenter.style.left = cx + "px"; deathCenter.style.top = cy + "px";
   deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
@@ -71,7 +72,7 @@ export function lsCenterDisappear() {
 
 // Démon útok - veľký démon v strede (100 % väčší než summon = scale 2); zvyšok kreslí raf do deathCenter
 export function demonCenterAppear() {
-  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  const { w, h } = appSize(), cx = w / 2, cy = h / 2;
   deathCenter.getAnimations().forEach(a => a.cancel());
   deathCenter.style.left = cx + "px"; deathCenter.style.top = cy + "px";
   deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
@@ -104,7 +105,7 @@ function _hopeFogPuff(ms, dir) {
   hopeFog.animate(a, { duration: ms, easing: dir === "in" ? "ease-out" : "ease-in" });
 }
 export function hopeCenterAppear() {
-  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  const { w, h } = appSize(), cx = w / 2, cy = h / 2;
   hopeCenter.getAnimations().forEach(a => a.cancel());
   hopeCenter.style.left = cx + "px"; hopeCenter.style.top = cy + "px";
   hopeFog.style.left = cx + "px"; hopeFog.style.top = cy + "px";

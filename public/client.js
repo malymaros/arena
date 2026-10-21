@@ -3,6 +3,7 @@
 // poradie v DOM musí ísť až po figúrach z registra fx, a vykreslí sa úvodný stav.
 // Moduly s vedľajšími efektmi pri načítaní (listenery, socket handlery, slučka kreslenia) sa importujú nižšie;
 // ich telá bežia pred týmto súborom, ale udalosti a prvý frame prídu až po jeho dobehnutí.
+import "/client/viewport.js";          // prispôsobenie veľkosti obrazovky - prvý, pred akýmkoľvek layoutom
 import * as G from "/shared/geometry.js";
 import "/client/net.js";              // socket + prihlásenie + room browser
 import "/client/socket-handlers.js";  // herné udalosti zo servera
@@ -14,6 +15,7 @@ import "/client/raf.js";              // hlavná slučka kreslenia
 import "/client/admin.js";            // ?admin=1 → tlačidlo reset roomky
 import "/client/debug-hope.js";       // ?hopedebug=1 → náhľad hope sprite
 import "/client/sound-ui.js";         // tlačidlo 🔊 + UI zvuky klikov
+import "/client/mobile-ui.js";        // dotyk: celá obrazovka + výzva otočiť na šírku
 import { actors } from "/client/actors.js";
 import { initCharFx, fxAll } from "/client/fx-registry.js";
 import { gridEl, actorsEl, TILE_W, TILE_H, GAP, cellToPx } from "/client/dom.js";

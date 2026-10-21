@@ -19,6 +19,7 @@ npm run golden:update   # rewrite the golden files - only for a deliberate behav
 npm run sim             # headless random-bot matches straight on the engine (tools/simulate.mjs, ~1 ms/match)
 node tools/difftest.mjs # engine at HEAD vs working tree on identical bot matches - must be 0 diffs for a pure refactor
 node tools/browser-smoke.mjs [--compare]  # CLIENT smoke test: headless Chrome/Edge spectates seeded bot matches (+ char-select hovers, a tournament) at 8× time; fails on JS errors / 4xx; --compare also runs HEAD and diffs the set of loaded sprite files
+node tools/screens.mjs [--only phone]  # screenshots of login / char-select / game on 9 screen sizes (desktop, tablet, phone landscape + portrait) into tmp/screens/ - check after any layout change
 ```
 
 Environment variables: `PORT` (default 3000), `ADMIN_KEY` (optional password for admin reset; if unset, reset is **open** — a deliberate owner decision, `?admin=1` is enough), `PLAYER_KEYS` (comma-separated entry passwords), `FORCE_FIRST_STARTER` (`A`|`B` — pins the otherwise random game-1 starter; used by the tests), `ARENA_SEED` (integer - all game randomness goes through the room's `rand()`, re-seeded at every `startMatch`, so identical inputs give bit-identical timelines; the tests default to `1`). Never call `Math.random` in game logic - use `rand()`.
@@ -109,6 +110,11 @@ HP and mana both cap at 10 and are rendered in the HUD as 10-segment bars (`rend
 ### Sprites and assets
 
 Sprite sheets are horizontal strips in `public/assets/<char>/`; frame count is inferred from `width / height` (frames must be square). Animation definitions (file, fps, loop) live in `ANIM_DEF` (generic) / the character's `anims` + `specialAnim` in `public/chars/<key>.js`. Characters with a native right-side palette (medusa, minotaur, naruto) have `meta.dirP2` in their `public/chars/<key>.js` (two sprite folders) instead of the CSS `alt-color` filter; medusa/minotaur `Charge.png` projectiles are per-palette recolored copies of fire's fireball, naruto's is a chakra spiral (P2 gold). Minotaur's sheet only has Idle/Walk/Attack/Hurt/Dead — its `spriteAlias` (`public/chars/minotaur.js`) maps the expected `Run.png`/`Attack_1.png`/`Attack_2.png` names onto them. Naruto's assets were extracted from a ripped sheet via the reproducible pipeline in `tools/sprites-naruto/` (see its README); `Special.png` = hand seals (special cast), `Special_2.png` = the clone-summon pose loop. Arena background layers are listed in the client-side `ARENAS_CLIENT` map and loaded from `public/arenas/<key>/`. Background layers render into low-res canvases (`ARENA_RES`, upscaled with `image-rendering: pixelated`).
+
+### Mobile & tablet
+
+**Read `docs/MOBILE.md` before touching layout.** The page is laid out for a fixed minimum of 1720×920 CSS px; on smaller screens `public/client/viewport.js` renders it on a "virtual screen" (`--app-w`/`--app-h`) and shrinks the whole `<body>` with one `transform: scale(--app-scale)` (≥ 1720×920 → scale 1, desktop unchanged). Therefore: never use `window.innerWidth/innerHeight` or `100vw/100vh` — use `appSize()` / `var(--app-w)`/`var(--app-h)`; convert event `clientX/Y` via `appScale()`; append fixed overlays to `body`. Touch-only extras (rotate-to-landscape hint, fullscreen button) live in `public/client/mobile-ui.js`; PWA manifest `public/manifest.webmanifest`, icons `public/icons/` (`node tools/make-icons.mjs`). Phase 2 (touch controls replacing hover previews/tooltips) is planned in the doc.
+
 
 ### Sound & music
 

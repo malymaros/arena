@@ -2,10 +2,25 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+/* mobil: žiadny pull-to-refresh / bounce, žiadny double-tap zoom, iOS nezväčšuje písmo na šírku */
+html {
+  background: #0e0f12; overflow: hidden; overscroll-behavior: none;
+  touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+}
+/* body = „virtuálna obrazovka" (client/viewport.js): min. 1720×920 layout px, zmenšená na skutočný displej
+   jedným transform: scale. Transform robí z body containing block aj pre position: fixed - fixné prvky
+   sa tak vzťahujú k nej. Bez JS (fallback hodnoty) je to obyčajné okno bez zmenšenia. */
 body {
   margin: 0; background: #0e0f12; color: #fff; overflow: hidden;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  position: fixed; left: var(--app-x, 0px); top: var(--app-y, 0px);
+  width: var(--app-w, 100vw); height: var(--app-h, 100vh);
+  transform: scale(var(--app-scale, 1)); transform-origin: 0 0;
+  overscroll-behavior: none;
 }
+/* dotyk: bez modrého záblesku pri ťuknutí, bez výberu textu a kontextovej bubliny pri podržaní (okrem polí) */
+.touch body { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.touch input, .touch textarea { -webkit-user-select: text; user-select: text; }
 
 /* ========== Arena bg ========== */
 .arena { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
@@ -88,7 +103,7 @@ body {
 }
 
 /* ========== Stage & Board ========== */
-.stage { position: relative; z-index: 1; display: grid; place-items: center; width: 100vw; height: 100vh; padding: 16px; }
+.stage { position: relative; z-index: 1; display: grid; place-items: center; width: var(--app-w, 100vw); height: var(--app-h, 100vh); padding: 16px; }
 .game  { display: grid; gap: 14px; }
 
 .board {
@@ -251,7 +266,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 }
 #timestop-overlay.hidden { display: none; }
 #timestop-overlay .ts-overlay-text {
-  margin-top: 14vh; font-weight: 900; font-size: clamp(20px, 4vw, 44px); letter-spacing: .06em;
+  margin-top: calc(var(--app-h, 100vh) * .14); font-weight: 900; font-size: clamp(20px, calc(var(--app-w, 100vw) * .04), 44px); letter-spacing: .06em;
   color: #e7dcff; text-shadow: 0 0 14px rgba(150,110,255,.85), 0 3px 0 #000;
   animation: ts-pulse 1.6s ease-in-out infinite;
 }
@@ -343,7 +358,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   align-items: center;
   gap: 14px;
   z-index: 3;
-  max-width: calc(100vw - 24px);
+  max-width: calc(var(--app-w, 100vw) - 24px);
 }
 /* pixel style - hranatý panel s tvrdým obrysom a bevel hranami, rovnako ako HUD widgety */
 .controls{
@@ -1353,7 +1368,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 /* chyba spojenia pri odosielaní ťahu - červený varovný pruh hore, klikom sa dá zavrieť */
 .conn-error{
   position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
-  z-index: 60; max-width: 92vw;
+  z-index: 60; max-width: calc(var(--app-w, 100vw) * .92);
   padding: 12px 20px;
   border-radius: 2px;
   background: rgba(140,20,24,.95);
@@ -1545,7 +1560,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .lobby.hidden{ display: none; }
 .lobby-card{
   background: #121315; border: 1px solid #2a2b2e; box-shadow: 0 0 0 2px #000, 0 12px 40px rgba(0,0,0,.6);
-  border-radius: 4px; padding: 24px 28px; width: min(620px, 94vw);
+  border-radius: 4px; padding: 24px 28px; width: min(620px, calc(var(--app-w, 100vw) * .94));
 }
 .lobby-title{ font-size: 30px; color: #ffb300; text-align: center; margin: 0 0 4px;
   text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.5); letter-spacing: 3px; }
@@ -2658,7 +2673,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .login.hidden{ display: none; }
 .login-card{
   background: #121315; border: 1px solid #2a2b2e; box-shadow: 0 0 0 2px #000, 0 12px 40px rgba(0,0,0,.6);
-  border-radius: 4px; padding: 28px 28px; width: min(420px, 94vw);
+  border-radius: 4px; padding: 28px 28px; width: min(420px, calc(var(--app-w, 100vw) * .94));
   display: flex; flex-direction: column; gap: 14px;
 }
 .login-title{ font-size: 30px; color: #ffb300; text-align: center; margin: 0;
@@ -2692,7 +2707,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .rooms.hidden{ display: none; }
 .rooms-card{
   background: #121315; border: 1px solid #2a2b2e; box-shadow: 0 0 0 2px #000, 0 12px 40px rgba(0,0,0,.6);
-  border-radius: 4px; padding: 28px; width: min(440px, 94vw);
+  border-radius: 4px; padding: 28px; width: min(440px, calc(var(--app-w, 100vw) * .94));
   display: flex; flex-direction: column; gap: 16px;
 }
 .rooms-title{ font-size: 30px; color: #ffb300; text-align: center; margin: 0;
@@ -2806,3 +2821,45 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #8a7f6a;
 }
 #sound-ctl .snd-row input[type=range]::-moz-range-track { background: transparent; }
+
+/* ========== Mobil / tablet (client/viewport.js, client/mobile-ui.js, docs/MOBILE.md) ========== */
+/* celá obrazovka - rovnaký pixel štýl ako 🔊, hneď vedľa neho */
+#fs-btn {
+  position: fixed; left: 70px; bottom: 14px; z-index: 9000;
+  width: 44px; height: 44px; padding: 9px; border: none; border-radius: 0; cursor: pointer;
+  background: #3a2f25; fill: #f2e6c9;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610, 4px 4px 0 rgba(0,0,0,.45);
+}
+#fs-btn svg { display: block; width: 100%; height: 100%; }
+#fs-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #1c1610, inset -2px -2px 0 #6b5843, 2px 2px 0 rgba(0,0,0,.45);
+}
+
+/* výzva otočiť zariadenie - len dotyk na výšku; nad všetkým (aj lobby / char-select / login).
+   Stránka je na výšku silno zmenšená, preto sa rozmery delia --app-scale (= normálna veľkosť na displeji). */
+#rotate-hint { display: none; }
+@media (orientation: portrait) {
+  .touch #rotate-hint {
+    position: fixed; inset: 0; z-index: 100000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: calc(22px / var(--app-scale, 1));
+    background: #08090c; color: #ffb300; text-align: center;
+    font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  }
+}
+#rotate-hint .rh-phone {
+  width: calc(46px / var(--app-scale, 1)); height: calc(78px / var(--app-scale, 1));
+  border: calc(5px / var(--app-scale, 1)) solid #f2e6c9; border-radius: calc(6px / var(--app-scale, 1));
+  box-shadow: 0 0 0 calc(2px / var(--app-scale, 1)) #000;
+  animation: rh-turn 2.4s ease-in-out infinite;
+}
+#rotate-hint .rh-text {
+  font-size: calc(16px / var(--app-scale, 1)); letter-spacing: calc(2px / var(--app-scale, 1));
+  text-shadow: calc(3px / var(--app-scale, 1)) calc(3px / var(--app-scale, 1)) 0 #7a1f00;
+}
+#rotate-hint .rh-sub { font-size: calc(9px / var(--app-scale, 1)); color: #9aa3ad; letter-spacing: calc(1px / var(--app-scale, 1)); }
+@keyframes rh-turn {
+  0%, 25%   { transform: rotate(0deg); }
+  55%, 100% { transform: rotate(-90deg); }
+}

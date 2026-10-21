@@ -1,3 +1,4 @@
 node_modules/
 *.stackdump
 .difftest_old/
+tmp/

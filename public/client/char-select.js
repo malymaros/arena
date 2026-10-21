@@ -12,6 +12,7 @@ import { SPECIAL_FPS } from "/chars/common.js";
 import { socket } from "/client/net.js";
 import { sfx } from "/client/sound.js";
 import { cellsForSpecialPreview } from "/client/zones.js";
+import { appScale } from "/client/viewport.js";
 
 /* ---------- Char select (preview) ---------- */
 export let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
@@ -355,7 +356,8 @@ function runeActive() {
 document.addEventListener("mousemove", (e) => {
   if (!hiddenRune) return;
   if (!runeActive()) { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); return; }
-  const t = Math.max(0, 1 - Math.hypot(e.clientX, e.clientY) / RUNE_RADIUS);
+  // clientX/Y sú skutočné px obrazovky, RUNE_RADIUS je v px layoutu (stránka môže byť zmenšená)
+  const t = Math.max(0, 1 - Math.hypot(e.clientX, e.clientY) / (RUNE_RADIUS * appScale()));
   // kvadratika - runa sa naplno rozsvieti až tesne pri rohu; po objavení drží slabý základ
   hiddenRune.style.opacity = String(Math.max(hiddenFound ? 0.12 : 0, t * t));
   hiddenRune.classList.toggle("near", t > 0.25);
