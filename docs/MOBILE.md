@@ -19,26 +19,44 @@ takže HUD, toolbar a overlaye ostanú pri okrajoch obrazovky. Na obrazovke ≥ 
 **Ďalej vo fáze 1:**
 - `index.html`: viewport bez zoomu (`user-scalable=no`, `viewport-fit=cover`), PWA meta tagy, `manifest.webmanifest`
   (fullscreen, na šírku) a ikony `public/icons/` (generuje `node tools/make-icons.mjs`);
-- `public/client/mobile-ui.js`: na dotykovom zariadení výzva „ROTATE YOUR DEVICE" na výšku a tlačidlo celej obrazovky
-  vedľa 🔊 (len kde to prehliadač vie - Android Chrome; iPhone Safari nie, tam pomôže „Pridať na plochu");
+- `public/client/mobile-ui.js`: na dotykovom zariadení výzva „ROTATE YOUR DEVICE" na výšku; celá obrazovka je v menu ☰
+  (len kde to prehliadač vie - Android Chrome; iPhone Safari nie, tam pomôže „Pridať na plochu");
 - CSS: žiadny pull-to-refresh, double-tap zoom, výber textu ani kontextová bublina pri podržaní (trieda `.touch` na `<html>`).
 
 **Kontrola:** `node tools/screens.mjs` nasníma login, výber postáv a hru na 9 veľkostiach (desktop, tablet, mobil na šírku
 aj na výšku) do `tmp/screens/` (mimo gitu). `--only phone` vyberie len niektoré zariadenia.
 
-## Fáza 2 - dotykové ovládanie (ďalej)
+## Návrh mobilného UI (dohodnutý s vlastníkom 2026-10-21)
 
-Na dotyku nefunguje všetko, čo stojí na hoveri:
-- náhľady zón (special, útok, melee, demon, položky vo fronte - `preview-hovers.js`, `queue.js`, `controls.js`)
-  a náhľad schopností v char-selecte → ťuknutie = náhľad, druhé ťuknutie = potvrdenie;
-- tooltipy cez `title=` sa na dotyku nezobrazia → dlhé podržanie alebo info panel;
-- easter-egg runa skrytej stránky reaguje len na `mousemove` → na dotyku je nedostupná (aj Vampire/Onryō/Jotaro);
-- `:hover` štýly ostávajú „visieť" po ťuknutí;
-- väčšie ciele pre prst (pickery smeru, výber políčka, vlkova 3×3 mriežka).
+**Pre koho:** telefóny (dotyk, kratšia strana do ~500 px) dostanú nové rozloženie; tablety ostávajú pri desktopovom
+rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
 
-## Fáza 3 - mobilné UI (neskôr)
+### Krok 1 - menu ☰, reload, admin, zvukové okno (hotové)
+- **Menu ☰** vľavo dole (`client/menu.js`), vždy dostupné aj nad zaseknutými overlaymi: **RELOAD GAME** (obnovenie
+  stránky, server hráča vráti na miesto - záchrana pri zaseknutí, v nainštalovanej appke niet iného refreshu),
+  celá obrazovka, **SOUND**, sekcia **ADMIN** (reset tejto roomky / všetkých).
+- **Admin = prihlásenie admin heslom** (`ADMIN_KEY` na serveri, nie v repe) namiesto hesla hráča. `?admin=1` zrušené;
+  na webe ostáva rohové tlačidlo „Reset this room" a „RESET ROOMS" v zozname roomiek - len pre admina.
+- **Zvukové okno** (`client/sound-ui.js`): MUTE + MASTER/MUSIC/SFX - široké posuvníky s veľkým jazdcom a tlačidlá −/+
+  po 10 %; na dotyku vo veľkosti displeja.
+- Menu a okná sa na dotyku kreslia v skutočnej veľkosti displeja (`--ui-k` = 1 / --app-scale), nezmenšujú sa s hrou.
 
-Kompaktnejší HUD na telefóne, akcie pod palcami, väčší login, lobby a char-select na malej obrazovke.
+### Krok 2 - dotykové ovládanie (telefón aj tablet)
+- **Ťuk na akciu = výber + náhľad:** zóna zásahu svieti na boarde, popis (názov · zóna · dmg · cena) v **info riadku
+  nad lištou tlačidiel**; nič sa nezaradí omylom.
+- **Smer / cieľ ťuknutím na board:** okolo postavy (resp. jej ghostu) sa ukážu šípky / povolené políčka, ťukneš priamo
+  na ne. Akcia bez smeru (recharge, shield…) sa zaradí druhým ťuknutím na to isté tlačidlo.
+- **Výber postavy:** ťuk na kartu = schopnosť + náhľad, potvrdenie tlačidlom **PICK <meno>**.
+- Skrytá stránka (runa) musí byť dosiahnuteľná aj dotykom; `:hover` štýly nesmú „visieť" po ťuknutí.
+
+### Krok 3 - rozloženie na telefóne
+- **Hra:** štruktúra ako desktop, prepočítaná pre telefón - HUD v stĺpcoch ~150 px po bokoch (celý: portrét, log kola,
+  korunky + 1st, hlavy tímu), board v strede väčší (~520×280 px na 844×390), pod ním front [1][2][3]; dole lišta
+  tlačidiel ~50×44 px s čitateľnými číslami (golden vľavo, ⏎ a LOCK vpravo).
+- **Login:** veľký nápis ARENA, NAME + PASSWORD + ENTER v jednom riadku hore (klávesnica na šírku zakryje spodných ~60 %).
+- **Lobby hosta:** dva stĺpce bez rolovania - vľavo formát / počet dlaždíc / časovač / náhľad / farba, vpravo
+  percentá dlaždíc s veľkými −/+, veľké START vpravo dole.
+- **Zoznam roomiek, výber postáv:** na celú obrazovku, väčšie karty a tlačidlá.
 
 ## Výkon (2026-10-21)
 

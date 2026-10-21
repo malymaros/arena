@@ -2,6 +2,7 @@
 // (meno + heslo, brána pred socket.connect) a room browser (create / join / spectate, admin RESET ROOMS).
 // client.js registruje herné handlery na exportovaný `socket` v tom istom tasku - pripojenie je asynchrónne,
 // takže žiadna udalosť neprepadne.
+import { isAdmin, setAdmin } from "/client/admin-state.js";
 
 // trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
 // (inak by sa vrátený hráč stal divákom a server by prestal brať jeho lock_in)
@@ -16,6 +17,8 @@ try {
 // autoConnect:false - najprv login (meno + heslo), potom socket.connect() s auth údajmi.
 // Všetky socket.on(...) handlery sa registrujú normálne aj na nepripojený socket.
 export const socket = io({ auth: { id: arenaId }, autoConnect: false });
+// admin = prihlásený admin heslom (server to pošle hneď po pripojení, ešte pred "rooms")
+socket.on("session", (s) => setAdmin(s?.admin));
 
 /* ---------- Prihlásenie (meno + heslo) - brána pred pripojením ---------- */
 (function initLogin() {
@@ -64,10 +67,6 @@ export const socket = io({ auth: { id: arenaId }, autoConnect: false });
 /* ---------- Room browser (po logine): zoznam roomiek - create / join / spectate ---------- */
 const roomsEl     = document.getElementById("rooms");
 const roomsListEl = document.getElementById("rooms-list");
-// admin režim (?admin=1[&key=…]) → room-browser dostane aj destruktívny „RESET ROOMS" (všetky roomky)
-const ADMIN_QP    = new URLSearchParams(location.search);
-const IS_ADMIN    = ADMIN_QP.has("admin");
-const ADMIN_KEY   = ADMIN_QP.get("key") || "";
 export function hideRooms() { roomsEl?.classList.add("hidden"); }
 function renderRooms(info) {
   if (!roomsListEl) return;
@@ -103,8 +102,8 @@ function renderRooms(info) {
     b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
     roomsListEl.appendChild(b);
   }
-  // admin: zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM) - len s ?admin=1
-  if (IS_ADMIN && list.length > 0) {
+  // admin (prihlásený admin heslom): zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM)
+  if (isAdmin() && list.length > 0) {
     const rb = document.createElement("button");
     rb.className = "room-btn reset";
     rb.textContent = "RESET ROOMS";
@@ -112,8 +111,7 @@ function renderRooms(info) {
     rb.addEventListener("click", () => {
       if (!confirm("Zrušiť VŠETKY roomky a odpojiť všetkých hráčov aj divákov?")) return;
       rb.disabled = true;
-      socket.emit("admin_reset_all", ADMIN_KEY);
-      fetch(`/admin/reset-all${ADMIN_KEY ? `?key=${encodeURIComponent(ADMIN_KEY)}` : ""}`).catch(() => {});
+      socket.emit("admin_reset_all");
     });
     roomsListEl.appendChild(rb);
   }

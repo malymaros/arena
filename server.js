@@ -64,7 +64,7 @@ app.use("/shared", express.static(path.join(__dirname, "shared"), {
 }));
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← voliteľné heslo pre admin reset
+const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← admin heslo: kto sa ním prihlási (namiesto hesla hráča), je admin
 // Heslá pre vstup do hry (rozdáva admin): čiarkou oddelený zoznam. Zatiaľ natvrdo "hamara"
 // (default), prepísateľné cez env PLAYER_KEYS=heslo1,heslo2 (napr. systemd deploy/arena.service).
 // POZOR: repo je verejné → tento default je viditeľný; na reálne tajné heslo nastav env a zmaž default.
@@ -84,10 +84,10 @@ function validateName(raw) {
   const n = raw.trim();
   return /^[A-Za-z]{1,8}$/.test(n) ? n : null;
 }
-// bez nastaveného ADMIN_KEY je admin reset OTVORENÝ (vedomé rozhodnutie vlastníka - ?admin=1 stačí);
-// s ADMIN_KEY musí kľúč sedieť
+// Admin = hráč prihlásený admin heslom (ADMIN_KEY) namiesto hesla hráča; môže aj normálne hrať.
+// Bez nastaveného ADMIN_KEY nie je adminom nikto (admin reset vypnutý). Heslo patrí do env na serveri, nie do repa.
 function okAdmin(keyFromClient) {
-  return !ADMIN_KEY || ADMIN_KEY === keyFromClient;
+  return !!ADMIN_KEY && ADMIN_KEY === keyFromClient;
 }
 
 /* ==================== Room factory ==================== */
@@ -404,7 +404,8 @@ app.get("/admin/reset-all", (req, res) => {
 // vtedy sa meno neprepisuje (guard v seat) - recovnutý socket už bol overený.
 io.use((socket, next) => {
   const pass = socket.handshake.auth?.pass;
-  if (PLAYER_KEYS.size && !PLAYER_KEYS.has(pass)) return next(new Error("bad_pass"));
+  // admin heslo platí aj ako vstupné heslo (admin môže normálne hrať)
+  if (!okAdmin(pass) && PLAYER_KEYS.size && !PLAYER_KEYS.has(pass)) return next(new Error("bad_pass"));
   const name = validateName(socket.handshake.auth?.name);
   if (!name) return next(new Error("bad_name"));
   socket.data.pendingName = name;
@@ -415,6 +416,10 @@ io.on("connection", (socket) => {
   const cid = socket.handshake.auth?.id || null; // trvalý token klienta (localStorage)
   socket.data.person = null;
   socket.data.roomId = null;
+  // admin = prihlásený admin heslom; počíta sa z handshake pri každom pripojení (aj pri connectionStateRecovery,
+  // kde sa middleware preskočí) a klient podľa toho ukáže admin sekciu menu / reset tlačidlá
+  socket.data.isAdmin = okAdmin(socket.handshake.auth?.pass);
+  socket.emit("session", { admin: socket.data.isAdmin });
 
   // reclaim naprieč roomkami: token už patrí hráčovi v niektorej žijúcej roomke → vráť ho rovno na miesto
   let placed = false;
@@ -463,12 +468,12 @@ io.on("connection", (socket) => {
   socket.on("draft_queue", (d) => roomForSocket(socket)?.onDraftQueue(socket, d));
   socket.on("retry", () => roomForSocket(socket)?.onRetry(socket));
 
-  // --- admin reset cez socket (napr. z klienta s ?admin=1) - globálny (všetky roomky)
-  socket.on("admin_reset_all", (key) => { if (okAdmin(key)) forceResetAll(); });
+  // --- admin reset cez socket - len socket prihlásený admin heslom; globálny (všetky roomky)
+  socket.on("admin_reset_all", () => { if (socket.data.isAdmin) forceResetAll(); });
 
-  // --- admin reset LEN tejto roomky (rohový button v hre): odpojí jej hráčov aj divákov a roomku zruší
-  socket.on("admin_reset_room", (key) => {
-    if (!okAdmin(key)) return;
+  // --- admin reset LEN tejto roomky (rohový button / menu): odpojí jej hráčov aj divákov a roomku zruší
+  socket.on("admin_reset_room", () => {
+    if (!socket.data.isAdmin) return;
     const room = roomForSocket(socket);
     if (!room) return;
     room.forceReset();         // odpojí hráčov + divákov, zruší časovače

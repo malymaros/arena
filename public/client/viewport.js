@@ -11,6 +11,9 @@ export const DESIGN_H = 920;  // ROUND nadpis + board s frontom + toolbar dole
 
 const root = document.documentElement;
 let scale = 1, appW = DESIGN_W, appH = DESIGN_H;
+/** Dotykové zariadenie (mobil, tablet). */
+export const isTouch = window.matchMedia("(pointer: coarse)").matches;
+root.classList.toggle("touch", isTouch);
 
 // bezpečné okraje (výrez kamery / zaoblené rohy na mobile na šírku) - env() sa dá prečítať len cez element
 const probe = document.createElement("div");
@@ -34,6 +37,9 @@ function fit() {
   root.style.setProperty("--app-x", inset.l + "px");
   root.style.setProperty("--app-y", inset.t + "px");
   root.classList.toggle("app-scaled", scale < 1);
+  // menu ☰, zvukové okno a pod. na dotyku: 1 CSS px = 1 skutočný px displeja (nezmenšuje sa s hrou, prst je
+  // vždy rovnako veľký); na desktope sa zmenšujú spolu so stránkou
+  root.style.setProperty("--ui-k", String(isTouch ? 1 / scale : 1));
 }
 
 /** Zmenšenie stránky (1 = bez zmeny). */
@@ -57,8 +63,6 @@ window.addEventListener("orientationchange", () => setTimeout(() => { fit(); res
 document.addEventListener("focusout", (e) => { if (e.target.matches?.("input, textarea")) setTimeout(resetZoom, 100); });
 
 /* ---------- dotykové zariadenia: celá obrazovka + PWA ---------- */
-export const isTouch = window.matchMedia("(pointer: coarse)").matches;
-root.classList.toggle("touch", isTouch);
 const standalone = window.matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches || navigator.standalone === true;
 root.classList.toggle("standalone", standalone);
 

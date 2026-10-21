@@ -16,7 +16,7 @@ const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf("--" + n); return i >= 0 ? args[i + 1] : d; };
 const OUT = path.resolve(opt("out", "tmp/screens"));
 const ONLY = opt("only", null);
-const PASS = "shots";
+const PASS = "shots", ADMIN_PASS = "shotsadmin"; // prehliadač sa prihlási ako admin (vidno admin sekciu menu)
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // w×h v CSS px (na šírku aj na výšku), dpr, mobile = dotyk + mobilný viewport
@@ -86,7 +86,7 @@ const url = `http://localhost:${port}`;
 let server = null;
 const startServer = async () => {
   if (server) { server.kill(); await sleep(400); }
-  server = spawn(process.execPath, ["server.js"], { env: { ...process.env, PORT: String(port), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: PASS, ARENA_SEED: "1" }, stdio: ["ignore", "ignore", "inherit"] });
+  server = spawn(process.execPath, ["server.js"], { env: { ...process.env, PORT: String(port), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: PASS, ADMIN_KEY: ADMIN_PASS, ARENA_SEED: "1" }, stdio: ["ignore", "ignore", "inherit"] });
   await sleep(1300);
 };
 fs.mkdirSync(OUT, { recursive: true });
@@ -131,7 +131,7 @@ try {
     await sleep(600);
     await shot(dev, "1-login");
     const name = "player" + "abcdefghij"[n++];
-    await br.evaluate(`(() => { document.getElementById("login-name").value = "${name}"; document.getElementById("login-pass").value = "${PASS}";
+    await br.evaluate(`(() => { document.getElementById("login-name").value = "${name}"; document.getElementById("login-pass").value = "${ADMIN_PASS}";
       document.getElementById("login-form").requestSubmit(); })()`);
     await waitPage(`document.querySelector(".room-btn.join")`, 10000, "join");
     await br.evaluate(`[...document.querySelectorAll(".room-btn.join")].at(-1).click()`);
@@ -149,6 +149,12 @@ try {
     await br.evaluate(`(() => { const b = document.querySelector('.btn.act.attack') || document.querySelector('[data-act="attack"]'); b?.click(); })()`);
     await sleep(500);
     await shot(dev, "4-picker");
+    await br.evaluate(`document.getElementById("menu-btn").click()`);
+    await sleep(300);
+    await shot(dev, "5-menu");
+    await br.evaluate(`document.querySelector('#menu-panel [data-act="sound"]').click()`);
+    await sleep(300);
+    await shot(dev, "6-sound");
     console.log(`${dev.name}: ok`);
     host.sock.close();
     await br.send("Page.navigate", { url: "about:blank" });

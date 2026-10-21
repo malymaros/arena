@@ -12,10 +12,11 @@ import "/client/controls.js";         // akčné tlačidlá a pickery
 import "/client/preview-hovers.js";   // hover náhľady zón pri plánovaní
 import "/client/retry.js";
 import "/client/raf.js";              // hlavná slučka kreslenia
-import "/client/admin.js";            // ?admin=1 → tlačidlo reset roomky
+import "/client/admin.js";            // admin (prihlásený admin heslom) → tlačidlo reset roomky
 import "/client/debug-hope.js";       // ?hopedebug=1 → náhľad hope sprite
-import "/client/sound-ui.js";         // tlačidlo 🔊 + UI zvuky klikov
-import "/client/mobile-ui.js";        // dotyk: celá obrazovka + výzva otočiť na šírku
+import "/client/sound-ui.js";         // zvukové okno (z menu) + UI zvuky klikov
+import "/client/menu.js";             // menu ☰: reload, celá obrazovka, zvuk, admin
+import "/client/mobile-ui.js";        // dotyk: výzva otočiť na šírku
 import { actors } from "/client/actors.js";
 import { initCharFx, fxAll } from "/client/fx-registry.js";
 import { gridEl, actorsEl, TILE_W, TILE_H, GAP, cellToPx } from "/client/dom.js";

@@ -24,16 +24,17 @@ function startServer() {
   return new Promise((resolve) => setTimeout(() => resolve(proc), 1200));
 }
 
-function connect() {
+function connect(pass = "testpass") {
   return new Promise((resolve, reject) => {
     // server odteraz vyžaduje platné meno (a heslo ak PLAYER_KEYS nastavené — v testoch prázdne);
     // meno = náhodné 1–8 znakov a–z, nech prejde validáciou middleware
     const name = "T" + Math.random().toString(36).replace(/[^a-z]/g, "").slice(0, 5) + "x";
-    const sock = io(URL, { transports: ["websocket"], auth: { name, pass: "testpass" } });
+    const sock = io(URL, { transports: ["websocket"], auth: { name, pass } });
     // pomalší boot servera nesmie zhodiť test — socket.io sa retryne samo; reject až po celkovom timeoute
     const killer = setTimeout(() => { sock.close(); reject(new Error("connect timeout")); }, 15000);
-    const ctx = { sock, slot: null, isHost: false, lastState: null, lastTimeline: null, timelines: [], gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0, rooms: null, spectator: false };
+    const ctx = { sock, session: null, slot: null, isHost: false, lastState: null, lastTimeline: null, timelines: [], gameOver: null, gameResult: null, lastTimer: null, colorRolls: 0, rooms: null, spectator: false };
     sock.on("you_are", (s) => { ctx.slot = s?.slot ?? s; ctx.isHost = !!s?.isHost; });
+    sock.on("session", (x) => { ctx.session = x; });           // { admin } - admin = prihlásený admin heslom
     sock.on("rooms", (r) => { ctx.rooms = r; });                 // zoznam roomiek (room-browser)
     sock.on("spectator", () => { ctx.spectator = true; });
     sock.on("color_roll", () => { ctx.colorRolls++; }); // ruleta farieb po configure_match (klient ju animuje)
@@ -2107,16 +2108,24 @@ async function main() {
     "TR: kolo v 2. roomke NEpresiaklo do 1. roomky (izolácia)");
 
   /* ---------- TR3: per-room admin reset zruší LEN svoju roomku (druhá beží ďalej) ---------- */
-  // zlý / prázdny kľúč sa ignoruje (bez platného ADMIN_KEY je admin reset vypnutý)
-  c1.sock.emit("admin_reset_room", "");
-  c3.sock.emit("admin_reset_all", "zly");
+  // admin = socket prihlásený admin heslom (ADMIN_KEY); bežný hráč reset spustiť nevie - ani so správnym kľúčom v argumente
+  check(c1.session?.admin === false, "ADMIN: hráč s heslom hráča nie je admin", JSON.stringify(c1.session));
+  c1.sock.emit("admin_reset_room", "testadmin");
+  c3.sock.emit("admin_reset_all", "testadmin");
   await new Promise(r => setTimeout(r, 400));
   const cW = await connect();
   await waitFor(() => cW.rooms != null, 5000, "cW dostal room-browser");
-  check((cW.rooms.rooms || []).length === 2, "TR3: admin reset so zlým kľúčom nič nezrušil (2 v zozname)", `rooms=${JSON.stringify(cW.rooms?.rooms)}`);
+  check((cW.rooms.rooms || []).length === 2, "TR3: admin reset od bežného hráča nič nezrušil (2 v zozname)", `rooms=${JSON.stringify(cW.rooms?.rooms)}`);
   cW.sock.close();
-  // c1 (v roomke A) spustí per-room reset → roomka A zmizne, roomka B (c3/c4) prežije
-  c1.sock.emit("admin_reset_room", "testadmin");
+  // admin (prihlásený admin heslom) si sadne ako divák do roomky A a spustí per-room reset →
+  // roomka A zmizne, roomka B (c3/c4) prežije
+  const cAdm = await connect("testadmin");
+  await waitFor(() => cAdm.rooms != null, 5000, "admin dostal room-browser");
+  check(cAdm.session?.admin === true, "ADMIN: prihlásenie admin heslom = admin (aj vstup do hry)", JSON.stringify(cAdm.session));
+  const roomA = (cAdm.rooms.rooms || []).find(r => r.id === Math.min(...cAdm.rooms.rooms.map(x => x.id)));
+  cAdm.sock.emit("spectate_room", { roomId: roomA.id });
+  await new Promise(r => setTimeout(r, 300));
+  cAdm.sock.emit("admin_reset_room");
   await new Promise(r => setTimeout(r, 400));
   const cX = await connect(); // nový príchod → room-browser
   await waitFor(() => cX.rooms != null, 5000, "cX dostal room-browser po per-room resete");
@@ -2124,14 +2133,16 @@ async function main() {
   cX.sock.close();
 
   /* ---------- TR2: admin „RESET ROOMS" (browser) zruší VŠETKY bežiace roomky ---------- */
-  // teraz beží 1 roomka (c3/c4); globálny admin reset so správnym kľúčom ju má zrušiť
-  c3.sock.emit("admin_reset_all", "testadmin");
+  // teraz beží 1 roomka (c3/c4); globálny admin reset od admina (z room-browsera) ju má zrušiť
+  const cAdm2 = await connect("testadmin");
+  await waitFor(() => cAdm2.session != null, 5000, "admin2 session");
+  cAdm2.sock.emit("admin_reset_all");
   await new Promise(r => setTimeout(r, 400));
   const c5 = await connect(); // nový príchod → room-browser
   await waitFor(() => c5.rooms != null, 5000, "c5 dostal room-browser po admin resete");
   check((c5.rooms.rooms || []).length === 0, "TR2: globálny admin reset zrušil všetky roomky (0 v zozname)", `rooms=${JSON.stringify(c5.rooms?.rooms)}`);
   check(c5.rooms.canCreate === true, "TR2: po admin resete sa dá vytvoriť nová roomka");
-  c5.sock.close();
+  c5.sock.close(); cAdm.sock.close(); cAdm2.sock.close();
 
   c3.sock.close(); c4.sock.close();
 

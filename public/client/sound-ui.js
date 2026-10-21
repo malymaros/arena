@@ -1,82 +1,65 @@
-// public/client/sound-ui.js - ovládanie zvuku v hre (tlačidlo 🔊 vľavo dole + panel: stlmiť, master / hudba /
-// efekty) a UI zvuky klikov: jeden delegovaný listener namiesto zvuku v každom handleri tlačidla
-// (LOCK IN → ui.lock_in, karta postavy → ui.pick, ostatné tlačidlá → ui.click).
+// public/client/sound-ui.js - zvukové okno (otvára ho menu ☰ cez openSoundWindow: stlmiť, master / hudba /
+// efekty - posuvníky + tlačidlá −/+ po 10 %, na dotyku vo veľkosti displeja) a UI zvuky klikov: jeden
+// delegovaný listener namiesto zvuku v každom handleri tlačidla (LOCK IN → ui.lock_in, karta postavy → ui.pick,
+// ostatné tlačidlá → ui.click). Klávesa M = stlmiť / zapnúť.
 import { sfx, setMusic, getSettings, setSettings, onSettingsChange } from "/client/sound.js";
 
-const wrap = document.createElement("div");
-wrap.id = "sound-ctl";
-wrap.innerHTML = `
-  <button type="button" class="snd-toggle" title="Sound settings" aria-label="Sound settings"></button>
-  <div class="snd-panel hidden" role="dialog" aria-label="Sound">
-    <label class="snd-row snd-mute"><input type="checkbox" data-k="muted" /> MUTE</label>
-    <label class="snd-row">MASTER <input type="range" min="0" max="1" step="0.05" data-k="master" /></label>
-    <label class="snd-row">MUSIC  <input type="range" min="0" max="1" step="0.05" data-k="music" /></label>
-    <label class="snd-row">SFX    <input type="range" min="0" max="1" step="0.05" data-k="sfx" /></label>
-  </div>`;
-document.body.appendChild(wrap);
+const ROWS = [["master", "MASTER"], ["music", "MUSIC"], ["sfx", "SFX"]];
+const backdrop = document.createElement("div");
+backdrop.className = "ui-backdrop hidden";
+const win = document.createElement("div");
+win.id = "sound-win";
+win.className = "ui-modal hidden";
+win.setAttribute("role", "dialog");
+win.setAttribute("aria-label", "Sound");
+win.innerHTML = `
+  <div class="um-head"><span>SOUND</span><button type="button" class="um-close" aria-label="Close">✕</button></div>
+  <label class="snd-mute"><input type="checkbox" data-k="muted" /> MUTE</label>
+  ${ROWS.map(([k, label]) => `
+  <div class="snd-row">
+    <span class="snd-label">${label}</span>
+    <button type="button" class="snd-step" data-k="${k}" data-d="-0.1" aria-label="${label} −">−</button>
+    <input type="range" min="0" max="1" step="0.05" data-k="${k}" aria-label="${label}" />
+    <button type="button" class="snd-step" data-k="${k}" data-d="0.1" aria-label="${label} +">+</button>
+    <span class="snd-val" data-v="${k}"></span>
+  </div>`).join("")}`;
+document.body.appendChild(backdrop);
+document.body.appendChild(win);
 
 // menu hudba už od prihlásenia / room-browsera (rozbehne sa prvým klikom); v hre ju prepína syncMusic podľa fázy
 setMusic("music.menu");
 
-const toggle = wrap.querySelector(".snd-toggle");
-const panel = wrap.querySelector(".snd-panel");
-
-// pixel-art reproduktor 16×13: b = teleso, w = vlny, x = krížik (stlmené); každý znak = jeden <rect>
-const SPEAKER = [
-  "................",
-  "................",
-  "......b.........",
-  ".....bb....w....",
-  "....bbb.....w...",
-  ".bbbbbb..w...w..",
-  ".bbbbbb...w..w..",
-  ".bbbbbb...w..w..",
-  ".bbbbbb...w..w..",
-  ".bbbbbb..w...w..",
-  "....bbb.....w...",
-  ".....bb....w....",
-  "......b.........",
-];
-const MUTED_X = ["x...x", ".x.x.", "..x..", ".x.x.", "x...x"];
-function speakerSvg(muted) {
-  let rects = "";
-  SPEAKER.forEach((row, y) => {
-    let r = row;
-    if (muted) {
-      r = r.replace(/w/g, ".");
-      const xr = MUTED_X[y - 5];
-      if (xr) r = r.slice(0, 9) + xr + r.slice(14);
-    }
-    [...r].forEach((c, x) => {
-      if (c !== ".") rects += `<rect x="${x}" y="${y + 1}" width="1" height="1" class="px-${c}"/>`;
-    });
-  });
-  return `<svg viewBox="0 0 16 15" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
-}
+export function openSoundWindow() { backdrop.classList.remove("hidden"); win.classList.remove("hidden"); }
+export function closeSoundWindow() { backdrop.classList.add("hidden"); win.classList.add("hidden"); }
 
 function render(s = getSettings()) {
-  const muted = s.muted || s.master === 0;
-  toggle.innerHTML = speakerSvg(muted);
-  toggle.classList.toggle("is-muted", muted);
-  for (const inp of wrap.querySelectorAll("input")) {
+  for (const inp of win.querySelectorAll("input")) {
     if (inp.type === "checkbox") inp.checked = !!s[inp.dataset.k];
     else { inp.value = s[inp.dataset.k]; inp.style.setProperty("--pct", `${inp.value * 100}%`); }
   }
+  for (const v of win.querySelectorAll(".snd-val")) v.textContent = `${Math.round((s[v.dataset.v] ?? 0) * 100)}%`;
 }
 render();
 onSettingsChange(render);
 
-toggle.addEventListener("click", () => panel.classList.toggle("hidden"));
-wrap.addEventListener("input", (ev) => {
+win.addEventListener("input", (ev) => {
   const inp = ev.target;
   if (!inp.dataset.k) return;
   if (inp.type === "range") inp.style.setProperty("--pct", `${inp.value * 100}%`);
   setSettings({ [inp.dataset.k]: inp.type === "checkbox" ? inp.checked : Number(inp.value) });
 });
 // pustenie posuvníka efektov zahrá ukážku (nech je počuť, ako hlasno to je)
-wrap.addEventListener("change", (ev) => { if (ev.target.dataset.k === "sfx" || ev.target.dataset.k === "master") sfx("ui.click"); });
-// klik mimo panelu ho zavrie
-document.addEventListener("pointerdown", (ev) => { if (!wrap.contains(ev.target)) panel.classList.add("hidden"); });
+win.addEventListener("change", (ev) => { if (ev.target.dataset.k === "sfx" || ev.target.dataset.k === "master") sfx("ui.click"); });
+win.addEventListener("click", (ev) => {
+  const step = ev.target.closest(".snd-step");
+  if (step) {
+    const k = step.dataset.k, v = Math.round(((getSettings()[k] ?? 0) + Number(step.dataset.d)) * 10) / 10;
+    setSettings({ [k]: Math.max(0, Math.min(1, v)) });
+  }
+  if (ev.target.closest(".um-close")) closeSoundWindow();
+});
+backdrop.addEventListener("click", closeSoundWindow);
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeSoundWindow(); });
 // M = stlmiť / zapnúť (mimo textových polí)
 document.addEventListener("keydown", (ev) => {
   if (ev.key !== "m" && ev.key !== "M") return;
@@ -87,8 +70,10 @@ document.addEventListener("keydown", (ev) => {
 // UI kliky - capture, aby zazneli aj keď handler tlačidla zastaví propagáciu
 document.addEventListener("click", (ev) => {
   const t = ev.target.closest?.("button, .btn, .char-card, [role=button]");
-  if (!t || t.disabled || wrap.contains(t)) return;
+  if (!t || t.disabled || win.contains(t)) return;
   if (t.id === "lock") sfx("ui.lock_in");
   else if (t.classList.contains("char-card")) sfx("ui.pick");
   else sfx("ui.click");
 }, true);
+// −/+ v okne: krátka ukážka hlasitosti (ako pustenie posuvníka)
+win.addEventListener("click", (ev) => { const k = ev.target.closest(".snd-step")?.dataset.k; if (k === "sfx" || k === "master") sfx("ui.click"); });

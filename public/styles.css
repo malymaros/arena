@@ -2771,71 +2771,95 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 }
   
 
-/* ========== Zvuk (public/client/sound-ui.js) ========== */
-#sound-ctl { position: fixed; left: 14px; bottom: 14px; z-index: 9000; font-family: "Press Start 2P", monospace; }
-/* retro pixel-art: tvrdé 2px okraje, bez zaoblenia, bevel z inset tieňov, ikona = SVG z pixelov (sound-ui.js) */
-#sound-ctl .snd-toggle {
-  width: 44px; height: 44px; padding: 6px; border: none; border-radius: 0; cursor: pointer;
-  background: #3a2f25;
+/* ========== Menu ☰, zvukové okno, admin (client/menu.js, sound-ui.js, admin.js) ========== */
+/* tlačidlo ☰ vľavo dole - retro pixel štýl (tvrdé 2px okraje, bevel z inset tieňov); nad všetkými obrazovkami,
+   aby sa dalo vždy obnoviť (aj nad zaseknutým overlayom, char-selectom, lobby, zoznamom roomiek) */
+#menu-btn {
+  position: fixed; left: 14px; bottom: 14px; z-index: 100002;
+  width: 44px; height: 44px; padding: 8px; border: none; border-radius: 0; cursor: pointer;
+  background: #3a2f25; fill: #f2e6c9; transform-origin: 0 100%;
   box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610, 4px 4px 0 rgba(0,0,0,.45);
 }
-#sound-ctl .snd-toggle svg { display: block; width: 100%; height: 100%; }
-#sound-ctl .snd-toggle .px-b { fill: #f2e6c9; }
-#sound-ctl .snd-toggle .px-w { fill: #d4a017; }
-#sound-ctl .snd-toggle .px-x { fill: #e0402f; }
-#sound-ctl .snd-toggle.is-muted .px-b { fill: #8a7f6a; }
-#sound-ctl .snd-toggle:hover { background: #4a3c2f; }
-#sound-ctl .snd-toggle:active {
-  transform: translate(2px, 2px);
-  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #1c1610, inset -2px -2px 0 #6b5843, 2px 2px 0 rgba(0,0,0,.45);
+#menu-btn svg { display: block; width: 100%; height: 100%; }
+#menu-btn:hover { background: #4a3c2f; }
+#menu-btn:active { box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #1c1610, inset -2px -2px 0 #6b5843, 2px 2px 0 rgba(0,0,0,.45); }
+/* dotyk: ~40 skutočných px bez ohľadu na zmenšenie hry */
+.touch #menu-btn { transform: scale(calc(var(--ui-k, 1) * .9)); }
+
+/* okná (menu, zvuk): na stred, nad všetkým; --ui-k = na dotyku skutočná veľkosť displeja (viewport.js) */
+.ui-backdrop { position: fixed; inset: 0; z-index: 100003; background: rgba(0,0,0,.55); }
+.ui-modal {
+  position: fixed; left: 50%; top: 50%; z-index: 100004;
+  transform: translate(-50%, -50%) scale(var(--ui-k, 1));
+  width: 480px; box-sizing: border-box;
+  max-width: calc(var(--app-w, 100vw) / var(--ui-k, 1) - 24px);
+  max-height: calc(var(--app-h, 100vh) / var(--ui-k, 1) - 16px); overflow: auto;
+  padding: 10px 16px 14px; border-radius: 0;
+  background: #241c15; color: #f2e6c9; font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  font-size: 12px; letter-spacing: 1px;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #6b5843, inset 0 0 0 4px #1c1610, 6px 6px 0 rgba(0,0,0,.45);
+  display: flex; flex-direction: column; gap: 8px;
 }
-#sound-ctl .snd-panel {
-  position: absolute; left: 0; bottom: 56px; min-width: 250px; padding: 14px 14px 12px; border-radius: 0;
-  background: #241c15; color: #f2e6c9; font-size: 9px; letter-spacing: 1px;
-  box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #6b5843, inset 0 0 0 4px #1c1610, 4px 4px 0 rgba(0,0,0,.45);
-  display: flex; flex-direction: column; gap: 12px;
+.ui-backdrop.hidden, .ui-modal.hidden { display: none; }
+.ui-modal .um-head { display: flex; align-items: center; justify-content: space-between; color: #ffb300; font-size: 14px;
+  text-shadow: 2px 2px 0 #000; }
+.ui-modal button { font-family: inherit; cursor: pointer; border: none; border-radius: 0; color: #f2e6c9; }
+.ui-modal .um-close { width: 40px; height: 40px; font-size: 16px; background: #3a2f25;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610; }
+
+/* položky menu - celé riadky, 48 px vysoké (prst) */
+.menu-item {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px;
+  min-height: 44px; flex: none; padding: 6px 14px; text-align: left; font-size: 12px; background: #3a2f25;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610;
 }
-#sound-ctl .snd-panel.hidden { display: none; }
-#sound-ctl .snd-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-shadow: 2px 2px 0 #000; }
-#sound-ctl .snd-mute { justify-content: flex-start; cursor: pointer; }
-/* pixel checkbox */
-#sound-ctl .snd-mute input {
-  appearance: none; -webkit-appearance: none; margin: 0; width: 14px; height: 14px; cursor: pointer;
+.menu-item:hover { background: #4a3c2f; }
+.menu-item small { font-size: 8px; color: #b8ab92; letter-spacing: 0; }
+.menu-item.danger { background: #5a1a1a; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #8e2a2a, inset -2px -2px 0 #2a0b0b; }
+.menu-item.danger:hover { background: #6e2020; }
+.menu-sep { margin-top: 2px; font-size: 9px; color: #e0402f; text-align: center; letter-spacing: 3px; }
+
+/* zvukové okno: MUTE + 3 riadky [label][−][posuvník][+][%] */
+#sound-win .snd-mute { display: flex; align-items: center; gap: 12px; min-height: 40px; cursor: pointer; text-shadow: 2px 2px 0 #000; }
+#sound-win .snd-mute input {
+  appearance: none; -webkit-appearance: none; margin: 0; width: 24px; height: 24px; cursor: pointer;
   background: #120d09; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #000;
 }
-#sound-ctl .snd-mute input:checked { background: #e0402f; box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #120d09; }
-/* pixel posuvník: segmentovaná lišta (zlatá výplň po --pct zo sound-ui.js) + hranatý jazdec */
-#sound-ctl .snd-row input[type=range] {
-  appearance: none; -webkit-appearance: none; width: 124px; height: 12px; margin: 0; cursor: pointer;
+#sound-win .snd-mute input:checked { background: #e0402f; box-shadow: 0 0 0 2px #000, inset 0 0 0 4px #120d09; }
+#sound-win .snd-row { display: flex; align-items: center; gap: 10px; min-height: 48px; text-shadow: 2px 2px 0 #000; }
+#sound-win .snd-label { width: 72px; flex: none; font-size: 10px; }
+#sound-win .snd-val { width: 48px; flex: none; text-align: right; font-size: 10px; color: #ffd24a; }
+#sound-win .snd-step { width: 40px; height: 40px; flex: none; font-size: 18px; background: #3a2f25;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610; }
+#sound-win .snd-step:active { box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #1c1610, inset -2px -2px 0 #6b5843; }
+/* pixel posuvník: segmentovaná lišta (zlatá výplň po --pct zo sound-ui.js) + hranatý jazdec - veľký na prst */
+#sound-win input[type=range] {
+  appearance: none; -webkit-appearance: none; flex: 1; min-width: 60px; height: 16px; margin: 0; cursor: pointer;
   background:
-    repeating-linear-gradient(to right, transparent 0 6px, #120d09 6px 8px),
+    repeating-linear-gradient(to right, transparent 0 8px, #120d09 8px 10px),
     linear-gradient(to right, #d4a017 0 var(--pct, 50%), #3a2f25 var(--pct, 50%) 100%);
   box-shadow: 0 0 0 2px #000;
 }
-#sound-ctl .snd-row input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 10px; height: 18px; background: #f2e6c9; border: none; border-radius: 0;
-  box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #8a7f6a;
+#sound-win input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 34px; background: #f2e6c9; border: none; border-radius: 0;
+  box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a;
 }
-#sound-ctl .snd-row input[type=range]::-moz-range-thumb {
-  width: 10px; height: 18px; background: #f2e6c9; border: none; border-radius: 0;
-  box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #8a7f6a;
+#sound-win input[type=range]::-moz-range-thumb {
+  width: 18px; height: 34px; background: #f2e6c9; border: none; border-radius: 0;
+  box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a;
 }
-#sound-ctl .snd-row input[type=range]::-moz-range-track { background: transparent; }
+#sound-win input[type=range]::-moz-range-track { background: transparent; }
+
+/* admin „Reset this room" vpravo dole - len admin na webe (nie dotyk: tam je v menu), len v roomke */
+#admin-reset {
+  display: none; position: fixed; right: 14px; bottom: 14px; z-index: 50;
+  padding: 10px 14px; border-radius: 10px; border: 1px solid #5a1a1a; background: #8e0000; color: #fff;
+  font-weight: 800; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.35);
+}
+.admin:not(.touch) #admin-reset { display: block; }
+#rooms:not(.hidden) ~ #admin-reset, #login:not(.hidden) ~ #admin-reset { display: none; }
 
 /* ========== Mobil / tablet (client/viewport.js, client/mobile-ui.js, docs/MOBILE.md) ========== */
-/* celá obrazovka - rovnaký pixel štýl ako 🔊, hneď vedľa neho */
-#fs-btn {
-  position: fixed; left: 70px; bottom: 14px; z-index: 9000;
-  width: 44px; height: 44px; padding: 9px; border: none; border-radius: 0; cursor: pointer;
-  background: #3a2f25; fill: #f2e6c9;
-  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610, 4px 4px 0 rgba(0,0,0,.45);
-}
-#fs-btn svg { display: block; width: 100%; height: 100%; }
-#fs-btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #1c1610, inset -2px -2px 0 #6b5843, 2px 2px 0 rgba(0,0,0,.45);
-}
-
 /* výzva otočiť zariadenie - len dotyk na výšku; nad všetkým (aj lobby / char-select / login).
    Stránka je na výšku silno zmenšená, preto sa rozmery delia --app-scale (= normálna veľkosť na displeji). */
 #rotate-hint { display: none; }

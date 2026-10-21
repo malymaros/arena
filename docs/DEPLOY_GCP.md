@@ -225,7 +225,12 @@ Užitočné (na VM):
 | `sudo systemctl restart caddy` | reštart proxy (po zmene Caddyfile) |
 | `journalctl -u caddy -f` | logy Caddy (napr. vydanie certu) |
 
-**Admin reset:** bez `ADMIN_KEY` je admin reset **otvorený** (`?admin=1` stačí - vedomé rozhodnutie). Ak ho chceš
-zamknúť heslom, nastav ho mimo repa cez override
-`sudo systemctl edit arena` → `[Service]` + `Environment=ADMIN_KEY=nejakeheslo` (prípadne aj `PLAYER_KEYS=…`),
-potom `sudo systemctl restart arena`. Reset potom: `https://arena.marosmaly.sk/?admin=1&key=nejakeheslo`.
+**Admin:** admin je hráč, ktorý sa v hre prihlási **admin heslom** (`ADMIN_KEY`) namiesto hesla hráča - v menu ☰ potom
+vidí ADMIN sekciu (reset roomky / všetkých roomiek). Heslo je mimo repa v systemd drop-in
+`/etc/systemd/system/arena.service.d/admin.conf`:
+```
+[Service]
+Environment=ADMIN_KEY=<admin heslo>
+```
+potom `sudo systemctl daemon-reload && sudo systemctl restart arena`. Bez `ADMIN_KEY` nie je adminom nikto.
+Skriptom: `curl -s "https://arena.marosmaly.sk/admin/reset-all?key=<admin heslo>"`.

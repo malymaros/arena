@@ -20,7 +20,7 @@ Zvuky sa robia v **Sound Labe** (`/sound-lab.html`) ako **zvukový balík**, ted
 | nainštalované balíky + aktívny (generované, neupravovať ručne) | `public/sounds/packs/index.js`, `public/sounds/packs/<id>/<verzia>/` |
 | prehrávač: vrstvy základ → aktívny balík → koncept, Web Audio, hudba | `public/client/sound.js` |
 | napojenie na hru (timeline → events.js → sound.js, fáza hry → hudba) | `public/client/sound-map.js` |
-| tlačidlo 🔊 v hre (mute, master/hudba/efekty, kláves **M**) + zvuky klikov | `public/client/sound-ui.js` |
+| zvukové okno z menu ☰ (mute, master/hudba/efekty s −/+, na dotyku vo veľkosti displeja; kláves **M** = mute) + zvuky klikov | `public/client/sound-ui.js` |
 | editor balíka | **`/sound-lab.html`** |
 
 ## Ako vytvoriť balík (ktokoľvek)
