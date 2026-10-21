@@ -54,9 +54,13 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
   šípky a políčka pickerov, karty postáv, hlavy tímu) ho len označí (`.touch-armed`) a pošle mu syntetický
   `mouseenter` - teda tie isté náhľady zón, ktoré na desktope ukazuje hover (`preview-hovers.js`, `queue.js`, …);
   druhé ťuknutie klik pustí ďalej; nad označenou akciou svieti štítok **TAP AGAIN** (`#touch-confirm`).
-  `oneTap()` = výnimky: tlačidlá otvárajúce picker a **všetky šípky / políčka pickerov** (jedno ťuknutie - výberom
-  bola už akcia; zónu ukazuje stlačenie, kým drží prst). Kým je picker otvorený, ostatné akcie sa neoznačujú -
-  klik prejde do `controls.js`, ktorý tlačidlom zatrasie (rovnaký zámok ako na desktope). Položky frontu sú len náhľad.
+  `oneTap()` = výnimky: tlačidlá otvárajúce picker a šípky pohybu (ležia na cieľovom políčku). Šípky útoku /
+  specialu a políčka pickera majú tiež dve ťuknutia so zónou + TAP AGAIN (vlastník chce náhľad vidieť pred
+  zaradením). Kým je picker otvorený, zamknuté tlačidlá (`.locked-ui`) majú na dotyku `pointer-events: none` -
+  nereagujú vôbec (žiadny popis ani náhľad); ťuk vedľa označenú šípku neruší a jej náhľad obnoví.
+  Položky frontu sú len náhľad.
+- výber postáv: kartou sa **nikdy nevyberá** (ani opakovaným ťuknutím) - len tlačidlom PICK / ADD / REMOVE
+  (`pickClick`). Panel náhľadu a PICK majú pevné rozmery, takže prepínanie kariet nič neposúva (overuje test).
 - výber postáv na telefóne: prvá viditeľná karta je vždy predvybraná bez hlasu (`arenaSilent` na syntetickom
   mouseenter) - pravý panel s náhľadom nikdy nie je prázdny. Hlas mena: dotyk pošle mouseenter dvakrát
   (prehliadač + touch.js), `char-select.js` druhý v rámci 500 ms ignoruje, inak by utol práve spustený hlas. Nové tlačidlo s náhľadom netreba nikde registrovať - stačí mu mouseenter handler ako na desktope.

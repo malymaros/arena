@@ -5,19 +5,21 @@
 //  1. Ťuk = výber + náhľad: prvé ťuknutie na akciu bez cieľa (melee, shield, recharge…) ju označí (.touch-armed,
 //     štítok TAP AGAIN), vyvolá jej hover náhľad (zóna na boarde - tie isté mouseenter handlery ako na desktope)
 //     a ukáže popis v info riadku; druhé ťuknutie ju vykoná. Tlačidlá, ktoré otvárajú výber smeru / políčka,
-//     reagujú hneď; kým je výber otvorený, ostatné akcie sú zamknuté (zatrasú sa ako na desktope).
+//     reagujú hneď; kým je výber otvorený, ostatné akcie na ťuknutie nereagujú vôbec (CSS pointer-events na
+//     .locked-ui) - nezmení sa ani popis, ani náhľad.
 //  2. Výbery smeru sa presunú do vrstvy nad boardom (#touch-layer) a otvárajú sa na postave (jej ghost pozícii
-//     po naplánovaných akciách), zväčšené na prst. Šípka / políčko = JEDNO ťuknutie (výberom bola už akcia);
-//     kým drží prst, ukazuje zónu zásahu.
+//     po naplánovaných akciách), zväčšené na prst. Šípka útoku / specialu a políčko = rovnako ako akcia: prvé
+//     ťuknutie ukáže zónu zásahu + TAP AGAIN, druhé zaradí. Šípky pohybu ležia na cieľovom políčku → jedno ťuknutie.
 //  3. Výber políčka (Soldier, pasca, Luffy) sa prekryje presne cez board - ťuká sa priamo na políčka.
-//  4. Výber postavy: ťuk na kartu = schopnosť + náhľad, tlačidlo PICK <meno> ju vyberie. Na telefóne je prvá
+//  4. Výber postavy: ťuk na kartu = schopnosť + náhľad (aj opakovaný - kartou sa NIKDY nevyberá), postavu
+//     vyberie len tlačidlo PICK <meno> (v turnajovom drafte ADD / REMOVE). Na telefóne je prvá
 //     karta predvybraná (bez hlasu), aby pravý panel s náhľadom nikdy nebol prázdny.
 //  5. :hover pravidlá sa na dotyku vypnú (po ťuknutí by „viseli").
 import { isTouch, isPhone, appScale } from "/client/viewport.js";
 import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, cellToPx, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
 import { specialTargetOf, uiLocked } from "/client/controls.js";
 import { ghostCharAt, ghostPos } from "/client/ghost.js";
-import { CHARS_BY_KEY } from "/chars/index.js";
+import { CHARS_BY_KEY, VAMP_CHARS } from "/chars/index.js";
 import { state, me, board } from "/client/session.js";
 import { planning } from "/client/planning.js";
 
@@ -65,19 +67,6 @@ function initPickerLayer() {
   }
   window.addEventListener("resize", syncLayer);
   syncLayer();
-  // šípka / políčko: kým drží prst, ukáž zónu zásahu (klik - pustenie - akciu hneď zaradí)
-  let pressed = null;
-  const release = () => { if (pressed?.isConnected) pressed.dispatchEvent(new MouseEvent("mouseleave")); pressed = null; };
-  layer.addEventListener("pointerdown", (e) => {
-    const t = e.target.closest(".arrow, .mini-target");
-    if (!t || t.disabled) return;
-    release();
-    pressed = t;
-    t.dispatchEvent(new MouseEvent("mouseenter"));
-    showInfo(describe(t));
-  });
-  layer.addEventListener("pointercancel", release);
-  layer.addEventListener("pointerleave", release);
 }
 function placePicker(el) {
   if (el.id === "cell-picker") {
@@ -108,7 +97,8 @@ function oneTap(el) {
   const c = ghostCharAt();
   if (el === specialBtn) return specialTargetOf(c) !== "none";
   if (el === mirrorBtn) return CHARS_BY_KEY[c]?.mirrorSlot === "special1";
-  if (el.closest("#touch-layer")) return true; // šípka / políčko pickera - zónu ukazuje už stlačenie (pressPreview)
+  if (el.closest("#dir-picker")) return true;            // pohyb - šípka leží na cieľovom políčku
+  if (el.closest("#dash-picker")) return !VAMP_CHARS[c];  // Vampire/Onryō: dash = charge so zónou → náhľad + TAP AGAIN
   return false;
 }
 // len náhľad (bez akcie): naplánované akcie vo fronte - ťuk zapne / vypne náhľad zóny
@@ -174,6 +164,9 @@ function initTapSelect() {
     if (!el) {
       // telefón: predvybraná karta ostáva (pravý panel výberu postáv nesmie ostať prázdny)
       if (ev.target.closest?.("#touch-pick") || (isPhone && armed?.classList.contains("char-card"))) return;
+      // otvorený výber smeru: ťuk vedľa (aj na zamknuté tlačidlo - prepustí ťuk na lištu) nič neruší
+      // (prehliadač pri ťuku inde poslal označenej šípke mouseleave a zmazal jej náhľad - obnov ho)
+      if (planning.openPicker) { if (armed?.isConnected) armed.dispatchEvent(new MouseEvent("mouseenter")); return; }
       disarm(); return;
     }
     if (el.disabled) return;
@@ -182,6 +175,14 @@ function initTapSelect() {
     if (previewOnly(el)) {
       ev.preventDefault(); ev.stopImmediatePropagation();
       if (armed === el) disarm(); else arm(el);
+      return;
+    }
+    // karta postavy: ťuk ju len označí (aj opakovaný) - vyberá výhradne tlačidlo PICK (pickClick)
+    if (el.classList.contains("char-card")) {
+      if (pickClick) return;                                   // klik z tlačidla PICK → vykonať výber
+      ev.preventDefault(); ev.stopImmediatePropagation();
+      if (armed !== el) arm(el);
+      syncPickBar();
       return;
     }
     if (armed === el) { disarm(); return; }                    // druhé ťuknutie → nechaj prejsť = vykonať
@@ -201,6 +202,7 @@ function initTapSelect() {
 
 /* ---------- 4. výber postavy: PICK <meno> pod náhľadom schopnosti ---------- */
 let pickBar = null;
+let pickClick = false; // práve prebieha klik vyvolaný tlačidlom PICK (jediná cesta, ako vybrať postavu)
 // telefón: výber postáv má náhľad schopnosti v pravom stĺpci - bez označenej karty by ostal prázdny a celý výber
 // by pôsobil posunutý doľava. Prvá viditeľná voliteľná karta je preto vždy predvybraná (bez hlasu mena).
 const visibleCard = (c) => c && c.isConnected && c.offsetParent !== null && !c.closest(".char-cards.hidden");
@@ -232,7 +234,10 @@ function initCharPick() {
   selEl.appendChild(pickBar);
   pickBar.addEventListener("click", () => {
     const card = armed?.classList.contains("char-card") ? armed : null;
-    if (card) card.click(); // armed karta → klik prejde interceptorom ako druhé ťuknutie
+    if (!card) return;
+    pickClick = true;
+    try { card.click(); } finally { pickClick = false; }
+    syncPickBar(); // draft: ADD ↔ REMOVE
   });
 }
 function syncPickBar() {
