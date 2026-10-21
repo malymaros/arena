@@ -2,20 +2,22 @@
 // dotyku nerobí nič - desktop ostáva presne ako bol. Musí sa importovať AŽ PO controls.js / preview-hovers.js /
 // char-select.js (presúva ich pickery a spolieha sa na ich už naviazané handlery).
 //
-//  1. Ťuk = výber + náhľad: prvé ťuknutie na akciu ju označí (.touch-armed), vyvolá jej hover náhľad (zóna na
-//     boarde - tie isté mouseenter handlery ako na desktope) a ukáže popis v info riadku; druhé ťuknutie ju
-//     vykoná. Tlačidlá, ktoré len otvárajú výber smeru / políčka, reagujú hneď (výberom je až cieľ).
+//  1. Ťuk = výber + náhľad: prvé ťuknutie na akciu bez cieľa (melee, shield, recharge…) ju označí (.touch-armed,
+//     štítok TAP AGAIN), vyvolá jej hover náhľad (zóna na boarde - tie isté mouseenter handlery ako na desktope)
+//     a ukáže popis v info riadku; druhé ťuknutie ju vykoná. Tlačidlá, ktoré otvárajú výber smeru / políčka,
+//     reagujú hneď; kým je výber otvorený, ostatné akcie sú zamknuté (zatrasú sa ako na desktope).
 //  2. Výbery smeru sa presunú do vrstvy nad boardom (#touch-layer) a otvárajú sa na postave (jej ghost pozícii
-//     po naplánovaných akciách), zväčšené na prst. Šípky pohybu ležia na cieľovom políčku → jedno ťuknutie;
-//     šípky útoku / specialov najprv ukážu zónu.
+//     po naplánovaných akciách), zväčšené na prst. Šípka / políčko = JEDNO ťuknutie (výberom bola už akcia);
+//     kým drží prst, ukazuje zónu zásahu.
 //  3. Výber políčka (Soldier, pasca, Luffy) sa prekryje presne cez board - ťuká sa priamo na políčka.
-//  4. Výber postavy: ťuk na kartu = schopnosť + náhľad, tlačidlo PICK <meno> ju vyberie.
+//  4. Výber postavy: ťuk na kartu = schopnosť + náhľad, tlačidlo PICK <meno> ju vyberie. Na telefóne je prvá
+//     karta predvybraná (bez hlasu), aby pravý panel s náhľadom nikdy nebol prázdny.
 //  5. :hover pravidlá sa na dotyku vypnú (po ťuknutí by „viseli").
-import { isTouch } from "/client/viewport.js";
+import { isTouch, isPhone, appScale } from "/client/viewport.js";
 import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, cellToPx, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
 import { specialTargetOf, uiLocked } from "/client/controls.js";
 import { ghostCharAt, ghostPos } from "/client/ghost.js";
-import { CHARS_BY_KEY, VAMP_CHARS } from "/chars/index.js";
+import { CHARS_BY_KEY } from "/chars/index.js";
 import { state, me, board } from "/client/session.js";
 import { planning } from "/client/planning.js";
 
@@ -63,6 +65,19 @@ function initPickerLayer() {
   }
   window.addEventListener("resize", syncLayer);
   syncLayer();
+  // šípka / políčko: kým drží prst, ukáž zónu zásahu (klik - pustenie - akciu hneď zaradí)
+  let pressed = null;
+  const release = () => { if (pressed?.isConnected) pressed.dispatchEvent(new MouseEvent("mouseleave")); pressed = null; };
+  layer.addEventListener("pointerdown", (e) => {
+    const t = e.target.closest(".arrow, .mini-target");
+    if (!t || t.disabled) return;
+    release();
+    pressed = t;
+    t.dispatchEvent(new MouseEvent("mouseenter"));
+    showInfo(describe(t));
+  });
+  layer.addEventListener("pointercancel", release);
+  layer.addEventListener("pointerleave", release);
 }
 function placePicker(el) {
   if (el.id === "cell-picker") {
@@ -93,8 +108,7 @@ function oneTap(el) {
   const c = ghostCharAt();
   if (el === specialBtn) return specialTargetOf(c) !== "none";
   if (el === mirrorBtn) return CHARS_BY_KEY[c]?.mirrorSlot === "special1";
-  if (el.closest("#dir-picker")) return true;
-  if (el.closest("#dash-picker")) return !VAMP_CHARS[c]; // Vampire/Onryō: dash = charge so zónou → náhľad
+  if (el.closest("#touch-layer")) return true; // šípka / políčko pickera - zónu ukazuje už stlačenie (pressPreview)
   return false;
 }
 // len náhľad (bez akcie): naplánované akcie vo fronte - ťuk zapne / vypne náhľad zóny
@@ -115,18 +129,33 @@ function showInfo(text) {
   infoEl.textContent = text;
   infoEl.classList.toggle("hidden", !text);
 }
-function arm(el) {
+// štítok „TAP AGAIN" nad označenou akciou - aby bolo jasné, že treba ťuknúť ešte raz
+let confirmEl = null;
+function placeConfirm(el) {
+  if (!confirmEl) { confirmEl = document.createElement("div"); confirmEl.id = "touch-confirm"; confirmEl.textContent = "TAP AGAIN"; document.body.appendChild(confirmEl); }
+  if (!el || el.classList.contains("char-card") || el.classList.contains("q-badge")) { confirmEl.classList.add("hidden"); return; }
+  // súradnice displeja → layout px v body (body je zmenšené transformom, viewport.js)
+  const r = el.getBoundingClientRect(), b = document.body.getBoundingClientRect(), k = appScale();
+  confirmEl.style.left = ((r.left + r.width / 2 - b.left) / k) + "px";
+  confirmEl.style.top = ((r.top - b.top) / k) + "px";
+  confirmEl.classList.remove("hidden");
+}
+function arm(el, silent = false) {
   disarm();
   armed = el;
   el.classList.add("touch-armed");
-  el.dispatchEvent(new MouseEvent("mouseenter")); // tie isté náhľady ako hover na desktope
+  const enter = new MouseEvent("mouseenter");
+  if (silent) enter.arenaSilent = true; // predvýber karty - náhľad bez hlasu mena (char-select.js)
+  el.dispatchEvent(enter); // tie isté náhľady ako hover na desktope
   if (!el.classList.contains("char-card")) showInfo(describe(el));
+  placeConfirm(el);
 }
 export function disarm() {
   if (!armed) return;
   const el = armed;
   armed = null;
   el.classList.remove("touch-armed");
+  placeConfirm(null);
   if (el.isConnected) el.dispatchEvent(new MouseEvent("mouseleave"));
   if (el.classList.contains("char-card")) el.closest(".char-cards")?.dispatchEvent(new MouseEvent("mouseleave"));
   showInfo("");
@@ -141,8 +170,15 @@ function initTapSelect() {
   document.addEventListener("click", (ev) => {
     if (armed && !armed.isConnected) disarm();
     const el = ev.target.closest?.(SELECTABLE);
-    if (!el) { if (!ev.target.closest?.("#touch-pick")) disarm(); return; }
+    if (isPhone && selEl && !selEl.classList.contains("hidden")) setTimeout(keepCardPreview, 30);
+    if (!el) {
+      // telefón: predvybraná karta ostáva (pravý panel výberu postáv nesmie ostať prázdny)
+      if (ev.target.closest?.("#touch-pick") || (isPhone && armed?.classList.contains("char-card"))) return;
+      disarm(); return;
+    }
     if (el.disabled) return;
+    // otvorený výber smeru / políčka zamyká ostatné akcie: klik prejde bez označenia → controls.js zatrasie tlačidlom
+    if (planning.openPicker && el.closest(".controls-row") && !oneTap(el)) { disarm(); return; }
     if (previewOnly(el)) {
       ev.preventDefault(); ev.stopImmediatePropagation();
       if (armed === el) disarm(); else arm(el);
@@ -165,8 +201,30 @@ function initTapSelect() {
 
 /* ---------- 4. výber postavy: PICK <meno> pod náhľadom schopnosti ---------- */
 let pickBar = null;
+// telefón: výber postáv má náhľad schopnosti v pravom stĺpci - bez označenej karty by ostal prázdny a celý výber
+// by pôsobil posunutý doľava. Prvá viditeľná voliteľná karta je preto vždy predvybraná (bez hlasu mena).
+const visibleCard = (c) => c && c.isConnected && c.offsetParent !== null && !c.closest(".char-cards.hidden");
+function autoArmCard() {
+  if (!isPhone || !selEl || selEl.classList.contains("hidden")) return;
+  if (armed?.classList.contains("char-card") && visibleCard(armed)) { keepCardPreview(); return; }
+  const card = [...selEl.querySelectorAll(".char-card[data-char]")].find(c => visibleCard(c) && !c.classList.contains("dead"));
+  if (card) { arm(card, true); syncPickBar(); }
+}
+// pravý panel mohol vyprázdniť mouseleave z prehliadača (dotyk mimo kariet) - obnov náhľad označenej karty
+function keepCardPreview() {
+  if (!armed?.classList.contains("char-card") || !visibleCard(armed)) return;
+  if (document.getElementById("char-ability")?.classList.contains("hidden")) {
+    const enter = new MouseEvent("mouseenter"); enter.arenaSilent = true; armed.dispatchEvent(enter);
+  }
+}
 function initCharPick() {
   if (!selEl) return;
+  if (isPhone) {
+    // otvorenie výberu, zmena stránky (šípky), roster-mode → predvýber prvej karty
+    const again = () => setTimeout(autoArmCard, 60);
+    new MutationObserver(again).observe(selEl, { attributes: true, attributeFilter: ["class"] });
+    selEl.querySelectorAll(".char-cards").forEach(el => new MutationObserver(again).observe(el, { attributes: true, attributeFilter: ["class"] }));
+  }
   pickBar = document.createElement("button");
   pickBar.type = "button";
   pickBar.id = "touch-pick";

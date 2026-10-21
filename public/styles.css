@@ -3060,3 +3060,25 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .weight .pct { font-size: 18px; }
 .phone .weights-sum { font-size: 18px; margin-top: 12px; }
 .phone .series-crowns.mage-heads { top: calc(100% + 176px); } /* turnaj: hlavy tímu pod zmenšenou vlajkou */
+
+/* štítok „TAP AGAIN" nad označenou akciou (touch.js) - jasné, že akciu zaradí druhé ťuknutie */
+#touch-confirm {
+  position: fixed; z-index: 62; pointer-events: none; white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: calc(4px * var(--ui-k, 1)) calc(8px * var(--ui-k, 1));
+  background: #ffd54f; color: #2a1c00; box-shadow: 0 0 0 2px #000, 0 4px 10px rgba(0,0,0,.5);
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: calc(9px * var(--ui-k, 1));
+  animation: touch-confirm-pulse .9s ease-in-out infinite;
+}
+#touch-confirm.hidden { display: none; }
+/* šípka dole k tlačidlu */
+#touch-confirm::after {
+  content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  border: calc(5px * var(--ui-k, 1)) solid transparent; border-top-color: #ffd54f;
+}
+@keyframes touch-confirm-pulse { 50% { filter: brightness(1.25); } }
+
+/* koniec hry: Play again / Leave the room v skutočnej veľkosti pre prst (dotyk) */
+.touch .go-buttons { gap: calc(14px * var(--ui-k, 1)); }
+.touch .retry { font-size: calc(15px * var(--ui-k, 1)); padding: calc(16px * var(--ui-k, 1)) calc(30px * var(--ui-k, 1)); }
+.touch .retry.leave { font-size: calc(13px * var(--ui-k, 1)); padding: calc(15px * var(--ui-k, 1)) calc(26px * var(--ui-k, 1)); }

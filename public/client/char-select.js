@@ -298,15 +298,22 @@ function clearAbilityPreview() {
   charAbilityEl?.classList.add("hidden");
 }
 let hoverVoice = null; // práve hrajúci hlas mena - ďalšia karta ho utne, nech sa mená neprekrývajú
+let hoverVoiceKey = null, hoverVoiceAt = 0;
 selEl.querySelectorAll(".char-card").forEach(card => {
   // preview karty Hidden stránky (Luffy/Jotaro) nemajú data-char na karte (neklikateľné) - kľúč nesie canvas
   const key = card.dataset.char || card.querySelector("canvas.char-canvas")?.dataset.char;
   if (!key) return; // placeholder "Coming soon"
-  card.addEventListener("mouseenter", () => {
+  card.addEventListener("mouseenter", (e) => {
     if (isMageDead(key)) return; // mŕtvy mág nemá náhľad špeciálu
+    renderAbilityPreview(key);
+    if (e.arenaSilent) return; // predvýber karty na telefóne (touch.js) - náhľad bez hlasu
+    // dotyk pošle mouseenter dvakrát (prehliadač + touch.js): druhý by utol práve spustený hlas a sám by
+    // nezahral (sfx má 60 ms poistku proti opakovaniu) → ticho. Rovnaká karta tesne po sebe = už hrá.
+    const now = performance.now();
+    if (key === hoverVoiceKey && now - hoverVoiceAt < 500) return;
+    hoverVoiceKey = key; hoverVoiceAt = now;
     hoverVoice?.then(h => h?.stop());
     hoverVoice = sfx("ui.hover_char", { char: key });
-    renderAbilityPreview(key);
   });
 });
 selEl.querySelectorAll(".char-cards").forEach(el => el.addEventListener("mouseleave", clearAbilityPreview));

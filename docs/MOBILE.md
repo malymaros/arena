@@ -53,8 +53,13 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
 - jeden capture listener na `click`: prvé ťuknutie na prvok zo zoznamu `SELECTABLE` (akčné tlačidlá, golden polovice,
   šípky a políčka pickerov, karty postáv, hlavy tímu) ho len označí (`.touch-armed`) a pošle mu syntetický
   `mouseenter` - teda tie isté náhľady zón, ktoré na desktope ukazuje hover (`preview-hovers.js`, `queue.js`, …);
-  druhé ťuknutie klik pustí ďalej. `oneTap()` = výnimky (tlačidlá otvárajúce picker, šípky pohybu); položky frontu
-  sú len náhľad. Nové tlačidlo s náhľadom netreba nikde registrovať - stačí mu mouseenter handler ako na desktope.
+  druhé ťuknutie klik pustí ďalej; nad označenou akciou svieti štítok **TAP AGAIN** (`#touch-confirm`).
+  `oneTap()` = výnimky: tlačidlá otvárajúce picker a **všetky šípky / políčka pickerov** (jedno ťuknutie - výberom
+  bola už akcia; zónu ukazuje stlačenie, kým drží prst). Kým je picker otvorený, ostatné akcie sa neoznačujú -
+  klik prejde do `controls.js`, ktorý tlačidlom zatrasie (rovnaký zámok ako na desktope). Položky frontu sú len náhľad.
+- výber postáv na telefóne: prvá viditeľná karta je vždy predvybraná bez hlasu (`arenaSilent` na syntetickom
+  mouseenter) - pravý panel s náhľadom nikdy nie je prázdny. Hlas mena: dotyk pošle mouseenter dvakrát
+  (prehliadač + touch.js), `char-select.js` druhý v rámci 500 ms ignoruje, inak by utol práve spustený hlas. Nové tlačidlo s náhľadom netreba nikde registrovať - stačí mu mouseenter handler ako na desktope.
 - pickery (`#dir-picker`, `#aim-picker`, … `#cell-picker`) sa pri štarte presunú do `#touch-layer` (fixná vrstva v body
   zarovnaná na board); MutationObserver ich pri otvorení umiestni na ghost pozíciu (cell-picker = mriežka cez board).
 - `:hover` pravidlá sa pri štarte vymažú zo štýlov (sú len kozmetické); runa reaguje na `pointermove`/`pointerdown`.

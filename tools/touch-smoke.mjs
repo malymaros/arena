@@ -75,6 +75,16 @@ const waitPage = async (expr, ms, what) => {
   throw new Error("timeout: " + what);
 };
 const CHAR_SELECT_READY = `!document.getElementById("char-select").classList.contains("hidden") && document.getElementById("color-roll").classList.contains("hidden")`;
+// stlačenie: prst dole → callback (napr. kontrola náhľadu počas držania) → prst hore
+const press = async (sel, during) => {
+  const c = await ev(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; })()`);
+  await sendT("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: c.x, y: c.y }] });
+  await sleep(150);
+  await during?.();
+  await sendT("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(350);
+  return c;
+};
 let fails = 0;
 const check = (ok, label, extra = "") => { console.log(`  ${ok ? "PASS" : "FAIL"}  ${label}${!ok && extra ? "  [" + extra + "]" : ""}`); if (!ok) fails++; };
 const queue = () => ev(`[...document.querySelectorAll("#queue .q-badge.mine.main")].map(b => [...b.classList].filter(c => !["q-badge","mine","main","q-warn","q-slot"].includes(c)).join(".") || "-")`);
@@ -96,6 +106,10 @@ try {
   await sleep(500);
 
   console.log("výber postavy");
+  if (!process.env.TOUCH_DEVICE) {
+    check(await ev(`!document.getElementById("touch-pick").classList.contains("hidden") && !document.getElementById("char-ability").classList.contains("hidden")`), "telefón: prvá karta je predvybraná (náhľad + PICK hneď)");
+    check((await ev(`document.getElementById("touch-pick").textContent`)) === "PICK FIRE WIZARD", "telefón: predvybraný je Fire Wizard", await ev(`document.getElementById("touch-pick").textContent`));
+  }
   // Soldier je na inej stránke výberu - prelistuj šípkou (jedno ťuknutie, nie je to výber)
   const page = Number(await ev(`document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").dataset.page`));
   for (let i = 0; i < 3 && await ev(`document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").classList.contains("hidden")`); i++)
@@ -120,19 +134,23 @@ try {
   check(aim.open && aim.inLayer, "attack otvorí picker na boarde jedným ťuknutím", JSON.stringify(aim));
   const center = await ev(`(() => { const p = document.getElementById("aim-picker").getBoundingClientRect(), c = document.querySelector('#grid .cell[data-x="3"][data-y="1"]').getBoundingClientRect(); return { dx: Math.round((p.left + p.width / 2) - (c.left + c.width / 2)), dy: Math.round((p.top + p.height / 2) - (c.top + c.height / 2)) }; })()`);
   check(Math.abs(center.dx) < 3 && Math.abs(center.dy) < 3, "picker je vycentrovaný na políčku postavy", JSON.stringify(center));
-  const arrow = await tap("#aim-picker .arrow.left");
+  // otvorený výber zamyká ostatné akcie: ťuk na melee nič neoznačí ani nezaradí, picker ostane otvorený
+  await tap("#melee-btn");
+  check(await ev(`!document.querySelector(".touch-armed") && !document.getElementById("aim-picker").classList.contains("hidden")`), "pri otvorenom výbere smeru sa iná akcia nedá označiť");
+  const arrow = await press("#aim-picker .arrow.left", async () => {
+    check((await preview()) > 0, "držanie šípky ukazuje zónu na boarde");
+    check((await info()).length > 0, "info riadok ukazuje popis", await info());
+    await shot("attack-press");
+  });
   check(arrow.w >= 40 && arrow.h >= 40, "šípka má aspoň 40×40 px na displeji", `${Math.round(arrow.w)}×${Math.round(arrow.h)}`);
-  check((await queue()).filter(x => x !== "-").length === 0, "prvý ťuk na šípku útoku nezaradil akciu", JSON.stringify(await queue()));
-  check((await preview()) > 0, "prvý ťuk na šípku ukázal zónu na boarde");
-  check((await info()).length > 0, "info riadok ukazuje popis", await info());
-  await shot("attack-armed");
-  await tap("#aim-picker .arrow.left");
-  check((await queue())[0] === "attack", "druhý ťuk zaradil útok", JSON.stringify(await queue()));
+  check((await queue())[0] === "attack", "jedno ťuknutie na šípku zaradilo útok", JSON.stringify(await queue()));
   check(await ev(`document.getElementById("aim-picker").classList.contains("hidden")`), "picker sa po zaradení zavrel");
 
   await tap("#melee-btn");
   check((await queue())[1] === "-", "prvý ťuk na melee nezaradil", JSON.stringify(await queue()));
   check((await preview()) > 0, "prvý ťuk na melee ukázal zasiahnuté políčko");
+  check(await ev(`(() => { const t = document.getElementById("touch-confirm"); return !!t && !t.classList.contains("hidden") && t.textContent === "TAP AGAIN"; })()`), "nad označenou akciou je štítok TAP AGAIN");
+  await shot("melee-armed");
   await tap("#melee-btn");
   check((await queue())[1] === "melee", "druhý ťuk na melee zaradil", JSON.stringify(await queue()));
 
@@ -154,9 +172,7 @@ try {
   check(Math.abs(cp.dx) < 3 && Math.abs(cp.dy) < 3 && Math.abs(cp.dw) < 3, "políčka výberu ležia presne na políčkach boardu", JSON.stringify(cp));
   await shot("cell-picker");
   await tap("#cell-picker .mini-target:nth-child(2)");
-  check((await queue()).filter(x => x !== "-").length === 0, "prvý ťuk na políčko nezaradil", JSON.stringify(await queue()));
-  await tap("#cell-picker .mini-target:nth-child(2)");
-  check((await queue())[0] === "special", "druhý ťuk na políčko zaradil special", JSON.stringify(await queue()));
+  check((await queue())[0] === "special", "jedno ťuknutie na políčko zaradilo special", JSON.stringify(await queue()));
 } catch (e) {
   console.error("CHYBA:", e.message); fails++;
 } finally {
