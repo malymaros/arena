@@ -23,6 +23,12 @@ import { DEATH_SEQ, DEATH_DIR, DEATH_ANIM, HOPE_DIR, HOPE_ANIM } from "/client/d
 import { hideDeathCenter, hideHopeCenter } from "/client/last-stand.js";
 
 /* ---------- RAF: actors + FX ---------- */
+// živé zoznamy podľa triedy namiesto querySelectorAll v každom frame (lacné; kópia [...] pred iteráciou,
+// lebo kreslenie môže prvky odobrať)
+const PROJECTILES = document.getElementsByClassName("projectile");
+const MAGE_HEADS = document.getElementsByClassName("mage-head");
+const SPECIAL_CENTERS = document.getElementsByClassName("special-center");
+const CHARGE_AURAS = document.getElementsByClassName("charge-aura");
 export function raf() {
   const now = performance.now();
   const map = { p1: actorP1, p2: actorP2 };
@@ -301,7 +307,8 @@ export function raf() {
   });
 
   // projectiles (plynulé perzistentné elementy v #actors)
-  document.querySelectorAll("canvas.projectile").forEach(cvs => {
+  [...PROJECTILES].forEach(cvs => {
+    if (cvs.tagName !== "CANVAS") return;
     const ctx = cvs.getContext("2d");
     const dir = cvs.dataset.dir;
     ensureSpriteMeta(dir, CHARGE_ANIM.file)
@@ -310,10 +317,11 @@ export function raf() {
   });
 
   // HUD hlavy magov + swap badge hlavy - animovaný výrez hlavy z idle spritu
-  document.querySelectorAll("canvas.mage-head[data-char]").forEach(cvs => drawMageHeadAnim(cvs, cvs.dataset.char, now));
+  [...MAGE_HEADS].forEach(cvs => { if (cvs.tagName === "CANVAS" && cvs.dataset.char) drawMageHeadAnim(cvs, cvs.dataset.char, now); });
 
   // specials v strede
-  document.querySelectorAll("canvas.special-center").forEach(cvs => {
+  [...SPECIAL_CENTERS].forEach(cvs => {
+    if (cvs.tagName !== "CANVAS") return;
     const ctx  = cvs.getContext("2d");
     const dir  = cvs.dataset.dir;
     const file = cvs.dataset.file;
@@ -335,7 +343,7 @@ export function raf() {
   });
 
   // nabíjacie aury (golden Last Stand / červená Last Hope / bežný recharge) plynulo sledujú postavu počas pohybu
-  document.querySelectorAll(".charge-aura[data-slot]").forEach(cont => placeChargeAura(cont, cont.dataset.slot));
+  [...CHARGE_AURAS].forEach(cont => { if (cont.dataset.slot) placeChargeAura(cont, cont.dataset.slot); });
 
   // Last Stand - trvalý golden stav riadený serverom (state[slot].lastStandBuff):
   // žiara postavy (actorFilter) + zlatý HUD + recharge aura + priehľadný démon za postavou

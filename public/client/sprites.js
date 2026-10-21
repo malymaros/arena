@@ -86,6 +86,27 @@ export function ensureSpriteMeta(charDir, file) {
   });
 }
 
+/* ---------- preskočenie zbytočného prekreslenia (výkon na mobile, docs/MOBILE.md) ---------- */
+// Slučka kreslenia (raf.js) volá drawSprite pre každý canvas 60× za sekundu, no sprity menia frame ~10× za sekundu.
+// drawSprite si preto pamätá, čo naposledy nakreslil do canvasu (kľúč = obrázok + frame + geometria), a rovnaký
+// obsah znova nekreslí. Pamäť canvasu sa zmaže pri AKOMKOĽVEK inom kreslení doň (priame clearRect/drawImage/… mimo
+// drawSprite, napr. Luffyho guma, char-select) aj pri zmene width/height (tá canvas vymaže), takže prípadné
+// priame kreslenie nikdy nezostane prekryté starým obsahom. Vrstvenie (clear=false) sa nepamätá nikdy.
+const lastDraw = new WeakMap(); // canvas → kľúč posledného vykreslenia
+let inDrawSprite = false;
+if (typeof CanvasRenderingContext2D !== "undefined") {
+  const P = CanvasRenderingContext2D.prototype;
+  for (const m of ["clearRect", "fillRect", "strokeRect", "drawImage", "putImageData", "fill", "stroke", "fillText", "strokeText", "reset"]) {
+    const orig = P[m];
+    if (typeof orig !== "function") continue;
+    P[m] = function (...a) { if (!inDrawSprite) lastDraw.delete(this.canvas); return orig.apply(this, a); };
+  }
+  for (const prop of ["width", "height"]) {
+    const d = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, prop);
+    if (d?.set) Object.defineProperty(HTMLCanvasElement.prototype, prop, { ...d, set(v) { lastDraw.delete(this); d.set.call(this, v); } });
+  }
+}
+
 export function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0, cropXFrac=0, cropRightFrac=0) {
   // anim.frames prepíše odhad počtu framov (keď framy nie sú štvorcové a inference zlyhá)
   const total = anim.frames || meta.frames;
@@ -113,7 +134,20 @@ export function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.
   const dw = sw * scale, dh = meta.fh * scale;
   // anchorY: 0 = hore, 0.5 = stred, 1 = dole; offsetX/offsetY = posun v px (záporné offsetY dvíha hore)
   const dx = (dstW - dw) / 2 + offsetX, dy = (dstH - dh) * anchorY + offsetY;
-  if (clear) ctx.clearRect(0, 0, dstW, dstH); // clear=false -> vrstvenie (efekt navrch mága)
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(meta.img, sx, 0, sw, meta.fh, dx, dy, dw, dh);
+  const cvs = ctx.canvas;
+  if (clear) {
+    const key = `${meta.img.src}|${sx}|${sw}|${dx}|${dy}|${dw}|${dh}|${dstW}|${dstH}`;
+    if (lastDraw.get(cvs) === key) return; // na canvase už je presne tento obraz
+    lastDraw.set(cvs, key);
+  } else {
+    lastDraw.delete(cvs); // vrstvenie mení obsah - ďalší clear=true musí kresliť
+  }
+  inDrawSprite = true;
+  try {
+    if (clear) ctx.clearRect(0, 0, dstW, dstH); // clear=false -> vrstvenie (efekt navrch mága)
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(meta.img, sx, 0, sw, meta.fh, dx, dy, dw, dh);
+  } finally {
+    inDrawSprite = false;
+  }
 }

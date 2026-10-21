@@ -39,3 +39,21 @@ Na dotyku nefunguje všetko, čo stojí na hoveri:
 ## Fáza 3 - mobilné UI (neskôr)
 
 Kompaktnejší HUD na telefóne, akcie pod palcami, väčší login, lobby a char-select na malej obrazovke.
+
+## Výkon (2026-10-21)
+
+Merané v Chrome ako mobil 844×390 so 4× spomaleným procesorom (≈ stredný telefón), zápas Escanor vs Naruto:
+
+| | pred | po |
+|---|---|---|
+| stiahnuté dáta (prvé spustenie + 1. zápas) | ~31 MB | ~11 MB |
+| hlavné vlákno pri čakaní na ťah | 70 % | 42 % |
+| hlavné vlákno pri prehrávaní kola | 79 % | 66 % |
+| sekané snímky (> 50 ms) pri prehrávaní | 3,1 % | 1,3 % |
+
+- **Pozadie arény:** originály v 3840 px (20 MB) ležia v `tools/arena-bg/src/`; `node tools/arena-bg/build.mjs` ich v headless
+  Chrome zmenší rovnakým drawImage ako klient na `ARENA_RES` (320×180) do `public/arenas/` (~300 kB) a sám overí
+  pixelovú zhodu. Nová aréna / zmena `ARENA_RES` = pridaj originály do `src/` a spusti skript znova.
+- **Kreslenie spritov:** `drawSprite` (`public/client/sprites.js`) nekreslí znova, ak je na canvase už presne ten istý
+  obraz (obrázok + frame + geometria). Akékoľvek iné kreslenie do canvasu alebo zmena jeho width/height pamäť
+  zmaže automaticky - priame kreslenie (mimo drawSprite) je teda bezpečné a netreba nič volať.
