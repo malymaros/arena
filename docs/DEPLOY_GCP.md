@@ -7,12 +7,12 @@ Súbory v repe (`deploy/`): `arena.service`, `Caddyfile`.
 
 > ### 🟢 Aktuálne nasadenie (produkcia)
 > Hra **beží** na **https://arena.marosmaly.sk** (od 2026-07-20, po migrácii z mŕtveho Oracle — viď `docs/DEPLOY_ORACLE.md`).
-> - **VM:** `instance-20260720-055132`, zóna `us-central1-a`, **Debian 13 (trixie), x86_64** — externá IP `34.134.62.153`
+> - **VM:** `instance-20260720-055132`, zóna `us-central1-a`, **Debian 13 (trixie), x86_64** — externá IP `34.58.136.172` (efemérna - 2026-10-21 sa zmenila z `34.134.62.153`; keď SSH vyprší, aktuálnu ukáže `nslookup arena.marosmaly.sk`)
 > - **GCP projekt:** „My First Project" (`project-51a54139-c05b-4e06-941`) pod **osobným Google účtom vlastníka**
 >   (adresa tu zámerne nie je - repo je verejné). VM v konzole: Compute Engine → VM instances v tomto projekte.
 > - **SSH** (login user je **`arena`**, nie `ubuntu`) - dve cesty, viď [sekcia 2b](#2b-prístup-z-ďalšieho-počítača-gcloud):
 >   - `gcloud compute ssh arena@instance-20260720-055132 --zone us-central1-a --project project-51a54139-c05b-4e06-941`
->   - alebo OpenSSH s kľúčom, ktorý je v metadátach projektu: `ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153`
+>   - alebo OpenSSH s kľúčom, ktorý je v metadátach projektu: `ssh -i ~/.ssh/google_compute_engine arena@34.58.136.172`
 >     (kľúč vytvára `gcloud compute ssh` pri prvom pripojení; pôvodný `gcp_arena.key` je len na pôvodnom PC)
 > - **App:** systemd služba `arena` (`/home/arena/arena`, `PORT=3000`), **Caddy** HTTPS proxy
 > - **Nová verzia (najčastejší úkon):** viď [sekcia 8 – Update](#8-update--prevádzka)
@@ -41,7 +41,7 @@ GCP konzola → **Compute Engine → VM instances → Create instance**.
 - **Machine type:** stačí malý shape (`e2-micro`/`e2-small` — hra je nenáročná).
 - **Boot disk:** *Debian* (13/trixie testované) alebo *Ubuntu*. Pri Ubuntu bude login user `ubuntu`; pri Debian s metadata kľúčom je user odvodený z comentu kľúča (viď krok 2).
 - **Networking:** nechaj default VPC, **External IPv4 = ephemeral** (alebo rezervuj statickú, aby sa IP nemenila po reštarte).
-- **Create.** Poznač si **External IP** (u nás `34.134.62.153`).
+- **Create.** Poznač si **External IP** (u nás `34.58.136.172`).
 
 ---
 
@@ -79,11 +79,11 @@ gcloud compute ssh arena@instance-20260720-055132 --zone us-central1-a --project
 ```
 
 Prvé `gcloud compute ssh` vygeneruje kľúč `~/.ssh/google_compute_engine` a **pridá ho** do SSH kľúčov projektu
-(existujúce nechá). Odvtedy funguje aj obyčajné `ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153`.
+(existujúce nechá). Odvtedy funguje aj obyčajné `ssh -i ~/.ssh/google_compute_engine arena@34.58.136.172`.
 
 > **Windows:** `gcloud.cmd` je dávkový súbor - dlhší `--command "…"` s úvodzovkami/`$()` rozbije. Na príkazy
-> na VM preto používaj OpenSSH (`ssh -i … arena@34.134.62.153 '…'`) a gcloud len na prvé pripojenie.
-> **Nájsť projekt:** `gcloud projects list` a `gcloud compute instances list --project <ID>` (hľadaj IP `34.134.62.153`).
+> na VM preto používaj OpenSSH (`ssh -i … arena@34.58.136.172 '…'`) a gcloud len na prvé pripojenie.
+> **Nájsť projekt:** `gcloud projects list` a `gcloud compute instances list --project <ID>` (hľadaj IP `34.58.136.172`).
 
 ## 3. Node + appka
 
@@ -206,7 +206,7 @@ Otvor ju v dvoch prehliadačoch (hra je pre 2 hráčov). Vstup je cez login (men
 Nasadenie novej verzie po `git push` (z ľubovoľného PC s prístupom podľa sekcie 2b):
 
 ```
-ssh -i ~/.ssh/google_compute_engine arena@34.134.62.153 'cd ~/arena && git status --short && git pull --ff-only && npm ci --omit=dev && sudo systemctl restart arena && systemctl is-active arena'
+ssh -i ~/.ssh/google_compute_engine arena@34.58.136.172 'cd ~/arena && git status --short && git pull --ff-only && npm ci --omit=dev && sudo systemctl restart arena && systemctl is-active arena'
 ```
 
 - `git status --short` má byť **prázdne** - na VM sa nič ručne neupravuje. Ak tam niečo je, najprv zisti čo.
