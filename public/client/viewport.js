@@ -22,8 +22,10 @@ function fit() {
   const cs = getComputedStyle(probe);
   const inset = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0,
                   b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
-  const vw = Math.max(1, window.innerWidth - inset.l - inset.r);
-  const vh = Math.max(1, window.innerHeight - inset.t - inset.b);
+  // clientWidth/Height = layout viewport (nezávisí od pinch zoomu); innerWidth/Height je na niektorých mobilných
+  // prehliadačoch (iOS Safari) visual viewport - pri priblížení by sa zoom „zapiekol" do výpočtu
+  const vw = Math.max(1, root.clientWidth - inset.l - inset.r);
+  const vh = Math.max(1, root.clientHeight - inset.t - inset.b);
   scale = Math.min(1, vw / DESIGN_W, vh / DESIGN_H);
   appW = vw / scale; appH = vh / scale;
   root.style.setProperty("--app-scale", String(scale));
@@ -39,10 +41,20 @@ export const appScale = () => scale;
 /** Veľkosť „virtuálnej" obrazovky v CSS px layoutu (súradnice pre position: fixed). */
 export const appSize = () => ({ w: appW, h: appH });
 
+// Hra sa zmenšuje sama, prehliadačový zoom je vždy 1. Niektoré prehliadače ho však samy zmenia (iOS priblíži pole
+// pri písaní, po otočení ostane starý zoom) - prepis viewport meta s minimum-scale=1 ho vráti na 1.
+const vpMeta = document.querySelector('meta[name="viewport"]');
+function resetZoom() {
+  if (!vpMeta || (window.visualViewport?.scale ?? 1) === 1) return;
+  const base = vpMeta.content;
+  vpMeta.content = base + ", minimum-scale=1";
+  setTimeout(() => { vpMeta.content = base; }, 50);
+}
+
 fit();
 window.addEventListener("resize", fit);
-window.addEventListener("orientationchange", () => setTimeout(fit, 250)); // iOS: rozmery dobehnú až po otočení
-window.visualViewport?.addEventListener("resize", fit);
+window.addEventListener("orientationchange", () => setTimeout(() => { fit(); resetZoom(); }, 250)); // iOS: rozmery dobehnú až po otočení
+document.addEventListener("focusout", (e) => { if (e.target.matches?.("input, textarea")) setTimeout(resetZoom, 100); });
 
 /* ---------- dotykové zariadenia: celá obrazovka + PWA ---------- */
 export const isTouch = window.matchMedia("(pointer: coarse)").matches;

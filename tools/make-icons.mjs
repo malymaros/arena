@@ -1,10 +1,12 @@
-// tools/make-icons.mjs - ikony aplikácie (PWA manifest, apple-touch-icon) z prvého framu Idle spritu Fire maga.
-// Pixel art sa zväčší celočíselne (nearest neighbor) na tmavé pozadie s oranžovým rámom; postava ostáva
-// vnútri bezpečnej zóny maskable ikony (Android ju môže orezať do kruhu).
+// tools/make-icons.mjs - ikony aplikácie (PWA manifest, apple-touch-icon): výsek HLAVY Fire wizarda z prvého framu
+// Idle spritu. Výrez vychádza z headCrop v public/chars/fire.js (HUD hlavy v turnaji), zúžený na samotnú hlavu. Pixel art sa zväčší
+// celočíselne (nearest neighbor) na tmavé pozadie s oranžovým rámom; hlava ostáva vnútri bezpečnej zóny maskable
+// ikony (Android ju môže orezať do kruhu).
 //   node tools/make-icons.mjs   → public/icons/icon-{180,192,512}.png
 import pngjs from "pngjs";
 import fs from "node:fs";
 import path from "node:path";
+import fire from "../public/chars/fire.js";
 const { PNG } = pngjs;
 
 const SRC = "public/assets/fire/Idle.png";
@@ -12,13 +14,18 @@ const OUT = "public/icons";
 const BG = [18, 19, 21], FRAME = [255, 179, 0], EDGE = [0, 0, 0];
 
 const sheet = PNG.sync.read(fs.readFileSync(SRC));
-const fh = sheet.height; // framy sú štvorcové
-// bbox nepriehľadných pixelov prvého framu
-let x0 = fh, y0 = fh, x1 = -1, y1 = -1;
-for (let y = 0; y < fh; y++) for (let x = 0; x < fh; x++) {
-  if (sheet.data[(y * sheet.width + x) * 4 + 3] > 20) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
-}
-const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+const fh = sheet.height; // framy sú štvorcové, berieme frame 0
+// headCrop zahŕňa aj ramená (HUD hlavy) - pre ikonu ho zúžime na kapucňu s tvárou: 60 % strany,
+// stred posunutý hore k tvári (namerané z výsledku, Fire Idle frame 0)
+const { cx, cy, size: cs } = fire.headCrop;
+const full = cs * fh, side = Math.round(full * 0.6);
+const sx0 = Math.round(cx * fh - full / 2 + full * 0.43 - side / 2);
+const sy0 = Math.round(cy * fh - full / 2 + full * 0.44 - side / 2);
+const px = (x, y) => {
+  if (x < 0 || y < 0 || x >= fh || y >= fh) return [0, 0, 0, 0];
+  const i = (y * sheet.width + x) * 4;
+  return [sheet.data[i], sheet.data[i + 1], sheet.data[i + 2], sheet.data[i + 3]];
+};
 
 fs.mkdirSync(OUT, { recursive: true });
 for (const size of [180, 192, 512]) {
@@ -30,17 +37,19 @@ for (const size of [180, 192, 512]) {
     const i = (y * size + x) * 4;
     img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255;
   }
-  // postava do max. 78 % výšky (bezpečná zóna maskable = vnútorných 80 %)
-  const k = Math.max(1, Math.floor((size * 0.78) / Math.max(bw, bh)));
-  const ox = Math.round((size - bw * k) / 2), oy = Math.round((size - bh * k) / 2);
-  for (let y = 0; y < bh * k; y++) for (let x = 0; x < bw * k; x++) {
-    const si = ((y0 + Math.floor(y / k)) * sheet.width + (x0 + Math.floor(x / k))) * 4;
-    const a = sheet.data[si + 3] / 255;
+  // hlava do max. 76 % strany (bezpečná zóna maskable = vnútorných 80 %), celočíselný násobok = ostré pixely
+  const k = Math.max(1, Math.floor((size * 0.76) / side));
+  const o = Math.round((size - side * k) / 2);
+  for (let y = 0; y < side * k; y++) for (let x = 0; x < side * k; x++) {
+    const [r, g, b, a8] = px(sx0 + Math.floor(x / k), sy0 + Math.floor(y / k));
+    const a = a8 / 255;
     if (!a) continue;
-    const di = ((oy + y) * size + (ox + x)) * 4;
-    for (let c = 0; c < 3; c++) img.data[di + c] = Math.round(sheet.data[si + c] * a + img.data[di + c] * (1 - a));
+    const di = ((o + y) * size + (o + x)) * 4;
+    img.data[di] = Math.round(r * a + img.data[di] * (1 - a));
+    img.data[di + 1] = Math.round(g * a + img.data[di + 1] * (1 - a));
+    img.data[di + 2] = Math.round(b * a + img.data[di + 2] * (1 - a));
   }
   const f = path.join(OUT, `icon-${size}.png`);
   fs.writeFileSync(f, PNG.sync.write(img));
-  console.log(f, `(postava ${bw}×${bh} ×${k})`);
+  console.log(f, `(hlava ${side}×${side} px ×${k})`);
 }
