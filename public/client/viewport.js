@@ -8,12 +8,18 @@
 // resp. var(--app-w)/var(--app-h); súradnice z udalostí (clientX/Y) sú v skutočných px → vydeľ appScale().
 export const DESIGN_W = 1720; // HUD (~310) + board (1070) + HUD (~310) + okraje
 export const DESIGN_H = 920;  // ROUND nadpis + board s frontom + toolbar dole
+// Telefón (dotyk, kratšia strana displeja ≤ 500 px) má vlastné rozloženie (trieda .phone, styles.css „Telefón"):
+// HUD zhustený v bočných stĺpcoch, lišta tlačidiel cez celú šírku. Potrebuje menej výšky → board vyjde väčší.
+export const PHONE_DESIGN_H = 830;
 
 const root = document.documentElement;
 let scale = 1, appW = DESIGN_W, appH = DESIGN_H;
 /** Dotykové zariadenie (mobil, tablet). */
 export const isTouch = window.matchMedia("(pointer: coarse)").matches;
 root.classList.toggle("touch", isTouch);
+/** Telefón - kratšia strana fyzického displeja ≤ 500 CSS px (nezávisí od otočenia). Tablety ostávajú pri desktope. */
+export const isPhone = isTouch && Math.min(screen.width, screen.height) <= 500;
+root.classList.toggle("phone", isPhone);
 
 // bezpečné okraje (výrez kamery / zaoblené rohy na mobile na šírku) - env() sa dá prečítať len cez element
 const probe = document.createElement("div");
@@ -29,7 +35,7 @@ function fit() {
   // prehliadačoch (iOS Safari) visual viewport - pri priblížení by sa zoom „zapiekol" do výpočtu
   const vw = Math.max(1, root.clientWidth - inset.l - inset.r);
   const vh = Math.max(1, root.clientHeight - inset.t - inset.b);
-  scale = Math.min(1, vw / DESIGN_W, vh / DESIGN_H);
+  scale = Math.min(1, vw / DESIGN_W, vh / (isPhone ? PHONE_DESIGN_H : DESIGN_H));
   appW = vw / scale; appH = vh / scale;
   root.style.setProperty("--app-scale", String(scale));
   root.style.setProperty("--app-w", appW + "px");

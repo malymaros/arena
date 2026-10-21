@@ -62,7 +62,7 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
   (`TOUCH_DEVICE=tablet` = iPad). Pozor: prihlasovacie meno v teste nesmie obsahovať heslo - headless Chrome by
   otvoril správcu hesiel a ten „zje" koniec dotyku.
 
-### Krok 3 - rozloženie na telefóne
+### Krok 3 - rozloženie na telefóne (hotové)
 - **Hra:** štruktúra ako desktop, prepočítaná pre telefón - HUD v stĺpcoch ~150 px po bokoch (celý: portrét, log kola,
   korunky + 1st, hlavy tímu), board v strede väčší (~520×280 px na 844×390), pod ním front [1][2][3]; dole lišta
   tlačidiel ~50×44 px s čitateľnými číslami (golden vľavo, ⏎ a LOCK vpravo).
@@ -70,6 +70,16 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
 - **Lobby hosta:** dva stĺpce bez rolovania - vľavo formát / počet dlaždíc / časovač / náhľad / farba, vpravo
   percentá dlaždíc s veľkými −/+, veľké START vpravo dole.
 - **Zoznam roomiek, výber postáv:** na celú obrazovku, väčšie karty a tlačidlá.
+
+**Ako je to spravené:** telefón = dotyk + kratšia strana fyzického displeja ≤ 500 px (`isPhone` vo `viewport.js`,
+trieda `.phone` na `<html>`; tablety nie). Virtuálna obrazovka je na telefóne nižšia (`PHONE_DESIGN_H` 830 namiesto
+920), takže všetko vyjde ~15 % väčšie (board ~500×270 px na 844×390). Celé rozloženie je čisté CSS v sekcii
+„Telefón" na konci `styles.css` - ovládanie a texty sa tam v dizajnových px zväčšujú, aby mali na displeji veľkosť
+pre prst a oko. Výber postáv je dvojstĺpcový (karty | náhľad schopnosti + PICK), login je jeden riadok navrchu,
+lobby má dva stĺpce a percentá dlaždíc majú na dotyku tlačidlá −/+ (`lobby.js`). Info riadok s popisom akcie je
+na telefóne navrchu (cez ROUND nadpis), lišta tlačidiel je posunutá doprava od menu ☰.
+**Pozor pri úpravách:** `#char-select` má na telefóne `display: grid` cez id selektor - preto `:not(.hidden)`,
+inak by prebil `.char-select.hidden` a výber postáv by nezmizol.
 
 ## Výkon (2026-10-21)
 

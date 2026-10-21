@@ -2934,3 +2934,129 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
 }
 #touch-pick.hidden { display: none; }
+
+/* ========== Telefón (html.phone - client/viewport.js; docs/MOBILE.md krok 3) ==========
+   Virtuálna obrazovka je na telefóne nižšia (PHONE_DESIGN_H 800) → board vyjde väčší (~0,49× na 844×390).
+   Ovládanie a texty sa preto v dizajnových px ZVÄČŠUJÚ, aby na displeji mali veľkosť pre prst / oko. */
+
+/* lišta tlačidiel - cez celú šírku dole, bez desktopového scale(1.2); tlačidlá ~46 skutočných px */
+/* posunutá doprava od menu ☰ (vľavo dole) */
+.phone .controls-row { bottom: 6px; left: calc(50% + 48px); transform: translateX(-50%); gap: 10px; max-width: calc(var(--app-w) - 120px); }
+.phone .controls { gap: 8px; padding: 6px 10px; }
+.phone .actions, .phone .meta { gap: 8px; }
+.phone .act-group { gap: 8px; padding-top: 26px; }
+.phone .act-group::after { font-size: 17px; }
+.phone .act-group::before { top: 19px; }
+.phone .btn.act { width: 98px; height: 84px; font-size: 38px; gap: 2px; }
+.phone .btn.act .cost { font-size: 21px; }
+.phone .btn.golden { width: 196px; }
+.phone .golden-half { font-size: 40px; padding: 10px 4px; }
+.phone .golden-half .cost { font-size: 21px; }
+.phone #undo { width: 80px; height: 84px; font-size: 36px; }
+.phone #lock { height: 84px; padding: 0 22px; font-size: 30px; }
+.phone .controls .divider { height: 72px; }
+.phone .btn.act.lasthope .lh-ico, .phone .btn.act.demon .ls-ico { width: 52px; height: 56px; }
+.phone .btn.act.lasthope .lh-cost, .phone .btn.act.demon .cost { font-size: 20px; }
+
+/* board + front [1][2][3] medzi ROUND nadpisom a lištou */
+.phone .stage { padding: 44px 16px 128px; }
+.phone .game { gap: 6px; }
+
+/* ROUND nadpis menší a vyššie (stred nad boardom) */
+.phone .hud-turn { top: 4px; font-size: 34px; }
+
+/* HUD v bočných stĺpcoch: box navrchu, vlajka „1st" a korunky / hlavy tímu hneď pod ním */
+.phone .hud-box { top: 22px; } /* menovka hráča trčí nad box */
+.phone .hud-p1 { left: 10px; }
+.phone .hud-p2 { right: 10px; }
+.phone .starter-flag { width: 150px; height: 165px; margin-top: 8px; }
+.phone .series-crowns { top: calc(100% + 186px); }
+
+/* info riadok (touch.js) - navrchu cez ROUND nadpis, mimo boardu a lišty */
+.phone #touch-info { top: 2px; bottom: auto; font-size: calc(9px * var(--ui-k, 1)); }
+
+/* výber postáv: dva stĺpce - vľavo nadpis + väčšie karty (+ potvrdenie tímu v turnaji), vpravo náhľad schopnosti
+   s väčším písmom a pod ním PICK (touch.js) */
+.phone #char-select:not(.hidden) { /* :not(.hidden) - id selektor by inak prebil .char-select.hidden */
+  display: grid; align-content: center; justify-content: center; column-gap: 48px; row-gap: 18px;
+  grid-template-columns: auto 620px; grid-template-rows: auto auto auto;
+  grid-template-areas: "title ability" "pager ability" "team pick";
+}
+.phone #char-select .char-page-title { grid-area: title; font-size: 40px; justify-self: center; }
+.phone #char-select .char-pager { grid-area: pager; gap: 20px; }
+.phone #char-select .team-bar { grid-area: team; }
+.phone #char-select .char-ability { grid-area: ability; height: auto; min-height: 520px; gap: 16px; align-self: center; }
+.phone #char-select #touch-pick { grid-area: pick; justify-self: center; align-self: start; }
+.phone .char-cards { gap: 22px; }
+.phone .char-card { width: 250px; height: 300px; }
+.phone .char-arrow { width: 70px; height: 100px; font-size: 26px; }
+.phone .ca-title { font-size: 22px; }
+.phone .ca-grid .mini-cell { width: 66px; height: 47px; }
+.phone .ca-text { font-size: 18px; max-width: 600px; }
+.phone .ca-stats { font-size: 22px; }
+.phone .ca-extra { height: 50px; }
+.phone .ca-pride img, .phone .ca-moon img, .phone .ca-luffy img { height: 50px; }
+.phone .ca-luffy img { width: 50px; }
+.phone .ca-pride .pride-num, .phone .ca-moon .ca-moon-dmg, .phone .ca-luffy .ca-luffy-dmg { font-size: 22px; }
+.phone .ca-text { height: auto; min-height: calc(5 * 1.7em); } /* dlhšie popisy na 5 riadkov, nepretečú do dmg */
+
+/* lobby: −/+ pri percentách dlaždíc (lobby.js, len dotyk) */
+.weight .w-step {
+  flex: 0 0 auto; width: 34px; height: 30px; padding: 0; cursor: pointer; border: none; border-radius: 2px;
+  background: #2a2d33; color: #ffb300; font-family: inherit; font-size: 14px;
+  box-shadow: 0 0 0 2px #000, inset 0 2px 0 rgba(255,255,255,.12), inset 0 -3px 0 rgba(0,0,0,.35);
+}
+.weight .w-step:active { transform: translateY(2px); }
+.touch .weight input { width: 64px; text-align: center; margin-left: 0; }
+.touch .weight .w-step:first-of-type { margin-left: auto; }
+
+/* login (telefón): nápis + jeden riadok NAME | PASSWORD | ENTER navrchu - klávesnica na šírku zakryje spodok */
+.phone .login { align-items: flex-start; padding: 26px 40px; }
+.phone .login-card {
+  width: 100%; max-width: none; padding: 26px 36px 30px;
+  display: grid; grid-template-columns: 1fr 1fr auto; gap: 18px 28px; align-items: end;
+}
+.phone .login-title { grid-column: 1 / -1; font-size: 56px; }
+.phone .login-label { font-size: 18px; }
+.phone .login-field input { font-size: 26px; padding: 18px 18px; }
+.phone .login-btn { width: auto; margin: 0; padding: 22px 46px; font-size: 26px; }
+.phone .login-error { grid-column: 1 / -1; font-size: 18px; }
+
+/* zoznam miestností (telefón): väčšia karta a tlačidlá */
+.phone .rooms-card { width: min(1000px, calc(var(--app-w) - 80px)); padding: 36px 40px; gap: 24px; }
+.phone .rooms-title { font-size: 56px; }
+.phone .rooms-list { gap: 20px; }
+.phone .room-card { padding: 22px 26px; }
+.phone .room-label { font-size: 26px; }
+.phone .room-btn { padding: 24px 36px; font-size: 24px; }
+.phone .room-btn.create, .phone .room-btn.reset { padding: 28px; font-size: 26px; }
+
+/* lobby hosta (telefón): dva stĺpce bez rolovania - vľavo voľby, vpravo percentá dlaždíc a START */
+.phone .lobby { padding: 16px 30px; }
+.phone .lobby-card {
+  width: 100%; max-width: none; padding: 20px 34px 26px;
+  display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; align-content: start;
+  grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview start" "timer start";
+}
+.phone .lobby-title { grid-area: title; font-size: 40px; margin-bottom: 6px; }
+.phone .lobby-sub { display: none; }
+.phone .lobby-card > .lobby-section:nth-of-type(1) { grid-area: format; }
+.phone .lobby-card > .lobby-section:nth-of-type(2) { grid-area: tiles; }
+.phone .lobby-card > .lobby-section:nth-of-type(3) { grid-area: weights; }
+.phone .lobby-card > .lobby-section:nth-of-type(4) { grid-area: color; }
+.phone .lobby-card > .lobby-section:nth-of-type(5) { grid-area: preview; }
+.phone .lobby-card > .lobby-section:nth-of-type(6) { grid-area: timer; }
+.phone .lobby-start { grid-area: start; align-self: end; margin: 0 0 18px; padding: 30px; font-size: 30px; }
+.phone .lobby-section { margin-bottom: 10px; }
+/* posledný riadok vľavo (časovač) nad menu ☰ v ľavom dolnom rohu */
+.phone .lobby { padding-bottom: 96px; }
+.phone .lobby-label { font-size: 17px; margin-bottom: 10px; }
+.phone .opt { font-size: 17px; padding: 14px 10px; min-width: 70px; }
+.phone .weights { grid-template-columns: 1fr; gap: 12px; }
+.phone .weight { font-size: 18px; gap: 12px; }
+.phone .weight .w-ico { width: 28px; height: 28px; }
+.phone .weight input { width: 90px; font-size: 22px; padding: 10px; }
+.phone .weight .w-step { width: 64px; height: 52px; font-size: 28px; }
+.phone .weight .pct { font-size: 18px; }
+.phone .weights-sum { font-size: 18px; margin-top: 12px; }
+.phone .series-crowns.mage-heads { top: calc(100% + 176px); } /* turnaj: hlavy tímu pod zmenšenou vlajkou */

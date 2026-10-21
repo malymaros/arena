@@ -1,6 +1,7 @@
 // public/client/lobby.js - lobby hosta: formát, tiles (počet + váhy, súčet 100 %), časovač, náhľad tiles,
 // farba → configure_match. Server konfiguráciu validuje/sanitizuje sám.
 import { socket } from "/client/net.js";
+import { isTouch } from "/client/viewport.js";
 
 const lobbyEl = document.getElementById("lobby");
 
@@ -32,6 +33,24 @@ export function showLobby() {
     startBtn.disabled = !ok;
   };
   inputs.forEach(i => i.addEventListener("input", refreshSum));
+  // dotyk: tlačidlá −/+ po 5 % namiesto písania (číselné pole by otvorilo klávesnicu cez pol obrazovky)
+  if (isTouch) inputs.forEach(i => {
+    i.readOnly = true;
+    const step = (d, text) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "w-step";
+      b.textContent = text;
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        i.value = String(Math.max(0, Math.min(100, (parseInt(i.value, 10) || 0) + d)));
+        refreshSum();
+      });
+      return b;
+    };
+    i.insertAdjacentElement("beforebegin", step(-5, "−"));
+    i.insertAdjacentElement("afterend", step(5, "+"));
+  });
   refreshSum();
 
   startBtn.addEventListener("click", () => {
