@@ -19,6 +19,7 @@ npm run golden:update   # rewrite the golden files - only for a deliberate behav
 npm run sim             # headless random-bot matches straight on the engine (tools/simulate.mjs, ~1 ms/match)
 node tools/difftest.mjs # engine at HEAD vs working tree on identical bot matches - must be 0 diffs for a pure refactor
 node tools/browser-smoke.mjs [--compare]  # CLIENT smoke test: headless Chrome/Edge spectates seeded bot matches (+ char-select hovers, a tournament) at 8× time; fails on JS errors / 4xx; --compare also runs HEAD and diffs the set of loaded sprite files
+node tools/touch-smoke.mjs [--shots dir]  # TOUCH controls test: real touch events in an emulated phone (TOUCH_DEVICE=tablet for iPad) - PICK, tap = select + preview / 2nd tap = queue, pickers on the board, cell picker over the board
 node tools/screens.mjs [--only phone]  # screenshots of login / char-select / game on 9 screen sizes (desktop, tablet, phone landscape + portrait) into tmp/screens/ - check after any layout change
 ```
 
@@ -113,7 +114,7 @@ Sprite sheets are horizontal strips in `public/assets/<char>/`; frame count is i
 
 ### Mobile & tablet
 
-**Read `docs/MOBILE.md` before touching layout.** The page is laid out for a fixed minimum of 1720×920 CSS px; on smaller screens `public/client/viewport.js` renders it on a "virtual screen" (`--app-w`/`--app-h`) and shrinks the whole `<body>` with one `transform: scale(--app-scale)` (≥ 1720×920 → scale 1, desktop unchanged). Therefore: never use `window.innerWidth/innerHeight` or `100vw/100vh` — use `appSize()` / `var(--app-w)`/`var(--app-h)`; convert event `clientX/Y` via `appScale()`; append fixed overlays to `body`. Touch-only extras (rotate-to-landscape hint, fullscreen button) live in `public/client/mobile-ui.js`; PWA manifest `public/manifest.webmanifest`, icons `public/icons/` (`node tools/make-icons.mjs`). Phase 2 (touch controls replacing hover previews/tooltips) is planned in the doc.
+**Read `docs/MOBILE.md` before touching layout.** The page is laid out for a fixed minimum of 1720×920 CSS px; on smaller screens `public/client/viewport.js` renders it on a "virtual screen" (`--app-w`/`--app-h`) and shrinks the whole `<body>` with one `transform: scale(--app-scale)` (≥ 1720×920 → scale 1, desktop unchanged). Therefore: never use `window.innerWidth/innerHeight` or `100vw/100vh` — use `appSize()` / `var(--app-w)`/`var(--app-h)`; convert event `clientX/Y` via `appScale()`; append fixed overlays to `body`. Touch-only extras: rotate-to-landscape hint in `public/client/mobile-ui.js`; **touch controls in `public/client/touch.js`** (tap = select + preview via a synthetic `mouseenter`, 2nd tap = execute; pickers moved into `#touch-layer` over the board at the ghost position; char-select PICK button; `:hover` rules stripped) — a new button with a hover preview needs nothing extra, its `mouseenter` handler is reused; PWA manifest `public/manifest.webmanifest`, icons `public/icons/` (`node tools/make-icons.mjs`). Step 3 (phone layout) is planned in the doc.
 
 
 ### Sound & music

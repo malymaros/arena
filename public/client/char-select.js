@@ -353,7 +353,8 @@ function runeActive() {
   // tam sa side-karta zobrazuje priamo v zlúčenom rade kariet, runa je zbytočná a kolidovala by s ním.
   return !selEl.classList.contains("hidden") && !selEl.classList.contains("roster-mode") && !hiddenMode;
 }
-document.addEventListener("mousemove", (e) => {
+// pointermove + pointerdown: myš aj dotyk (na dotyku niet pohybu bez prsta - runu zobudí ťuknutie / ťah pri rohu)
+const runeProximity = (e) => {
   if (!hiddenRune) return;
   if (!runeActive()) { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); return; }
   // clientX/Y sú skutočné px obrazovky, RUNE_RADIUS je v px layoutu (stránka môže byť zmenšená)
@@ -362,7 +363,9 @@ document.addEventListener("mousemove", (e) => {
   hiddenRune.style.opacity = String(Math.max(hiddenFound ? 0.12 : 0, t * t));
   hiddenRune.classList.toggle("near", t > 0.25);
   hiddenRune.classList.toggle("lit", t > 0.75);
-});
+};
+document.addEventListener("pointermove", runeProximity);
+document.addEventListener("pointerdown", runeProximity);
 function showHiddenPage() {
   hiddenMode = true;
   selEl.classList.add("hidden-mode");

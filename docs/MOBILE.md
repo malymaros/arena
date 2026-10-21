@@ -41,13 +41,26 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
   po 10 %; na dotyku vo veľkosti displeja.
 - Menu a okná sa na dotyku kreslia v skutočnej veľkosti displeja (`--ui-k` = 1 / --app-scale), nezmenšujú sa s hrou.
 
-### Krok 2 - dotykové ovládanie (telefón aj tablet)
+### Krok 2 - dotykové ovládanie (telefón aj tablet) (hotové)
 - **Ťuk na akciu = výber + náhľad:** zóna zásahu svieti na boarde, popis (názov · zóna · dmg · cena) v **info riadku
   nad lištou tlačidiel**; nič sa nezaradí omylom.
 - **Smer / cieľ ťuknutím na board:** okolo postavy (resp. jej ghostu) sa ukážu šípky / povolené políčka, ťukneš priamo
   na ne. Akcia bez smeru (recharge, shield…) sa zaradí druhým ťuknutím na to isté tlačidlo.
 - **Výber postavy:** ťuk na kartu = schopnosť + náhľad, potvrdenie tlačidlom **PICK <meno>**.
 - Skrytá stránka (runa) musí byť dosiahnuteľná aj dotykom; `:hover` štýly nesmú „visieť" po ťuknutí.
+
+**Ako je to spravené (`public/client/touch.js`, len pri dotyku - desktop nezmenený):**
+- jeden capture listener na `click`: prvé ťuknutie na prvok zo zoznamu `SELECTABLE` (akčné tlačidlá, golden polovice,
+  šípky a políčka pickerov, karty postáv, hlavy tímu) ho len označí (`.touch-armed`) a pošle mu syntetický
+  `mouseenter` - teda tie isté náhľady zón, ktoré na desktope ukazuje hover (`preview-hovers.js`, `queue.js`, …);
+  druhé ťuknutie klik pustí ďalej. `oneTap()` = výnimky (tlačidlá otvárajúce picker, šípky pohybu); položky frontu
+  sú len náhľad. Nové tlačidlo s náhľadom netreba nikde registrovať - stačí mu mouseenter handler ako na desktope.
+- pickery (`#dir-picker`, `#aim-picker`, … `#cell-picker`) sa pri štarte presunú do `#touch-layer` (fixná vrstva v body
+  zarovnaná na board); MutationObserver ich pri otvorení umiestni na ghost pozíciu (cell-picker = mriežka cez board).
+- `:hover` pravidlá sa pri štarte vymažú zo štýlov (sú len kozmetické); runa reaguje na `pointermove`/`pointerdown`.
+- **Test:** `node tools/touch-smoke.mjs [--shots <adresár>]` - skutočné dotyky v emulácii telefónu
+  (`TOUCH_DEVICE=tablet` = iPad). Pozor: prihlasovacie meno v teste nesmie obsahovať heslo - headless Chrome by
+  otvoril správcu hesiel a ten „zje" koniec dotyku.
 
 ### Krok 3 - rozloženie na telefóne
 - **Hra:** štruktúra ako desktop, prepočítaná pre telefón - HUD v stĺpcoch ~150 px po bokoch (celý: portrét, log kola,

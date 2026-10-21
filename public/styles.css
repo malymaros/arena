@@ -2887,3 +2887,50 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   0%, 25%   { transform: rotate(0deg); }
   55%, 100% { transform: rotate(-90deg); }
 }
+
+/* ========== Dotykové ovládanie (client/touch.js, docs/MOBILE.md krok 2) ========== */
+/* vrstva nad boardom (fixná v body, zarovnaná na board) - pickery smeru / políčka sa otvárajú na postave */
+#touch-layer { position: fixed; z-index: 60; pointer-events: none; }
+#touch-layer .dir-picker {
+  pointer-events: auto; position: absolute; bottom: auto;
+  /* stred pickera na stred políčka postavy; zväčšený tak, aby šípka mala ~44 skutočných px */
+  transform: translate(-50%, -50%) scale(calc(var(--ui-k, 1) * 1.1));
+  background: transparent; box-shadow: none; padding: 0; gap: 10px;
+}
+#touch-layer .dir-picker .arrow { width: 40px; height: 40px; padding: 0; font-size: 20px; opacity: .92;
+  box-shadow: 0 0 0 2px #000, 0 3px 8px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.18), inset 0 -2px 0 rgba(0,0,0,.35); }
+/* stredná bunka 3×3 krížov je prázdna - postava pod ňou ostáva vidieť */
+#touch-layer .dir-picker.wolf-picker .wolf-center { width: 40px; height: 40px; }
+/* výber políčka = priamo políčka boardu (rozmery nastaví touch.js) */
+#touch-layer .dir-picker.cell-picker { transform: none; padding: 0; }
+#touch-layer .cell-picker .mini-target {
+  width: auto; height: auto; font-size: 44px; opacity: .78;
+  background: rgba(55, 64, 90, .55); box-shadow: inset 0 0 0 3px rgba(255,255,255,.35);
+}
+#touch-layer .cell-picker .mini-target:disabled { background: rgba(10, 12, 18, .55); }
+#touch-layer .cell-picker .mini-target.touch-armed { background: rgba(123, 31, 162, .7); }
+
+/* označený prvok (prvé ťuknutie) - žltý pulzujúci obrys */
+.touch .touch-armed { outline: 3px solid #ffd54f; outline-offset: 2px; animation: touch-armed 1s ease-in-out infinite; }
+@keyframes touch-armed { 50% { outline-color: rgba(255, 213, 79, .35); } }
+.touch .char-card.touch-armed { transform: translateY(-6px); }
+
+/* info riadok nad lištou tlačidiel - popis označenej akcie; písmo v skutočných px displeja */
+#touch-info {
+  /* left/right 0 + margin auto: celá šírka k dispozícii (left: 50% by ju zúžilo na polovicu → 4 riadky) */
+  position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; bottom: 150px; z-index: 61;
+  max-width: calc(var(--app-w, 100vw) - 40px); padding: calc(6px * var(--ui-k, 1)) calc(12px * var(--ui-k, 1));
+  background: rgba(12, 14, 18, .92); box-shadow: 0 0 0 2px #000; color: #ffd54f; text-align: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: calc(10px * var(--ui-k, 1));
+  line-height: 1.5; pointer-events: none;
+}
+#touch-info.hidden { display: none; }
+
+/* výber postavy: PICK <meno> pod náhľadom schopnosti */
+#touch-pick {
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: calc(12px * var(--ui-k, 1));
+  padding: calc(12px * var(--ui-k, 1)) calc(24px * var(--ui-k, 1)); border: none; border-radius: 2px; cursor: pointer;
+  background: #ffb300; color: #2a1c00; letter-spacing: 2px;
+  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
+}
+#touch-pick.hidden { display: none; }
