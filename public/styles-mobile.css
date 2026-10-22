@@ -1,0 +1,305 @@
+/* public/styles-mobile.css - všetko CSS pre dotykové zariadenia a telefón (docs/MOBILE.md). Načíta sa PO styles.css.
+   html.touch = dotyk (telefón aj tablet), html.phone = dotyk + krátka strana ≤ 500 px (client/viewport.js).
+   Pravidlá:
+   - každý selektor je tu len RAZ - pri úprave zmeň existujúci riadok, nepridávaj prepis na koniec súboru;
+   - telefónne pravidlo vždy viaž na rodičovskú obrazovku (.phone .lobby …, .phone #queue …, .phone .char-ability …):
+     všeobecná trieda (.opt, .weight…) sa môže vyskytovať aj inde (kolízia .phone .opt vs. .q-badge.opt);
+   - kontrola: node tools/screens.mjs --compare <uložené štýly> (refaktor = 0 rozdielov), node tools/touch-smoke.mjs. */
+
+/* ========== Mobil / tablet: výzva otočiť zariadenie (client/mobile-ui.js) ==========
+   Len dotyk na výšku; nad všetkým (aj lobby / char-select / login). Stránka je na výšku silno zmenšená,
+   preto sa rozmery delia --app-scale (= normálna veľkosť na displeji). */
+#rotate-hint { display: none; }
+@media (orientation: portrait) {
+  .touch #rotate-hint {
+    position: fixed; inset: 0; z-index: 100000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: calc(22px / var(--app-scale, 1));
+    background: #08090c; color: #ffb300; text-align: center;
+    font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+  }
+}
+#rotate-hint .rh-phone {
+  width: calc(46px / var(--app-scale, 1)); height: calc(78px / var(--app-scale, 1));
+  border: calc(5px / var(--app-scale, 1)) solid #f2e6c9; border-radius: calc(6px / var(--app-scale, 1));
+  box-shadow: 0 0 0 calc(2px / var(--app-scale, 1)) #000;
+  animation: rh-turn 2.4s ease-in-out infinite;
+}
+#rotate-hint .rh-text {
+  font-size: calc(16px / var(--app-scale, 1)); letter-spacing: calc(2px / var(--app-scale, 1));
+  text-shadow: calc(3px / var(--app-scale, 1)) calc(3px / var(--app-scale, 1)) 0 #7a1f00;
+}
+#rotate-hint .rh-sub { font-size: calc(9px / var(--app-scale, 1)); color: #9aa3ad; letter-spacing: calc(1px / var(--app-scale, 1)); }
+@keyframes rh-turn {
+  0%, 25%   { transform: rotate(0deg); }
+  55%, 100% { transform: rotate(-90deg); }
+}
+
+/* ========== Dotyk - telefón aj tablet (client/touch.js) ========== */
+
+/* bez modrého záblesku pri ťuknutí, bez výberu textu a kontextovej bubliny pri podržaní (okrem polí) */
+.touch body { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.touch input, .touch textarea { -webkit-user-select: text; user-select: text; }
+/* menu ☰: ~40 skutočných px bez ohľadu na zmenšenie hry */
+.touch #menu-btn { transform: scale(calc(var(--ui-k, 1) * .9)); }
+
+/* vrstva nad boardom (fixná v body, zarovnaná na board) - pickery smeru / políčka sa otvárajú na postave */
+#touch-layer { position: fixed; z-index: 60; pointer-events: none; }
+#touch-layer .dir-picker {
+  pointer-events: auto; position: absolute; bottom: auto;
+  /* stred pickera na stred políčka postavy; zväčšený tak, aby šípka mala ~44 skutočných px */
+  transform: translate(-50%, -50%) scale(calc(var(--ui-k, 1) * 1.1));
+  background: transparent; box-shadow: none; padding: 0; gap: 10px;
+}
+#touch-layer .dir-picker .arrow { width: 40px; height: 40px; padding: 0; font-size: 20px; opacity: .92;
+  box-shadow: 0 0 0 2px #000, 0 3px 8px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.18), inset 0 -2px 0 rgba(0,0,0,.35); }
+/* stredná bunka 3×3 krížov je prázdna - postava pod ňou ostáva vidieť */
+#touch-layer .dir-picker.wolf-picker .wolf-center { width: 40px; height: 40px; }
+/* výber políčka = priamo políčka boardu (rozmery nastaví touch.js) */
+#touch-layer .dir-picker.cell-picker { transform: none; padding: 0; }
+#touch-layer .cell-picker .mini-target {
+  width: auto; height: auto; font-size: 44px; opacity: .78;
+  background: rgba(55, 64, 90, .55); box-shadow: inset 0 0 0 3px rgba(255,255,255,.35);
+}
+#touch-layer .cell-picker .mini-target:disabled { background: rgba(10, 12, 18, .55); }
+#touch-layer .cell-picker .mini-target.touch-armed { background: rgba(123, 31, 162, .7); }
+
+/* označený prvok (prvé ťuknutie) - žltý pulzujúci obrys */
+.touch .touch-armed { outline: 3px solid #ffd54f; outline-offset: 2px; animation: touch-armed 1s ease-in-out infinite; }
+@keyframes touch-armed { 50% { outline-color: rgba(255, 213, 79, .35); } }
+
+/* štítok „TAP AGAIN" nad označenou akciou - jasné, že akciu zaradí druhé ťuknutie */
+#touch-confirm {
+  position: fixed; z-index: 62; pointer-events: none; white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: calc(4px * var(--ui-k, 1)) calc(8px * var(--ui-k, 1));
+  background: #ffd54f; color: #2a1c00; box-shadow: 0 0 0 2px #000, 0 4px 10px rgba(0,0,0,.5);
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: calc(9px * var(--ui-k, 1));
+  animation: touch-confirm-pulse .9s ease-in-out infinite;
+}
+#touch-confirm.hidden { display: none; }
+/* šípka dole k tlačidlu */
+#touch-confirm::after {
+  content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  border: calc(5px * var(--ui-k, 1)) solid transparent; border-top-color: #ffd54f;
+}
+@keyframes touch-confirm-pulse { 50% { filter: brightness(1.25); } }
+
+/* info riadok nad lištou tlačidiel - popis označenej akcie; písmo v skutočných px displeja */
+#touch-info {
+  /* left/right 0 + margin auto: celá šírka k dispozícii (left: 50% by ju zúžilo na polovicu → 4 riadky) */
+  position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; bottom: 150px; z-index: 61;
+  max-width: calc(var(--app-w, 100vw) - 40px); padding: calc(6px * var(--ui-k, 1)) calc(12px * var(--ui-k, 1));
+  background: rgba(12, 14, 18, .92); box-shadow: 0 0 0 2px #000; color: #ffd54f; text-align: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: calc(10px * var(--ui-k, 1));
+  line-height: 1.5; pointer-events: none;
+}
+#touch-info.hidden { display: none; }
+
+/* zamknuté tlačidlá (otvorený výber smeru, po LOCK IN, počas prehrávania) na ťuknutie nereagujú vôbec -
+   žiadny náhľad z prehliadača, žiadny popis, žiadne označenie */
+.touch .controls-row .locked-ui { pointer-events: none; }
+
+/* menu ☰: RELOAD GAME len s nápisom, bez vysvetľujúceho podnadpisu */
+.touch .menu-item[data-act="reload"] small { display: none; }
+
+/* lobby: −/+ pri percentách dlaždíc (lobby.js, len dotyk) */
+.weight .w-step {
+  flex: 0 0 auto; width: 34px; height: 30px; padding: 0; cursor: pointer; border: none; border-radius: 2px;
+  background: #2a2d33; color: #ffb300; font-family: inherit; font-size: 14px;
+  box-shadow: 0 0 0 2px #000, inset 0 2px 0 rgba(255,255,255,.12), inset 0 -3px 0 rgba(0,0,0,.35);
+}
+.weight .w-step:active { transform: translateY(2px); }
+.touch .weight input { width: 64px; text-align: center; margin-left: 0; }
+.touch .weight .w-step:first-of-type { margin-left: auto; }
+
+/* výber postavy: PICK <meno> pod náhľadom schopnosti (jediná cesta, ako postavu vybrať) */
+#touch-pick {
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: calc(12px * var(--ui-k, 1));
+  padding: calc(12px * var(--ui-k, 1)) calc(24px * var(--ui-k, 1)); border: none; border-radius: 2px; cursor: pointer;
+  background: #ffb300; color: #2a1c00; letter-spacing: 2px;
+  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
+}
+#touch-pick.hidden { display: none; }
+/* označená karta musí byť jasne vidieť - ostatné karty stmavnú, označená sa zdvihne, zväčší a dostane biely rám
+   so zlatou žiarou a zlatú menovku (statické, bez nekonečnej animácie) */
+.touch .char-cards:has(.char-card.touch-armed) .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
+.touch .char-card.touch-armed {
+  transform: translateY(-10px) scale(1.04); z-index: 2; outline: none; animation: none;
+  box-shadow: 0 0 0 5px #fff, 0 0 0 9px #ffb300, 0 0 0 11px #000, 0 0 34px 6px rgba(255,200,40,.75);
+}
+.touch .char-card.touch-armed .char-name { background: #ffb300; color: #1a1200; text-shadow: none; padding: 7px 6px; }
+/* skrytá stránka „Hidden": všetko oranžové (označená karta, PICK, nadpis náhľadu, políčko postavy v mini-mape)
+   je ladené do fialovej ako zvyšok stránky */
+.touch #char-select.hidden-mode .char-card.touch-armed {
+  box-shadow: 0 0 0 5px #fff, 0 0 0 9px #9a6ff0, 0 0 0 11px #000, 0 0 34px 6px rgba(177,122,255,.75);
+}
+.touch #char-select.hidden-mode .char-card.touch-armed .char-name { background: #9a6ff0; color: #12061f; }
+.touch #char-select.hidden-mode #touch-pick { background: #9a6ff0; color: #12061f; }
+.touch #char-select.hidden-mode .ca-title { color: #b17aff; }
+.touch #char-select.hidden-mode .ca-grid .mini-cell.caster { background: #9a6ff0; }
+/* tablet (dotyk, desktopové rozloženie): panel náhľadu a PICK s pevnou šírkou - centrovaný obsah rôznej dĺžky
+   by ich inak pri prepínaní kariet posúval do strán */
+.touch:not(.phone) #char-select .char-ability { width: 620px; }
+.touch:not(.phone) #char-select #touch-pick { width: 460px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* koniec hry: PLAY AGAIN / LEAVE ROOM v skutočnej veľkosti pre prst */
+.touch .go-buttons { gap: calc(14px * var(--ui-k, 1)); }
+.touch .retry, .touch .retry.leave { font-size: calc(15px * var(--ui-k, 1)); padding: calc(16px * var(--ui-k, 1)) calc(30px * var(--ui-k, 1)); }
+
+/* ========== Telefón (html.phone - client/viewport.js) ==========
+   Virtuálna obrazovka je na telefóne nižšia (PHONE_DESIGN_H 800) → board vyjde väčší (~0,49× na 844×390).
+   Ovládanie a texty sa preto v dizajnových px ZVÄČŠUJÚ, aby na displeji mali veľkosť pre prst / oko.
+   Poradie: login → miestnosti → nastavenie zápasu → čakanie a losovanie → výber postáv → hra → koniec hry. */
+
+/* --- login: nápis + jeden riadok NAME | PASSWORD | ENTER navrchu - klávesnica na šírku zakryje spodok --- */
+.phone .login { align-items: flex-start; padding: 26px 40px; }
+.phone .login-card {
+  width: 100%; max-width: none; padding: 26px 36px 30px;
+  display: grid; grid-template-columns: 1fr 1fr auto; gap: 18px 28px; align-items: end;
+}
+.phone .login-title { grid-column: 1 / -1; font-size: 56px; }
+.phone .login-label { font-size: 18px; }
+.phone .login-field input { font-size: 26px; padding: 18px 18px; }
+.phone .login-btn { width: auto; margin: 0; padding: 22px 46px; font-size: 26px; }
+.phone .login-error { grid-column: 1 / -1; font-size: 18px; }
+
+/* --- zoznam miestností: väčšia karta a tlačidlá --- */
+.phone .rooms-card { width: min(1000px, calc(var(--app-w) - 80px)); padding: 36px 40px; gap: 24px; }
+.phone .rooms-title { font-size: 56px; }
+.phone .rooms-list { gap: 20px; }
+.phone .room-card { padding: 22px 26px; }
+.phone .room-label { font-size: 26px; }
+.phone .room-btn { padding: 24px 36px; font-size: 24px; }
+.phone .room-btn.create, .phone .room-btn.reset { padding: 28px; font-size: 26px; }
+
+/* --- nastavenie zápasu (lobby hosta) na celú obrazovku: dva stĺpce bez rolovania - vľavo voľby, vpravo percentá
+   dlaždíc, START cez celú šírku dole. Voľné miesto ide do riadku nadpisu (1fr) a nadpis je v ňom vycentrovaný.
+   Menu ☰ sa počas nastavovania skryje (inak by lobby muselo uhýbať jeho rohu). --- */
+html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
+.phone .lobby { padding: 0; align-items: stretch; }
+.phone .lobby-card {
+  width: 100%; max-width: none; padding: 30px 48px 36px; border: none; border-radius: 0; box-shadow: none;
+  display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; align-content: start;
+  grid-template-rows: 1fr repeat(6, auto);
+  grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview weights" "timer weights" "start start";
+}
+.phone .lobby-title { grid-area: title; font-size: 52px; margin-bottom: 16px; align-self: center; }
+.phone .lobby-sub { display: none; }
+.phone .lobby-card > .lobby-section:nth-of-type(1) { grid-area: format; }
+.phone .lobby-card > .lobby-section:nth-of-type(2) { grid-area: tiles; }
+.phone .lobby-card > .lobby-section:nth-of-type(3) { grid-area: weights; align-self: start; } /* percentá nenaťahujú riadky vľavo */
+.phone .lobby-card > .lobby-section:nth-of-type(4) { grid-area: color; }
+.phone .lobby-card > .lobby-section:nth-of-type(5) { grid-area: preview; }
+.phone .lobby-card > .lobby-section:nth-of-type(6) { grid-area: timer; }
+.phone .lobby-section { margin-bottom: 20px; }
+.phone .lobby-label { font-size: 21px; margin-bottom: 12px; }
+.phone .lobby .opt { font-size: 21px; padding: 20px 12px; min-width: 70px; }
+.phone .lobby .weights { grid-template-columns: 1fr; gap: 16px; }
+.phone .lobby .weight { font-size: 22px; gap: 12px; }
+.phone .lobby .weight .w-ico { width: 34px; height: 34px; }
+.phone .lobby .weight input { width: 100px; font-size: 26px; padding: 12px; }
+.phone .lobby .weight .w-step { width: 74px; height: 60px; font-size: 32px; }
+.phone .lobby .weight .pct { font-size: 20px; }
+.phone .lobby .weights-sum { font-size: 21px; margin-top: 12px; }
+.phone .lobby-start { grid-area: start; margin: 12px 0 0; padding: 30px; font-size: 36px; }
+
+/* --- hlášky čakania (host / súper / tím) a losovanie strán cez celú výšku obrazovky --- */
+.phone .lobby-wait { font-size: 40px; line-height: 1.9; padding: 60px 90px; color: #e4e6ea; }
+.phone .cr-title { font-size: 40px; }
+.phone .cr-wheel { width: 500px; height: 500px; }
+.phone .cr-knob { width: 44px; height: 44px; }
+.phone .cr-result { font-size: 40px; }
+
+/* --- výber postáv: dva stĺpce - vľavo nadpis + pás postáv (+ potvrdenie tímu v turnaji), vpravo náhľad schopnosti
+   a pod ním PICK. Panel náhľadu má PEVNÚ výšku (popis na 6 riadkov, dlhší sa zmenší - char-select.js; štatistiky
+   1 riadok) a PICK pevnú šírku na jeden riadok → prepínanie kariet nemení mriežku a nič neskáče. --- */
+.phone #char-select:not(.hidden) { /* :not(.hidden) - id selektor by inak prebil .char-select.hidden */
+  display: grid; align-content: center; justify-content: center; column-gap: 48px; row-gap: 18px;
+  grid-template-columns: auto 620px; grid-template-rows: auto auto auto;
+  grid-template-areas: "title ability" "pager ability" "team pick";
+}
+.phone #char-select .char-page-title { grid-area: title; font-size: 40px; justify-self: center; }
+.phone #char-select .team-bar { grid-area: team; }
+.phone #char-select .char-cards { gap: 22px; }
+.phone #char-select .char-card { width: 250px; height: 300px; }
+.phone #char-select .char-arrow { display: none; } /* bez šípok - pás sa ťahá prstom, Hidden otvára/zatvára runa */
+.phone #char-select .char-ability { grid-area: ability; height: 600px; min-height: 0; gap: 16px; align-self: center; justify-content: flex-start; }
+.phone .char-ability .ca-title { font-size: 22px; }
+.phone .char-ability .ca-grid .mini-cell { width: 66px; height: 47px; }
+.phone .char-ability .ca-text { font-size: 18px; max-width: 600px; height: calc(6 * 1.7em); min-height: 0; overflow: hidden; }
+.phone .char-ability .ca-stats { font-size: 22px; height: 34px; min-height: 0; }
+.phone .char-ability .ca-extra { height: 50px; }
+.phone .char-ability .ca-pride img, .phone .char-ability .ca-moon img, .phone .char-ability .ca-luffy img { height: 50px; }
+.phone .char-ability .ca-luffy img { width: 50px; }
+.phone .char-ability .ca-pride .pride-num, .phone .char-ability .ca-moon .ca-moon-dmg, .phone .char-ability .ca-luffy .ca-luffy-dmg { font-size: 22px; }
+.phone #char-select #touch-pick {
+  grid-area: pick; justify-self: stretch; align-self: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: calc(11px * var(--ui-k, 1)); padding: calc(12px * var(--ui-k, 1)) calc(10px * var(--ui-k, 1));
+}
+/* pás postáv (client/char-strip.js): bežné stránky tvoria jeden cyklický pás - kontajnery stránok bez boxu, karty
+   absolútne v .char-pager, ich polohu (transform) píše char-strip.js; okraje pásu sa strácajú do tmy.
+   Šírka pásu je rovnaká aj na Hidden stránke, nech sa panel vpravo pri prepnutí nehýbe. */
+.phone #char-select .char-pager { grid-area: pager; gap: 20px; }
+.phone #char-select:not(.roster-mode) .char-pager { width: 980px; }
+.phone #char-select.strip-mode .char-pager {
+  position: relative; height: 380px; touch-action: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+}
+.phone #char-select.strip-mode .char-cards:not([data-page="hidden"]) { display: contents; }
+.phone #char-select.strip-mode .char-cards:not([data-page="hidden"]) .char-card {
+  position: absolute; left: 50%; top: 50%; transition: box-shadow .15s ease, filter .15s ease;
+}
+.phone #char-select.strip-mode .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
+
+/* --- hra: lišta tlačidiel cez celú šírku dole (posunutá doprava od menu ☰), bez desktopového scale(1.2);
+   tlačidlá ~46 skutočných px --- */
+.phone .controls-row { bottom: 6px; left: calc(50% + 48px); transform: translateX(-50%); gap: 10px; max-width: calc(var(--app-w) - 120px); }
+.phone .controls { gap: 8px; padding: 6px 10px; }
+.phone .actions, .phone .meta { gap: 8px; }
+.phone .act-group { gap: 8px; padding-top: 26px; }
+.phone .act-group::after { font-size: 17px; }
+.phone .act-group::before { top: 19px; }
+.phone .btn.act { width: 98px; height: 84px; font-size: 38px; gap: 2px; }
+.phone .btn.act .cost { font-size: 21px; }
+.phone .btn.golden { width: 196px; }
+.phone .golden-half { font-size: 40px; padding: 10px 4px; }
+.phone .golden-half .cost { font-size: 21px; }
+.phone #undo { width: 80px; height: 84px; font-size: 36px; }
+.phone #lock { height: 84px; padding: 0 22px; font-size: 30px; }
+.phone .controls .divider { height: 72px; }
+.phone .btn.act.lasthope .lh-ico, .phone .btn.act.demon .ls-ico { width: 52px; height: 56px; }
+.phone .btn.act.lasthope .lh-cost, .phone .btn.act.demon .cost { font-size: 20px; }
+
+/* board + zápis kola medzi ROUND nadpisom a lištou */
+.phone .stage { padding: 44px 16px 128px; }
+.phone .game { gap: 6px; }
+/* zápis kola: voliteľné zlaté bunky (golden shield/mirror/mana, Last Stand) rovnako vysoké ako hlavné akcie,
+   ikona čitateľná, démon vyplní bunku - riadok je jednotný, nič netrčí ani sa nestráca */
+.phone #queue .q-badge.opt { width: 44px; height: 40px; padding: 0; font-size: 20px; align-self: auto; }
+.phone #queue .q-badge.opt .ls-badge { height: 32px; }
+
+/* ROUND nadpis menší a vyššie (stred nad boardom); hláška „your move / waiting" široký pás nad boardom */
+.phone .hud-turn { top: 4px; font-size: 34px; }
+.phone .turn-status { top: 64px; font-size: 24px; padding: 18px 30px; }
+/* info riadok (touch.js) - navrchu cez ROUND nadpis, mimo boardu a lišty */
+.phone #touch-info { top: 2px; bottom: auto; font-size: calc(9px * var(--ui-k, 1)); }
+
+/* HUD v bočných stĺpcoch: box navrchu, vlajka „1st" a korunky / hlavy tímu hneď pod ním */
+.phone .hud-box { top: 22px; } /* menovka hráča trčí nad box */
+.phone .hud-p1 { left: 10px; }
+.phone .hud-p2 { right: 10px; }
+/* vlajka „1st" bez žrde: celé miesto pod boxom zaberie len látka (oblasť viewBoxu x 16–94, y 10–50 → SVG sa zväčší
+   a posunie tak, aby látka presne vyplnila box vlajky; pomer boxu = 78:40) */
+.phone .starter-flag { width: 236px; height: 121px; margin-top: 14px; }
+.phone .starter-flag .flag-pole { display: none; }
+.phone .starter-flag svg { position: absolute; width: 128.2%; height: 275%; left: -20.5%; top: -25%; }
+.phone .hud-p2 .starter-flag svg { left: -7.7%; } /* zrkadlené SVG: látka je v ňom na x 6–84 % */
+.phone .starter-flag .flag-label { top: 50%; font-size: 36px; }
+.phone .series-crowns { top: calc(100% + 186px); }
+.phone .series-crowns.mage-heads { top: calc(100% + 176px); } /* turnaj: hlavy tímu pod vlajkou */
+
+/* --- koniec hry: veľké tlačidlá --- */
+.phone .go-buttons { gap: 26px; padding: 26px; }
+.phone .go-buttons .retry { min-width: 400px; font-size: 26px; padding: 30px 34px 34px; }

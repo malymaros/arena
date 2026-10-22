@@ -23,8 +23,10 @@ takže HUD, toolbar a overlaye ostanú pri okrajoch obrazovky. Na obrazovke ≥ 
   (len kde to prehliadač vie - Android Chrome; iPhone Safari nie, tam pomôže „Pridať na plochu");
 - CSS: žiadny pull-to-refresh, double-tap zoom, výber textu ani kontextová bublina pri podržaní (trieda `.touch` na `<html>`).
 
-**Kontrola:** `node tools/screens.mjs` nasníma login, výber postáv a hru na 9 veľkostiach (desktop, tablet, mobil na šírku
-aj na výšku) do `tmp/screens/` (mimo gitu). `--only phone` vyberie len niektoré zariadenia.
+**Kontrola:** `node tools/screens.mjs` nasníma 18 obrazoviek (login, miestnosti, nastavenie zápasu, čakanie, losovanie, výber postáv
+vrátane Hidden, hra, picker, menu, Last Stand, FINAL ROUND, hlášky, koniec hry) na 9 veľkostiach (desktop, tablet, mobil na šírku
+aj na výšku) do `tmp/screens/` (mimo gitu). `--only phone` vyberie len niektoré zariadenia. Pri refaktore CSS:
+`--styles tmp/pred.json` pred zmenou, `--compare tmp/pred.json` po nej - vypočítané štýly všetkých prvkov musia sedieť (0 rozdielov).
 
 ## Návrh mobilného UI (dohodnutý s vlastníkom 2026-10-21)
 
@@ -71,7 +73,7 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
   otvára aj zatvára runa v rohu (na Hidden svieti stále) a návrat obnoví miesto v páse. Mimo pásu: výber z turnajového
   tímu (roster-mode) a Hidden stránka.
 - pickery (`#dir-picker`, `#aim-picker`, … `#cell-picker`) sa pri štarte presunú do `#touch-layer` (fixná vrstva v body
-  zarovnaná na board); MutationObserver ich pri otvorení umiestni na ghost pozíciu (cell-picker = mriežka cez board).
+  zarovnaná na board); MutationObserver ich pri otvorení umiestni pevne do stredu boardu (pri postave by na krajnom riadku trčali mimo plochy; cell-picker = mriežka cez board).
 - `:hover` pravidlá sa pri štarte vymažú zo štýlov (sú len kozmetické); runa reaguje na `pointermove`/`pointerdown`.
 - **Test:** `node tools/touch-smoke.mjs [--shots <adresár>]` - skutočné dotyky v emulácii telefónu
   (`TOUCH_DEVICE=tablet` = iPad). Pozor: prihlasovacie meno v teste nesmie obsahovať heslo - headless Chrome by
@@ -89,7 +91,7 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
 **Ako je to spravené:** telefón = dotyk + kratšia strana fyzického displeja ≤ 500 px (`isPhone` vo `viewport.js`,
 trieda `.phone` na `<html>`; tablety nie). Virtuálna obrazovka je na telefóne nižšia (`PHONE_DESIGN_H` 830 namiesto
 920), takže všetko vyjde ~15 % väčšie (board ~500×270 px na 844×390). Celé rozloženie je čisté CSS v sekcii
-„Telefón" na konci `styles.css` - ovládanie a texty sa tam v dizajnových px zväčšujú, aby mali na displeji veľkosť
+„Telefón" v `public/styles-mobile.css` (všetko CSS pre dotyk a telefón, načíta sa po `styles.css`; každý selektor raz, telefónne pravidlá viazané na svoju obrazovku) - ovládanie a texty sa tam v dizajnových px zväčšujú, aby mali na displeji veľkosť
 pre prst a oko. Výber postáv je dvojstĺpcový (karty | náhľad schopnosti + PICK), login je jeden riadok navrchu,
 lobby má dva stĺpce a percentá dlaždíc majú na dotyku tlačidlá −/+ (`lobby.js`). Info riadok s popisom akcie je
 na telefóne navrchu (cez ROUND nadpis), lišta tlačidiel je posunutá doprava od menu ☰.
