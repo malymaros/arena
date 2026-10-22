@@ -205,3 +205,19 @@ obsadené; style = súčet Recalculate Style v okne (ms).
 | Stav | round hl.vl. % | golden hl.vl. % | golden FPS | demon hl.vl. % | demon FPS | demon snímky > 50 ms % | demon style ms |
 |---|---|---|---|---|---|---|---|
 | pred (etapa 0) | 49.3 | 97.0 | 39.7 | 97.2 | 27.4 | 12.8 | 2074 |
+
+**Záverečné A/B** (`--ab 26e29cd`, striedavé behy, medián; 26e29cd = klient pred zmenami, po = f431db1):
+
+| Zariadenie / režim | okno | hl. vlákno % | GPU % | FPS | snímky > 50 ms % | p95 snímka ms |
+|---|---|---|---|---|---|---|
+| telefón, lite (predvolené na dotyku), 5+5 behov | round | 56 → 44 | 22 → 18 | 52 → 51 | 1.0 → 0.7 | 18 → 18 |
+| | golden | 97 → 48 | 83 → 15 | 37 → 56 | 10.2 → 0.0 | 53 → 18 |
+| | demon | 98 → 67 | 85 → 19 | 23 → 51 | 36.0 → 1.4 | 88 → 19 |
+| tablet 1180×820, lite, 3+3 | golden | 92 → 52 | 89 → 16 | 31 → 55 | 20.3 → 0.0 | 54 → 19 |
+| | demon | 94 → 71 | 90 → 20 | 19 → 50 | 53.5 → 1.2 | 107 → 35 |
+| telefón, full (vzhľad desktopu), 3+3 | golden | 97 → 95 | 82 → 80 | 36 → 39 | 9.2 → 5.4 | 53 → 53 |
+| | demon | 98 → 98 | 86 → 83 | 23 → 25 | 34.0 → 27.6 | 89 → 72 |
+
+Full režim (desktop) dostal len zmeny bez vplyvu na vzhľad (poloha bez getComputedStyle, trvalá aura, zápisy
+len pri zmene, kreslenie len viditeľných overlayov) - JS pri démonovi 9.7 → 4.6 s, FPS takmer rovnaké. Tablet
+v nečinnom okne ukázal mierne vyššie GPU (18 → 26 %) - v rámci rozptylu behov, telefón tam naopak klesol.
