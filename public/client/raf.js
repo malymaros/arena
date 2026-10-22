@@ -6,7 +6,7 @@ import { tickTurnTimer } from "/client/turn-timer.js";
 import { perfFrame } from "/client/perf.js";
 import { actors } from "/client/actors.js";
 import { state, me, otherSlot } from "/client/session.js";
-import { positionActors, computeFacing, escPrideMul, ESC_FEET_FRAC, PAIR_SHIFT_DEFAULT, pairShift } from "/client/placement.js";
+import { positionActors, computeFacing, escPrideMul, ESC_FEET_FRAC, PAIR_SHIFT_DEFAULT, pairShift, liveActorPos } from "/client/placement.js";
 import { usesAltColor, charDirFor, ANIM_DEF, VAMP_ONESHOT_KEYS, ensureSpriteMeta, drawSprite, ACTOR_W, ACTOR_H, portraitFill, CHARGE_ANIM } from "/client/sprites.js";
 import { actorFilter, SUMMON_CROP, placeChargeAura, spawnChargeAura } from "/client/board-fx.js";
 import { CHARS_BY_KEY, SPECIAL_ANIMS, PAIR_SHIFT, PORTRAIT_SCALE, HEAD_CX } from "/chars/index.js";
@@ -376,16 +376,18 @@ export function raf() {
         deathBehind.style.opacity = "0";
       } else if (!lastStand.banishing && tgt && tgt.char && !tgt.down) {
         // pozícia sleduje postavu per-frame (bez transition); opacity 0.25 dotiahne CSS transition plynulo (z 1 po settle)
-        const actorEl = buffSlot === "p1" ? actorP1 : actorP2;
-        const aLeft = parseFloat(getComputedStyle(actorEl).left) || 0; // počas pohybu = interpolovaná hodnota (CSS transition)
-        const aTop  = parseFloat(getComputedStyle(actorEl).top)  || 0;
+        // počas pohybu = interpolovaná hodnota CSS transition - dopočítaná, nie getComputedStyle (výkon)
+        const { left: aLeft, top: aTop } = liveActorPos(buffSlot);
         const facing = computeFacing(state.p1, state.p2);
         const headDx = (facing[buffSlot] || 1) * ACTOR_W * ((HEAD_CX[tgt.char] ?? 0.5) - 0.5);
         const shift = pairShift(buffSlot); // aktér nesie shift v transforme, nie v left
-        deathBehind.style.left = (aLeft + shift + headDx + DEATH_SEQ.behindOffsetX) + "px";
-        deathBehind.style.top  = (aTop + DEATH_SEQ.behindOffsetY) + "px";
-        deathBehind.style.transform = `scale(${DEATH_SEQ.behindRatio})`;
-        deathBehind.style.opacity = String(DEATH_SEQ.behindOpacity);
+        // zápisy len pri zmene - stojaca postava = žiadna invalidácia štýlu/layoutu
+        const dl = (aLeft + shift + headDx + DEATH_SEQ.behindOffsetX) + "px", dt = (aTop + DEATH_SEQ.behindOffsetY) + "px";
+        const dtr = `scale(${DEATH_SEQ.behindRatio})`, dop = String(DEATH_SEQ.behindOpacity);
+        if (deathBehind.style.left !== dl) deathBehind.style.left = dl;
+        if (deathBehind.style.top !== dt) deathBehind.style.top = dt;
+        if (deathBehind.style.transform !== dtr) deathBehind.style.transform = dtr;
+        if (deathBehind.style.opacity !== dop) deathBehind.style.opacity = dop;
       }
     } else if (lastStand.realActive) {
       // koniec buffnutého stavu (smrť/výhra) - uprac

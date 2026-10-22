@@ -8,6 +8,29 @@ import { actorP1, actorP2, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
 import { ACTOR_W, ACTOR_H } from "/client/sprites.js";
 import { CHAR_FX, fxAll } from "/client/fx-registry.js";
 import { cloneEls, youMarker } from "/client/actor-layers.js";
+import { MOVE_MS } from "/client/anim.js";
+
+/* ---------- živá pozícia figúr bez čítania DOM (výkon, docs/PERF_PLAN.md etapa 3) ---------- */
+// Postavy a klony kĺžu cez CSS transition left/top (lineárne, MOVE_MS = --move-ms). Kto potrebuje ich AKTUÁLNU
+// (interpolovanú) pozíciu každý frame (démon za postavou, nabíjacie aury), by inak čítal getComputedStyle - to
+// vynúti prepočet štýlov uprostred frame-u. Preto si pri každom zápise cieľa pamätáme pohyb a pozíciu dopočítame.
+// Kľúč: "p1"/"p2" = postava, "clone:p1"/"clone:p2" = tieňový klon.
+const motion = {};
+function trackMove(key, x, y, snap) {
+  const now = performance.now();
+  const m = motion[key];
+  if (snap || !m) { motion[key] = { x0: x, y0: y, x1: x, y1: y, t0: now }; return; }
+  if (m.x1 === x && m.y1 === y) return; // rovnaký cieľ → CSS transition sa nereštartuje
+  const cur = liveActorPos(key, now);
+  motion[key] = { x0: cur.left, y0: cur.top, x1: x, y1: y, t0: now };
+}
+/** Aktuálna (interpolovaná) left/top figúry v px - rovnaká hodnota, akú by vrátil getComputedStyle. */
+export function liveActorPos(key, now = performance.now()) {
+  const m = motion[key];
+  if (!m) return { left: 0, top: 0 };
+  const k = MOVE_MS > 0 ? Math.min(1, Math.max(0, (now - m.t0) / MOVE_MS)) : 1;
+  return { left: m.x0 + (m.x1 - m.x0) * k, top: m.y0 + (m.y1 - m.y0) * k };
+}
 
 /* ---------- Facing + umiestnenie ---------- */
 export function computeFacing(p1, p2) {
@@ -77,9 +100,11 @@ export function positionActors(s, immediate = false) {
       el.style.top  = py + "px";
       void el.offsetHeight;
       el.style.transition = "";
+      trackMove(slot, px, py, true);
     } else {
       el.style.left = px + "px";
       el.style.top  = py + "px";
+      trackMove(slot, px, py, false);
     }
 
     const shift = pairShift(slot, s);
@@ -141,9 +166,11 @@ export function positionActors(s, immediate = false) {
       el.style.left = px + "px"; el.style.top = py + "px";
       void el.offsetHeight;
       el.style.transition = "";
+      trackMove("clone:" + slot, px, py, true);
     } else {
       // bežný frame - CSS transition dá súbežný slide s majiteľom (rozdelenie aj zliatie plynulo)
       el.style.left = px + "px"; el.style.top = py + "px";
+      trackMove("clone:" + slot, px, py, false);
     }
     el.style.transform = `translateX(${shift}px) scaleX(${currentFacing(slot, facing)})`;
     el._logCell = { x: c.x, y: c.y };

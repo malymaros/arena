@@ -14,6 +14,7 @@
 //   node tools/perf-probe.mjs --ref <commit>        → meria danú verziu (dočasný git worktree)
 //   node tools/perf-probe.mjs --label po-etape-2    → názov výsledku (default "work" / ref)
 //   node tools/perf-probe.mjs --base tmp/perf/pred.json → vypíše aj rozdiel oproti uloženému výsledku
+//   node tools/perf-probe.mjs --ab <commit> --label etapa3 → striedavé behy <commit> a pracovného stromu (spoľahlivé A/B)
 //   node tools/perf-probe.mjs --reps 1 --profile golden_idle → navyše vypíše najdrahšie JS funkcie a udalosti v okne
 //   node tools/perf-probe.mjs --reps 1 --shots tmp/perf/shots → snímky na vizuálnu kontrolu (lite vs full: --perf)
 //   --device tablet (1180×820, DPR 2) · --throttle 6 · --reps 5 · --perf full|lite (URL ?perf=…, od etapy 1)
@@ -318,42 +319,68 @@ const METRICS = [["busy", "hl.vlákno %"], ["gpu", "GPU %"], ["fps", "FPS"], ["s
   ["styleMs", "style ms"], ["layoutMs", "layout ms"], ["paintMs", "paint ms"], ["compositeMs", "composite ms"], ["scriptMs", "script ms"]];
 const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : NaN; };
 
-let root = process.cwd(), wt = null;
-if (REF) {
-  wt = path.join(os.tmpdir(), `arena-perf-${Date.now()}`);
-  execSync(`git worktree add --detach "${wt}" ${REF}`, { stdio: "ignore" });
-  if (!fs.existsSync(path.join(wt, "node_modules"))) fs.symlinkSync(path.resolve("node_modules"), path.join(wt, "node_modules"), "junction");
-  root = wt;
+// dočasný git worktree pre danú verziu (node_modules cez junction)
+const worktrees = [];
+function checkout(ref) {
+  const dir = path.join(os.tmpdir(), `arena-perf-${Date.now()}-${worktrees.length}`);
+  execSync(`git worktree add --detach "${dir}" ${ref}`, { stdio: "ignore" });
+  if (!fs.existsSync(path.join(dir, "node_modules"))) fs.symlinkSync(path.resolve("node_modules"), path.join(dir, "node_modules"), "junction");
+  worktrees.push(dir);
+  return dir;
 }
-console.log(`perf-probe: ${LABEL} · ${DEVICE} ${DEV.width}×${DEV.height} · CPU ${THROTTLE}× · ${REPS} behov${PERF ? " · perf=" + PERF : ""}`);
-const runs = [];
+function aggregate(runs, label) {
+  const good = runs.filter(r => !r.errors.length);
+  const result = { label, device: DEVICE, throttle: THROTTLE, perf: PERF, reps: good.length, date: new Date().toISOString(), windows: {} };
+  for (const w of WINDOWS) {
+    result.windows[w] = {};
+    for (const [k] of METRICS) result.windows[w][k] = median(good.map(r => r.windows[w]?.[k]).filter(v => v != null));
+  }
+  return result;
+}
+const f = (v) => (v == null || Number.isNaN(v) ? "-" : v >= 100 ? v.toFixed(0) : v.toFixed(1));
+function printTable(result, base) {
+  console.log(`
+${"okno".padEnd(12)}` + METRICS.map(([, n]) => n.padStart(15)).join(""));
+  for (const w of WINDOWS) {
+    console.log(w.padEnd(12) + METRICS.map(([k]) => {
+      const v = result.windows[w][k], b = base?.windows?.[w]?.[k];
+      return (f(v) + (b != null ? ` (${f(b)})` : "")).padStart(15);
+    }).join(""));
+  }
+  if (base) console.log(`(v zátvorke: ${base.label})`);
+}
+function save(result) {
+  fs.mkdirSync("tmp/perf", { recursive: true });
+  const file = path.join("tmp/perf", `${result.label.replace(/[^\w.@-]+/g, "_")}${DEVICE !== "phone" ? "-" + DEVICE : ""}.json`);
+  fs.writeFileSync(file, JSON.stringify(result, null, 2));
+  console.log(`uložené: ${file}`);
+}
+
+// --ab <ref>: striedavé behy verzie <ref> a pracovného stromu (A, B, A, B…) - obe verzie zažijú rovnakú záťaž
+// počítača, porovnanie je preto spoľahlivejšie než dva samostatné behy po sebe
+const AB = opt("ab", null);
+const sides = AB ? [{ label: `${LABEL}@${AB}`, root: null, ref: AB }, { label: LABEL, root: process.cwd() }]
+                 : [{ label: LABEL, root: REF ? null : process.cwd(), ref: REF }];
+console.log(`perf-probe: ${sides.map(x => x.label).join(" vs ")} · ${DEVICE} ${DEV.width}×${DEV.height} · CPU ${THROTTLE}× · ${REPS} behov${PERF ? " · perf=" + PERF : ""}`);
+const runs = sides.map(() => []);
 try {
-  for (let r = 0; r < REPS; r++) runs.push(await runOnce(root, r));
+  for (const sd of sides) if (!sd.root) sd.root = checkout(sd.ref);
+  for (let r = 0; r < REPS; r++) {
+    for (let k = 0; k < sides.length; k++) {
+      if (sides.length > 1) process.stdout.write(`[${sides[k].label}] `);
+      runs[k].push(await runOnce(sides[k].root, r));
+    }
+  }
 } finally {
-  if (wt) {
-    try { fs.unlinkSync(path.join(wt, "node_modules")); } catch {}
-    try { execSync(`git worktree remove --force "${wt}"`, { stdio: "ignore" }); } catch {}
+  for (const dir of worktrees) {
+    try { fs.unlinkSync(path.join(dir, "node_modules")); } catch {}
+    try { execSync(`git worktree remove --force "${dir}"`, { stdio: "ignore" }); } catch {}
   }
 }
-const good = runs.filter(r => !r.errors.length);
-if (!good.length) { console.log("Žiadny úspešný beh."); process.exit(1); }
-const result = { label: LABEL, device: DEVICE, throttle: THROTTLE, perf: PERF, reps: good.length, date: new Date().toISOString(), windows: {} };
-for (const w of WINDOWS) {
-  result.windows[w] = {};
-  for (const [k] of METRICS) result.windows[w][k] = median(good.map(r => r.windows[w]?.[k]).filter(v => v != null));
-}
-const base = BASE && fs.existsSync(BASE) ? JSON.parse(fs.readFileSync(BASE, "utf8")) : null;
-const f = (v) => (v == null || Number.isNaN(v) ? "-" : v >= 100 ? v.toFixed(0) : v.toFixed(1));
-console.log(`\n${"okno".padEnd(12)}` + METRICS.map(([, n]) => n.padStart(15)).join(""));
-for (const w of WINDOWS) {
-  console.log(w.padEnd(12) + METRICS.map(([k]) => {
-    const v = result.windows[w][k], b = base?.windows?.[w]?.[k];
-    return (f(v) + (b != null ? ` (${f(b)})` : "")).padStart(15);
-  }).join(""));
-}
-if (base) console.log(`(v zátvorke: ${base.label})`);
-fs.mkdirSync("tmp/perf", { recursive: true });
-const file = path.join("tmp/perf", `${LABEL.replace(/[^\w.-]+/g, "_")}${DEVICE !== "phone" ? "-" + DEVICE : ""}.json`);
-fs.writeFileSync(file, JSON.stringify(result, null, 2));
-console.log(`\nuložené: ${file}`);
-process.exit(runs.length - good.length ? 1 : 0);
+const results = sides.map((sd, k) => aggregate(runs[k], sd.label));
+if (results.some(r => !r.reps)) { console.log("Niektorá verzia nemá ani jeden úspešný beh."); process.exit(1); }
+const base = AB ? results[0] : (BASE && fs.existsSync(BASE) ? JSON.parse(fs.readFileSync(BASE, "utf8")) : null);
+printTable(results.at(-1), base);
+console.log("");
+results.forEach(save);
+process.exit(runs.flat().some(r => r.errors.length) ? 1 : 0);

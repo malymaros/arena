@@ -3,8 +3,8 @@
 // summon klona, tile flare, spotreba tile a pomocné triedy buniek.
 import { actors } from "/client/actors.js";
 import { state, me } from "/client/session.js";
-import { cellToPx, TILE_W, actorsEl, TILE_H, actorP1, actorP2 } from "/client/dom.js";
-import { computeFacing, positionActors, pairShift } from "/client/placement.js";
+import { cellToPx, TILE_W, actorsEl, TILE_H } from "/client/dom.js";
+import { computeFacing, positionActors, pairShift, liveActorPos } from "/client/placement.js";
 import { ACTOR_W, ACTOR_H, usesAltColor, charDirFor, CHARGE_SCALE } from "/client/sprites.js";
 import { lastStand } from "/client/last-stand-state.js";
 import { cloneEls } from "/client/actor-layers.js";
@@ -322,13 +322,14 @@ export function placeChargeAura(cont, slot) {
   // postava nie je v strede bunky - rovnaký horizontálny offset tela ako „YOU" vlajka (HEAD_CX + flip)
   const facing = computeFacing(state?.p1, state?.p2);
   const headDx = (facing[slot] || 1) * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
-  const actorEl = onClone ? cloneEls[slot] : (slot === "p1" ? actorP1 : actorP2);
-  const aLeft = parseFloat(getComputedStyle(actorEl).left) || 0; // interpolovaná hodnota počas CSS transition
-  const aTop  = parseFloat(getComputedStyle(actorEl).top)  || 0;
+  // interpolovaná pozícia počas CSS transition - dopočítaná (placement.js), nie getComputedStyle (výkon)
+  const { left: aLeft, top: aTop } = liveActorPos(onClone ? "clone:" + slot : slot);
   const cellLeft = aLeft + (ACTOR_W - TILE_W) / 2;
   const cellTop  = aTop + (ACTOR_H - TILE_H);
-  cont.style.left = (cellLeft + TILE_W / 2 + shift + headDx) + "px";
-  cont.style.top  = (cellTop + TILE_H) + "px"; // päta postavy = spodok bunky
+  const l = (cellLeft + TILE_W / 2 + shift + headDx) + "px";
+  const t = (cellTop + TILE_H) + "px"; // päta postavy = spodok bunky
+  if (cont.style.left !== l) cont.style.left = l; // zápis len pri zmene (stojaca postava = žiadny layout)
+  if (cont.style.top !== t) cont.style.top = t;
 }
 
 // ---- Plynulý projektil basic útoku ----
