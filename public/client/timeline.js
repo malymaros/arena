@@ -31,6 +31,7 @@ import { deathBehind } from "/client/overlays.js";
 import { DEATH_SEQ } from "/client/demon-sprites.js";
 import { sfx, setMusic, musicKey } from "/client/sound.js";
 import { soundForFrame, soundTimelineStart, syncMusic } from "/client/sound-map.js";
+import { perf } from "/client/perf.js";
 
 /* ---------- GameOver sekvencia ---------- */
 function showGameOverSequence(winner) {
@@ -624,7 +625,7 @@ export function schedulePlayTimeline(timeline) {
         // takže raf sa démona nedotýka. Settle (down=false) potom v rafe plynulo stmaví na 0.25.
         lastStand.banishing = false;
         placeDeathBehind(e.from);
-        deathBehind.style.filter = "drop-shadow(0 0 16px #ffd24a)";
+        deathBehind.style.filter = perf.lite ? "drop-shadow(0 0 6px #ffd24a)" : "drop-shadow(0 0 16px #ffd24a)"; // lite: menší rozptyl (výkon)
         deathBehind.style.opacity = "1"; // CSS transition spraví plynulý nábeh z 0
       }
       if (e.kind === "last_stand_banish" && (e.from === "p1" || e.from === "p2")) {

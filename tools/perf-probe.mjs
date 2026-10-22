@@ -15,6 +15,7 @@
 //   node tools/perf-probe.mjs --label po-etape-2    → názov výsledku (default "work" / ref)
 //   node tools/perf-probe.mjs --base tmp/perf/pred.json → vypíše aj rozdiel oproti uloženému výsledku
 //   node tools/perf-probe.mjs --reps 1 --profile golden_idle → navyše vypíše najdrahšie JS funkcie a udalosti v okne
+//   node tools/perf-probe.mjs --reps 1 --shots tmp/perf/shots → snímky na vizuálnu kontrolu (lite vs full: --perf)
 //   --device tablet (1180×820, DPR 2) · --throttle 6 · --reps 5 · --perf full|lite (URL ?perf=…, od etapy 1)
 import { spawn, execSync } from "node:child_process";
 import { io } from "socket.io-client";
@@ -32,6 +33,7 @@ const THROTTLE = Number(opt("throttle", 4));
 const DEVICE = opt("device", "phone");
 const PERF = opt("perf", null);
 const BASE = opt("base", null);
+const SHOTS = opt("shots", null); // priečinok → snímky obrazovky (zlatý stav + priebeh finálneho kola); metriky sú potom skreslené
 const PROFILE = opt("profile", null); // názov okna → CPU profil (top funkcie podľa vlastného času) + top udalosti tracu
 const PASS = "perf";
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -266,8 +268,18 @@ async function runOnce(root, rep) {
       await waitFor(() => c1.timelines.length > n, 10000, "timeline " + what);
       await sleep(300);
       const t0 = Date.now();
-      while (await playing() && Date.now() - t0 < 60000) await sleep(100);
+      let k = 0;
+      while (await playing() && Date.now() - t0 < 60000) {
+        if (SHOTS && Date.now() - t0 > k * 1500) await shot(`${what.replace(/\W+/g, "_")}-${String(k++).padStart(2, "0")}`);
+        await sleep(100);
+      }
       await sleep(400);
+    };
+    const shot = async (name) => {
+      if (!SHOTS) return;
+      fs.mkdirSync(SHOTS, { recursive: true });
+      const r = await br.send("Page.captureScreenshot", { format: "png" });
+      fs.writeFileSync(path.join(SHOTS, `${LABEL}-${name}.png`), Buffer.from(r.result.data, "base64"));
     };
 
     await measure("idle", () => sleep(4000));
@@ -282,6 +294,7 @@ async function runOnce(root, rep) {
       [[A("recharge"), A("move", "down"), A("attack", "left")], [A("recharge"), A("move", "up"), A("attack", "left")]], "summon"));
     if (!c1.st.p1?.lastStandBuff) throw new Error("démon sa nevyvolal (lastStandBuff chýba)");
     await measure("golden_idle", () => sleep(4000));
+    await shot("golden_idle");
     // kolo 3 (final): p2 Last Hope, p1 démonov útok
     await measure("demon", () => playRound(
       [[A("demon"), A("recharge"), A("move", "left")], [A("recharge"), A("demon"), A("move", "right")], [A("demon"), A("move", "up"), A("recharge")],

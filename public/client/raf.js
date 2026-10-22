@@ -59,7 +59,8 @@ export function raf() {
     }
     cvs.style.display = "block";
     cvs.classList.toggle("alt-color", usesAltColor(st.char, slot)); // Medúza p2 = natívna paleta, bez filtra
-    cvs.style.filter = actorFilter(slot, now); // glow: obrana (pulz) > zlatý „YOU", + alt-color
+    const flt = actorFilter(slot, now); // glow: obrana (pulz) > zlatý „YOU", + alt-color
+    if (cvs.style.filter !== flt) cvs.style.filter = flt; // zápis len pri zmene (výkon - inak invalidácia štýlu každý frame)
 
     const dir  = charDirFor(st.char, slot);
     // victory aj casting (special) = slučka efektového sprite daného mága priamo na malej postave (nie úderový švih)
@@ -113,7 +114,8 @@ export function raf() {
     if (el.style.display === "none" || !st?.clone || !st.char) return;
     const ctx = el.getContext("2d");
     el.classList.toggle("alt-color", usesAltColor(st.char, slot));
-    el.style.filter = actorFilter(slot, now, true); // klon: bez Last Stand zlatého glow
+    const cflt = actorFilter(slot, now, true); // klon: bez Last Stand zlatého glow
+    if (el.style.filter !== cflt) el.style.filter = cflt;
     const dir = charDirFor(st.char, slot);
     const aSt = actors.animState[slot];
     const stoned = (st.stone || 0) > 0;

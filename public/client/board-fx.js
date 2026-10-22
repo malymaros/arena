@@ -12,6 +12,7 @@ import { HEAD_CX, PROJECTILE, CHAR_META } from "/chars/index.js";
 import { CHAR_FX } from "/client/fx-registry.js";
 import { spawnExplosionAt } from "/client/explosion.js";
 import { CHARGE_STEP_MS } from "/shared/timing.js";
+import { perf } from "/client/perf.js";
 
 /* ---------- bubliny -X HP / +Y MANA ---------- */
 
@@ -271,10 +272,19 @@ export function spawnCloneSummonFx(slot, cell, durMs) {
 }
 
 // glow okolo postavy: obrana (pulzuje) nahrádza zlatý „YOU", inak fallback na zlatý
+// VÝKON (docs/PERF_PLAN.md, etapa 2): drop-shadow sa prepočíta vždy, keď sa zmení hodnota filtra ALEBO obsah canvasu.
+// Obsah (sprite frame) sa mení ~10×/s, preto pulz krokujeme po GLOW_STEP_MS (nie každý frame) - filter sa tak
+// prepočíta zhruba vtedy, keď aj tak treba prekresliť postavu. V úspornom režime (perf.lite) je žiara statická
+// a má 2 vrstvy namiesto 7 (rovnaká farba, tenší obrys).
+const GLOW_STEP_MS = 100;
 const YOU_GOLD_GLOW = "drop-shadow(0 0 1px #fff3b0) drop-shadow(0 0 4px #ffc107) drop-shadow(0 0 8px #ff9100)";
+const YOU_GOLD_GLOW_LITE = "drop-shadow(0 0 2px #ffc107) drop-shadow(0 0 7px #ff9100)";
 const GLOW_COL = { shield: "#4dd0e1", shieldGold: "#ffca28", mirror: "#ce93d8", mirrorGold: "#ffca28" }; // štít / golden štít / mirror / golden mirror
+const glowStep = (now) => Math.floor(now / GLOW_STEP_MS) * GLOW_STEP_MS;
 function pulseGlow(color, now) {
-  const c = color, t = 0.5 + 0.5 * Math.sin(now / 240); // 0..1 pulz
+  const c = color;
+  if (perf.lite) return `drop-shadow(0 0 2px ${c}) drop-shadow(0 0 10px ${c})`;
+  const t = 0.5 + 0.5 * Math.sin(glowStep(now) / 240); // 0..1 pulz
   const b1 = (3 + 2 * t).toFixed(1);
   const b2 = (8 + 5 * t).toFixed(1);
   const b3 = (14 + 9 * t).toFixed(1);
@@ -287,7 +297,8 @@ export function actorFilter(slot, now, isClone = false) {
   const st = state?.[slot];
   // golden recharge stav (death summon) - žiarivý zlatý pulz postavy, má prednosť pred ostatným (klon ho nemá)
   if (lastStand.goldenSlot === slot && !isClone) {
-    const t = 0.5 + 0.5 * Math.sin(now / 110);
+    if (perf.lite) return "brightness(1.35) saturate(1.5) " + pulseGlow("#ffd24a", now);
+    const t = 0.5 + 0.5 * Math.sin(glowStep(now) / 110);
     return `brightness(${(1.15 + 0.45 * t).toFixed(2)}) saturate(1.5) ` + pulseGlow("#ffd24a", now);
   }
   const alt = usesAltColor(st?.char, slot) ? "saturate(.22) brightness(1.4) " : "";
@@ -296,7 +307,7 @@ export function actorFilter(slot, now, isClone = false) {
   let glow = "";
   if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
   else if (st?.mirror) glow = pulseGlow(st.mirrorGold ? GLOW_COL.mirrorGold : GLOW_COL.mirror, now);
-  else if (slot === me) glow = YOU_GOLD_GLOW;
+  else if (slot === me) glow = perf.lite ? YOU_GOLD_GLOW_LITE : YOU_GOLD_GLOW;
   return (stone + alt + glow).trim();
 }
 
