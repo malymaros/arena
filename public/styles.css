@@ -3159,3 +3159,12 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   box-shadow: 0 0 0 5px #fff, 0 0 0 9px #ffb300, 0 0 0 11px #000, 0 0 34px 6px rgba(255,200,40,.75);
 }
 .touch .char-card.touch-armed .char-name { background: #ffb300; color: #1a1200; text-shadow: none; padding: 7px 6px; }
+/* dotyk, skrytá stránka „Hidden": všetko oranžové (označená karta, PICK, nadpis náhľadu, políčko postavy v mini-mape)
+   je ladené do fialovej ako zvyšok stránky */
+.touch #char-select.hidden-mode .char-card.touch-armed {
+  box-shadow: 0 0 0 5px #fff, 0 0 0 9px #9a6ff0, 0 0 0 11px #000, 0 0 34px 6px rgba(177,122,255,.75);
+}
+.touch #char-select.hidden-mode .char-card.touch-armed .char-name { background: #9a6ff0; color: #12061f; }
+.touch #char-select.hidden-mode #touch-pick { background: #9a6ff0; color: #12061f; }
+.touch #char-select.hidden-mode .ca-title { color: #b17aff; }
+.touch #char-select.hidden-mode .ca-grid .mini-cell.caster { background: #9a6ff0; }

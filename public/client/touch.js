@@ -181,6 +181,7 @@ function initTapSelect() {
     if (el.classList.contains("char-card")) {
       if (pickClick) return;                                   // klik z tlačidla PICK → vykonať výber
       ev.preventDefault(); ev.stopImmediatePropagation();
+      if (!el.dataset.char) return;                            // „Coming soon" - na ťuk nereaguje vôbec
       if (armed !== el) arm(el);
       syncPickBar();
       return;
@@ -206,11 +207,16 @@ let pickClick = false; // práve prebieha klik vyvolaný tlačidlom PICK (jedin�
 // telefón: výber postáv má náhľad schopnosti v pravom stĺpci - bez označenej karty by ostal prázdny a celý výber
 // by pôsobil posunutý doľava. Prvá viditeľná voliteľná karta je preto vždy predvybraná (bez hlasu mena).
 const visibleCard = (c) => c && c.isConnected && c.offsetParent !== null && !c.closest(".char-cards.hidden");
+// Pri otvorení výberu je predvýber tichý; po prepnutí stránky (šípky, runa → Hidden) hlas mena zaznie
+// (doprava → Medusa, doľava → Escanor, Hidden → Vampire / Onryō). Okno 1 s pokryje aj glitch prechod runy.
+let voiceUntil = 0;
 function autoArmCard() {
   if (!isPhone || !selEl || selEl.classList.contains("hidden")) return;
   if (armed?.classList.contains("char-card") && visibleCard(armed)) { keepCardPreview(); return; }
   const card = [...selEl.querySelectorAll(".char-card[data-char]")].find(c => visibleCard(c) && !c.classList.contains("dead"));
-  if (card) { arm(card, true); syncPickBar(); }
+  const voice = performance.now() < voiceUntil;
+  voiceUntil = 0;
+  if (card) { arm(card, !voice); syncPickBar(); }
 }
 // pravý panel mohol vyprázdniť mouseleave z prehliadača (dotyk mimo kariet) - obnov náhľad označenej karty
 function keepCardPreview() {
@@ -224,6 +230,9 @@ function initCharPick() {
   if (isPhone) {
     // otvorenie výberu, zmena stránky (šípky), roster-mode → predvýber prvej karty
     const again = () => setTimeout(autoArmCard, 60);
+    document.addEventListener("click", (ev) => {
+      if (ev.target.closest?.("#char-page-prev, #char-page-next, #hidden-rune")) voiceUntil = performance.now() + 1000;
+    }, true);
     new MutationObserver(again).observe(selEl, { attributes: true, attributeFilter: ["class"] });
     selEl.querySelectorAll(".char-cards").forEach(el => new MutationObserver(again).observe(el, { attributes: true, attributeFilter: ["class"] }));
   }

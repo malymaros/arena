@@ -43,6 +43,9 @@ export const VOICE = {
 // postava, pre ktorú efekt znamená iný hlas: Jotarov `special` je vždy Special 2 (THE WORLD má timestop_start),
 // jeho Special 1 (útok v slote mirroru) hrá tiež hlas Special 2
 export const VOICE_BY_CHAR = { jotaro: { special: "voice.special2", special1: "voice.special2" } };
+// postava, ktorej hlas zaznie pri KAŽDOM frame behu (nie len raz): Onryō pri melee povie hlášku pri každom
+// z 3 švihov (krátka hláška sa zmestí do beatu) - ako vlkolak, ktorého nahrávka melee má tri opakovania
+export const VOICE_EACH_BEAT = { onre: new Set(["melee"]) };
 // frame s týmto efektom nesie vlastný zvuk presunu - zmena pozície v ňom nie je krok/dash
 export const OWN_LOCO = new Set(["wolf_charge", "vamp_charge", "luffy_pull", "luffy_roll", "trap_tp_in", "trap_tp_out", "teleport_in"]);
 export const HIT_HEAVY_DMG = 8;
@@ -104,8 +107,9 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
     run.add(id);
     const char = charOf(slot);
     const voiceKey = VOICE_BY_CHAR[char]?.[e.kind] || VOICE[e.kind];
-    if (voiceKey && firstOfRun && !e.clone) {
-      out.push({ key: voiceKey, char, pan: panOf(e), windowMs: runWindow(timeline, i, id) });
+    const eachBeat = VOICE_EACH_BEAT[char]?.has(e.kind);
+    if (voiceKey && (firstOfRun || eachBeat) && !e.clone) {
+      out.push({ key: voiceKey, char, pan: panOf(e), windowMs: eachBeat ? win : runWindow(timeline, i, id) });
     }
     if (ONCE_PER_RUN.has(e.kind)) {
       if (!firstOfRun) continue;
