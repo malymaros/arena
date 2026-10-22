@@ -282,6 +282,13 @@ function renderAbilityPreview(char) {
   caTextEl.innerHTML = `<div class="ca-desc">${def.desc}</div>`;
   caTextEl.querySelectorAll(".pix-ico[data-pix]").forEach(el => { el.innerHTML = pixSvg(el.dataset.pix); });
   hydratePix(caTextEl); // prípadné [data-emoji] ikony
+  // telefón: blok popisu má pevnú výšku (výber nesmie skákať) - dlhý popis (Naruto) sa zmenší, kým sa doň nevojde
+  const desc = caTextEl.firstElementChild;
+  if (document.documentElement.classList.contains("phone") && desc) {
+    for (let fs = parseFloat(getComputedStyle(desc).fontSize); desc.offsetHeight > caTextEl.clientHeight && fs > 11; fs--) {
+      desc.style.fontSize = `${fs - 1}px`;
+    }
+  }
   const stats = document.getElementById("ca-stats");
   stats.innerHTML = def.dmg != null
     ? `<span class="ca-dmg"><span class="ca-num">${def.dmg}</span><span class="pix-ico" data-emoji="☠️"></span>${def.bonus ? `<span class="pix-ico" data-emoji="${def.bonus}"></span>` : ""}</span>` // Countess/Onre: bonus ikona (heal ❤️ / drain 💧) hneď za lebkou

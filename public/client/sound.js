@@ -11,7 +11,8 @@ import { trimOf, loopXfade } from "/sounds/trim.js";
 import { loadDraft, draftUrlResolver, isPreviewOn } from "/sounds/draft-store.js";
 
 const SETTINGS_KEY = "arena.sound";
-const DEFAULTS = { master: 0.8, sfx: 0.8, music: 0.5, muted: false };
+// predvolené (kým si hráč nič nenastavil): efekty naplno, hudba v pozadí - postavy majú byť počuť (aj z reproduktora mobilu)
+const DEFAULTS = { master: 1, sfx: 1, music: 0.3, muted: false };
 
 // localStorage môže hodiť (súkromné okno, zablokované dáta) - zvuk musí fungovať aj bez neho
 const load = (k, def) => { try { const v = JSON.parse(localStorage.getItem(k)); return v && typeof v === "object" ? v : def; } catch { return def; } };
@@ -85,6 +86,7 @@ export const soundReady = (async () => {
 
 /* ---------- Web Audio ---------- */
 let ctx = null, sfxBus = null;
+const SFX_MAKEUP = 1.8; // ≈ +5 dB pred kompresorom
 const buffers = new Map(); // url → Promise<AudioBuffer|null>
 
 function ensureCtx() {
@@ -92,8 +94,15 @@ function ensureCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   ctx = new AC();
+  // efekty idú cez kompresor + zosilnenie: tiché zvuky sú hlasnejšie a súbežné (zásah + výbuch + hlas) sa nezlejú
+  // do skreslenia - na slabom reproduktore mobilu je ich tak počuť
   sfxBus = ctx.createGain();
-  sfxBus.connect(ctx.destination);
+  sfxBus.gain.value = SFX_MAKEUP;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.knee.value = 8; comp.ratio.value = 4;
+  comp.attack.value = 0.003; comp.release.value = 0.2;
+  sfxBus.connect(comp);
+  comp.connect(ctx.destination);
   return ctx;
 }
 function loadBuffer(url) {
@@ -152,7 +161,8 @@ export function sfx(key, { char = null, pan = 0, volume = 1, windowMs = null } =
   if (!urls.length) return;
   const i = Math.floor(Math.random() * urls.length);
   const jitter = /^(game|round|music)\./.test(k) ? 0 : 0.04; // jemná zmena výšky - opakované kroky neznejú ako stroj
-  return playUrl(urls[i], (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k), trim: e.trims?.[i] });
+  return playUrl(urls[i], (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k), trim: e.trims?.[i],
+    duck: !/^(ui|music)./.test(k) }); // herné efekty stíšia hudbu (kliky v UI nie)
 }
 
 const activeSources = new Set(); // práve hrajúce efekty (stopAllSfx - Sound Lab „Stop“)
@@ -160,7 +170,7 @@ const activeSources = new Set(); // práve hrajúce efekty (stopAllSfx - Sound L
 // nízkoúrovňové prehratie (lab ním skúša knižnicu); hlasitosť = vol × efekty × master
 // → Promise<{ stop(), ended: Promise }> | null (súbor sa nedá načítať)
 // trim = [začiatokMs, koniecMs] - prehrá len hlavnú časť súboru (trim.js)
-export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit = "keep", trim = null } = {}) {
+export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit = "keep", trim = null, duck = false } = {}) {
   if (!ensureCtx()) return Promise.resolve(null);
   if (!unlocked) unlock();
   return loadBuffer(url).then(buf => {
@@ -187,6 +197,7 @@ export function playUrl(url, vol = 1, { pan = 0, rate = 1, windowMs = null, fit 
     }
     node.connect(sfxBus);
     const realMs = plan.playMs ?? partMs / (rate * plan.rate); // reálne trvanie prehrávania
+    if (duck) duckMusic(realMs);
     src.start(t0, offMs / 1000);
     src.stop(t0 + realMs / 1000);
     activeSources.add(src);
@@ -223,7 +234,21 @@ const FADE_MS = 900;
 
 function musicTargetVolume() {
   const e = entryFor(currentMusicKey);
-  return settings.muted ? 0 : (e?.vol ?? 1) * settings.music * settings.master;
+  return settings.muted ? 0 : (e?.vol ?? 1) * settings.music * settings.master * duckLevel;
+}
+// stíšenie hudby počas herných efektov („ducking"): kým hrá efekt, hudba klesne na DUCK_TO a potom sa plynulo vráti
+const DUCK_TO = 0.5, DUCK_TAIL_MS = 250;
+let duckLevel = 1, duckUntil = 0, duckTimer = null;
+function duckMusic(ms) {
+  duckUntil = Math.max(duckUntil, performance.now() + ms + DUCK_TAIL_MS);
+  if (duckTimer) return;
+  duckTimer = setInterval(() => {
+    const target = performance.now() < duckUntil ? DUCK_TO : 1;
+    duckLevel += (target - duckLevel) * (target < duckLevel ? 0.5 : 0.15); // rýchlo dole, pomaly hore
+    if (Math.abs(duckLevel - target) < 0.01) duckLevel = target;
+    music?.setVolume(musicTargetVolume());
+    if (duckLevel === 1) { clearInterval(duckTimer); duckTimer = null; }
+  }, 50);
 }
 // Hlasitosť každého prehrávača sa počíta z JEHO POZÍCIE v skladbe, nie z bežiaceho časovača: prelínanie
 // konca so začiatkom tak nezamrzne ani v skrytej karte, kde prehliadač časovače brzdí (až na 1× za minútu) -

@@ -141,8 +141,11 @@ try {
     await waitPage(`!document.getElementById("char-select")?.classList.contains("hidden") && document.getElementById("color-roll")?.classList.contains("hidden")`, 15000, "char-select");
     await sleep(800);
     await shot(dev, "2-charselect");
-    // na dotyku prvé ťuknutie kartu len označí (touch.js) - potvrdí ju PICK
-    await br.evaluate(`(() => { document.querySelector('.char-card[data-char="naruto"]')?.click(); const p = document.getElementById("touch-pick"); if (p && !p.classList.contains("hidden")) p.click(); })()`);
+    // na dotyku prvé ťuknutie kartu len označí (touch.js) - potvrdí ju PICK; Naruto má najdlhší popis schopnosti
+    await br.evaluate(`document.querySelector('.char-card[data-char="naruto"]')?.click()`);
+    await sleep(500);
+    await shot(dev, "2b-naruto");
+    await br.evaluate(`(() => { const p = document.getElementById("touch-pick"); if (p && !p.classList.contains("hidden")) p.click(); })()`);
     host.sock.emit("choose_character", "escanor");
     await sleep(3500); // intro / transform
     await shot(dev, "3-game");

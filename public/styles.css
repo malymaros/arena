@@ -2974,7 +2974,13 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .hud-box { top: 22px; } /* menovka hráča trčí nad box */
 .phone .hud-p1 { left: 10px; }
 .phone .hud-p2 { right: 10px; }
-.phone .starter-flag { width: 150px; height: 165px; margin-top: 8px; }
+/* vlajka „1st" na telefóne bez žrde: celé miesto pod boxom zaberie len látka (oblasť viewBoxu x 16–94, y 10–50 →
+   SVG sa zväčší a posunie tak, aby látka presne vyplnila box vlajky; pomer boxu = 78:40) */
+.phone .starter-flag { width: 280px; height: 144px; margin-top: 10px; }
+.phone .starter-flag .flag-pole { display: none; }
+.phone .starter-flag svg { position: absolute; width: 128.2%; height: 275%; left: -20.5%; top: -25%; }
+.phone .hud-p2 .starter-flag svg { left: -7.7%; } /* zrkadlené SVG: látka je v ňom na x 6–84 % */
+.phone .starter-flag .flag-label { top: 50%; font-size: 44px; }
 .phone .series-crowns { top: calc(100% + 186px); }
 
 /* info riadok (touch.js) - navrchu cez ROUND nadpis, mimo boardu a lišty */
@@ -3143,3 +3149,5 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   background: rgba(6,6,10,.8); opacity: 0; transition: opacity .6s ease;
 }
 .perf-lite body.labyrinth-mode .arena::before { opacity: 1; }
+/* dotyk: RELOAD GAME v menu len s nápisom, bez vysvetľujúceho podnadpisu */
+.touch .menu-item[data-act="reload"] small { display: none; }
