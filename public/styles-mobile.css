@@ -122,14 +122,20 @@
 @keyframes no-mana-pulse { 50% { opacity: .35; } }
 /* tlačidlo, na ktoré na ďalšom mieste fronty nebude mana - len sivé (bez zámku), ťuknuteľné (ukáže červený štítok) */
 .phone .btn.act.no-mana, .phone .golden-half.no-mana { filter: grayscale(.85) brightness(.6); }
-/* zablokovaná akcia (otvorený výber smeru, golden pre startera, po LOCK IN…) - veľký zámok v strede tlačidla;
-   stmavenie cez prekryv namiesto filtra, aby zámok ostal jasný a odlíšil sa od „málo many" */
-.phone .btn.locked-ui, .phone .btn.locked-perm, .phone .btn.locked-golden { filter: none; }
-.phone .btn.locked-ui::before, .phone .btn.locked-perm::before, .phone .btn.locked-golden::before {
+/* zablokovaná akcia (otvorený výber smeru, golden pre startera, po LOCK IN…), už zaradená akcia (každá raz
+   za kolo) a LOCK IN / ↩ pri otvorenom výbere smeru (.touch-locked, touch.js) - veľký zámok v strede tlačidla;
+   stmavenie cez prekryv namiesto filtra, aby zámok ostal jasný a odlíšil sa od „málo many" (len sivé) */
+.phone .btn.locked-ui, .phone .btn.locked-perm, .phone .btn.locked-golden, .phone .btn.touch-locked,
+.phone .actions .btn.act:disabled { position: relative; filter: none; opacity: 1; }
+.phone .btn.touch-locked { pointer-events: none; }
+.phone .btn.locked-ui::before, .phone .btn.locked-perm::before, .phone .btn.locked-golden::before,
+.phone .btn.touch-locked::before, .phone .actions .btn.act:disabled::before {
   content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: rgba(10, 12, 16, .62);
 }
-.phone .btn.locked-ui::after, .phone .btn.locked-perm::after, .phone .btn.locked-golden::after {
-  top: 50%; right: auto; left: 50%; z-index: 3; transform: translate(-50%, -50%); font-size: 40px;
+.phone .btn.locked-ui::after, .phone .btn.locked-perm::after, .phone .btn.locked-golden::after,
+.phone .btn.touch-locked::after, .phone .actions .btn.act:disabled::after {
+  content: "🔒"; position: absolute; top: 50%; right: auto; left: 50%; z-index: 3; transform: translate(-50%, -50%);
+  font-size: 40px; line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,.8);
 }
 
 /* info riadok nad lištou tlačidiel - popis označenej akcie; písmo v skutočných px displeja */
@@ -318,7 +324,10 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone #undo { width: 80px; height: 84px; font-size: 36px; }
 .phone #lock { height: 84px; padding: 0 22px; font-size: 30px; }
 .phone .controls .divider { height: 72px; }
-.phone .btn.act.lasthope .lh-ico, .phone .btn.act.demon .ls-ico { width: 52px; height: 56px; }
+.phone .btn.act.lasthope .lh-ico { width: 52px; height: 56px; }
+/* démon (útok vo FINAL kole aj Last Stand polovica zlatého tlačidla) vyplní celé tlačidlo */
+.phone .btn.act.demon, .phone .golden-half.ls-half { padding: 3px; }
+.phone .btn.act.demon .ls-ico, .phone .golden-half.ls-half .ls-ico { width: 100%; height: 78px; min-height: 0; object-fit: contain; image-rendering: pixelated; }
 
 /* board + zápis kola medzi ROUND nadpisom a lištou */
 .phone .stage { padding: 44px 16px 128px; }
@@ -327,6 +336,11 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
    ikona čitateľná, démon vyplní bunku - riadok je jednotný, nič netrčí ani sa nestráca */
 .phone #queue .q-badge.opt { width: 44px; height: 40px; padding: 0; font-size: 20px; align-self: auto; }
 .phone #queue .q-badge.opt .ls-badge { height: 32px; }
+/* prázdne sloty hlavných akcií: holé čísla (bez krúžkov ①②③ - na telefóne nečitateľné), väčšie a kontrastnejšie;
+   moje odlíši zlatý prerušovaný rámik (queue.js) */
+.phone #queue .q-badge.main.q-slot { font-size: 34px; font-weight: 900; line-height: 1; }
+.phone #queue .q-badge.main.mine.q-slot { color: #ffd54f; }
+.phone #queue .q-badge.main.opp.q-slot { color: rgba(255, 255, 255, .7); }
 
 /* ROUND nadpis menší a vyššie (stred nad boardom); hláška „your move / waiting" široký pás nad boardom */
 .phone .hud-turn { top: 4px; font-size: 34px; }

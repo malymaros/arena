@@ -15,6 +15,7 @@ import { syncGoldenHalves, updateGoldenButton, syncButtonBadges, updateUiLocks }
 import { qCursor } from "/client/actor-layers.js";
 import { renderMageHeads } from "/client/hud.js";
 import { socket } from "/client/net.js";
+import { isPhone } from "/client/viewport.js";
 
 /* ---------- Queue + Lock ---------- */
 // ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove); ownerSlot kvôli alt-color hláv p2
@@ -235,7 +236,8 @@ export function renderQueue() {
       if (b.kind === "gshield")    el.innerHTML = '<span class="g-ico dim">🛡️</span>';
       else if (b.kind === "gmana") el.innerHTML = '<span class="g-ico dim">🙏</span>';
       else if (oppStoned) { el.classList.add("stoned"); el.textContent = "🗿"; }
-      else el.textContent = mine ? ["①", "②", "③"][b.idx] : String(b.idx + 1); // ja kružok, súper holé cifry
+      // ja kružok, súper holé cifry; telefón holé cifry obom (krúžky sú tam nečitateľné - odlíši zlatý rámik)
+      else el.textContent = mine && !isPhone ? ["①", "②", "③"][b.idx] : String(b.idx + 1);
       el.title = oppStoned ? "Opponent is petrified - this action is skipped (carry-over stun)"
         : mine ? "Your action (required)" : "Opponent (hidden until it resolves)";
     }

@@ -17,9 +17,9 @@
 //  5. :hover pravidlá sa na dotyku vypnú (po ťuknutí by „viseli").
 //  6. Telefón: namiesto popisu štítok s cenou a účinkom (touch-label.js) nad tlačidlom - pri otvorenom výbere
 //     smeru nad tlačidlom, ktoré ho otvorilo; žltá linka = varovanie; málo many = červený štítok, blikajúci obrys
-//     mana baru, sivé tlačidlo a akciu nejde zaradiť (druhé ťuknutie nič nespraví).
+//     mana baru a sivé tlačidlo - zaradiť sa dá aj tak (server ju preškrtne). Zablokované = zámok v strede.
 import { isTouch, isPhone, appScale } from "/client/viewport.js";
-import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
+import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, lockBtn, undoBtn, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
 import { specialTargetOf, uiLocked } from "/client/controls.js";
 import { ghostCharAt } from "/client/ghost.js";
 import { CHARS_BY_KEY, VAMP_CHARS } from "/chars/index.js";
@@ -154,9 +154,6 @@ function openPickerEl() {
   if (!planning.openPicker) return null;
   return PICKER_IDS.map(id => document.getElementById(id)).find(p => p && !p.classList.contains("hidden")) || null;
 }
-// slot štítku pre prvok: tlačidlo akcie priamo, šípka / políčko výberu cez tlačidlo, ktoré výber otvorilo
-const slotFor = (el) => slotOf(el) || slotOf(openerOf(el?.closest?.(".dir-picker")));
-const noManaFor = (el) => isPhone && !!slotFor(el) && labelInfo(slotFor(el), el).noMana;
 function setFlash(on) {
   const bar = on && me ? document.getElementById(`${me}-mana`) : null;
   if (flashBar && flashBar !== bar) flashBar.classList.remove("no-mana-flash");
@@ -183,8 +180,10 @@ function refreshLabel() {
   const inPicker = !!armed?.closest?.("#touch-layer");
   const pick = inPicker && host ? labelInfo(slotOf(host), armed) : null;
   const noMana = !!info?.noMana || !!pick?.noMana;
+  // pri otvorenom výbere smeru sú zamknuté aj LOCK IN a ↩ (rovnaký zámok ako akcie)
+  for (const b of [lockBtn, undoBtn]) b?.classList.toggle("touch-locked", !!planning.openPicker);
   if (info?.text) {
-    const tap = host === armed && !noMana;
+    const tap = host === armed;
     const html = `<div class="tl-main">${costMarkup(info.text)}</div>`
       + (info.warn ? `<div class="tl-warn">⚠ ${info.warn}</div>` : "")
       + (tap ? `<div class="tl-tap">TAP AGAIN</div>` : "");
@@ -193,8 +192,8 @@ function refreshLabel() {
     labelEl.classList.remove("hidden");
     placeAbove(labelEl, host);
   } else labelEl.classList.add("hidden");
-  // bublina nad šípkou / políčkom / hlavou maga: TAP AGAIN (+ varovanie závislé od smeru); pri malej mane nič
-  if (!armed || (host === armed && info?.text) || (inPicker && noMana)) placeConfirm(null);
+  // bublina nad šípkou / políčkom / hlavou maga: TAP AGAIN (+ varovanie závislé od smeru)
+  if (!armed || (host === armed && info?.text)) placeConfirm(null);
   else placeConfirm(armed, pick?.warn && pick.warn !== info?.warn ? pick.warn : null);
   setFlash(noMana && !!info?.text);
   syncNoMana();
@@ -257,11 +256,7 @@ function initTapSelect() {
       syncPickBar();
       return;
     }
-    // telefón, málo many: druhé ťuknutie akciu nezaradí (štítok je červený, mana bar bliká)
-    if (armed === el && noManaFor(el)) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
     if (armed === el) { disarm(); return; }                    // druhé ťuknutie → nechaj prejsť = vykonať
-    // šípka na jedno ťuknutie (dash), na ktorú nie je mana: len označiť - červený štítok, nezaradí
-    if (oneTap(el) && !uiLocked() && el.classList.contains("arrow") && noManaFor(el)) { ev.preventDefault(); ev.stopImmediatePropagation(); arm(el); return; }
     if (oneTap(el) && !uiLocked()) { disarm(); if (!isPhone) showInfo(describe(el)); return; } // otvorenie výberu / pohyb hneď
     ev.preventDefault(); ev.stopImmediatePropagation();         // prvé ťuknutie → len výber + náhľad
     arm(el);

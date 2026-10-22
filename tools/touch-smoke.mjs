@@ -205,6 +205,9 @@ try {
     const lk = await ev(`(() => { const b = document.getElementById("melee-btn"), a = getComputedStyle(b, "::after"), r = b.getBoundingClientRect();
       return { locked: b.classList.contains("locked-ui"), content: a.content, cx: Math.round(parseFloat(a.left) - r.width / 2 / (r.width / b.offsetWidth)), t: a.transform }; })()`);
     check(lk.locked && lk.content.includes("🔒") && Math.abs(lk.cx) < 2 && lk.t !== "none", "telefón: zablokovaná akcia má zámok v strede", JSON.stringify(lk));
+    check(await ev(`["lock", "undo"].every(id => { const b = document.getElementById(id); return b.classList.contains("touch-locked") && getComputedStyle(b, "::after").content.includes("🔒"); })`), "telefón: pri výbere smeru majú zámok aj LOCK IN a ↩");
+    const digits = await ev(`[...document.querySelectorAll("#queue .q-badge.main.q-slot")].map(b => b.textContent).join("")`);
+    check(/^[123]+$/.test(digits), "telefón: lišta kola má holé čísla (bez krúžkov)", digits);
   }
   await shot("attack-armed");
   // otvorený výber zamyká ostatné akcie: ťuk na iné tlačidlá nič nezmení (popis, náhľad, označenie, picker)
@@ -254,12 +257,14 @@ try {
     check(await ev(`document.getElementById("melee-btn").classList.contains("no-mana") && !document.querySelector(".controls-row .btn.act.mana").classList.contains("no-mana")`), "tlačidlo bez many je sivé, recharge nie");
     await tap("#melee-btn");
     check(await labelRed(), "ťuk na melee bez many: červený štítok", await label());
-    check(!(await label()).includes("TAP AGAIN"), "červený štítok neponúka TAP AGAIN", await label());
+    check((await label()).includes("TAP AGAIN"), "červený štítok aj tak ponúka TAP AGAIN (akcia sa dá zaradiť)", await label());
     check(await ev(`!!document.querySelector(".mana-bar.no-mana-flash")`), "mana bar bliká červeným obrysom");
     await shot("no-mana");
     await tap("#melee-btn");
-    check((await queue())[1] === "-", "druhý ťuk na melee bez many nezaradil", JSON.stringify(await queue()));
-    await tap("#undo"); await sleep(300);
+    check((await queue())[1] === "melee", "druhý ťuk na melee bez many ho zaradí (server ho preškrtne)", JSON.stringify(await queue()));
+    check(await ev(`(() => { const b = document.getElementById("melee-btn"); return b.disabled && getComputedStyle(b, "::after").content.includes("🔒"); })()`), "zaradená akcia má zámok v strede");
+    await shot("used-lock");
+    await tap("#undo"); await tap("#undo"); await sleep(300);
     check(!(await labelRed()) && !(await ev(`!!document.querySelector(".mana-bar.no-mana-flash")`)), "po zrušení výberu červený štítok aj obrys zmiznú");
     check(await ev(`!document.getElementById("melee-btn").classList.contains("no-mana")`), "po undo je melee znova zaplatiteľné");
     // varovanie: obrana ako posledná akcia kola (bot hostbot = p1 začína → tapper je nestartér)

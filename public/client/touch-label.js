@@ -1,7 +1,7 @@
 // public/client/touch-label.js - telefón: štítok akcie (cena + účinok) namiesto popisu. Tlačidlá na telefóne
 // nesú len piktogram; po prvom ťuknutí sa nad tlačidlom ukáže štítok z poľa `label` (balance-ui.js BUTTON_TEXT,
 // prebité v public/chars/<key>.js buttons.<slot>.label), prípadne žltá linka varovania (ghost.js planWarnings
-// pre akciu na ďalšom mieste fronty). Málo many = červený štítok a akciu nejde zaradiť (touch.js).
+// pre akciu na ďalšom mieste fronty). Málo many = červený štítok (zaradiť sa dá, server ju preškrtne).
 // Čisté výpočty - vykresľovanie a umiestnenie robí touch.js.
 import { moveBtn, attackBtn, dashBtn, meleeBtn, specialBtn, mirrorBtn, rechargeBtn, demonBtn, lastHopeBtn } from "/client/dom.js";
 import { state, me } from "/client/session.js";
