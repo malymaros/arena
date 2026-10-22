@@ -3187,3 +3187,18 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .go-buttons { gap: 26px; padding: 26px; }
 .phone .go-buttons .retry { min-width: 400px; font-size: 26px; padding: 30px 34px 34px; }
 .phone .cr-knob { width: 44px; height: 44px; }
+/* ========== Telefón - pás postáv (client/char-strip.js) ==========
+   bežné stránky výberu tvoria jeden cyklický pás: kontajnery stránok bez boxu, karty absolútne v .char-pager,
+   ich polohu (transform) píše char-strip.js; okraje pásu sa strácajú do tmy. Šípky na telefóne nie sú vôbec. */
+.phone .char-arrow { display: none; }
+.phone #char-select.strip-mode .char-pager {
+  position: relative; width: 980px; height: 380px; touch-action: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+}
+.phone #char-select.strip-mode .char-cards:not([data-page="hidden"]) { display: contents; }
+.phone #char-select.strip-mode .char-cards:not([data-page="hidden"]) .char-card {
+  position: absolute; left: 50%; top: 50%; transition: box-shadow .15s ease, filter .15s ease;
+}
+.phone #char-select.strip-mode .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
+.phone #char-select:not(.roster-mode) .char-pager { width: 980px; } /* rovnaká šírka v páse aj na Hidden stránke - panel vpravo sa nehýbe */

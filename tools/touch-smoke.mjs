@@ -100,33 +100,64 @@ try {
     check(await ev(`!document.getElementById("touch-pick").classList.contains("hidden") && !document.getElementById("char-ability").classList.contains("hidden")`), "telefón: prvá karta je predvybraná (náhľad + PICK hneď)");
     check((await ev(`document.getElementById("touch-pick").textContent`)) === "PICK FIRE WIZARD", "telefón: predvybraný je Fire Wizard", await ev(`document.getElementById("touch-pick").textContent`));
   }
-  // prepínanie kariet nesmie nič posunúť: na každej stránke ťukni na každú kartu a porovnaj polohy
-  const layoutOf = () => ev(`JSON.stringify([...document.querySelectorAll("#char-page-title, #char-ability, #touch-pick, .char-cards:not(.hidden) .char-card")]
-    .map(e => { const r = e.getBoundingClientRect(); return e.classList.contains("touch-armed") ? [Math.round(r.left), Math.round(r.top + 0)] : [Math.round(r.left), Math.round(r.top), Math.round(r.height)]; })
-    .map(a => a.slice(0, 2)))`);
-  const jumps = [];
-  for (let pg = 0; pg < 3; pg++) {
-    let ref = null;
-    const keys = await ev(`[...document.querySelectorAll(".char-cards:not(.hidden) .char-card[data-char]")].map(c => c.dataset.char)`);
-    for (const k of keys) {
-      await tap(`.char-card[data-char="${k}"]`);
-      // označená karta je zámerne o 6 px vyššie (transform) - porovnávame bez nej
-      const l = await ev(`JSON.stringify([...document.querySelectorAll("#char-page-title, #char-ability, #touch-pick, .char-cards:not(.hidden) .char-card:not(.touch-armed)")].map(e => { const r = e.getBoundingClientRect(); return [e.id || e.dataset.char, Math.round(r.left), Math.round(r.top)]; }))`);
-      const pos = JSON.parse(l).filter(x => x[0] !== k);
-      const keyed = Object.fromEntries(pos.map(x => [x[0], x.slice(1).join(",")]));
-      if (ref) for (const [id, v] of Object.entries(keyed)) if (ref[id] && ref[id] !== v) jumps.push(`${k}: ${id} ${ref[id]} → ${v}`);
-      ref = { ...(ref || {}), ...keyed };
+  if (!process.env.TOUCH_DEVICE) {
+    // telefón: jeden cyklický pás postáv (char-strip.js) namiesto stránok so šípkami
+    const armedChar = () => ev(`document.querySelector(".char-card.touch-armed")?.dataset.char || null`);
+    const pr = await ev(`(() => { const r = document.querySelector(".char-pager").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; })()`);
+    const step = pr.w / 980 * 272; // jedna karta pásu v px displeja
+    const swipe = async (cards) => {
+      await sendT("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: pr.x, y: pr.y }] });
+      for (let i = 1; i <= 16; i++) { await sendT("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: pr.x - step * cards * i / 16, y: pr.y }] }); await sleep(16); }
+      await sendT("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await sleep(1200);
+    };
+    check(await ev(`document.getElementById("char-select").classList.contains("strip-mode") && getComputedStyle(document.getElementById("char-page-next")).display === "none"`), "telefón: postavy sú v páse, šípky nie sú");
+    await swipe(1);
+    check(await armedChar() === "lightning", "potiahnutie o kartu doľava označí ďalšiu postavu", String(await armedChar()));
+    for (let i = 0; i < 9; i++) await swipe(1);
+    check(await armedChar() === "lightning", "pás je cyklický (9 kariet dookola = späť na tej istej)", String(await armedChar()));
+    await swipe(-1);
+    check(await armedChar() === "fire", "potiahnutie doprava vráti predošlú postavu", String(await armedChar()));
+    await sendT("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: pr.x - step, y: pr.y }] });
+    await sendT("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await sleep(1200);
+    const mid = await ev(`(() => { const a = document.querySelector(".char-card.touch-armed").getBoundingClientRect(), p = document.querySelector(".char-pager").getBoundingClientRect(); return Math.abs(Math.round((a.left + a.width / 2) - (p.left + p.width / 2))); })()`);
+    check(await armedChar() === "werewolf" && Math.abs(mid) < 3, "ťuk na bočnú kartu ju označí a dotočí do stredu", `${await armedChar()} ${mid}px`);
+    await tap("#hidden-rune"); await sleep(900);
+    check(await ev(`document.getElementById("char-select").classList.contains("hidden-mode")`), "runa otvorí Hidden stránku");
+    await tap("#hidden-rune"); await sleep(1300);
+    check(await ev(`document.getElementById("char-select").classList.contains("strip-mode")`) && await armedChar() === "werewolf", "runa na Hidden stránke vráti hráča do pásu na to isté miesto", String(await armedChar()));
+    await swipe(-1); // werewolf → soldier
+    check(await armedChar() === "soldier", "dotočenie na Soldiera", String(await armedChar()));
+  } else {
+    // prepínanie kariet nesmie nič posunúť: na každej stránke ťukni na každú kartu a porovnaj polohy
+    const layoutOf = () => ev(`JSON.stringify([...document.querySelectorAll("#char-page-title, #char-ability, #touch-pick, .char-cards:not(.hidden) .char-card")]
+      .map(e => { const r = e.getBoundingClientRect(); return e.classList.contains("touch-armed") ? [Math.round(r.left), Math.round(r.top + 0)] : [Math.round(r.left), Math.round(r.top), Math.round(r.height)]; })
+      .map(a => a.slice(0, 2)))`);
+    const jumps = [];
+    for (let pg = 0; pg < 3; pg++) {
+      let ref = null;
+      const keys = await ev(`[...document.querySelectorAll(".char-cards:not(.hidden) .char-card[data-char]")].map(c => c.dataset.char)`);
+      for (const k of keys) {
+        await tap(`.char-card[data-char="${k}"]`);
+        // označená karta je zámerne o 6 px vyššie (transform) - porovnávame bez nej
+        const l = await ev(`JSON.stringify([...document.querySelectorAll("#char-page-title, #char-ability, #touch-pick, .char-cards:not(.hidden) .char-card:not(.touch-armed)")].map(e => { const r = e.getBoundingClientRect(); return [e.id || e.dataset.char, Math.round(r.left), Math.round(r.top)]; }))`);
+        const pos = JSON.parse(l).filter(x => x[0] !== k);
+        const keyed = Object.fromEntries(pos.map(x => [x[0], x.slice(1).join(",")]));
+        if (ref) for (const [id, v] of Object.entries(keyed)) if (ref[id] && ref[id] !== v) jumps.push(`${k}: ${id} ${ref[id]} → ${v}`);
+        ref = { ...(ref || {}), ...keyed };
+      }
+      if (pg < 2) await tap("#char-page-next");
     }
-    if (pg < 2) await tap("#char-page-next");
+    check(jumps.length === 0, "prepínanie kariet nič neposúva (nadpis, karty, náhľad, PICK)", jumps.slice(0, 4).join(" | "));
+    for (let i = 0; i < 3 && await ev(`document.getElementById("char-page-prev") && !document.getElementById("char-page-prev").classList.contains("off")`); i++) await tap("#char-page-prev");
+    void layoutOf;
+    // Soldier je na inej stránke výberu - prelistuj šípkou (jedno ťuknutie, nie je to výber)
+    const page = Number(await ev(`document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").dataset.page`));
+    for (let i = 0; i < 3 && await ev(`document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").classList.contains("hidden")`); i++)
+      await tap(page < 1 ? "#char-page-prev" : "#char-page-next");
+    check(await ev(`!document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").classList.contains("hidden")`), "listovanie stránok výberu ťuknutím na šípku");
   }
-  check(jumps.length === 0, "prepínanie kariet nič neposúva (nadpis, karty, náhľad, PICK)", jumps.slice(0, 4).join(" | "));
-  for (let i = 0; i < 3 && await ev(`document.getElementById("char-page-prev") && !document.getElementById("char-page-prev").classList.contains("off")`); i++) await tap("#char-page-prev");
-  void layoutOf;
-  // Soldier je na inej stránke výberu - prelistuj šípkou (jedno ťuknutie, nie je to výber)
-  const page = Number(await ev(`document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").dataset.page`));
-  for (let i = 0; i < 3 && await ev(`document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").classList.contains("hidden")`); i++)
-    await tap(page < 1 ? "#char-page-prev" : "#char-page-next");
-  check(await ev(`!document.querySelector('.char-card[data-char="soldier"]').closest(".char-cards").classList.contains("hidden")`), "listovanie stránok výberu ťuknutím na šípku");
   await tap('.char-card[data-char="soldier"]');
   check(await ev(`!document.getElementById("touch-pick").classList.contains("hidden")`), "ťuk na kartu ukáže PICK");
   check((await ev(`document.getElementById("touch-pick").textContent`)) === "PICK SOLDIER", "PICK nesie meno postavy", await ev(`document.getElementById("touch-pick").textContent`));

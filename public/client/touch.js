@@ -22,6 +22,7 @@ import { ghostCharAt, ghostPos } from "/client/ghost.js";
 import { CHARS_BY_KEY, VAMP_CHARS } from "/chars/index.js";
 import { state, me, board } from "/client/session.js";
 import { planning } from "/client/planning.js";
+import { stripActive, stripCenterCard } from "/client/char-strip.js";
 
 
 /* ---------- 5. :hover pravidlá preč (na dotyku po ťuknutí „visia") - sú len kozmetické ---------- */
@@ -206,14 +207,23 @@ let pickBar = null;
 let pickClick = false; // práve prebieha klik vyvolaný tlačidlom PICK (jediná cesta, ako vybrať postavu)
 // telefón: výber postáv má náhľad schopnosti v pravom stĺpci - bez označenej karty by ostal prázdny a celý výber
 // by pôsobil posunutý doľava. Prvá viditeľná voliteľná karta je preto vždy predvybraná (bez hlasu mena).
-const visibleCard = (c) => c && c.isConnected && c.offsetParent !== null && !c.closest(".char-cards.hidden");
+// trieda .hidden stránky neplatí v páse postáv (char-strip.js - všetky bežné stránky naraz, okrem Hidden) ani vo
+// výbere z turnajového tímu (roster-mode zlúči všetky stránky, aj Hidden; mimo tímu sú karty display: none)
+const visibleCard = (c) => {
+  if (!c || !c.isConnected || c.offsetParent === null) return false;
+  if (selEl.classList.contains("roster-mode")) return true;
+  return stripActive() ? !c.closest('[data-page="hidden"]') : !c.closest(".char-cards.hidden");
+};
 // Pri otvorení výberu je predvýber tichý; po prepnutí stránky (šípky, runa → Hidden) hlas mena zaznie
 // (doprava → Medusa, doľava → Escanor, Hidden → Vampire / Onryō). Okno 1 s pokryje aj glitch prechod runy.
 let voiceUntil = 0;
 function autoArmCard() {
   if (!isPhone || !selEl || selEl.classList.contains("hidden")) return;
-  if (armed?.classList.contains("char-card") && visibleCard(armed)) { keepCardPreview(); return; }
-  const card = [...selEl.querySelectorAll(".char-card[data-char]")].find(c => visibleCard(c) && !c.classList.contains("dead"));
+  // označená karta ostáva (napr. draft → výber z tímu): obnov PICK (ADD/REMOVE → PICK) aj náhľad, aj keď ho
+  // char-select.js pri prepnutí režimu zmaže až po tomto volaní
+  if (armed?.classList.contains("char-card") && visibleCard(armed)) { keepCardPreview(); syncPickBar(); setTimeout(keepCardPreview, 300); return; }
+  const card = stripActive() ? stripCenterCard()
+    : [...selEl.querySelectorAll(".char-card[data-char]")].find(c => visibleCard(c) && !c.classList.contains("dead"));
   const voice = performance.now() < voiceUntil;
   voiceUntil = 0;
   if (card) { arm(card, !voice); syncPickBar(); }

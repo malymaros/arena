@@ -12,7 +12,7 @@ import { SPECIAL_FPS } from "/chars/common.js";
 import { socket } from "/client/net.js";
 import { sfx } from "/client/sound.js";
 import { cellsForSpecialPreview } from "/client/zones.js";
-import { appScale } from "/client/viewport.js";
+import { appScale, isPhone } from "/client/viewport.js";
 
 /* ---------- Char select (preview) ---------- */
 export let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
@@ -361,6 +361,14 @@ export let hiddenMode = false;
 const RUNE_RADIUS = 260; // px od ľavého horného rohu, odkiaľ sa runa začína zjavovať
 let hiddenFound = false; // po prvom objavení (localStorage) ostáva runa trvalo slabo viditeľná
 try { hiddenFound = localStorage.getItem("arenaHiddenFound") === "1"; } catch {}
+// telefón (bez šípok): na otvorenej Hidden stránke runa v rohu stále svieti a ťuk na ňu vráti hráča späť do pásu
+// postáv (char-strip.js) na miesto, kde bol
+const phoneRuneBack = () => isPhone && hiddenMode && !selEl.classList.contains("hidden");
+function showPhoneRuneBack() {
+  if (!hiddenRune || !isPhone) return;
+  hiddenRune.style.opacity = ".6";
+  hiddenRune.classList.add("near");
+}
 function runeActive() {
   // turnaj: v DRAFTE (team-mode) runu PUSTÍME - side-postavu (svojej strany) si tam draftneš cez rovnaký
   // easter-egg ako v single/bo3 (ostáva „tajná"). Roster-mode (výber maga z už draftnutého tímu) ju nepustí:
@@ -370,6 +378,7 @@ function runeActive() {
 // pointermove + pointerdown: myš aj dotyk (na dotyku niet pohybu bez prsta - runu zobudí ťuknutie / ťah pri rohu)
 const runeProximity = (e) => {
   if (!hiddenRune) return;
+  if (phoneRuneBack()) return; // telefón na Hidden stránke: runa svieti stále (cesta späť), neriadi ju vzdialenosť
   if (!runeActive()) { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); return; }
   // clientX/Y sú skutočné px obrazovky, RUNE_RADIUS je v px layoutu (stránka môže byť zmenšená)
   const t = Math.max(0, 1 - Math.hypot(e.clientX, e.clientY) / (RUNE_RADIUS * appScale()));
@@ -392,6 +401,7 @@ function showHiddenPage() {
   clearAbilityPreview();
   hiddenRune?.classList.remove("near", "lit");
   if (hiddenRune) hiddenRune.style.opacity = "0";
+  showPhoneRuneBack();
 }
 
 /* nepravidelné efekty otvorenej Hidden stránky:
@@ -491,6 +501,12 @@ function syncRosterGlitch() {
   }
 }
 hiddenRune?.addEventListener("click", () => {
+  if (phoneRuneBack()) { // návrat z Hidden do pásu postáv - rovnaký glitch prechod ako pri vstupe
+    selEl.classList.add("cs-glitch");
+    setTimeout(() => { setCharPage(charPage); hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); }, 240);
+    setTimeout(() => selEl.classList.remove("cs-glitch"), 520);
+    return;
+  }
   if (!runeActive()) return;
   if (!hiddenFound) { hiddenFound = true; try { localStorage.setItem("arenaHiddenFound", "1"); } catch {} }
   selEl.classList.add("cs-glitch");
