@@ -2185,6 +2185,11 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
     border-radius: 2px;
     animation: ca-streak .5s ease-out infinite;
   }
+  /* trvalá aura (Last Stand / Last Hope, keepAura): jadro pulzuje stále, nie raz */
+  .charge-aura.persistent .ca-core{ animation: ca-core .95s ease-out infinite; }
+  /* úsporná grafika: pásiky a prstenec bez rozmazaného tieňa (farbu nesie gradient / okraj) */
+  .perf-lite .charge-aura .ca-streak,
+  .perf-lite .charge-aura .ca-ring{ box-shadow: none !important; }
   @keyframes ca-core{
     0%   { opacity: 0;   transform: translate(-50%,50%) scale(.5); }
     25%  { opacity: .9;  transform: translate(-50%,50%) scale(1.05); }

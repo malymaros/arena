@@ -8,7 +8,7 @@ import { actors } from "/client/actors.js";
 import { state, me, otherSlot } from "/client/session.js";
 import { positionActors, computeFacing, escPrideMul, ESC_FEET_FRAC, PAIR_SHIFT_DEFAULT, pairShift, liveActorPos } from "/client/placement.js";
 import { usesAltColor, charDirFor, ANIM_DEF, VAMP_ONESHOT_KEYS, ensureSpriteMeta, drawSprite, ACTOR_W, ACTOR_H, portraitFill, CHARGE_ANIM } from "/client/sprites.js";
-import { actorFilter, SUMMON_CROP, placeChargeAura, spawnChargeAura } from "/client/board-fx.js";
+import { actorFilter, SUMMON_CROP, placeChargeAura, keepAura } from "/client/board-fx.js";
 import { CHARS_BY_KEY, SPECIAL_ANIMS, PAIR_SHIFT, PORTRAIT_SCALE, HEAD_CX } from "/chars/index.js";
 import { SPECIAL_FPS } from "/chars/common.js";
 import { currentAnim } from "/client/anim.js";
@@ -360,7 +360,8 @@ export function raf() {
       lastStand.goldenSlot = goldOn ? buffSlot : null;
       hudBoxP1.classList.toggle("death-golden", goldOn && buffSlot === "p1");
       hudBoxP2.classList.toggle("death-golden", goldOn && buffSlot === "p2");
-      if (goldOn && now - lastStand.auraAt > 950) { spawnChargeAura(buffSlot, true); lastStand.auraAt = now; } // permanentná golden recharge
+      keepAura(buffSlot, "gold", goldOn); // permanentná golden recharge (jedna trvalá aura)
+      keepAura(buffSlot === "p1" ? "p2" : "p1", "gold", false);
       // démon sa drží za postavou na 0.25 - naviazaný na ŽIVÚ (interpolovanú) pozíciu sprite-u postavy,
       // takže sa kĺže spolu s ňou (nie teleport). Drží sa keď postava STOJÍ (server flag !st.down) - počas
       // summon/banish prechodov (st.down=true, resp. lastStand.banishing) ho riadia efekty. State-driven = robustné.
@@ -392,6 +393,7 @@ export function raf() {
     } else if (lastStand.realActive) {
       // koniec buffnutého stavu (smrť/výhra) - uprac
       lastStand.realActive = false; lastStand.banishing = false; lastStand.goldenSlot = null;
+      keepAura("p1", "gold", false); keepAura("p2", "gold", false);
       hudBoxP1.classList.remove("death-golden");
       hudBoxP2.classList.remove("death-golden");
       deathBehind.getAnimations().forEach(a => a.cancel());
@@ -414,9 +416,11 @@ export function raf() {
     if (hopeSlot) {
       lastStand.hopeActive = true;
       const tgt = state[hopeSlot];
-      if (tgt && tgt.char && !tgt.down && now - lastStand.hopeAuraAt > 950) { spawnChargeAura(hopeSlot, false, true); lastStand.hopeAuraAt = now; }
+      keepAura(hopeSlot, "red", !!(tgt && tgt.char && !tgt.down)); // trvalá červená aura
+      keepAura(hopeSlot === "p1" ? "p2" : "p1", "red", false);
     } else if (lastStand.hopeActive) {
       lastStand.hopeActive = false;
+      keepAura("p1", "red", false); keepAura("p2", "red", false);
       hudBoxP1.classList.remove("hope-red");
       hudBoxP2.classList.remove("hope-red");
       hideHopeCenter();

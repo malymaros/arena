@@ -449,8 +449,15 @@ export function spawnChargeAura(slot, gold = false, red = false, anchor = "actor
   cont.dataset.slot = slot;            // raf podľa toho auru drží na interpolovanej pozícii postavy
   if (anchor === "clone") cont.dataset.anchor = "clone";
   placeChargeAura(cont, slot);
+  fillAura(cont);
+  actorsEl.appendChild(cont);
+  setTimeout(() => cont.remove(), 1100);
+}
+// obsah aury: jadro, prstenec a pásiky (lite: menej pásikov, CSS .perf-lite im vypne tiene)
+function fillAura(cont) {
   cont.innerHTML = '<span class="ca-core"></span><span class="ca-ring"></span>';
-  for (let i = 0; i < 18; i++) {
+  const n = perf.lite ? 8 : 18;
+  for (let i = 0; i < n; i++) {
     const s = document.createElement("span");
     s.className = "ca-streak";
     s.style.left = ((Math.random() * 2 - 1) * TILE_W * 0.2).toFixed(0) + "px"; // užší rozptyl = na postave
@@ -458,6 +465,27 @@ export function spawnChargeAura(slot, gold = false, red = false, anchor = "actor
     s.style.animationDelay = (Math.random() * 0.55).toFixed(2) + "s";
     cont.appendChild(s);
   }
+}
+
+// Trvalá aura (zlatý Last Stand stav, červený Last Hope mód): JEDEN element na celý stav - jadro pulzuje nekonečnou
+// CSS animáciou (.persistent), pásiky sú nekonečné tak či tak. Predtým sa každých 950 ms vytvárala nová aura
+// (22 elementov, dve naraz) - neustále pridávanie/mazanie DOM stálo veľa prepočtu štýlov a vrstiev (PERF_PLAN etapa 4).
+// on = false (alebo skrytý hráč v labyrinte) auru odstráni, nech nesvieti na starej pozícii.
+const persistentAuras = {};
+export function keepAura(slot, variant, on) {
+  const key = slot + ":" + variant;
+  const cur = persistentAuras[key];
+  const p = state?.[slot];
+  if (!on || !p || p.x == null) {
+    if (cur) { cur.remove(); delete persistentAuras[key]; }
+    return;
+  }
+  if (cur && cur.isConnected) return; // pozíciu drží raf (placeChargeAura)
+  const cont = document.createElement("div");
+  cont.className = `charge-aura ${variant} persistent`;
+  cont.dataset.slot = slot;
+  placeChargeAura(cont, slot);
+  fillAura(cont);
   actorsEl.appendChild(cont);
-  setTimeout(() => cont.remove(), 1100);
+  persistentAuras[key] = cont;
 }
