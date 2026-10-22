@@ -369,6 +369,14 @@ function showPhoneRuneBack() {
   hiddenRune.style.opacity = ".6";
   hiddenRune.classList.add("near");
 }
+// zatvorenie výberu postáv (PICK skrytej postavy) alebo odchod z Hidden: svietiaca runa musí zhasnúť hneď,
+// nie až pri ďalšom dotyku (runeProximity) - inak ostane v rohu aj počas hry
+if (hiddenRune && isPhone) {
+  new MutationObserver(() => {
+    if (phoneRuneBack()) return;
+    if (hiddenRune.style.opacity === ".6") { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); }
+  }).observe(selEl, { attributes: true, attributeFilter: ["class"] });
+}
 function runeActive() {
   // turnaj: v DRAFTE (team-mode) runu PUSTÍME - side-postavu (svojej strany) si tam draftneš cez rovnaký
   // easter-egg ako v single/bo3 (ostáva „tajná"). Roster-mode (výber maga z už draftnutého tímu) ju nepustí:

@@ -177,8 +177,8 @@ try {
   await tap("#attack-btn");
   const aim = await ev(`(() => { const p = document.getElementById("aim-picker"); return { open: !p.classList.contains("hidden"), inLayer: !!p.closest("#touch-layer") }; })()`);
   check(aim.open && aim.inLayer, "attack otvorí picker na boarde jedným ťuknutím", JSON.stringify(aim));
-  const center = await ev(`(() => { const p = document.getElementById("aim-picker").getBoundingClientRect(), c = document.querySelector('#grid .cell[data-x="3"][data-y="1"]').getBoundingClientRect(); return { dx: Math.round((p.left + p.width / 2) - (c.left + c.width / 2)), dy: Math.round((p.top + p.height / 2) - (c.top + c.height / 2)) }; })()`);
-  check(Math.abs(center.dx) < 3 && Math.abs(center.dy) < 3, "picker je vycentrovaný na políčku postavy", JSON.stringify(center));
+  const center = await ev(`(() => { const p = document.getElementById("aim-picker").getBoundingClientRect(), c = document.getElementById("touch-layer").getBoundingClientRect(); return { dx: Math.round((p.left + p.width / 2) - (c.left + c.width / 2)), dy: Math.round((p.top + p.height / 2) - (c.top + c.height / 2)) }; })()`);
+  check(Math.abs(center.dx) < 3 && Math.abs(center.dy) < 3, "picker je pevne v strede boardu", JSON.stringify(center));
   const arrow = await tap("#aim-picker .arrow.left");
   check(arrow.w >= 40 && arrow.h >= 40, "šípka má aspoň 40×40 px na displeji", `${Math.round(arrow.w)}×${Math.round(arrow.h)}`);
   check((await queue()).filter(x => x !== "-").length === 0, "prvý ťuk na šípku útoku nezaradil akciu", JSON.stringify(await queue()));

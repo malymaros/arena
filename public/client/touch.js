@@ -16,11 +16,11 @@
 //     karta predvybraná (bez hlasu), aby pravý panel s náhľadom nikdy nebol prázdny.
 //  5. :hover pravidlá sa na dotyku vypnú (po ťuknutí by „viseli").
 import { isTouch, isPhone, appScale } from "/client/viewport.js";
-import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, cellToPx, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
+import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
 import { specialTargetOf, uiLocked } from "/client/controls.js";
-import { ghostCharAt, ghostPos } from "/client/ghost.js";
+import { ghostCharAt } from "/client/ghost.js";
 import { CHARS_BY_KEY, VAMP_CHARS } from "/chars/index.js";
-import { state, me, board } from "/client/session.js";
+import { board } from "/client/session.js";
 import { planning } from "/client/planning.js";
 import { stripActive, stripCenterCard } from "/client/char-strip.js";
 
@@ -76,11 +76,10 @@ function placePicker(el) {
       gridTemplateColumns: `repeat(${board.w}, ${TILE_W}px)`, gridAutoRows: `${TILE_H}px` });
     return;
   }
-  const p = ghostPos() || state?.[me];
-  if (!p || p.x == null) return;
-  const { left, top } = cellToPx(p.x, p.y);
-  el.style.left = (left + TILE_W / 2) + "px";
-  el.style.top = (top + TILE_H / 2) + "px";
+  // smerové pickery pevne v strede boardu (nie pri postave - na krajnom riadku/stĺpci by šípky trčali mimo plochy
+  // cez nadpis, HUD či lištu); smery sú absolútne, poloha pickera na nich nič nemení
+  el.style.left = (board.w * TILE_W + (board.w - 1) * GAP) / 2 + "px";
+  el.style.top = (board.h * TILE_H + (board.h - 1) * GAP) / 2 + "px";
 }
 
 /* ---------- 1. ťuk = výber + náhľad, druhý ťuk = vykonať ---------- */
