@@ -3151,3 +3151,11 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .perf-lite body.labyrinth-mode .arena::before { opacity: 1; }
 /* dotyk: RELOAD GAME v menu len s nápisom, bez vysvetľujúceho podnadpisu */
 .touch .menu-item[data-act="reload"] small { display: none; }
+/* dotyk, výber postáv: označená karta musí byť jasne vidieť - ostatné karty stmavnú, označená sa zdvihne,
+   zväčší a dostane biely rám so zlatou žiarou a zlatú menovku (statické, bez nekonečnej animácie) */
+.touch .char-cards:has(.char-card.touch-armed) .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
+.touch .char-card.touch-armed {
+  transform: translateY(-10px) scale(1.04); z-index: 2; outline: none; animation: none;
+  box-shadow: 0 0 0 5px #fff, 0 0 0 9px #ffb300, 0 0 0 11px #000, 0 0 34px 6px rgba(255,200,40,.75);
+}
+.touch .char-card.touch-armed .char-name { background: #ffb300; color: #1a1200; text-shadow: none; padding: 7px 6px; }

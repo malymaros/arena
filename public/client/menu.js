@@ -1,12 +1,12 @@
 // public/client/menu.js - menu ☰ v ľavom dolnom rohu, dostupné vždy (aj nad char-selectom, lobby, zoznamom
 // roomiek a zaseknutými overlaymi): RELOAD GAME (= obnovenie stránky; server hráča vráti na jeho miesto),
 // celá obrazovka (kde to prehliadač vie), zvuk (okno zo sound-ui.js) a pre admina (prihlásený admin heslom)
-// reset tejto roomky / všetkých roomiek. GRAPHICS prepína úspornú grafiku (perf.js: auto → lite → full). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
+// reset tejto roomky / všetkých roomiek. GRAPHICS prepína úspornú grafiku LITE ↔ FULL (perf.js; kým hráč neklikne, platí auto). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
 import { socket } from "/client/net.js";
 import { isAdmin, onAdminChange } from "/client/admin-state.js";
 import { canFullscreen, toggleFullscreen } from "/client/viewport.js";
 import { openSoundWindow } from "/client/sound-ui.js";
-import { perf, perfMode, setPerfMode } from "/client/perf.js";
+import { perf, setPerfMode } from "/client/perf.js";
 
 // pixel-art ☰ 12×12
 const ICON = ["............", "............", ".bbbbbbbbbb.", ".bbbbbbbbbb.", "............", ".bbbbbbbbbb.",
@@ -40,14 +40,12 @@ function render() {
     <button type="button" class="menu-item" data-act="reload">⟳ RELOAD GAME<small>if the game is stuck - you keep your seat</small></button>
     ${canFullscreen ? `<button type="button" class="menu-item" data-act="fullscreen">⛶ ${fsLabel}</button>` : ""}
     <button type="button" class="menu-item" data-act="sound">♪ SOUND</button>
-    <button type="button" class="menu-item" data-act="graphics">◐ GRAPHICS: ${GFX_LABEL[perfMode()]}${perfMode() === "auto" ? (perf.lite ? " (LITE)" : " (FULL)") : ""}<small>lite = fewer effects, smoother on phones</small></button>
+    <button type="button" class="menu-item" data-act="graphics">◐ GRAPHICS: ${perf.lite ? "LITE" : "FULL"}</button>
     ${isAdmin() ? `
       <div class="menu-sep">ADMIN</div>
       ${inRoom() ? `<button type="button" class="menu-item danger" data-act="reset-room">✖ RESET THIS ROOM</button>` : ""}
       <button type="button" class="menu-item danger" data-act="reset-all">✖ RESET ALL ROOMS</button>` : ""}`;
 }
-const GFX_LABEL = { auto: "AUTO", lite: "LITE", full: "FULL" };
-const GFX_NEXT = { auto: "lite", lite: "full", full: "auto" };
 export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
 export function closeMenu() { backdrop.classList.add("hidden"); panel.classList.add("hidden"); }
 
@@ -64,7 +62,7 @@ panel.addEventListener("click", (ev) => {
   if (act === "reload") { location.reload(); return; }
   if (act === "fullscreen") { toggleFullscreen(); closeMenu(); return; }
   if (act === "sound") { closeMenu(); openSoundWindow(); return; }
-  if (act === "graphics") { setPerfMode(GFX_NEXT[perfMode()]); render(); return; }
+  if (act === "graphics") { setPerfMode(perf.lite ? "full" : "lite"); render(); return; }
   if (act === "reset-room") {
     if (!confirm("Zrušiť TÚTO roomku a odpojiť jej hráčov aj divákov?")) return;
     socket.emit("admin_reset_room"); closeMenu(); return;
