@@ -3070,7 +3070,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 30px 48px 36px; grid-template-rows: 1fr repeat(6, auto); }
 html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .lobby-label { font-size: 17px; margin-bottom: 10px; }
-.phone .opt { font-size: 17px; padding: 14px 10px; min-width: 70px; }
+.phone .lobby .opt { font-size: 17px; padding: 14px 10px; min-width: 70px; }
 .phone .weights { grid-template-columns: 1fr; gap: 12px; }
 .phone .weight { font-size: 18px; gap: 12px; }
 .phone .weight .w-ico { width: 28px; height: 28px; }
@@ -3207,7 +3207,7 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .lobby-title { font-size: 52px; margin-bottom: 16px; }
 .phone .lobby-section { margin-bottom: 20px; }
 .phone .lobby-label { font-size: 21px; margin-bottom: 12px; }
-.phone .opt { font-size: 21px; padding: 20px 12px; }
+.phone .lobby .opt { font-size: 21px; padding: 20px 12px; }
 .phone .weights { gap: 16px; }
 .phone .weight { font-size: 22px; }
 .phone .weight .w-ico { width: 34px; height: 34px; }
@@ -3217,3 +3217,7 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .weights-sum { font-size: 21px; }
 .phone .lobby-start { padding: 30px; font-size: 36px; margin-top: 12px; }
 .phone .lobby-title { align-self: center; } /* vyššia obrazovka (malý telefón): zvyšok miesta sa rozdelí nad aj pod nadpis */
+/* telefón - zápis kola: voliteľné zlaté bunky (golden shield/mirror/mana, Last Stand) rovnako vysoké ako hlavné akcie,
+   ikona čitateľná, démon vyplní bunku - riadok je jednotný, nič netrčí ani sa nestráca */
+.phone .q-badge.opt { width: 44px; height: 40px; padding: 0; font-size: 20px; align-self: auto; }
+.phone .q-badge.opt .ls-badge { height: 32px; }
