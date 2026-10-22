@@ -125,6 +125,11 @@ try {
     check(await armedChar() === "werewolf" && Math.abs(mid) < 3, "ťuk na bočnú kartu ju označí a dotočí do stredu", `${await armedChar()} ${mid}px`);
     await tap("#hidden-rune"); await sleep(900);
     check(await ev(`document.getElementById("char-select").classList.contains("hidden-mode")`), "runa otvorí Hidden stránku");
+    // PICK skrytej postavy zatvorí výber - svietiaca runa musí zhasnúť hneď, nie až po ďalšom ťuknutí
+    await ev(`document.getElementById("char-select").classList.add("hidden")`); await sleep(100);
+    const runeAfter = await ev(`(() => { const r = document.getElementById("hidden-rune"); return r.style.opacity + "|" + r.classList.contains("near"); })()`);
+    check(runeAfter === "0|false", "zatvorenie výberu z Hidden stránky zhasne runu", runeAfter);
+    await ev(`(() => { document.getElementById("char-select").classList.remove("hidden"); const r = document.getElementById("hidden-rune"); r.style.opacity = ".6"; r.classList.add("near"); })()`);
     await tap("#hidden-rune"); await sleep(1300);
     check(await ev(`document.getElementById("char-select").classList.contains("strip-mode")`) && await armedChar() === "werewolf", "runa na Hidden stránke vráti hráča do pásu na to isté miesto", String(await armedChar()));
     await swipe(-1); // werewolf → soldier

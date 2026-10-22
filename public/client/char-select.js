@@ -374,7 +374,8 @@ function showPhoneRuneBack() {
 if (hiddenRune && isPhone) {
   new MutationObserver(() => {
     if (phoneRuneBack()) return;
-    if (hiddenRune.style.opacity === ".6") { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); }
+    // pozor: style.opacity sa číta normalizované („.6" → „0.6"), preto zhasíname podľa stavu výberu, nie podľa hodnoty
+    if (!runeActive()) { hiddenRune.style.opacity = "0"; hiddenRune.classList.remove("near", "lit"); }
   }).observe(selEl, { attributes: true, attributeFilter: ["class"] });
 }
 function runeActive() {
