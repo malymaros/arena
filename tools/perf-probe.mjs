@@ -17,7 +17,7 @@
 //   node tools/perf-probe.mjs --ab <commit> --label etapa3 → striedavé behy <commit> a pracovného stromu (spoľahlivé A/B)
 //   node tools/perf-probe.mjs --reps 1 --profile golden_idle → navyše vypíše najdrahšie JS funkcie a udalosti v okne
 //   node tools/perf-probe.mjs --reps 1 --shots tmp/perf/shots → snímky na vizuálnu kontrolu (lite vs full: --perf)
-//   --device tablet (1180×820, DPR 2) · --throttle 6 · --reps 5 · --perf full|lite (URL ?perf=…, od etapy 1)
+//   --device tablet (1180×820, DPR 2) | --device 1720x920@1 (vlastné) · --throttle 6 · --reps 5 · --perf full|lite (URL ?perf=…, od etapy 1)
 import { spawn, execSync } from "node:child_process";
 import { io } from "socket.io-client";
 import WebSocket from "ws";
@@ -38,7 +38,10 @@ const SHOTS = opt("shots", null); // priečinok → snímky obrazovky (zlatý st
 const PROFILE = opt("profile", null); // názov okna → CPU profil (top funkcie podľa vlastného času) + top udalosti tracu
 const PASS = "perf";
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const DEV = DEVICE === "tablet" ? { width: 1180, height: 820, deviceScaleFactor: 2 } : { width: 844, height: 390, deviceScaleFactor: 3 };
+// --device phone | tablet | ŠxV@DPR (napr. 1720x920@1 = bez zmenšenia stránky, viewport.js scale 1)
+const customDev = /^(\d+)x(\d+)@([\d.]+)$/.exec(DEVICE);
+const DEV = customDev ? { width: +customDev[1], height: +customDev[2], deviceScaleFactor: +customDev[3] }
+  : DEVICE === "tablet" ? { width: 1180, height: 820, deviceScaleFactor: 2 } : { width: 844, height: 390, deviceScaleFactor: 3 };
 const WINDOWS = ["idle", "round", "summon", "golden_idle", "demon"];
 
 const BROWSERS = [
@@ -351,7 +354,7 @@ ${"okno".padEnd(12)}` + METRICS.map(([, n]) => n.padStart(15)).join(""));
 }
 function save(result) {
   fs.mkdirSync("tmp/perf", { recursive: true });
-  const file = path.join("tmp/perf", `${result.label.replace(/[^\w.@-]+/g, "_")}${DEVICE !== "phone" ? "-" + DEVICE : ""}.json`);
+  const file = path.join("tmp/perf", `${result.label.replace(/[^\w.@-]+/g, "_")}${DEVICE !== "phone" ? "-" + DEVICE.replace(/[^\w.]+/g, "_") : ""}.json`);
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
   console.log(`uložené: ${file}`);
 }
