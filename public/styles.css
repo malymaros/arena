@@ -3055,7 +3055,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; align-content: start;
   grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview start" "timer start";
 }
-.phone .lobby-title { grid-area: title; font-size: 44px; margin-bottom: 24px; } /* riadky volieb sa rozložia po celej výške (space-between) - dole neostane prázdny pás */
+.phone .lobby-title { grid-area: title; font-size: 44px; margin-bottom: 24px; align-self: start; } /* voľny priestor obrazovky ide do riadku nadpisu (1fr) = medzera pod nadpisom, voľby ostávajú husté dole */
 .phone .lobby-sub { display: none; }
 .phone .lobby-card > .lobby-section:nth-of-type(1) { grid-area: format; }
 .phone .lobby-card > .lobby-section:nth-of-type(2) { grid-area: tiles; }
@@ -3067,7 +3067,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .lobby-section { margin-bottom: 10px; }
 /* lobby na celú obrazovku - menu ☰ sa počas nastavovania zápasu skryje (inak by lobby muselo uhýbať jeho rohu) */
 .phone .lobby { padding: 0; align-items: stretch; }
-.phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 30px 48px 36px; align-content: space-between; }
+.phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 30px 48px 36px; grid-template-rows: 1fr repeat(5, auto); }
 html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .lobby-label { font-size: 17px; margin-bottom: 10px; }
 .phone .opt { font-size: 17px; padding: 14px 10px; min-width: 70px; }
