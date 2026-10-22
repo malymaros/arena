@@ -3,7 +3,11 @@
 // vytvoria; do DOM ich pripája client.js na pôvodnom mieste (za figúrami z registra fx), poradie vrstiev ostáva.
 import { TILE_H } from "/client/dom.js";
 import { ACTOR_W, ACTOR_H } from "/client/sprites.js";
-import { DEATH_SCALE } from "/client/demon-sprites.js";
+import { DEATH_SCALE, DEATH_FRAME, HOPE_FRAME } from "/client/demon-sprites.js";
+
+// Viditeľnosť stredových overlayov (nastavuje last-stand.js pri nástupe/odchode/skrytí) - raf kreslí sprite len do
+// viditeľného canvasu (výkon: inak by sa démon aj Last Hope kreslili celú hru do neviditeľných canvasov).
+export const overlayVis = new WeakMap();
 
 // DEATH summon - screen-space overlay (fixed, mimo stacking contextu .stage, aby bolo vidno v každej fáze).
 // Veľkosť medzi fázami riešime CSS transformom scale(); canvas má základnú „stredovú" veľkosť.
@@ -11,7 +15,9 @@ export const deathCenter = document.createElement("canvas");
 deathCenter.id = "death-center";
 {
   const px = Math.round(TILE_H * DEATH_SCALE);
-  deathCenter.width = px; deathCenter.height = px;
+  // backing = rozmer zdrojového framu (kreslí sa 1:1), CSS ho zväčší s image-rendering: pixelated - rovnaký
+  // výsledok, menej pixelov na vyplnenie
+  deathCenter.width = DEATH_FRAME; deathCenter.height = DEATH_FRAME;
   deathCenter.style.width = px + "px"; deathCenter.style.height = px + "px";
   deathCenter.style.position = "fixed";
   deathCenter.style.left = "50%"; deathCenter.style.top = "50%";
@@ -56,7 +62,7 @@ hopeCenter.id = "hope-center";
   // canvas v pomere framu (768×512 = 1.5:1) a poriadne veľký, nech hope postava vyplní priestor (nie letterbox)
   const ch = Math.round(TILE_H * 3.4);
   const cw = Math.round(ch * 768 / 512);
-  hopeCenter.width = cw; hopeCenter.height = ch;
+  hopeCenter.width = HOPE_FRAME.w; hopeCenter.height = HOPE_FRAME.h; // backing 1:1 so zdrojovým framom (viď deathCenter)
   hopeCenter.style.width = cw + "px"; hopeCenter.style.height = ch + "px";
   hopeCenter.style.position = "fixed";
   hopeCenter.style.left = "50%"; hopeCenter.style.top = "50%";

@@ -110,7 +110,11 @@ if (typeof CanvasRenderingContext2D !== "undefined") {
 export function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.95, anchorY=0.5, clear=true, offsetX=0, offsetY=0, cropXFrac=0, cropRightFrac=0) {
   // anim.frames prepíše odhad počtu framov (keď framy nie sú štvorcové a inference zlyhá)
   const total = anim.frames || meta.frames;
-  const fw = anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
+  // anim.cols: atlas (mriežka cols stĺpcov, frame i → stĺpec i % cols, riadok floor(i / cols)) namiesto pásu -
+  // veľké sprity (démon, Last Hope), ktoré by ako pás presiahli 4096 px (limit textúry mobilných GPU)
+  const cols = anim.cols || 0;
+  const fw = cols ? Math.round(meta.img.naturalWidth / cols) : anim.frames ? Math.round(meta.img.naturalWidth / total) : meta.fw;
+  const fh = cols ? Math.round(meta.img.naturalHeight / Math.ceil(total / cols)) : meta.fh;
   // anim.frameIndex: explicitný frame (vlastná časová logika, napr. Escanor IntroStand s loopFrom)
   // anim.loopFrom: prehraj RAZ celé (0..N-1), potom cykli len chvost od loopFrom (napr. Escanorov WinSunBoard -
   // zdvih ruky raz, ďalej len ústa + preblikávajúce slnko). Vyžaduje t relatívny od štartu animácie.
@@ -128,15 +132,16 @@ export function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.
   //   napr. Luffyho zapečená natiahnutá ruka+päsť: necháme len telo, dosah kreslí procedurálna guma
   const cropPx  = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
   const cropRPx = Math.round(fw * Math.max(0, Math.min(0.9, cropRightFrac)));
-  const sx = idx * fw + cropPx;
+  const sx = (cols ? idx % cols : idx) * fw + cropPx;
+  const sy = cols ? Math.floor(idx / cols) * fh : 0;
   const sw = Math.max(1, fw - 2 * cropPx - cropRPx);
-  const scale = Math.min(dstW / fw, dstH / meta.fh) * fill; // výška ostáva „normálna" (škáluje sa podľa plnej výšky/šírky framu)
-  const dw = sw * scale, dh = meta.fh * scale;
+  const scale = Math.min(dstW / fw, dstH / fh) * fill; // výška ostáva „normálna" (škáluje sa podľa plnej výšky/šírky framu)
+  const dw = sw * scale, dh = fh * scale;
   // anchorY: 0 = hore, 0.5 = stred, 1 = dole; offsetX/offsetY = posun v px (záporné offsetY dvíha hore)
   const dx = (dstW - dw) / 2 + offsetX, dy = (dstH - dh) * anchorY + offsetY;
   const cvs = ctx.canvas;
   if (clear) {
-    const key = `${meta.img.src}|${sx}|${sw}|${dx}|${dy}|${dw}|${dh}|${dstW}|${dstH}`;
+    const key = `${meta.img.src}|${sx}|${sy}|${sw}|${dx}|${dy}|${dw}|${dh}|${dstW}|${dstH}`;
     if (lastDraw.get(cvs) === key) return; // na canvase už je presne tento obraz
     lastDraw.set(cvs, key);
   } else {
@@ -146,7 +151,7 @@ export function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.
   try {
     if (clear) ctx.clearRect(0, 0, dstW, dstH); // clear=false -> vrstvenie (efekt navrch mága)
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(meta.img, sx, 0, sw, meta.fh, dx, dy, dw, dh);
+    ctx.drawImage(meta.img, sx, sy, sw, fh, dx, dy, dw, dh);
   } finally {
     inDrawSprite = false;
   }

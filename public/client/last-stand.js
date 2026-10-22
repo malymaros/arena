@@ -5,7 +5,7 @@ import { cellToPx, TILE_W, TILE_H } from "/client/dom.js";
 import { pairShift, computeFacing } from "/client/placement.js";
 import { ACTOR_W, ACTOR_H } from "/client/sprites.js";
 import { HEAD_CX } from "/chars/index.js";
-import { deathFog, deathCenter, hopeFog, hopeCenter, deathBehind } from "/client/overlays.js";
+import { deathFog, deathCenter, hopeFog, hopeCenter, deathBehind, overlayVis } from "/client/overlays.js";
 import { DEATH_SEQ } from "/client/demon-sprites.js";
 import { appSize } from "/client/viewport.js";
 import { perf } from "/client/perf.js";
@@ -58,7 +58,8 @@ function _deathFogPuff(ms, dir) {
 // banish smrť po démon útoku - na obrazovke porazeného ostal démon visieť v strede cez GAME OVER).
 // Preto sa koncový stav po dobehnutí zapíše do inline štýlu a animácia sa hneď zruší.
 function pinOnFinish(el, anim, styles) {
-  anim.onfinish = () => { Object.assign(el.style, styles); anim.cancel(); };
+  overlayVis.set(el, true); // počas animácie (nástup aj odchod) je vidno - raf kreslí
+  anim.onfinish = () => { Object.assign(el.style, styles); anim.cancel(); if (styles.opacity === "0") overlayVis.set(el, false); };
 }
 
 export function lsCenterAppear() {
@@ -139,6 +140,7 @@ export function hideHopeCenter() {
   hopeCenter.getAnimations().forEach(a => a.cancel());
   hopeFog.getAnimations().forEach(a => a.cancel());
   hopeCenter.style.opacity = "0";
+  overlayVis.set(hopeCenter, false);
   hopeFog.style.opacity = "0";
   hopeFog.style.display = "none";
 }
@@ -149,6 +151,7 @@ export function hideDeathCenter() {
   deathCenter.getAnimations().forEach(a => a.cancel());
   deathFog.getAnimations().forEach(a => a.cancel());
   deathCenter.style.opacity = "0";
+  overlayVis.set(deathCenter, false);
   deathFog.style.opacity = "0";
   deathFog.style.display = "none";
 }

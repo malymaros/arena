@@ -19,9 +19,15 @@ import { simulatedClonePos, ghostPos, ghostCharAt } from "/client/ghost.js";
 import { planning } from "/client/planning.js";
 import { drawMageHeadAnim } from "/client/mage-head.js";
 import { lastStand } from "/client/last-stand-state.js";
-import { deathBehind, deathCenter, hopeCenter } from "/client/overlays.js";
+import { deathBehind, deathCenter, hopeCenter, overlayVis } from "/client/overlays.js";
 import { DEATH_SEQ, DEATH_DIR, DEATH_ANIM, HOPE_DIR, HOPE_ANIM } from "/client/demon-sprites.js";
 import { hideDeathCenter, hideHopeCenter } from "/client/last-stand.js";
+
+// prednačítanie + dekódovanie spritov démona a Last Hope: kreslia sa až pri vyvolaní (len viditeľné), nech sa
+// prvé vyvolanie nezasekne na sťahovaní/dekódovaní veľkého obrázka
+for (const [dir, anim] of [[DEATH_DIR, DEATH_ANIM], [HOPE_DIR, HOPE_ANIM]]) {
+  ensureSpriteMeta(dir, anim.file).then(m => m.img.decode?.()).catch(() => {});
+}
 
 /* ---------- RAF: actors + FX ---------- */
 // živé zoznamy podľa triedy namiesto querySelectorAll v každom frame (lacné; kópia [...] pred iteráciou,
@@ -403,9 +409,13 @@ export function raf() {
   }
 
   // DEATH summon - framy do oboch canvasov: stredový overlay (fill 1.0) + „za postavou" (ako postava: ACTOR rozmer)
-  ensureSpriteMeta(DEATH_DIR, DEATH_ANIM.file).then(meta => {
-    drawSprite(deathCenter.getContext("2d"), meta, DEATH_ANIM, now, deathCenter.width, deathCenter.height, 1.0);
-    drawSprite(deathBehind.getContext("2d"), meta, DEATH_ANIM, now, ACTOR_W, ACTOR_H);
+  // kreslí sa len do viditeľného canvasu (výkon) - stredový podľa overlayVis (last-stand.js), „za postavou" počas
+  // Last Stand stavu alebo kým ho nejaký efekt drží viditeľný (revive nábeh, banish)
+  const drawDeathCenter = overlayVis.get(deathCenter) === true;
+  const drawDeathBehind = lastStand.realActive || deathBehind.style.opacity !== "0";
+  if (drawDeathCenter || drawDeathBehind) ensureSpriteMeta(DEATH_DIR, DEATH_ANIM.file).then(meta => {
+    if (drawDeathCenter) drawSprite(deathCenter.getContext("2d"), meta, DEATH_ANIM, now, deathCenter.width, deathCenter.height, 1.0);
+    if (drawDeathBehind) drawSprite(deathBehind.getContext("2d"), meta, DEATH_ANIM, now, ACTOR_W, ACTOR_H);
   }).catch(()=>{});
 
   // Last Hope - trvalý červený ultra mód (state[slot].lastHopeBuff): pulzujúci červený mana bar + periodická červená aura
@@ -428,7 +438,7 @@ export function raf() {
   }
 
   // Last Hope summon - hope sprite do stredového overlay (viditeľnosť riadi opacity cez hopeCenterAppear/Disappear)
-  ensureSpriteMeta(HOPE_DIR, HOPE_ANIM.file).then(meta => {
+  if (overlayVis.get(hopeCenter) === true) ensureSpriteMeta(HOPE_DIR, HOPE_ANIM.file).then(meta => {
     drawSprite(hopeCenter.getContext("2d"), meta, HOPE_ANIM, now, hopeCenter.width, hopeCenter.height, 1.0);
   }).catch(()=>{});
 

@@ -2,7 +2,7 @@
 // Bez vplyvu na hru; aktivuje sa len query parametrom.
 
 /* ---------- DEBUG: hope sprite animácia (?hopedebug=1) ----------
-   Samostatný náhľad - nájdi správny počet framov v sprite_strip.png (frame inference predpokladá štvorec).
+   Samostatný náhľad atlasu hope/atlas.png (mriežka COLS stĺpcov, tools/sprites-overlays) - kontrola počtu framov.
    [ / ]  počet framov   |   - / =  fps   |   ←/→  ručný krok   |   medzerník  pauza   |   0  auto */
 (function hopeDebug() {
   const params = new URLSearchParams(location.search);
@@ -22,27 +22,28 @@
   document.body.appendChild(ov);
 
   const ctx = cv.getContext("2d");
-  let frames = Number(params.get("frames")) || 18; // štart = inference (9216/512)
+  let frames = Number(params.get("frames")) || 12;
+  const cols = Number(params.get("cols")) || 4;
   let fps = 10, manual = -1, paused = false;
 
   const img = new Image();
-  img.src = "/assets/hope/sprite_strip.png";
+  img.src = "/assets/hope/atlas.png";
 
   function draw(t) {
     if (img.complete && img.naturalWidth) {
-      const fw = img.naturalWidth / frames, fh = img.naturalHeight;
+      const fw = img.naturalWidth / cols, fh = img.naturalHeight / Math.ceil(frames / cols);
       const idx = manual >= 0 ? manual : (paused ? 0 : Math.floor((t / (1000 / fps)) % frames));
       ctx.clearRect(0, 0, cv.width, cv.height);
       ctx.imageSmoothingEnabled = false;
       const scale = Math.min(cv.width / fw, cv.height / fh);
       const dw = fw * scale, dh = fh * scale;
-      ctx.drawImage(img, Math.round(idx * fw), 0, Math.round(fw), fh, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
+      ctx.drawImage(img, Math.round((idx % cols) * fw), Math.round(Math.floor(idx / cols) * fh), Math.round(fw), Math.round(fh), (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
       info.textContent =
         `hope sprite ${img.naturalWidth}×${img.naturalHeight}\n` +
-        `frames=${frames}  frameW=${(img.naturalWidth / frames).toFixed(1)}  fps=${fps}  frame=${idx}${manual >= 0 ? " [MANUAL]" : paused ? " [PAUSE]" : ""}\n` +
+        `frames=${frames}  cols=${cols}  size=${fw.toFixed(0)}×${fh.toFixed(0)}  fps=${fps}  frame=${idx}${manual >= 0 ? " [MANUAL]" : paused ? " [PAUSE]" : ""}\n` +
         `[ / ] frames     - / = fps     ←/→ krok     medzerník pauza     0 auto`;
     } else {
-      info.textContent = "načítavam /assets/hope/sprite_strip.png …";
+      info.textContent = "načítavam /assets/hope/atlas.png …";
     }
     requestAnimationFrame(draw);
   }
