@@ -110,17 +110,22 @@ vlastnej bunke, úder po charge, úder pasce) → `voice.melee`.
 (EBU R128, v úseku `trim`) a nastaví `vol` na cieľ **−18 LUFS** s rezervou vrcholu −1 dBFS (`vol` najviac 2 =
 zosilnenie tichej nahrávky). Spusti ho po každom pridaní/výmene nahrávky hlasu; bez `--write` len vypíše tabuľku.
 
-## Fáza ako jedna stopa (pakt Last Stand)
+## Fáza ako jedna stopa (démon, Last Hope)
 
-Niektoré udalosti majú okno cez celú fázu, nie len cez svoj frame (`PHASE_SPAN` v `events.js`). Pakt Last Stand má dve stopy:
+Niektoré udalosti majú okno cez celú fázu, nie len cez svoj frame (`PHASE_SPAN` v `events.js`). Tieto stopy hrajú
+**bez náhodnej zmeny tempa/výšky** (ostatné efekty ±4 %), lebo ide o dlhé repliky. Hlas démona = REAPER (`custom/demon/`).
 
-| Kľúč | Kedy zaznie | Okno |
-|---|---|---|
-| `last_stand` | **stopa 1 - vyvolanie**: démon sa vynorí v strede a odčerpá HP/manu na 0 | **2,4 s** (1 000 + 1 400 ms), končí smrťou |
-| `last_stand_kill` | **stopa 2 - smrť + oživenie**: smrť, démon za postavou, zlaté dvíhanie HP/many, hráč vstane | **3,9 s** (700 + 700 + 1 600 + 900 ms); s Narutovým klonom / pascou Vampire-Onryō o 1,08 s dlhšie |
+| Kľúč | Kedy zaznie | Okno | Súbor |
+|---|---|---|---|
+| `last_stand` | pakt, **stopa 1 - vyvolanie**: démon sa vynorí v strede a odčerpá HP/manu na 0 | **2,4 s** (1 000 + 1 400 ms), končí smrťou | reaper-intro1 (2,52 s) |
+| `last_stand_kill` | pakt, **stopa 2 - smrť + oživenie**: smrť, démon za postavou, zlaté dvíhanie, hráč vstane | **3,9 s** (700 + 700 + 1 600 + 900 ms); s Narutovým klonom / pascou o 1,08 s dlhšie | reaper-intro2 (4,22 s) |
+| `demon_summon` | **útok démona**: vynorenie → 3 bliknutia políčok → zásah → odchod zo stredu | **8,0 s** (1 000 + 3 × 1 620 + 1 080 + 1 080); brániaci sa súper 6,9 s | reaper-attack (8,78 s) |
+| `last_stand_banish` | **vyhnanie na konci FINAL ROUND**: duch opustí postavu → v strede → odčerpanie → smrť | **4,6 s** (1 500 + 1 000 + 1 400 + 700); potom pád porazeného (1,3 s) a koniec hry | reaper-outro (6,26 s) |
+| `last_hope` | **Last Hope**: postava sa vynorí → HP 1 / mana 10 → zmizne | **3,3 s** (1 000 + 1 400 + 900) | (predvolený) |
 
-`last_stand_revive` hrá uprostred stopy 2 - pri jednej stope nechaj prázdne. Smrť pri vyhnaní démona (doom) má vlastný kľúč
-`last_stand_banish_kill`. Časy fáz sú `LS_*_MS` v `shared/timing.js` - zmena tam = `npm run sounds:windows`.
+`last_stand_revive` a `demon_attack` hrajú uprostred týchto stôp - nechaj ich prázdne. Smrť pri vyhnaní má vlastný kľúč
+`last_stand_banish_kill`. Časy fáz sú `LS_*_MS` / `LH_*_MS` v `shared/timing.js` - zmena tam = `npm run sounds:windows`.
+Hlasitosť REAPER nahrávok vyrovnáva `node tools/voice-loudness.mjs --write` (rovnako ako hlasy postáv).
 
 ## Ako pridať novú udalosť (vývoj)
 

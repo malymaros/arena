@@ -418,51 +418,54 @@
   ]
  },
  "demon_summon": {
-  "med": 1000,
+  "med": 8020,
   "values": [
-   1000
+   6940,
+   8020,
+   9100
   ]
  },
  "demon_summon.escanor": {
-  "med": 1000,
+  "med": 8020,
   "values": [
-   1000
+   8020
   ]
  },
  "demon_summon.fire": {
-  "med": 1000,
+  "med": 6940,
   "values": [
-   1000
+   6940
   ]
  },
  "demon_summon.lightning": {
-  "med": 1000,
+  "med": 8020,
   "values": [
-   1000
+   8020
   ]
  },
  "demon_summon.minotaur": {
-  "med": 1000,
+  "med": 9100,
   "values": [
-   1000
+   8020,
+   9100
   ]
  },
  "demon_summon.naruto": {
-  "med": 1000,
+  "med": 8020,
   "values": [
-   1000
+   8020
   ]
  },
  "demon_summon.onre": {
-  "med": 1000,
+  "med": 8020,
   "values": [
-   1000
+   8020
   ]
  },
  "demon_summon.werewolf": {
-  "med": 1000,
+  "med": 6940,
   "values": [
-   1000
+   6940
   ]
  },
  "golden_mana": {
@@ -1252,33 +1255,33 @@
   ]
  },
  "last_hope": {
-  "med": 1000,
+  "med": 3300,
   "values": [
-   1000
+   3300
   ]
  },
  "last_hope.jotaro": {
-  "med": 1000,
+  "med": 3300,
   "values": [
-   1000
+   3300
   ]
  },
  "last_hope.lightning": {
-  "med": 1000,
+  "med": 3300,
   "values": [
-   1000
+   3300
   ]
  },
  "last_hope.luffy": {
-  "med": 1000,
+  "med": 3300,
   "values": [
-   1000
+   3300
   ]
  },
  "last_hope.werewolf": {
-  "med": 1000,
+  "med": 3300,
   "values": [
-   1000
+   3300
   ]
  },
  "last_stand": {
@@ -1366,87 +1369,89 @@
   ]
  },
  "last_stand_banish": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600,
+   5680
   ]
  },
  "last_stand_banish.countess": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.escanor": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.fire": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.jotaro": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.lightning": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.luffy": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.medusa": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.minotaur": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.naruto": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600,
+   5680
   ]
  },
  "last_stand_banish.onre": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.soldier": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.wanderer": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish.werewolf": {
-  "med": 1500,
+  "med": 4600,
   "values": [
-   1500
+   4600
   ]
  },
  "last_stand_banish_kill": {

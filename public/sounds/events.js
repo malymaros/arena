@@ -49,9 +49,14 @@ export const VOICE_EACH_BEAT = { onre: new Set(["melee"]) };
 // FÁZA ako jedna stopa: okno udalosti siaha od jej frame-u až po frame s efektom `until` (`inclusive` = vrátane neho).
 // Pakt Last Stand má dve stopy: `last_stand` = vyvolanie (démon sa vynorí + odčerpá HP/manu, až po smrť) a
 // `last_stand_kill` = smrť + oživenie (démon za postavou, zlaté dvíhanie, hráč vstane - vrátane settle).
+// Útok démona (`demon_summon`) = vynorenie → 3 bliknutia → zásah → odchod; vyhnanie (`last_stand_banish`) = duch opustí
+// postavu → v strede → odčerpanie → smrť.
 export const PHASE_SPAN = {
   last_stand_summon: { until: "last_stand_kill", inclusive: false },
   last_stand_kill:   { until: "last_stand_settle", inclusive: true },
+  demon_summon:      { until: "demon_center_out", inclusive: true },
+  last_stand_banish: { until: "last_stand_banish_kill", inclusive: true },
+  last_hope_summon:  { until: "last_hope_settle", inclusive: true }, // Last Hope: vynorenie → HP 1 / mana 10 → zmizne
 };
 function phaseWindow(timeline, i, { until, inclusive }) {
   let ms = 0;

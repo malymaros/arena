@@ -9,6 +9,10 @@ import { SOUNDS } from "/sounds/manifest.js";
 import { fitPlan, defaultFit } from "/sounds/fit.js";
 import { trimOf, loopXfade } from "/sounds/trim.js";
 import { loadDraft, draftUrlResolver, isPreviewOn } from "/sounds/draft-store.js";
+import { PHASE_SPAN, DIRECT } from "/sounds/events.js";
+
+// kľúče stôp cez celú fázu (pakt, útok démona, vyhnanie, Last Hope) - dlhé repliky hrajú bez náhodnej zmeny tempa
+const PHASE_KEYS = new Set(Object.keys(PHASE_SPAN).map(kind => DIRECT[kind]));
 
 const SETTINGS_KEY = "arena.sound";
 // predvolené (kým si hráč nič nenastavil): efekty naplno, hudba v pozadí - postavy majú byť počuť (aj z reproduktora mobilu)
@@ -160,9 +164,10 @@ export function sfx(key, { char = null, pan = 0, volume = 1, windowMs = null } =
   const urls = e?.urls || [];
   if (!urls.length) return;
   const i = Math.floor(Math.random() * urls.length);
-  const jitter = /^(game|round|music)\./.test(k) ? 0 : 0.04; // jemná zmena výšky - opakované kroky neznejú ako stroj
+  // jemná zmena výšky - opakované kroky neznejú ako stroj; nie pri znelkách/hudbe a stopách cez celú fázu (dlhé repliky)
+  const jitter = /^(game|round|music)\./.test(k) || PHASE_KEYS.has(k.split(".")[0]) ? 0 : 0.04;
   return playUrl(urls[i], (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k), trim: e.trims?.[i],
-    duck: !/^(ui|music)./.test(k) }); // herné efekty stíšia hudbu (kliky v UI nie)
+    duck: !/^(ui|music)\./.test(k) }); // herné efekty stíšia hudbu (kliky v UI nie)
 }
 
 const activeSources = new Set(); // práve hrajúce efekty (stopAllSfx - Sound Lab „Stop“)

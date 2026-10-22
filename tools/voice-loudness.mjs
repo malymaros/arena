@@ -1,4 +1,4 @@
-// tools/voice-loudness.mjs - vyrovnanie hlasitosti HLASOV postáv (voice.* a ui.hover_char.* z custom/ nahrávok)
+// tools/voice-loudness.mjs - vyrovnanie hlasitosti HLASOV (voice.*, ui.hover_char.* z custom/ nahrávok + hlas démona custom/demon/)
 // podľa vnímanej hlasitosti LUFS (EBU R128 / ITU-R BS.1770: K-váženie, bloky 400 ms, hradlá -70 LUFS a -10 LU),
 // meranej v úseku, ktorý hra naozaj prehráva (trim). vol = zosilnenie na cieľ TARGET_LUFS, ale vrchol nahrávky
 // nesmie prekročiť PEAK_MAX_DBFS (inak by sa skreslila) a vol najviac MAX_VOL.
@@ -31,7 +31,8 @@ const MEASURE = `(async () => {
   const { SOUNDS } = await import("/sounds/manifest.js");
   const out = [];
   for (const [key, e] of Object.entries(SOUNDS)) {
-    if (!/^(voice\\.|ui\\.hover_char\\.)/.test(key) || !e.files?.[0]?.startsWith("custom/")) continue;
+    // hlasy postáv + hlas démona (REAPER, custom/demon/)
+    if (!(/^(voice\\.|ui\\.hover_char\\.)/.test(key) || e.files?.[0]?.startsWith("custom/demon/")) || !e.files?.[0]?.startsWith("custom/")) continue;
     const file = e.files[0];
     const a = await new OfflineAudioContext(1, 48000, 48000).decodeAudioData(await (await fetch("/sounds/" + file)).arrayBuffer());
     const sr = a.sampleRate, tr = e.trim?.[file] || [0, a.duration * 1000];
@@ -101,7 +102,7 @@ try {
     const short = result < TARGET_LUFS - 0.5 ? `  (pod cieľom ${(result - TARGET_LUFS).toFixed(1)} dB - obmedzené vrcholom)` : "";
     console.log(`${row.key.padEnd(28)}${String(row.vol).padEnd(7)}${row.lufs.toFixed(1).padStart(5)}  ${row.peakDb.toFixed(1).padStart(6)}  → ${String(vol).padEnd(5)} ${result.toFixed(1).padStart(6)}${short}`);
     if (WRITE) {
-      const re = new RegExp(`("${row.key.replace(/\./g, "\\.")}": \\{[^\\n]*?vol: )[0-9.]+`);
+      const re = new RegExp(`("${row.key.replace(/\./g, "\\.")}":\\s*\\{[^\\n]*?vol: )[0-9.]+`); // \\s* - kľúče môžu byť zarovnané medzerami
       if (!re.test(manifest)) throw new Error(`${row.key}: položka v manifeste nemá vol na jednom riadku`);
       manifest = manifest.replace(re, `$1${vol}`);
     }
