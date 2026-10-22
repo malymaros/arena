@@ -7,13 +7,14 @@
 //   summon       - kolo s vyvolaním démona (Last Stand: zabitie + oživenie, zlatý stav)
 //   golden_idle  - plánovanie v zlatom stave (žiara, aura, démon za postavou)
 //   demon        - finálne kolo: Last Hope + démonov útok + banish
-// Pre každé okno: % hlavného vlákna, priemerné FPS a % snímok > 50 ms (z rAF v stránke), čas v Recalculate Style,
+// Pre každé okno: % hlavného vlákna, % GPU procesu, priemerné FPS a % snímok > 50 ms (z rAF v stránke), čas v Recalculate Style,
 // Layout, Paint (+PrePaint) a Composite (z Tracingu). Beh sa opakuje (--reps, default 3), berie sa medián.
 //
 //   node tools/perf-probe.mjs                       → pracovný strom, tabuľka + tmp/perf/<label>.json
 //   node tools/perf-probe.mjs --ref <commit>        → meria danú verziu (dočasný git worktree)
 //   node tools/perf-probe.mjs --label po-etape-2    → názov výsledku (default "work" / ref)
 //   node tools/perf-probe.mjs --base tmp/perf/pred.json → vypíše aj rozdiel oproti uloženému výsledku
+//   node tools/perf-probe.mjs --reps 1 --profile golden_idle → navyše vypíše najdrahšie JS funkcie a udalosti v okne
 //   --device tablet (1180×820, DPR 2) · --throttle 6 · --reps 5 · --perf full|lite (URL ?perf=…, od etapy 1)
 import { spawn, execSync } from "node:child_process";
 import { io } from "socket.io-client";
@@ -31,6 +32,7 @@ const THROTTLE = Number(opt("throttle", 4));
 const DEVICE = opt("device", "phone");
 const PERF = opt("perf", null);
 const BASE = opt("base", null);
+const PROFILE = opt("profile", null); // názov okna → CPU profil (top funkcie podľa vlastného času) + top udalosti tracu
 const PASS = "perf";
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const DEV = DEVICE === "tablet" ? { width: 1180, height: 820, deviceScaleFactor: 2 } : { width: 844, height: 390, deviceScaleFactor: 3 };
@@ -122,7 +124,11 @@ function traceMetrics(events, winMs) {
   const counts = new Map();
   for (const e of events) if (e.ph === "X" && names.get(`${e.pid}:${e.tid}`) === "CrRendererMain") counts.set(`${e.pid}:${e.tid}`, (counts.get(`${e.pid}:${e.tid}`) || 0) + 1);
   const main = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  const sum = { task: 0, style: 0, layout: 0, paint: 0, composite: 0, script: 0 };
+  const sum = { task: 0, style: 0, layout: 0, paint: 0, composite: 0, script: 0, gpu: 0 };
+  // GPU proces (CrGpuMain): rasterizácia a filtre (drop-shadow, blur) - v headless softvérovo, ale úmerne záťaži
+  for (const e of events) {
+    if (e.ph === "X" && e.name === "RunTask" && names.get(`${e.pid}:${e.tid}`) === "CrGpuMain") sum.gpu += (e.dur || 0) / 1000;
+  }
   for (const e of events) {
     if (e.ph !== "X" || `${e.pid}:${e.tid}` !== main) continue;
     const d = (e.dur || 0) / 1000;
@@ -135,6 +141,7 @@ function traceMetrics(events, winMs) {
   }
   return {
     busy: (sum.task / winMs) * 100,
+    gpu: (sum.gpu / winMs) * 100,
     styleMs: sum.style, layoutMs: sum.layout, paintMs: sum.paint, compositeMs: sum.composite, scriptMs: sum.script,
   };
 }
@@ -146,6 +153,35 @@ function frameMetrics(deltas, winMs) {
     slow: (deltas.filter(d => d > 50).length / deltas.length) * 100,
     p95: s[Math.floor(s.length * 0.95)] || s.at(-1),
   };
+}
+
+/* ---------- --profile: najdrahšie funkcie / udalosti ---------- */
+function printProfile(prof) {
+  const dt = new Map(); // id uzla → vlastný čas (ms) zo samplov
+  prof.samples.forEach((id, i) => dt.set(id, (dt.get(id) || 0) + (prof.timeDeltas[i] || 0) / 1000));
+  const by = new Map();
+  for (const n of prof.nodes) {
+    const cf = n.callFrame;
+    const k = `${cf.functionName || "(anon)"} ${(cf.url || "").replace(/^https?:\/\/[^/]+/, "")}:${cf.lineNumber + 1}`;
+    by.set(k, (by.get(k) || 0) + (dt.get(n.id) || 0));
+  }
+  const total = [...by.values()].reduce((a, b) => a + b, 0);
+  console.log(`
+  CPU profil (${total.toFixed(0)} ms) - top vlastný čas:`);
+  [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).forEach(([k, v]) => console.log(`    ${v.toFixed(0).padStart(6)} ms  ${k}`));
+}
+function printTraceTop(events) {
+  const names = new Map();
+  for (const e of events) if (e.ph === "M" && e.name === "thread_name") names.set(`${e.pid}:${e.tid}`, e.args?.name);
+  const by = new Map();
+  for (const e of events) {
+    if (e.ph !== "X") continue;
+    const th = names.get(`${e.pid}:${e.tid}`) || "?";
+    const k = `${th} · ${e.name}`;
+    by.set(k, (by.get(k) || 0) + (e.dur || 0) / 1000);
+  }
+  console.log("  trace - top udalosti (vrátane vnorených):");
+  [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).forEach(([k, v]) => console.log(`    ${v.toFixed(0).padStart(6)} ms  ${k}`));
 }
 
 /* ---------- jeden beh scenára ---------- */
@@ -210,13 +246,16 @@ async function runOnce(root, rep) {
       traceEvents = [];
       const done = new Promise(r => { traceDone = r; });
       await br.send("Tracing.start", { categories: "toplevel,devtools.timeline,disabled-by-default-devtools.timeline,__metadata", transferMode: "ReportEvents" });
+      if (PROFILE === name) { await br.send("Profiler.enable"); await br.send("Profiler.setSamplingInterval", { interval: 200 }); await br.send("Profiler.start"); }
       await br.evaluate(`window.__fr = []`);
       const t0 = Date.now();
       await body();
       const winMs = Date.now() - t0;
       const deltas = await br.evaluate(`(() => { const f = window.__fr || []; window.__fr = null; return f; })()`);
+      if (PROFILE === name) printProfile((await br.send("Profiler.stop")).result.profile);
       await br.send("Tracing.end");
       await done;
+      if (PROFILE === name) printTraceTop(traceEvents);
       out[name] = { ms: winMs, ...frameMetrics(deltas, winMs), ...traceMetrics(traceEvents, winMs) };
       traceEvents = null;
     };
@@ -262,7 +301,7 @@ async function runOnce(root, rep) {
 }
 
 /* ---------- hlavný beh ---------- */
-const METRICS = [["busy", "hl.vlákno %"], ["fps", "FPS"], ["slow", "snímky>50ms %"], ["p95", "p95 snímka ms"],
+const METRICS = [["busy", "hl.vlákno %"], ["gpu", "GPU %"], ["fps", "FPS"], ["slow", "snímky>50ms %"], ["p95", "p95 snímka ms"],
   ["styleMs", "style ms"], ["layoutMs", "layout ms"], ["paintMs", "paint ms"], ["compositeMs", "composite ms"], ["scriptMs", "script ms"]];
 const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : NaN; };
 
