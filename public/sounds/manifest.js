@@ -113,13 +113,14 @@ export const SOUNDS = {
   "timestop_start": { files: [DIG + "lowDown.ogg"], vol: 0.7, status: "default", note: "THE WORLD" },
   "timestop_end":   { files: [DIG + "highUp.ogg"], vol: 0.7, status: "default" },
   "demon_summon":   { files: [SCI + "lowFrequency_explosion_000.ogg"], vol: 0.7, status: "default", note: "Last Stand démon" },
-  "last_stand":     { files: [JIN + "jingles_STEEL10.ogg"], vol: 0.6, status: "default", note: "pakt Last Stand" },
+  "last_stand":     { files: [JIN + "jingles_STEEL10.ogg"], vol: 0.6, status: "default", note: "pakt Last Stand - STOPA 1: vyvolanie (démon sa vynorí a odčerpá HP/manu, až po smrť); okno = celá fáza" },
   "last_hope":      { files: [DIG + "powerUp11.ogg"], vol: 0.6, status: "default" },
 
   /* ---------- zatiaľ ticho (udalosť je napojená, čaká na výber vlastníka) ---------- */
   "demon_attack":      { files: [], vol: 0.7, status: "default", note: "útok démona (Last Stand)" },
-  "last_stand_kill":   { files: [], vol: 0.7, status: "default", note: "smrť z paktu / banish" },
-  "last_stand_revive": { files: [], vol: 0.7, status: "default", note: "oživenie po pakte" },
+  "last_stand_kill":   { files: [], vol: 0.7, status: "default", note: "pakt Last Stand - STOPA 2: smrť + oživenie (démon za postavou, zlaté dvíhanie, hráč vstane); okno = celá fáza" },
+  "last_stand_revive": { files: [], vol: 0.7, status: "default", note: "oživenie po pakte - hrá uprostred STOPY 2 (last_stand_kill); pri jednej stope nechaj prázdne" },
+  "last_stand_banish_kill": { files: [], vol: 0.7, status: "default", note: "smrť pri vyhnaní démona (doom na konci FINAL ROUND)" },
   "last_stand_banish": { files: [], vol: 0.7, status: "default", note: "duch opúšťa postavu (banish)" },
   "stoned":            { files: [], vol: 0.5, status: "default", note: "skamenený preskakuje akciu" },
   "labyrinth_reveal":  { files: [], vol: 0.6, status: "default", note: "skrytý súper sa zjaví pred zásahom" },

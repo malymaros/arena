@@ -25,7 +25,7 @@ export const DIRECT = {
   stoned: "stoned", labyrinth_reveal: "labyrinth_reveal", thread_mark: "thread_mark",
   clone_born: "clone_born", clone_hit: "clone_hit", teleport_in: "teleport_in", trap_tp_in: "teleport_in",
   demon_attack: "demon_attack", last_stand_kill: "last_stand_kill", last_stand_revive: "last_stand_revive",
-  last_stand_banish: "last_stand_banish", last_stand_banish_kill: "last_stand_kill",
+  last_stand_banish: "last_stand_banish", last_stand_banish_kill: "last_stand_banish_kill",
   vamp_heal_cast: "vamp_heal_cast", luffy_ball_form: "luffy_ball_form", wanderer_no_regen: "wanderer_no_regen",
   charge: "attack", special: "special",
 };
@@ -46,6 +46,23 @@ export const VOICE_BY_CHAR = { jotaro: { special: "voice.special2", special1: "v
 // postava, ktorej hlas zaznie pri KAŽDOM frame behu (nie len raz): Onryō pri melee povie hlášku pri každom
 // z 3 švihov (krátka hláška sa zmestí do beatu) - ako vlkolak, ktorého nahrávka melee má tri opakovania
 export const VOICE_EACH_BEAT = { onre: new Set(["melee"]) };
+// FÁZA ako jedna stopa: okno udalosti siaha od jej frame-u až po frame s efektom `until` (`inclusive` = vrátane neho).
+// Pakt Last Stand má dve stopy: `last_stand` = vyvolanie (démon sa vynorí + odčerpá HP/manu, až po smrť) a
+// `last_stand_kill` = smrť + oživenie (démon za postavou, zlaté dvíhanie, hráč vstane - vrátane settle).
+export const PHASE_SPAN = {
+  last_stand_summon: { until: "last_stand_kill", inclusive: false },
+  last_stand_kill:   { until: "last_stand_settle", inclusive: true },
+};
+function phaseWindow(timeline, i, { until, inclusive }) {
+  let ms = 0;
+  for (let j = i; j < timeline.length; j++) {
+    const hit = j > i && (timeline[j].effects || []).some(e => e.kind === until);
+    if (hit && !inclusive) break;
+    ms += timeline[j].delayMs || 0;
+    if (hit) break;
+  }
+  return ms;
+}
 // frame s týmto efektom nesie vlastný zvuk presunu - zmena pozície v ňom nie je krok/dash
 export const OWN_LOCO = new Set(["wolf_charge", "vamp_charge", "luffy_pull", "luffy_roll", "trap_tp_in", "trap_tp_out", "teleport_in"]);
 export const HIT_HEAVY_DMG = 8;
@@ -101,7 +118,7 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
     if (e.kind === "golden_mana" && !e.gained) continue; // odmietnutá výmena
     const key = DIRECT[e.kind];
     if (!key) continue;
-    let windowMs = win;
+    let windowMs = PHASE_SPAN[e.kind] ? phaseWindow(timeline, i, PHASE_SPAN[e.kind]) : win;
     const id = runId(e, slot);
     const firstOfRun = !tr.prevRun.has(id);
     run.add(id);

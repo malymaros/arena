@@ -110,6 +110,18 @@ vlastnej bunke, úder po charge, úder pasce) → `voice.melee`.
 (EBU R128, v úseku `trim`) a nastaví `vol` na cieľ **−18 LUFS** s rezervou vrcholu −1 dBFS (`vol` najviac 2 =
 zosilnenie tichej nahrávky). Spusti ho po každom pridaní/výmene nahrávky hlasu; bez `--write` len vypíše tabuľku.
 
+## Fáza ako jedna stopa (pakt Last Stand)
+
+Niektoré udalosti majú okno cez celú fázu, nie len cez svoj frame (`PHASE_SPAN` v `events.js`). Pakt Last Stand má dve stopy:
+
+| Kľúč | Kedy zaznie | Okno |
+|---|---|---|
+| `last_stand` | **stopa 1 - vyvolanie**: démon sa vynorí v strede a odčerpá HP/manu na 0 | **2,4 s** (1 000 + 1 400 ms), končí smrťou |
+| `last_stand_kill` | **stopa 2 - smrť + oživenie**: smrť, démon za postavou, zlaté dvíhanie HP/many, hráč vstane | **3,9 s** (700 + 700 + 1 600 + 900 ms); s Narutovým klonom / pascou Vampire-Onryō o 1,08 s dlhšie |
+
+`last_stand_revive` hrá uprostred stopy 2 - pri jednej stope nechaj prázdne. Smrť pri vyhnaní démona (doom) má vlastný kľúč
+`last_stand_banish_kill`. Časy fáz sú `LS_*_MS` v `shared/timing.js` - zmena tam = `npm run sounds:windows`.
+
 ## Ako pridať novú udalosť (vývoj)
 
 1. Do `SOUNDS` v manifeste pridaj kľúč so `status: "default"` a poznámkou, kedy zaznie.

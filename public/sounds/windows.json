@@ -1282,87 +1282,87 @@
   ]
  },
  "last_stand": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.countess": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.escanor": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.fire": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.jotaro": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.lightning": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.luffy": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.medusa": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.minotaur": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.naruto": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.onre": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.soldier": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.wanderer": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand.werewolf": {
-  "med": 1000,
+  "med": 2400,
   "values": [
-   1000
+   2400
   ]
  },
  "last_stand_banish": {
@@ -1449,88 +1449,176 @@
    1500
   ]
  },
- "last_stand_kill": {
+ "last_stand_banish_kill": {
   "med": 700,
   "values": [
    700
+  ]
+ },
+ "last_stand_banish_kill.countess": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.escanor": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.fire": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.jotaro": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.lightning": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.luffy": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.medusa": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.minotaur": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.naruto": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.onre": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.soldier": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.wanderer": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_banish_kill.werewolf": {
+  "med": 700,
+  "values": [
+   700
+  ]
+ },
+ "last_stand_kill": {
+  "med": 3900,
+  "values": [
+   3900,
+   4980
   ]
  },
  "last_stand_kill.countess": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900,
+   4980
   ]
  },
  "last_stand_kill.escanor": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.fire": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.jotaro": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.lightning": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.luffy": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.medusa": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.minotaur": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.naruto": {
-  "med": 700,
+  "med": 4980,
   "values": [
-   700
+   3900,
+   4980
   ]
  },
  "last_stand_kill.onre": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900,
+   4980
   ]
  },
  "last_stand_kill.soldier": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.wanderer": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_kill.werewolf": {
-  "med": 700,
+  "med": 3900,
   "values": [
-   700
+   3900
   ]
  },
  "last_stand_revive": {
