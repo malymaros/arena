@@ -3,7 +3,8 @@
 // Slučka sa spustí pri načítaní modulu; prvý frame beží až po inicializácii client.js.
 import { actorP1, actorP2, cellToPx, TILE_W, TILE_H, hudCharP1, hudBoxP1, hudCharP2, hudBoxP2 } from "/client/dom.js";
 import { tickTurnTimer } from "/client/turn-timer.js";
-import { perfFrame } from "/client/perf.js";
+import { perf, perfFrame } from "/client/perf.js";
+import { setStyle } from "/client/style-cache.js";
 import { actors } from "/client/actors.js";
 import { state, me, otherSlot } from "/client/session.js";
 import { positionActors, computeFacing, escPrideMul, ESC_FEET_FRAC, PAIR_SHIFT_DEFAULT, pairShift, liveActorPos } from "/client/placement.js";
@@ -36,12 +37,18 @@ const PROJECTILES = document.getElementsByClassName("projectile");
 const MAGE_HEADS = document.getElementsByClassName("mage-head");
 const SPECIAL_CENTERS = document.getElementsByClassName("special-center");
 const CHARGE_AURAS = document.getElementsByClassName("charge-aura");
+// úsporná grafika: kreslenie najviac perf.fpsCap-krát za sekundu (30) - sprity menia frame ~10×/s a pohyb
+// figúr aj projektilov robia CSS transitions mimo tejto slučky, takže plynulosť ostáva; šetrí CPU a batériu
+let lastDrawAt = -Infinity;
 export function raf() {
   const now = performance.now();
   const map = { p1: actorP1, p2: actorP2 };
 
   perfFrame(now);     // strážca FPS (auto úsporná grafika)
   tickTurnTimer(now); // odpočet času na ťah (auto-lock pri vypršaní)
+  // -4 ms tolerancia: pri 60 Hz displeji kreslí presne každý druhý frame (nie občas každý tretí)
+  if (perf.fpsCap && now - lastDrawAt < 1000 / perf.fpsCap - 4) { requestAnimationFrame(raf); return; }
+  lastDrawAt = now;
 
   // po vypršaní facing override (streľba do strany) otoč postavu späť k súperovi -
   // positionActors sa inak volá len pri timeline frame-och, takže posledná akcia kola by ostala "visieť"
@@ -60,10 +67,10 @@ export function raf() {
 
     if (!st || !st.char || st.x == null) { // labyrint: skrytý súper sa nekreslí
       ctx.clearRect(0, 0, cvs.width, cvs.height);
-      cvs.style.display = "none";
+      setStyle(cvs, "display", "none");
       return;
     }
-    cvs.style.display = "block";
+    setStyle(cvs, "display", "block");
     cvs.classList.toggle("alt-color", usesAltColor(st.char, slot)); // Medúza p2 = natívna paleta, bez filtra
     const flt = actorFilter(slot, now); // glow: obrana (pulz) > zlatý „YOU", + alt-color
     if (cvs.style.filter !== flt) cvs.style.filter = flt; // zápis len pri zmene (výkon - inak invalidácia štýlu každý frame)
@@ -164,13 +171,13 @@ export function raf() {
                  (cg.x !== mine.clone.x || cg.y !== mine.clone.y);
     if (!show) {
       ctx.clearRect(0, 0, cloneGhost.width, cloneGhost.height);
-      cloneGhost.style.display = "none";
+      setStyle(cloneGhost, "display", "none");
     } else {
-      cloneGhost.style.display = "block";
+      setStyle(cloneGhost, "display", "block");
       const { left, top } = cellToPx(cg.x, cg.y);
-      cloneGhost.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
-      cloneGhost.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
-      cloneGhost.style.transform = `scaleX(${computeFacing(state.p1, state.p2)[me]})`;
+      setStyle(cloneGhost, "left", (left - (ACTOR_W - TILE_W) / 2) + "px");
+      setStyle(cloneGhost, "top", (top - (ACTOR_H - TILE_H)) + "px");
+      setStyle(cloneGhost, "transform", `scaleX(${computeFacing(state.p1, state.p2)[me]})`);
       cloneGhost.classList.toggle("alt-color", usesAltColor(mine.char, me));
       const dir = charDirFor(mine.char, me);
       ensureSpriteMeta(dir, ANIM_DEF.idle.file)
@@ -189,18 +196,18 @@ export function raf() {
                  (gp.x !== mine.x || gp.y !== mine.y);
     if (!show) {
       ctx.clearRect(0, 0, actorGhost.width, actorGhost.height);
-      actorGhost.style.display = "none";
+      setStyle(actorGhost, "display", "none");
     } else {
-      actorGhost.style.display = "block";
+      setStyle(actorGhost, "display", "block");
       const { left, top } = cellToPx(gp.x, gp.y);
-      actorGhost.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
-      actorGhost.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
+      setStyle(actorGhost, "left", (left - (ACTOR_W - TILE_W) / 2) + "px");
+      setStyle(actorGhost, "top", (top - (ACTOR_H - TILE_H)) + "px");
       const ghostChar = ghostCharAt() || mine.char;
       // rovnaký flip ako hráčov sprite; Escanor sa škáluje podľa pride (od pät) rovnako ako živá postava
       const gFace = computeFacing(state.p1, state.p2)[me];
       const gPride = escPrideMul({ char: ghostChar, pride: mine.pride, moon: mine.moon });
-      if (gPride !== 1) { actorGhost.style.transformOrigin = `50% ${ESC_FEET_FRAC * 100}%`; actorGhost.style.transform = `scaleX(${gFace * gPride}) scaleY(${gPride})`; }
-      else { actorGhost.style.transformOrigin = ""; actorGhost.style.transform = `scaleX(${gFace})`; }
+      if (gPride !== 1) { setStyle(actorGhost, "transformOrigin", `50% ${ESC_FEET_FRAC * 100}%`); setStyle(actorGhost, "transform", `scaleX(${gFace * gPride}) scaleY(${gPride})`); }
+      else { setStyle(actorGhost, "transformOrigin", ""); setStyle(actorGhost, "transform", `scaleX(${gFace})`); }
       actorGhost.classList.toggle("alt-color", usesAltColor(ghostChar, me));
       const dir = charDirFor(ghostChar, me);
       // boardFit ghost (Jotaro/Luffy) menší + ukotvený na nohy ako na boarde (rovnaká normalizácia veľkosti)
@@ -236,14 +243,14 @@ export function raf() {
       el.classList.toggle("alt-color", !!(fig && fig.lit) && !!oppChar && usesAltColor(oppChar, oppS));
       if (!fig) {
         // decentne sa STRATÍ v hmle (opacity fade-out cez CSS transition); display necháme block, nech fade dobehne
-        el.style.opacity = "0";
+        setStyle(el, "opacity", "0");
         ctx.clearRect(0, 0, el.width, el.height);
         return;
       }
-      el.style.opacity = "1"; // vynorí sa/ostane (fade-in + lit↔čierny cez CSS transition)
+      setStyle(el, "opacity", "1"); // vynorí sa/ostane (fade-in + lit↔čierny cez CSS transition)
       const { left, top } = cellToPx(fig.cell[0], fig.cell[1]);
-      el.style.left = (left - (ACTOR_W - TILE_W) / 2) + "px";
-      el.style.top  = (top - (ACTOR_H - TILE_H)) + "px";
+      setStyle(el, "left", (left - (ACTOR_W - TILE_W) / 2) + "px");
+      setStyle(el, "top", (top - (ACTOR_H - TILE_H)) + "px");
       // zdieľa bunku s mojou figúrou → odstúp na súperovu stranu ako pairShift (moja figúra odstúpi cez
       // pairShift/foeShift sama); druhá lovcova figúra na TEJ ISTEJ bunke = jeho klon stacknutý na
       // majiteľovi → + STACK_OFFSET posun ako klon v positionActors
@@ -253,11 +260,11 @@ export function raf() {
       if (i === 1 && figs[0] && figs[0].cell[0] === fig.cell[0] && figs[0].cell[1] === fig.cell[1]) shift += 18;
       if (fig.lit) {
         // ožiarený lovec = plnohodnotná figúra: facing ako na zdieľanej bunke (p1 doprava, p2 doľava) + level veľkosť
-        el.style.transformOrigin = prideMul !== 1 ? `50% ${ESC_FEET_FRAC * 100}%` : "";
-        el.style.transform = `translateX(${shift}px) scaleX(${(oppS === "p2" ? -1 : 1) * prideMul}) scaleY(${prideMul})`;
+        setStyle(el, "transformOrigin", prideMul !== 1 ? `50% ${ESC_FEET_FRAC * 100}%` : "");
+        setStyle(el, "transform", `translateX(${shift}px) scaleX(${(oppS === "p2" ? -1 : 1) * prideMul}) scaleY(${prideMul})`);
       } else {
-        el.style.transformOrigin = "";
-        el.style.transform = shift ? `translateX(${shift}px)` : "";
+        setStyle(el, "transformOrigin", "");
+        setStyle(el, "transform", shift ? `translateX(${shift}px)` : "");
       }
       // lit → animuj NORMÁLNE (idle loop, t=now); čierny breadcrumb = statická póza (t=0)
       const t = fig.lit ? now : 0;
@@ -375,12 +382,12 @@ export function raf() {
       // labyrint: skrytý buffnutý hráč (x null) - priehľadný démon za postavou sa skryje,
       // nemá ho kam sledovať (inak by ostal svietiť na starej/rohovej pozícii a prezradil buff)
       if (tgt && tgt.x == null) {
-        deathBehind.style.opacity = "0";
+        setStyle(deathBehind, "opacity", "0");
       } else if (lastStand.banishing && tgt && tgt.down) {
         // po banish kille hráč leží mŕtvy - démon za postavou nemá za kým visieť; stavová poistka
         // drží nulu každý tick (fill-forwards animácia banishu mohla racenúť so state updatom).
         // Summon choreografiu (down=true, lastStand.banishing=false) sa toto nedotýka - revive riadi efekt.
-        deathBehind.style.opacity = "0";
+        setStyle(deathBehind, "opacity", "0");
       } else if (!lastStand.banishing && tgt && tgt.char && !tgt.down) {
         // pozícia sleduje postavu per-frame (bez transition); opacity 0.25 dotiahne CSS transition plynulo (z 1 po settle)
         // počas pohybu = interpolovaná hodnota CSS transition - dopočítaná, nie getComputedStyle (výkon)
@@ -403,7 +410,7 @@ export function raf() {
       hudBoxP1.classList.remove("death-golden");
       hudBoxP2.classList.remove("death-golden");
       deathBehind.getAnimations().forEach(a => a.cancel());
-      deathBehind.style.opacity = "0";
+      setStyle(deathBehind, "opacity", "0");
       hideDeathCenter();
     }
   }
