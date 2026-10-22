@@ -121,11 +121,11 @@ Niektoré udalosti majú okno cez celú fázu, nie len cez svoj frame (`PHASE_SP
 | `last_stand_kill` | pakt, **stopa 2 - smrť + oživenie**: smrť, démon za postavou, zlaté dvíhanie, hráč vstane | **3,9 s** (700 + 700 + 1 600 + 900 ms); s Narutovým klonom / pascou o 1,08 s dlhšie | reaper-intro2 (4,22 s) |
 | `demon_summon` | **útok démona**: vynorenie → 3 bliknutia políčok → zásah → odchod zo stredu | **8,0 s** (1 000 + 3 × 1 620 + 1 080 + 1 080); brániaci sa súper 6,9 s | reaper-attack (8,78 s) |
 | `last_stand_banish` | **vyhnanie na konci FINAL ROUND**: duch opustí postavu → v strede → odčerpanie → smrť | **4,6 s** (1 500 + 1 000 + 1 400 + 700); potom pád porazeného (1,3 s) a koniec hry | reaper-outro (6,26 s) |
-| `last_hope` | **Last Hope**: postava sa vynorí → HP 1 / mana 10 → zmizne | **3,3 s** (1 000 + 1 400 + 900) | (predvolený) |
+| `last_hope` | **Last Hope**: postava sa vynorí → HP 1 / mana 10 → zmizne | **3,3 s** (1 000 + 1 400 + 900) | custom/hope/last-hope (3,81 s - doznievanie 0,5 s do ďalšej akcie) |
 
 `last_stand_revive` a `demon_attack` hrajú uprostred týchto stôp - nechaj ich prázdne. Smrť pri vyhnaní má vlastný kľúč
 `last_stand_banish_kill`. Časy fáz sú `LS_*_MS` / `LH_*_MS` v `shared/timing.js` - zmena tam = `npm run sounds:windows`.
-Hlasitosť REAPER nahrávok vyrovnáva `node tools/voice-loudness.mjs --write` (rovnako ako hlasy postáv).
+Hlasitosť REAPER a Last Hope nahrávok vyrovnáva `node tools/voice-loudness.mjs --write` (rovnako ako hlasy postáv).
 
 ## Ako pridať novú udalosť (vývoj)
 

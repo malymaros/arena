@@ -114,7 +114,7 @@ export const SOUNDS = {
   "timestop_end":   { files: [DIG + "highUp.ogg"], vol: 0.7, status: "default" },
   "demon_summon":   { files: ["custom/demon/reaper-attack.mp3"], vol: 1.07, fit: "keep", trim: { "custom/demon/reaper-attack.mp3": [180,8960] }, status: "picked", note: "REAPER - útok démona ako jedna stopa: vynorenie → 3 bliknutia → zásah → odchod (okno cez celú fázu)" },
   "last_stand":     { files: ["custom/demon/reaper-intro1.mp3"], vol: 0.91, fit: "keep", trim: { "custom/demon/reaper-intro1.mp3": [80,2600] }, status: "picked", note: "REAPER - pakt Last Stand, STOPA 1: vyvolanie (démon sa vynorí a odčerpá HP/manu, až po smrť); okno = celá fáza" },
-  "last_hope":      { files: [DIG + "powerUp11.ogg"], vol: 0.6, status: "default" },
+  "last_hope":      { files: ["custom/hope/last-hope.mp3"], vol: 1.04, fit: "keep", status: "picked", note: "Last Hope ako jedna stopa: postava sa vynorí → HP 1 / mana 10 → zmizne (okno 3,3 s; súbor 3,8 s - doznievanie ide do ďalšej akcie)" },
 
   /* ---------- zatiaľ ticho (udalosť je napojená, čaká na výber vlastníka) ---------- */
   "demon_attack":      { files: [], vol: 0.7, status: "default", note: "útok démona (Last Stand)" },
