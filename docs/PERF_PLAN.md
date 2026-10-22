@@ -151,6 +151,28 @@ Pozor: klon (`isClone`) zlatú žiaru nemá; skrytý súper v labyrinte (x null)
    (porovnať rovnakú scénu pri `scale 1` a `0.45`). Nižšie dizajnové rozlíšenie pre telefón je veľký
    zásah do layoutu (`docs/MOBILE.md`) - iba ak to čísla jasne ukážu.
 
+## Stav realizácie (2026-10-22) - čo sa urobilo inak než v pláne
+
+Všetky etapy sú hotové (commity „Výkon etapa N"). Odchýlky od plánu a prečo:
+
+- **Etapa 2 (žiara):** namiesto druhej glow vrstvy za postavou (pozíciu/otočenie/veľkosť postavy nastavuje
+  viac modulov - kópia by sa ľahko rozišla) má lite **statickú žiaru z 2 drop-shadow vrstiev** (namiesto 7
+  pulzujúcich). Full (desktop) má pulz krokovaný po 100 ms - vzhľad rovnaký, samotné krokovanie však meranie
+  takmer nezlepšilo (zisk prináša až lite).
+- **Etapa 3:** démon za postavou a aury ostali na `left/top` (nie `transform`) - banish démona animuje
+  `transform` cez WAAPI a nebili by sa. Kľúčové bolo odstrániť vynútený prepočet štýlov (`getComputedStyle`);
+  zápisy `left/top` sa navyše robia len pri zmene (stojaca postava = žiadny layout).
+- **Etapa 5:** stmavenie pri THE WORLD (grayscale) ostáva filtrom - tmavá vrstva by odfarbenie nenahradila
+  a THE WORLD je zriedkavý; labyrint má v lite tmavú vrstvu.
+- **Etapa 6:** polovičné rozlíšenie spritov pre mobil sa nerobilo - Last Hope sa na telefóne s vysokým DPR
+  zobrazuje väčší než zdroj, zmenšenie by bolo vidno. Atlas zväčšil sťahovanie len o 3.5 %.
+  V headless meraní je etapa neutrálna (limit textúr a pamäť sa prejavia až na reálnom mobilnom GPU).
+- **Etapa 7:** `will-change` sa vyskúšal (A/B) - bez merateľného zisku, len GPU pamäť navyše → nezaradený.
+- **Etapa 8:** `renderGrid` je v profile démona < 1 % času → bez zmeny. Zmenšenie `<body>` (viewport.js)
+  výkon nebrzdí: tá istá scéna bez zmenšenia (1720×920, DPR 1) stojí viac hlavného vlákna (démon 86 %)
+  než zmenšená na telefóne s porovnateľným počtom pixelov (844×390, DPR 2: 64 %) → nižšie dizajnové
+  rozlíšenie by nepomohlo.
+
 ## Overenie po každej etape
 
 - `npm run lint` (0 chýb, 0 varovaní), `npm test`, `npm run golden` (musí ostať bez zmeny - engine sa nemení).

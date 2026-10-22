@@ -107,3 +107,7 @@ Merané v Chrome ako mobil 844×390 so 4× spomaleným procesorom (≈ stredný 
 - **Kreslenie spritov:** `drawSprite` (`public/client/sprites.js`) nekreslí znova, ak je na canvase už presne ten istý
   obraz (obrázok + frame + geometria). Akékoľvek iné kreslenie do canvasu alebo zmena jeho width/height pamäť
   zmaže automaticky - priame kreslenie (mimo drawSprite) je teda bezpečné a netreba nič volať.
+- **Úsporná grafika (2026-10-22):** na dotyku je predvolene zapnutý režim lite (`public/client/perf.js`, menu ☰ → GRAPHICS) -
+  lacnejšia žiara, aura a pulzy, bez rozmazania, slučka kreslenia 30 FPS. Démon (Last Stand) sekal: na telefóne so 4×
+  spomaleným CPU išiel na ~25 FPS pri 95 % vyťaženia hlavného vlákna a 90 % GPU. Postup, odchýlky a namerané výsledky
+  sú v `docs/PERF_PLAN.md`, meranie `node tools/perf-probe.mjs`.
