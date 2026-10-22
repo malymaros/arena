@@ -48,12 +48,14 @@ export default {
       skin: "vamp-charge",
       title: `Charge - rush in a direction; stops at the first foe and strikes for ${VAMP_CHARGE_DMG} dmg. A landed hit heals up to ${VAMP_CHARGE_BONUS} HP (blocked = nothing)`,
       cost: `−${DASH_COST}{💧} ${VAMP_CHARGE_DMG}{☠️}{❤️}`,
+      label: `{💧}${DASH_COST} {☠️}${VAMP_CHARGE_DMG} HEAL ${VAMP_CHARGE_BONUS}`,
     },
     attack: { title: "Range Attack - a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance" },
     // pasca - teleport + bezplatný úder pri súperovom vstupe/prechode
     special: {
       title: `Special (−${SPECIAL_COST} mana, ${VAMP_TRAP_DMG} dmg) - set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit heals you. Only one trap - recasting replaces it`,
       cost: `−${SPECIAL_COST}{💧} ${VAMP_TRAP_DMG}{☠️}{❤️}`,
+      label: `{💧}${SPECIAL_COST} TRAP`,
     },
   },
   // mini mapa BEZ blokovaných buniek; cast bliká celou plochou (server posiela cells), cieľ sa nezvýrazní - pasca je tajná

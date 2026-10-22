@@ -32,7 +32,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: SPECIAL_ZONE_DMG.escanor, dir: "right", desc: "Directional (left/right). Range depends on your Pride level - Pride rises each round you don't shield/mirror, and falls when you use them or take a hit" },
   buttons: {
     // smerový dmg (8); rozsah rastie s pride levelom (veľkosť postavy na ploche = indikátor pride)
-    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.escanor} dmg) - choose a direction (left/right)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.escanor}{☠️}` },
+    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.escanor} dmg) - choose a direction (left/right)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.escanor}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${SPECIAL_ZONE_DMG.escanor}` },
   },
   specialTarget: "dir",
   // smerový (left/right) - rozsah podľa pride levelu (kotva mimo plochy = prázdna zóna aj pri pride 3)

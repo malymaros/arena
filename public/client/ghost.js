@@ -66,6 +66,7 @@ export function planWarnings() {
   const inB = (x, y) => x >= 0 && y >= 0 && x < board.w && y < board.h;
   const D4 = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   let mana = mine.mana ?? 0;
+  if (planning.lastHopeArmed) mana = MAX_MANA; // Last Hope sa vyhodnotí pred všetkým a naplní manu
   // golden predťah (len nestartér) sa platí pred prvou akciou startera
   if (planning.goldenArmed && mana >= GOLDEN_COST) mana -= GOLDEN_COST;
   else if (planning.goldenMirrorArmed && mana >= GOLDEN_MIRROR_COST) mana -= GOLDEN_MIRROR_COST;
@@ -105,6 +106,24 @@ export function planWarnings() {
     }
   }
   return out;
+}
+// telefón (touch-label.js): varovanie pre akciu, ktorá by sa práve zaradila na ďalšie miesto fronty - tá istá
+// simulácia ako planWarnings, akcia sa do fronty vloží len na čas výpočtu
+export function candidateWarning(action) {
+  const q = planning.myQueue;
+  q.push(action);
+  try { return planWarnings()[q.length - 1]; } finally { q.pop(); }
+}
+// krátky text varovania do štítku (telefón); null = bez varovania. Mana sa rieši zvlášť (červený štítok).
+export const NO_MANA_RE = /^Not enough mana/;
+export function shortWarning(w) {
+  if (!w || NO_MANA_RE.test(w)) return null;
+  if (w === LAST_DEFENSE_WARN) return "EXPIRES UNUSED";
+  if (w === MIRROR_IMMUNE_WARN) return "ONLY BLOCKS";
+  if (/already be full/.test(w)) return "MANA FULL";
+  if (/off the board/i.test(w)) return "OFF BOARD";
+  if (/petrified/.test(w)) return "ALREADY STONE";
+  return "NO EFFECT";
 }
 
 // lomená dráha diagonálnej strely (1 odraz, roh neodráža, max 3 bunky) - shared/geometry, tá istá ako server

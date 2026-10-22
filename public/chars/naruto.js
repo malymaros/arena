@@ -20,7 +20,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "👥" }, desc: "Self (must stand alone) - summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit" },
   buttons: {
     // žiadny priamy dmg - musí stáť sám, prizve tieňového klona
-    special: { title: `Special (−${SPECIAL_COST} mana) - must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit`, cost: `−${SPECIAL_COST}{💧} 👥` },
+    special: { title: `Special (−${SPECIAL_COST} mana) - must stand alone: summons a shadow clone that copies his moves (up/down inverted), deals the same dmg as Naruto (double when stacked on his cell) and vanishes on any hit`, cost: `−${SPECIAL_COST}{💧} 👥`, label: `{💧}${SPECIAL_COST} CLONE` },
   },
   // range self - summon tieňového klona na vlastnej bunke (musí na nej stáť sám)
   specialZone: ({ me }) => [[me.x, me.y]],

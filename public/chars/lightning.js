@@ -18,7 +18,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: SPECIAL_ZONE_DMG.lightning, desc: `Full hp from <span class="pix-ico mini" data-pix="heart"></span> tiles<br>Range: opposite-colour cells` },
   // tlačidlá: cena {emoji} = pixelová mini ikona (client costHtml)
   buttons: {
-    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.lightning} dmg)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.lightning}{☠️}` },
+    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.lightning} dmg)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.lightning}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${SPECIAL_ZONE_DMG.lightning}` },
   },
   // náhľad zóny specialu: všetky políčka opačnej „šachovej" farby než na ktorej stojí
   specialZone: ({ G, board, me }) => G.lightningCells(board, me),

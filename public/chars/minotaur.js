@@ -20,7 +20,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "🌀" }, desc: "Whole board, no dmg - banishes the foe into the labyrinth until any hit lands, where you hunt with 2× dmg. Their steps weave a thread; stepping on it reveals your silhouette" },
   buttons: {
     // žiadny dmg - celoplošný labyrint (trvá do vzájomného zásahu)
-    special: { title: `Special (−${SPECIAL_COST} mana) - hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit`, cost: `−${SPECIAL_COST}{💧} 🌀` },
+    special: { title: `Special (−${SPECIAL_COST} mana) - hits the whole board: banishes the opponent into the labyrinth (they see only their own cell) until either of you lands a hit`, cost: `−${SPECIAL_COST}{💧} 🌀`, label: `{💧}${SPECIAL_COST} LABYRINTH` },
   },
   specialZone: ({ G, board }) => G.allCells(board), // celoplošný (labyrint zasiahne súpera kdekoľvek)
 };

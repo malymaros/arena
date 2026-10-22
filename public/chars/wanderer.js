@@ -19,7 +19,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: SPECIAL_ZONE_DMG.wanderer, desc: `Each round he doesn't use mirror +${WANDERER_MANA_REGEN}<span class="pix-ico mini" data-pix="drop"></span><br>Range: diagonal neighbours` },
   // tlačidlá: cena {emoji} = pixelová mini ikona (client costHtml)
   buttons: {
-    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.wanderer} dmg)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.wanderer}{☠️}` },
+    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.wanderer} dmg)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.wanderer}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${SPECIAL_ZONE_DMG.wanderer}` },
   },
   specialZone: ({ G, board, me }) => G.diagNeighbors(board, me),
 };

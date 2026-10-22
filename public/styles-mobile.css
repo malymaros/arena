@@ -80,10 +80,44 @@
 #touch-confirm.hidden { display: none; }
 /* šípka dole k tlačidlu */
 #touch-confirm::after {
-  content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  content: ""; position: absolute; left: var(--tip-x, 50%); top: 100%; transform: translateX(-50%);
   border: calc(5px * var(--ui-k, 1)) solid transparent; border-top-color: #ffd54f;
 }
 @keyframes touch-confirm-pulse { 50% { filter: brightness(1.25); } }
+/* varovanie nad TAP AGAIN pri šípke (závislé od smeru - napr. mimo plochy) */
+#touch-confirm .tc-warn { display: block; margin-bottom: calc(3px * var(--ui-k, 1)); color: #7a3b00; }
+
+/* telefón: štítok akcie - cena a účinok namiesto popisu (touch.js + touch-label.js) */
+#touch-label {
+  position: fixed; z-index: 62; pointer-events: none; white-space: nowrap; text-align: center;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: calc(5px * var(--ui-k, 1)) calc(9px * var(--ui-k, 1));
+  background: rgba(12, 14, 18, .95); color: #fff; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #ffd54f, 0 4px 10px rgba(0,0,0,.5);
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: calc(12px * var(--ui-k, 1)); line-height: 1.35;
+}
+#touch-label.hidden { display: none; }
+#touch-label::after {
+  content: ""; position: absolute; left: var(--tip-x, 50%); top: 100%; transform: translateX(-50%);
+  border: calc(6px * var(--ui-k, 1)) solid transparent; border-top-color: #ffd54f;
+}
+#touch-label .pix-ico.mini { width: calc(14px * var(--ui-k, 1)); height: calc(14px * var(--ui-k, 1)); vertical-align: -.15em; margin: 0 1px; }
+#touch-label .tl-warn { margin-top: calc(4px * var(--ui-k, 1)); color: #ffd54f; font-size: calc(9px * var(--ui-k, 1)); }
+#touch-label .tl-tap {
+  margin: calc(5px * var(--ui-k, 1)) calc(-9px * var(--ui-k, 1)) calc(-5px * var(--ui-k, 1));
+  padding: calc(3px * var(--ui-k, 1)) 0; background: #ffd54f; color: #2a1c00; font-size: calc(8px * var(--ui-k, 1));
+}
+/* málo many: červený štítok (nedá sa zaradiť) */
+#touch-label.no-mana { background: rgba(110, 10, 10, .95); box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #ff5252, 0 4px 10px rgba(0,0,0,.5); animation: touch-label-red .5s steps(2) infinite; }
+#touch-label.no-mana::after { border-top-color: #ff5252; }
+@keyframes touch-label-red { 50% { opacity: .7; } }
+/* ...a vlastný mana bar bliká červeným obrysom (len obrys - výplň sa nemení) */
+.phone .mana-bar.no-mana-flash::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  box-shadow: inset 0 0 0 9px #ff3b3b; animation: no-mana-blink .5s steps(2) infinite;
+}
+@keyframes no-mana-blink { 50% { opacity: 0; } }
+/* tlačidlo, na ktoré na ďalšom mieste fronty nebude mana - sivé, ale ťuknuteľné (ukáže červený štítok) */
+.phone .btn.act.no-mana, .phone .golden-half.no-mana { filter: grayscale(.85) brightness(.6); }
 
 /* info riadok nad lištou tlačidiel - popis označenej akcie; písmo v skutočných px displeja */
 #touch-info {
@@ -262,15 +296,16 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .act-group::after { font-size: 17px; }
 .phone .act-group::before { top: 19px; }
 .phone .btn.act { width: 98px; height: 84px; font-size: 38px; gap: 2px; }
-.phone .btn.act .cost { font-size: 21px; }
+/* tlačidlá nesú len piktogram - cena a účinok sú v štítku po prvom ťuknutí (touch-label.js) */
+.phone .btn.act .cost { display: none; }
+.phone .btn.act > .pix-ico:not(.charge-mark), .phone .golden-half > .g-ico { width: 54px; height: 54px; }
 .phone .btn.golden { width: 196px; }
 .phone .golden-half { font-size: 40px; padding: 10px 4px; }
-.phone .golden-half .cost { font-size: 21px; }
+.phone .golden-half .cost { display: none; }
 .phone #undo { width: 80px; height: 84px; font-size: 36px; }
 .phone #lock { height: 84px; padding: 0 22px; font-size: 30px; }
 .phone .controls .divider { height: 72px; }
 .phone .btn.act.lasthope .lh-ico, .phone .btn.act.demon .ls-ico { width: 52px; height: 56px; }
-.phone .btn.act.lasthope .lh-cost, .phone .btn.act.demon .cost { font-size: 20px; }
 
 /* board + zápis kola medzi ROUND nadpisom a lištou */
 .phone .stage { padding: 44px 16px 128px; }
@@ -283,8 +318,6 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 /* ROUND nadpis menší a vyššie (stred nad boardom); hláška „your move / waiting" široký pás nad boardom */
 .phone .hud-turn { top: 4px; font-size: 34px; }
 .phone .turn-status { top: 64px; font-size: 24px; padding: 18px 30px; }
-/* info riadok (touch.js) - navrchu cez ROUND nadpis, mimo boardu a lišty */
-.phone #touch-info { top: 2px; bottom: auto; font-size: calc(9px * var(--ui-k, 1)); }
 
 /* HUD v bočných stĺpcoch: box navrchu, vlajka „1st" a korunky / hlavy tímu hneď pod ním */
 .phone .hud-box { top: 22px; } /* menovka hráča trčí nad box */

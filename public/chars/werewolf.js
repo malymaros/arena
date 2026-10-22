@@ -40,6 +40,7 @@ export default {
       return {
         title: `Special (−${SPECIAL_COST} mana, ${dmg} dmg by moon phase) - charge in one of 8 directions: the werewolf stops at the first foe in his path (or the board edge) and strikes; he stays on the target's cell even if blocked or mirrored`,
         cost: `−${SPECIAL_COST}{💧} ${dmg}{☠️}`,
+        label: `{💧}${SPECIAL_COST} {☠️}${dmg}`,
       };
     },
     specialKey: (ui) => String(moonLvl(ui)),

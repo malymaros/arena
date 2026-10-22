@@ -17,7 +17,7 @@ export default {
   abilityPreview: { caster: { x: 0, y: 1 }, dmg: SPECIAL_ZONE_DMG.fire, desc: `Boost range ±1 row from <span class="pix-ico mini" data-pix="flame"></span> tiles<br>Range: whole row` },
   // tlačidlá: cena {emoji} = pixelová mini ikona (client costHtml)
   buttons: {
-    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.fire} dmg)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.fire}{☠️}` },
+    special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.fire} dmg)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.fire}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${SPECIAL_ZONE_DMG.fire}` },
   },
   // náhľad zóny specialu: celý riadok; na Damage dlaždici riadky ±1 (server: fireOnDmgTile)
   specialZone: ({ G, board, me, tiles }) =>

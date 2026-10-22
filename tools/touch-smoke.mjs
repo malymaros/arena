@@ -80,6 +80,10 @@ const check = (ok, label, extra = "") => { console.log(`  ${ok ? "PASS" : "FAIL"
 const queue = () => ev(`[...document.querySelectorAll("#queue .q-badge.mine.main")].map(b => [...b.classList].filter(c => !["q-badge","mine","main","q-warn","q-slot"].includes(c)).join(".") || "-")`);
 const preview = () => ev(`document.querySelectorAll("#grid .preview-red").length`);
 const info = () => ev(`(() => { const e = document.getElementById("touch-info"); return e && !e.classList.contains("hidden") ? e.textContent : ""; })()`);
+// telefón: štítok cena + účinok nad tlačidlom (namiesto popisu v info riadku); tablet ostáva pri info riadku
+const PHONE = !process.env.TOUCH_DEVICE;
+const label = () => ev(`(() => { const e = document.getElementById("touch-label"); return e && !e.classList.contains("hidden") ? e.textContent : ""; })()`);
+const labelRed = () => ev(`!!document.querySelector("#touch-label.no-mana:not(.hidden)")`);
 
 const host = io(url, { transports: ["websocket"], auth: { name: "hostbot", pass: PASS } });
 let hst = null; host.on("state", s => { hst = s; });
@@ -189,12 +193,17 @@ try {
   check((await queue()).filter(x => x !== "-").length === 0, "prvý ťuk na šípku útoku nezaradil akciu", JSON.stringify(await queue()));
   check((await preview()) > 0, "prvý ťuk na šípku ukázal zónu na boarde");
   check(await ev(`(() => { const t = document.getElementById("touch-confirm"); return !!t && !t.classList.contains("hidden"); })()`), "nad šípkou je štítok TAP AGAIN");
-  const infoBefore = await info();
-  check(infoBefore.length > 0, "info riadok ukazuje popis", infoBefore);
+  const desc = PHONE ? label : info;
+  const infoBefore = await desc();
+  if (PHONE) {
+    check(infoBefore === "1 3/2/1", "telefón: nad tlačidlom útoku je štítok cena + dmg (bez popisu)", infoBefore);
+    check(await info() === "", "telefón: textový popis sa neukazuje", await info());
+    check(await ev(`getComputedStyle(document.querySelector("#attack-btn .cost")).display === "none"`), "telefón: tlačidlo nesie len piktogram");
+  } else check(infoBefore.length > 0, "info riadok ukazuje popis", infoBefore);
   await shot("attack-armed");
   // otvorený výber zamyká ostatné akcie: ťuk na iné tlačidlá nič nezmení (popis, náhľad, označenie, picker)
   await tap("#melee-btn"); await tap("#special-btn"); await tap(".controls-row .btn.act.shield");
-  check(await info() === infoBefore, "pri otvorenom výbere smeru iné tlačidlá nemenia popis", await info());
+  check(await desc() === infoBefore, "pri otvorenom výbere smeru iné tlačidlá nemenia popis", await desc());
   check(await ev(`!!document.querySelector("#aim-picker .arrow.left.touch-armed") && !document.getElementById("aim-picker").classList.contains("hidden")`), "pri otvorenom výbere smeru ostáva označená šípka a picker otvorený");
   check((await preview()) > 0, "náhľad zóny útoku ostal");
   await tap("#aim-picker .arrow.left");
@@ -204,7 +213,8 @@ try {
   await tap("#melee-btn");
   check((await queue())[1] === "-", "prvý ťuk na melee nezaradil", JSON.stringify(await queue()));
   check((await preview()) > 0, "prvý ťuk na melee ukázal zasiahnuté políčko");
-  check(await ev(`(() => { const t = document.getElementById("touch-confirm"); return !!t && !t.classList.contains("hidden") && t.textContent === "TAP AGAIN"; })()`), "nad označenou akciou je štítok TAP AGAIN");
+  if (PHONE) check(await label() === "4 8TAP AGAIN", "telefón: nad označenou akciou je štítok cena + dmg + TAP AGAIN", await label());
+  else check(await ev(`(() => { const t = document.getElementById("touch-confirm"); return !!t && !t.classList.contains("hidden") && t.textContent === "TAP AGAIN"; })()`), "nad označenou akciou je štítok TAP AGAIN");
   await shot("melee-armed");
   await tap("#melee-btn");
   check((await queue())[1] === "melee", "druhý ťuk na melee zaradil", JSON.stringify(await queue()));
@@ -230,6 +240,31 @@ try {
   check((await queue()).filter(x => x !== "-").length === 0, "prvý ťuk na políčko nezaradil", JSON.stringify(await queue()));
   await tap("#cell-picker .mini-target:nth-child(2)");
   check((await queue())[0] === "special", "druhý ťuk na políčko zaradil special", JSON.stringify(await queue()));
+
+  if (PHONE) {
+    console.log("málo many (telefón)");
+    // mana 6: special (5) → ostane 1; melee (4) aj ďalší special sa nedajú zaplatiť
+    await sleep(500);
+    check(await ev(`document.getElementById("melee-btn").classList.contains("no-mana") && !document.querySelector(".controls-row .btn.act.mana").classList.contains("no-mana")`), "tlačidlo bez many je sivé, recharge nie");
+    await tap("#melee-btn");
+    check(await labelRed(), "ťuk na melee bez many: červený štítok", await label());
+    check(!(await label()).includes("TAP AGAIN"), "červený štítok neponúka TAP AGAIN", await label());
+    check(await ev(`!!document.querySelector(".mana-bar.no-mana-flash")`), "mana bar bliká červeným obrysom");
+    await shot("no-mana");
+    await tap("#melee-btn");
+    check((await queue())[1] === "-", "druhý ťuk na melee bez many nezaradil", JSON.stringify(await queue()));
+    await tap("#undo"); await sleep(300);
+    check(!(await labelRed()) && !(await ev(`!!document.querySelector(".mana-bar.no-mana-flash")`)), "po zrušení výberu červený štítok aj obrys zmiznú");
+    check(await ev(`!document.getElementById("melee-btn").classList.contains("no-mana")`), "po undo je melee znova zaplatiteľné");
+    // varovanie: obrana ako posledná akcia kola (bot hostbot = p1 začína → tapper je nestartér)
+    await tap(".controls-row .btn.act.mana"); await tap(".controls-row .btn.act.mana");
+    await tap("#melee-btn"); await tap("#melee-btn");
+    await tap(".controls-row .btn.act.shield");
+    const sl = await label();
+    check(sl.includes("BLOCK") && (sl.includes("EXPIRES UNUSED") || sl.includes("TAP AGAIN")), "štítok štítu: BLOCK (+ varovanie na poslednom mieste kola)", sl);
+    await shot("shield-label");
+    await tap("#undo"); await tap("#undo"); await tap("#undo");
+  }
 } catch (e) {
   console.error("CHYBA:", e.message); fails++;
 } finally {

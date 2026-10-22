@@ -27,13 +27,13 @@ export default {
   // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
   buttons: {
-    melee: { title: `Melee (−${MELEE_COST} mana, ${JOTARO_MELEE_DMG} dmg, hits only an opponent on your cell)`, cost: `−${MELEE_COST}{💧} ${JOTARO_MELEE_DMG}{☠️}` },
+    melee: { title: `Melee (−${MELEE_COST} mana, ${JOTARO_MELEE_DMG} dmg, hits only an opponent on your cell)`, cost: `−${MELEE_COST}{💧} ${JOTARO_MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${JOTARO_MELEE_DMG}` },
     // mirror slot = Special 1 (Star Platinum) - fialový „???" skin + L/R picker
-    mirror: { skin: "jotaro-s1", title: `Star Platinum - a directional (left/right) strike hitting BOTH diagonal cells on that side for ${JOTARO_S1_DMG} dmg`, cost: `−${JOTARO_S1_COST}{💧} ${JOTARO_S1_DMG}{☠️}` },
+    mirror: { skin: "jotaro-s1", title: `Star Platinum - a directional (left/right) strike hitting BOTH diagonal cells on that side for ${JOTARO_S1_DMG} dmg`, cost: `−${JOTARO_S1_COST}{💧} ${JOTARO_S1_DMG}{☠️}`, label: `{💧}${JOTARO_S1_COST} {☠️}${JOTARO_S1_DMG}` },
     // klasická ✨ ikona; mení sa len cena: pred THE WORLD hodiny (⏱), po ňom (worldUsed) Special 2 = 8 dmg
     special: (ui) => ui.worldUsed
-      ? { title: `Special 2 (−${JOTARO_S2_COST} mana, ${JOTARO_S2_DMG} dmg) - a directional (left/right) strike on the adjacent cell`, cost: `−${JOTARO_S2_COST}{💧} ${JOTARO_S2_DMG}{☠️}` }
-      : { title: `THE WORLD (−${WORLD_COST} mana, once per game) - time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes`, cost: `−${WORLD_COST}{💧} ⏱` },
+      ? { title: `Special 2 (−${JOTARO_S2_COST} mana, ${JOTARO_S2_DMG} dmg) - a directional (left/right) strike on the adjacent cell`, cost: `−${JOTARO_S2_COST}{💧} ${JOTARO_S2_DMG}{☠️}`, label: `{💧}${JOTARO_S2_COST} {☠️}${JOTARO_S2_DMG}` }
+      : { title: `THE WORLD (−${WORLD_COST} mana, once per game) - time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes`, cost: `−${WORLD_COST}{💧} ⏱`, label: `{💧}${WORLD_COST} TIME STOP` },
   },
   // THE WORLD bez cieľa; po ňom Special 2 smerový (L/R picker)
   specialTarget: (ui) => ui.worldUsed ? "dir" : "none",

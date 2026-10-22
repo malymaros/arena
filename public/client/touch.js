@@ -15,6 +15,9 @@
 //     vyberie len tlačidlo PICK <meno> (v turnajovom drafte ADD / REMOVE). Na telefóne je prvá
 //     karta predvybraná (bez hlasu), aby pravý panel s náhľadom nikdy nebol prázdny.
 //  5. :hover pravidlá sa na dotyku vypnú (po ťuknutí by „viseli").
+//  6. Telefón: namiesto popisu štítok s cenou a účinkom (touch-label.js) nad tlačidlom - pri otvorenom výbere
+//     smeru nad tlačidlom, ktoré ho otvorilo; žltá linka = varovanie; málo many = červený štítok, blikajúci obrys
+//     mana baru, sivé tlačidlo a akciu nejde zaradiť (druhé ťuknutie nič nespraví).
 import { isTouch, isPhone, appScale } from "/client/viewport.js";
 import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
 import { specialTargetOf, uiLocked } from "/client/controls.js";
@@ -23,6 +26,10 @@ import { CHARS_BY_KEY, VAMP_CHARS } from "/chars/index.js";
 import { board } from "/client/session.js";
 import { planning } from "/client/planning.js";
 import { stripActive, stripCenterCard } from "/client/char-strip.js";
+import { slotOf, labelInfo, openerOf, MANA_BUTTONS } from "/client/touch-label.js";
+import { costMarkup } from "/client/balance-ui.js";
+import { hydratePix } from "/client/pix.js";
+import { state, me } from "/client/session.js";
 
 
 /* ---------- 5. :hover pravidlá preč (na dotyku po ťuknutí „visia") - sú len kozmetické ---------- */
@@ -63,7 +70,7 @@ function initPickerLayer() {
     if (!el) continue;
     layer.appendChild(el);
     // otvorenie pickera (controls.js zhodí .hidden) → umiestni ho na postavu / cez board
-    new MutationObserver(() => { if (!el.classList.contains("hidden")) { syncLayer(); placePicker(el); } })
+    new MutationObserver(() => { if (!el.classList.contains("hidden")) { syncLayer(); placePicker(el); } refreshLabel(); })
       .observe(el, { attributes: true, attributeFilter: ["class"] });
   }
   window.addEventListener("resize", syncLayer);
@@ -121,14 +128,76 @@ function showInfo(text) {
 }
 // štítok „TAP AGAIN" nad označenou akciou - aby bolo jasné, že treba ťuknúť ešte raz
 let confirmEl = null;
-function placeConfirm(el) {
-  if (!confirmEl) { confirmEl = document.createElement("div"); confirmEl.id = "touch-confirm"; confirmEl.textContent = "TAP AGAIN"; document.body.appendChild(confirmEl); }
+function placeConfirm(el, warn = null) {
+  if (!confirmEl) { confirmEl = document.createElement("div"); confirmEl.id = "touch-confirm"; document.body.appendChild(confirmEl); }
   if (!el || el.classList.contains("char-card") || el.classList.contains("q-badge")) { confirmEl.classList.add("hidden"); return; }
-  // súradnice displeja → layout px v body (body je zmenšené transformom, viewport.js)
-  const r = el.getBoundingClientRect(), b = document.body.getBoundingClientRect(), k = appScale();
-  confirmEl.style.left = ((r.left + r.width / 2 - b.left) / k) + "px";
-  confirmEl.style.top = ((r.top - b.top) / k) + "px";
+  confirmEl.innerHTML = (warn ? `<span class="tc-warn">⚠ ${warn}</span>` : "") + "TAP AGAIN";
   confirmEl.classList.remove("hidden");
+  placeAbove(confirmEl, el);
+}
+// bublina nad prvkom: súradnice displeja → layout px v body (body je zmenšené transformom, viewport.js);
+// vodorovne sa drží na obrazovke (krajné zlaté tlačidlá), šípka bubliny ostáva nad prvkom (--tip-x)
+function placeAbove(box, el) {
+  const r = el.getBoundingClientRect(), b = document.body.getBoundingClientRect(), k = appScale();
+  const cx = (r.left + r.width / 2 - b.left) / k;
+  const half = box.offsetWidth / 2, maxX = b.width / k;
+  const x = Math.min(Math.max(cx, half + 6), maxX - half - 6);
+  box.style.left = x + "px";
+  box.style.top = ((r.top - b.top) / k) + "px";
+  box.style.setProperty("--tip-x", (cx - x + half) + "px");
+}
+
+/* ---------- 6. telefón: štítok cena + účinok (touch-label.js) ---------- */
+let labelEl = null;
+let flashBar = null;
+function openPickerEl() {
+  if (!planning.openPicker) return null;
+  return PICKER_IDS.map(id => document.getElementById(id)).find(p => p && !p.classList.contains("hidden")) || null;
+}
+// slot štítku pre prvok: tlačidlo akcie priamo, šípka / políčko výberu cez tlačidlo, ktoré výber otvorilo
+const slotFor = (el) => slotOf(el) || slotOf(openerOf(el?.closest?.(".dir-picker")));
+const noManaFor = (el) => isPhone && !!slotFor(el) && labelInfo(slotFor(el), el).noMana;
+function setFlash(on) {
+  const bar = on && me ? document.getElementById(`${me}-mana`) : null;
+  if (flashBar && flashBar !== bar) flashBar.classList.remove("no-mana-flash");
+  flashBar = bar;
+  bar?.classList.add("no-mana-flash");
+}
+// sivé tlačidlá akcií, na ktoré na ďalšom mieste fronty nebude mana
+function syncNoMana() {
+  const playing = state?.phase === "playing" && !!state?.[me]?.char && !uiLocked();
+  for (const b of MANA_BUTTONS()) b.classList.toggle("no-mana", playing && !b.disabled && labelInfo(slotOf(b), b).noMana);
+}
+function refreshLabel() {
+  if (!isPhone) return;
+  if (!labelEl) {
+    labelEl = document.createElement("div");
+    labelEl.id = "touch-label";
+    labelEl.className = "hidden";
+    document.body.appendChild(labelEl);
+  }
+  // štítok visí nad tlačidlom, ktoré otvorilo výber, inak nad označeným tlačidlom akcie
+  const opener = openerOf(openPickerEl());
+  const host = slotOf(opener) ? opener : (armed && slotOf(armed) ? armed : null);
+  const info = host ? labelInfo(slotOf(host), host) : null;
+  const inPicker = !!armed?.closest?.("#touch-layer");
+  const pick = inPicker && host ? labelInfo(slotOf(host), armed) : null;
+  const noMana = !!info?.noMana || !!pick?.noMana;
+  if (info?.text) {
+    const tap = host === armed && !noMana;
+    const html = `<div class="tl-main">${costMarkup(info.text)}</div>`
+      + (info.warn ? `<div class="tl-warn">⚠ ${info.warn}</div>` : "")
+      + (tap ? `<div class="tl-tap">TAP AGAIN</div>` : "");
+    if (labelEl.dataset.html !== html) { labelEl.dataset.html = html; labelEl.innerHTML = html; hydratePix(labelEl); }
+    labelEl.classList.toggle("no-mana", noMana);
+    labelEl.classList.remove("hidden");
+    placeAbove(labelEl, host);
+  } else labelEl.classList.add("hidden");
+  // bublina nad šípkou / políčkom / hlavou maga: TAP AGAIN (+ varovanie závislé od smeru); pri malej mane nič
+  if (!armed || (host === armed && info?.text) || (inPicker && noMana)) placeConfirm(null);
+  else placeConfirm(armed, pick?.warn && pick.warn !== info?.warn ? pick.warn : null);
+  setFlash(noMana && !!info?.text);
+  syncNoMana();
 }
 function arm(el, silent = false) {
   disarm();
@@ -137,6 +206,7 @@ function arm(el, silent = false) {
   const enter = new MouseEvent("mouseenter");
   if (silent) enter.arenaSilent = true; // predvýber karty - náhľad bez hlasu mena (char-select.js)
   el.dispatchEvent(enter); // tie isté náhľady ako hover na desktope
+  if (isPhone) { refreshLabel(); return; } // telefón: štítok namiesto popisu
   if (!el.classList.contains("char-card")) showInfo(describe(el));
   placeConfirm(el);
 }
@@ -150,6 +220,7 @@ export function disarm() {
   if (el.classList.contains("char-card")) el.closest(".char-cards")?.dispatchEvent(new MouseEvent("mouseleave"));
   showInfo("");
   syncPickBar();
+  refreshLabel();
 }
 function initTapSelect() {
   infoEl = document.createElement("div");
@@ -186,8 +257,12 @@ function initTapSelect() {
       syncPickBar();
       return;
     }
+    // telefón, málo many: druhé ťuknutie akciu nezaradí (štítok je červený, mana bar bliká)
+    if (armed === el && noManaFor(el)) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
     if (armed === el) { disarm(); return; }                    // druhé ťuknutie → nechaj prejsť = vykonať
-    if (oneTap(el) && !uiLocked()) { disarm(); showInfo(describe(el)); return; } // otvorenie výberu / pohyb hneď
+    // šípka na jedno ťuknutie (dash), na ktorú nie je mana: len označiť - červený štítok, nezaradí
+    if (oneTap(el) && !uiLocked() && el.classList.contains("arrow") && noManaFor(el)) { ev.preventDefault(); ev.stopImmediatePropagation(); arm(el); return; }
+    if (oneTap(el) && !uiLocked()) { disarm(); if (!isPhone) showInfo(describe(el)); return; } // otvorenie výberu / pohyb hneď
     ev.preventDefault(); ev.stopImmediatePropagation();         // prvé ťuknutie → len výber + náhľad
     arm(el);
     syncPickBar();
@@ -199,6 +274,8 @@ function initTapSelect() {
     .observe(queueEl, { childList: true, subtree: true });
   // info riadok nechaj len kým je otvorený výber alebo niečo označené
   setInterval(() => { if (!armed && !planning.openPicker && infoEl && !infoEl.classList.contains("hidden")) showInfo(""); }, 400);
+  // telefón: štítok, sivé tlačidlá a obrys mana baru sledujú manu a frontu (zmena stavu, golden, Last Hope…)
+  if (isPhone) setInterval(refreshLabel, 400);
 }
 
 /* ---------- 4. výber postavy: PICK <meno> pod náhľadom schopnosti ---------- */

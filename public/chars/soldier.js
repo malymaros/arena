@@ -26,7 +26,7 @@ export default {
   abilityPreview: { caster: { x: 0, y: 1 }, dmg: SOLDIER_SPECIAL_DMG, target: { x: 2, y: 0 }, desc: "Pick any cell except your own and the foe's current one - a sniper beam strikes it, so the foe is hit only if they move onto it" },
   buttons: {
     // snajperský lúč na zvolenú bunku - súperovu aktuálnu ani vlastnú nejde vybrať (trafí, len keď sa pohne)
-    special: { title: `Special (−${SPECIAL_COST} mana, ${SOLDIER_SPECIAL_DMG} dmg) - pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it`, cost: `−${SPECIAL_COST}{💧} ${SOLDIER_SPECIAL_DMG}{☠️}` },
+    special: { title: `Special (−${SPECIAL_COST} mana, ${SOLDIER_SPECIAL_DMG} dmg) - pick a target cell (not yours or the foe's current one): a sniper beam strikes it, so the foe is hit only if they move onto it`, cost: `−${SPECIAL_COST}{💧} ${SOLDIER_SPECIAL_DMG}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${SOLDIER_SPECIAL_DMG}` },
   },
   // mini mapa pod tlačidlom; cieľová bunka je súčasť AKCIE (cell) - zóna sa z pozície neodvodzuje
   specialTarget: "cell",

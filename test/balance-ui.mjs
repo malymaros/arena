@@ -54,5 +54,19 @@ for (let moon = 0; moon < 4; moon++) {
   check(s.cost === `−${B.SPECIAL_COST}{💧} ${B.WOLF_MOON_DMG[moon]}{☠️}`, `werewolf: mesiac ${moon} → ${B.WOLF_MOON_DMG[moon]} dmg`);
 }
 
+/* ---------- 3) štítky na telefóne (label) - cena a účinok z balance.js ---------- */
+const lbl = (k, slot, ui = {}) => title(k, slot, ui)?.label;
+check(lbl("medusa", "special") === `{💧}${B.SPECIAL_COST} PETRIFY ${B.STONE_ACTIONS}`, "medusa: štítok PETRIFY");
+check(lbl("countess", "dash") === `{💧}${B.DASH_COST} {☠️}${B.VAMP_CHARGE_DMG} HEAL ${B.VAMP_CHARGE_BONUS}`
+  && lbl("onre", "dash") === `{💧}${B.DASH_COST} {☠️}${B.VAMP_CHARGE_DMG} DRAIN ${B.VAMP_CHARGE_BONUS}`, "vampire/onryo: štítok chargu");
+check(lbl("jotaro", "special", { worldUsed: false }) === `{💧}${B.WORLD_COST} TIME STOP`
+  && lbl("jotaro", "special", { worldUsed: true }) === `{💧}${B.JOTARO_S2_COST} {☠️}${B.JOTARO_S2_DMG}`, "jotaro: štítok THE WORLD / Special 2");
+for (let moon = 0; moon < 4; moon++) {
+  check(lbl("werewolf", "special", { st: { moon, char: "werewolf" }, moon }) === `{💧}${B.SPECIAL_COST} {☠️}${B.WOLF_MOON_DMG[moon]}`, `werewolf: štítok pri mesiaci ${moon}`);
+}
+for (const k of ["fire", "lightning", "wanderer", "escanor"]) {
+  check(lbl(k, "special") === `{💧}${B.SPECIAL_COST} {☠️}${B.SPECIAL_ZONE_DMG[k]}`, `${k}: štítok specialu`);
+}
+
 console.log(fails ? `\nBALANS UI: ${fails} chýb` : "\nBALANS UI SEDÍ");
 process.exit(fails ? 1 : 0);
