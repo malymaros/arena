@@ -3053,7 +3053,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .lobby-card {
   width: 100%; max-width: none; padding: 20px 34px 26px;
   display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; align-content: start;
-  grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview start" "timer start";
+  grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview weights" "timer weights" "start start";
 }
 .phone .lobby-title { grid-area: title; font-size: 44px; margin-bottom: 24px; align-self: start; } /* voľny priestor obrazovky ide do riadku nadpisu (1fr) = medzera pod nadpisom, voľby ostávajú husté dole */
 .phone .lobby-sub { display: none; }
@@ -3063,11 +3063,11 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .lobby-card > .lobby-section:nth-of-type(4) { grid-area: color; }
 .phone .lobby-card > .lobby-section:nth-of-type(5) { grid-area: preview; }
 .phone .lobby-card > .lobby-section:nth-of-type(6) { grid-area: timer; }
-.phone .lobby-start { grid-area: start; align-self: end; margin: 0 0 18px; padding: 30px; font-size: 30px; }
+.phone .lobby-start { grid-area: start; margin: 18px 0 0; padding: 26px; font-size: 30px; } /* cez celú šírku pod oboma stĺpcami */
 .phone .lobby-section { margin-bottom: 10px; }
 /* lobby na celú obrazovku - menu ☰ sa počas nastavovania zápasu skryje (inak by lobby muselo uhýbať jeho rohu) */
 .phone .lobby { padding: 0; align-items: stretch; }
-.phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 30px 48px 36px; grid-template-rows: 1fr repeat(5, auto); }
+.phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 30px 48px 36px; grid-template-rows: 1fr repeat(6, auto); }
 html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .lobby-label { font-size: 17px; margin-bottom: 10px; }
 .phone .opt { font-size: 17px; padding: 14px 10px; min-width: 70px; }
@@ -3202,3 +3202,4 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 }
 .phone #char-select.strip-mode .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
 .phone #char-select:not(.roster-mode) .char-pager { width: 980px; } /* rovnaká šírka v páse aj na Hidden stránke - panel vpravo sa nehýbe */
+.phone .lobby-card > .lobby-section:nth-of-type(3) { align-self: start; } /* percentá dlaždíc nenaťahujú riadky ľavého stĺpca */
