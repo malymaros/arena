@@ -1405,10 +1405,16 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
     inset 0 3px 0 rgba(255,255,255,.3),
     inset 0 -4px 0 rgba(0,0,0,.35);
 }
-.go-buttons { display: flex; flex-direction: column; gap: 14px; align-items: center; pointer-events: none; }
-/* „Leave the room" - neutrálna sivá, odlíšená od zeleného Play again */
-.retry.leave { background: #5a5d66; font-size: 11px; padding: 13px 22px 15px; }
-.retry.leave:hover { background: #6a6e78; }
+/* tlačidlá vedľa seba na tmavom pixel paneli, rovnako vysoké; texty verzálkami ako zvyšok UI */
+.go-buttons {
+  display: flex; flex-direction: row; gap: 16px; align-items: stretch; pointer-events: none;
+  padding: 16px; border-radius: 2px; background: rgba(10,11,14,.88);
+  box-shadow: 0 0 0 2px #000, 0 0 0 5px #3a3d44, 0 0 0 7px #000, 0 14px 36px rgba(0,0,0,.6);
+}
+.go-buttons .retry { min-width: 230px; letter-spacing: 2px; }
+/* „Leave room" - tmavé sekundárne tlačidlo, odlíšené od zeleného Play again */
+.retry.leave { background: #2b2e35; color: #d9dbe0; font-size: 13px; padding: 16px 26px 18px; }
+.retry.leave:hover { background: #3a3e47; }
 .retry:hover { background: #379e3d; }
 .retry:active {
   transform: translateY(3px);
@@ -3059,8 +3065,10 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .lobby-card > .lobby-section:nth-of-type(6) { grid-area: timer; }
 .phone .lobby-start { grid-area: start; align-self: end; margin: 0 0 18px; padding: 30px; font-size: 30px; }
 .phone .lobby-section { margin-bottom: 10px; }
-/* posledný riadok vľavo (časovač) nad menu ☰ v ľavom dolnom rohu */
-.phone .lobby { padding-bottom: 96px; }
+/* lobby na celú obrazovku - menu ☰ sa počas nastavovania zápasu skryje (inak by lobby muselo uhýbať jeho rohu) */
+.phone .lobby { padding: 0; align-items: stretch; }
+.phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 26px 48px 30px; align-content: center; }
+html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .lobby-label { font-size: 17px; margin-bottom: 10px; }
 .phone .opt { font-size: 17px; padding: 14px 10px; min-width: 70px; }
 .phone .weights { grid-template-columns: 1fr; gap: 12px; }
@@ -3092,7 +3100,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 /* koniec hry: Play again / Leave the room v skutočnej veľkosti pre prst (dotyk) */
 .touch .go-buttons { gap: calc(14px * var(--ui-k, 1)); }
 .touch .retry { font-size: calc(15px * var(--ui-k, 1)); padding: calc(16px * var(--ui-k, 1)) calc(30px * var(--ui-k, 1)); }
-.touch .retry.leave { font-size: calc(13px * var(--ui-k, 1)); padding: calc(15px * var(--ui-k, 1)) calc(26px * var(--ui-k, 1)); }
+.touch .retry.leave { font-size: calc(15px * var(--ui-k, 1)); padding: calc(16px * var(--ui-k, 1)) calc(30px * var(--ui-k, 1)); }
 /* výber postáv na telefóne bez skákania: panel náhľadu má PEVNÚ výšku (popis na 6 riadkov, štatistiky 1 riadok),
    takže prepínanie kariet nemení výšku riadkov mriežky a karty vľavo ani PICK sa nehýbu */
 .phone #char-select .char-ability { height: 600px; min-height: 0; justify-content: flex-start; }
@@ -3168,3 +3176,14 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .touch #char-select.hidden-mode #touch-pick { background: #9a6ff0; color: #12061f; }
 .touch #char-select.hidden-mode .ca-title { color: #b17aff; }
 .touch #char-select.hidden-mode .ca-grid .mini-cell.caster { background: #9a6ff0; }
+/* telefón: hlášky čakania (lobby, tím, ťah) veľké, nech využijú priestor obrazovky */
+.phone .lobby-wait { font-size: 40px; line-height: 1.9; padding: 60px 90px; color: #e4e6ea; }
+.phone .turn-status { top: 64px; font-size: 24px; padding: 18px 30px; }
+/* telefón: losovanie strán (koliesko) cez celú výšku obrazovky */
+.phone .cr-title { font-size: 40px; }
+.phone .cr-wheel { width: 500px; height: 500px; }
+.phone .cr-result { font-size: 40px; }
+/* telefón: tlačidlá konca hry väčšie */
+.phone .go-buttons { gap: 26px; padding: 26px; }
+.phone .go-buttons .retry { min-width: 400px; font-size: 26px; padding: 30px 34px 34px; }
+.phone .cr-knob { width: 44px; height: 44px; }
