@@ -31,8 +31,8 @@ const MEASURE = `(async () => {
   const { SOUNDS } = await import("/sounds/manifest.js");
   const out = [];
   for (const [key, e] of Object.entries(SOUNDS)) {
-    // hlasy postáv + vlastné nahrávky démona (REAPER, custom/demon/) a Last Hope (custom/hope/)
-    if (!(/^(voice\\.|ui\\.hover_char\\.)/.test(key) || /^custom\\/(demon|hope)\\//.test(e.files?.[0] || "")) || !e.files?.[0]?.startsWith("custom/")) continue;
+    // hlasy postáv + vlastné nahrávky démona (REAPER, custom/demon/), Last Hope (custom/hope/) a FINAL ROUND (custom/round/)
+    if (!(/^(voice\\.|ui\\.hover_char\\.)/.test(key) || /^custom\\/(demon|hope|round)\\//.test(e.files?.[0] || "")) || !e.files?.[0]?.startsWith("custom/")) continue;
     const file = e.files[0];
     const a = await new OfflineAudioContext(1, 48000, 48000).decodeAudioData(await (await fetch("/sounds/" + file)).arrayBuffer());
     const sr = a.sampleRate, tr = e.trim?.[file] || [0, a.duration * 1000];

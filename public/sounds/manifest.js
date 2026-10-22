@@ -60,7 +60,7 @@ export const SOUNDS = {
   "ui.timer_tick":  { files: [UI + "tick_002.ogg"],         vol: 0.5,  status: "default", note: "posledných 5 s ťahu" },
   "ui.color_roll":  { files: [UI + "scroll_003.ogg"],       vol: 0.5,  status: "default", note: "roztočenie yin-yang šípky" },
   "round.start":    { files: [JIN + "jingles_HIT03.ogg"],   vol: 0.5,  status: "default", note: "banner ROUND N" },
-  "round.final":    { files: [JIN + "jingles_STEEL05.ogg"], vol: 0.6,  status: "default", note: "banner FINAL ROUND" },
+  "round.final":    { files: ["custom/round/final-round.mp3"], vol: 0.78, fit: "keep", trim: { "custom/round/final-round.mp3": [80,2180] }, status: "picked", note: "banner FINAL ROUND (1,9 s; súbor 2,1 s)" },
 
   /* ---------- pohyb ---------- */
   "move":      { files: vars(IMP + "footstep_concrete_", 5), vol: 0.5, status: "default" },
@@ -121,7 +121,7 @@ export const SOUNDS = {
   "last_stand_kill":   { files: ["custom/demon/reaper-intro2.mp3"], vol: 0.95, fit: "keep", trim: { "custom/demon/reaper-intro2.mp3": [180,4400] }, status: "picked", note: "REAPER - pakt Last Stand, STOPA 2: smrť + oživenie (démon za postavou, zlaté dvíhanie, hráč vstane); okno = celá fáza" },
   "last_stand_revive": { files: [], vol: 0.7, status: "default", note: "oživenie po pakte - hrá uprostred STOPY 2 (last_stand_kill); pri jednej stope nechaj prázdne" },
   "last_stand_banish_kill": { files: [], vol: 0.7, status: "default", note: "smrť pri vyhnaní démona (doom na konci FINAL ROUND)" },
-  "last_stand_banish": { files: ["custom/demon/reaper-outro.mp3"], vol: 1.11, fit: "keep", trim: { "custom/demon/reaper-outro.mp3": [120,6380] }, status: "picked", note: "REAPER - démon odchádza na konci FINAL ROUND (banish) ako jedna stopa: duch opustí postavu → v strede → odčerpanie → smrť" },
+  "last_stand_banish": { files: ["custom/demon/reaper-outro-shorter.mp3"], vol: 0.94, fit: "keep", trim: { "custom/demon/reaper-outro-shorter.mp3": [0,4680] }, status: "picked", note: "REAPER - démon odchádza na konci FINAL ROUND (banish) ako jedna stopa: duch opustí postavu → v strede → odčerpanie → smrť" },
   "stoned":            { files: [], vol: 0.5, status: "default", note: "skamenený preskakuje akciu" },
   "labyrinth_reveal":  { files: [], vol: 0.6, status: "default", note: "skrytý súper sa zjaví pred zásahom" },
   "thread_mark":       { files: [], vol: 0.5, status: "default", note: "stretnutie na Ariadninej niti" },
