@@ -20,11 +20,13 @@ import { isPhone } from "/client/viewport.js";
 /* ---------- Queue + Lock ---------- */
 // ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove); ownerSlot kvôli alt-color hláv p2
 function actionBadgeView(a, ownerSlot) {
-  const arrow = ARROW_DIR;
-  const dd = ARROW_DIR[displayDir(a, ownerSlot)] || ""; // Narutov vertikálny smer (move/dash/attack) súperovi anonymizovaný (↕)
+  // telefón: v lište len piktogramy, bez smerových šípok (na malej bunke sú nečitateľné; smer ukáže náhľad / ghost)
+  const arrow = isPhone ? {} : ARROW_DIR;
+  const dd = arrow[displayDir(a, ownerSlot)] || ""; // Narutov vertikálny smer (move/dash/attack) súperovi anonymizovaný (↕)
+  const noDir = isPhone ? "" : "?";
   switch (a?.type) {
-    case "move":          return { cls: "move",    text: `🚶${dd || "?"}` };
-    case "dash":          return { cls: "dash", text: `🏃${dd || "?"}` };
+    case "move":          return { cls: "move",    text: `🚶${dd || noDir}` };
+    case "dash":          return { cls: "dash", text: `🏃${dd || noDir}` };
     case "recharge":      return { cls: "mana",    text: "🙏" };
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };

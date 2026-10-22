@@ -2,6 +2,7 @@
 import { me, state } from "/client/session.js";
 import { logP1, logP2 } from "/client/dom.js";
 import { LS_BADGE_IMG } from "/client/pix.js";
+import { isPhone } from "/client/viewport.js";
 
 /* ---------- záznam akcií kola pod widgetom ---------- */
 // Narutov vertikálny pohyb je verejne zrkadlený klonom (klon ide opačne) → smer up/down by SÚPEROVI prezradil,
@@ -22,7 +23,8 @@ export function displayDir(action, ownerSlot) {
   return dir;
 }
 function actionIcon(action, ownerSlot) {
-  const arr = (a) => ARROW_DIR[displayDir(a, ownerSlot)] || "";
+  // telefón: zápis kola v karte hráča len s piktogramami, bez smerových šípok (rovnako ako lišta kola)
+  const arr = (a) => (isPhone ? "" : ARROW_DIR[displayDir(a, ownerSlot)] || "");
   switch (action?.type) {
     case "move":     return `🚶${arr(action)}`;
     case "dash":     return `🏃${arr(action)}`;
@@ -35,7 +37,7 @@ function actionIcon(action, ownerSlot) {
     case "golden_mirror": return "🪞";
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
-    case "special":  return `✨${ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje - len čistý badge
+    case "special":  return `✨${isPhone ? "" : ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje - len čistý badge
     // Jotarov útok v mirror slote sa v zápise kola tvári ako obyčajný mirror (🪞, bez smeru) -
     // analógia k Vampire/Onryō, ktorých charge v dash slote sa ukazuje ako obyčajný dash (nemaskuje smer útoku)
     case "special1": return "🪞";

@@ -217,6 +217,13 @@ try {
   check((await preview()) > 0, "náhľad zóny útoku ostal");
   await tap("#aim-picker .arrow.left");
   check((await queue())[0] === "attack", "druhý ťuk na šípku zaradil útok", JSON.stringify(await queue()));
+  if (PHONE) {
+    const bt = await ev(`document.querySelector("#queue .q-badge.mine.main.attack")?.textContent || ""`);
+    check(bt === "🏹", "telefón: lišta kola ukazuje len piktogram akcie (bez šípky smeru)", bt);
+    const lg = await ev(`(async () => { const m = await import("/client/action-log.js"); const s = await import("/client/session.js");
+      m.appendActionLog(s.me, { type: "move", dir: "left" }); const t = document.getElementById("log-" + s.me).textContent; m.clearActionLogs(); return t; })()`);
+    check(lg.includes("🚶") && !/[←→↑↓↕]/.test(lg), "telefón: zápis kola v karte hráča bez šípok smeru", lg);
+  }
   check(await ev(`document.getElementById("aim-picker").classList.contains("hidden")`), "picker sa po zaradení zavrel");
 
   await tap("#melee-btn");
