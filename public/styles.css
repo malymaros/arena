@@ -2982,11 +2982,11 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .hud-p2 { right: 10px; }
 /* vlajka „1st" na telefóne bez žrde: celé miesto pod boxom zaberie len látka (oblasť viewBoxu x 16–94, y 10–50 →
    SVG sa zväčší a posunie tak, aby látka presne vyplnila box vlajky; pomer boxu = 78:40) */
-.phone .starter-flag { width: 280px; height: 144px; margin-top: 10px; }
+.phone .starter-flag { width: 236px; height: 121px; margin-top: 14px; }
 .phone .starter-flag .flag-pole { display: none; }
 .phone .starter-flag svg { position: absolute; width: 128.2%; height: 275%; left: -20.5%; top: -25%; }
 .phone .hud-p2 .starter-flag svg { left: -7.7%; } /* zrkadlené SVG: látka je v ňom na x 6–84 % */
-.phone .starter-flag .flag-label { top: 50%; font-size: 44px; }
+.phone .starter-flag .flag-label { top: 50%; font-size: 36px; }
 .phone .series-crowns { top: calc(100% + 186px); }
 
 /* info riadok (touch.js) - navrchu cez ROUND nadpis, mimo boardu a lišty */
@@ -3055,7 +3055,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; align-content: start;
   grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview start" "timer start";
 }
-.phone .lobby-title { grid-area: title; font-size: 40px; margin-bottom: 6px; }
+.phone .lobby-title { grid-area: title; font-size: 44px; margin-bottom: 24px; } /* riadky volieb sa rozložia po celej výške (space-between) - dole neostane prázdny pás */
 .phone .lobby-sub { display: none; }
 .phone .lobby-card > .lobby-section:nth-of-type(1) { grid-area: format; }
 .phone .lobby-card > .lobby-section:nth-of-type(2) { grid-area: tiles; }
@@ -3067,7 +3067,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .phone .lobby-section { margin-bottom: 10px; }
 /* lobby na celú obrazovku - menu ☰ sa počas nastavovania zápasu skryje (inak by lobby muselo uhýbať jeho rohu) */
 .phone .lobby { padding: 0; align-items: stretch; }
-.phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 26px 48px 30px; align-content: center; }
+.phone .lobby-card { border: none; border-radius: 0; box-shadow: none; padding: 30px 48px 36px; align-content: space-between; }
 html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .lobby-label { font-size: 17px; margin-bottom: 10px; }
 .phone .opt { font-size: 17px; padding: 14px 10px; min-width: 70px; }
