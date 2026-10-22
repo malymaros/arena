@@ -3,6 +3,7 @@
 // Slučka sa spustí pri načítaní modulu; prvý frame beží až po inicializácii client.js.
 import { actorP1, actorP2, cellToPx, TILE_W, TILE_H, hudCharP1, hudBoxP1, hudCharP2, hudBoxP2 } from "/client/dom.js";
 import { tickTurnTimer } from "/client/turn-timer.js";
+import { perfFrame } from "/client/perf.js";
 import { actors } from "/client/actors.js";
 import { state, me, otherSlot } from "/client/session.js";
 import { positionActors, computeFacing, escPrideMul, ESC_FEET_FRAC, PAIR_SHIFT_DEFAULT, pairShift } from "/client/placement.js";
@@ -33,6 +34,7 @@ export function raf() {
   const now = performance.now();
   const map = { p1: actorP1, p2: actorP2 };
 
+  perfFrame(now);     // strážca FPS (auto úsporná grafika)
   tickTurnTimer(now); // odpočet času na ťah (auto-lock pri vypršaní)
 
   // po vypršaní facing override (streľba do strany) otoč postavu späť k súperovi -
