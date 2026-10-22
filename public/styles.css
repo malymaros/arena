@@ -3104,3 +3104,42 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
    by ich inak pri prepínaní kariet posúval do strán */
 .touch:not(.phone) #char-select .char-ability { width: 620px; }
 .touch:not(.phone) #char-select #touch-pick { width: 460px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ========== Úsporná grafika (html.perf-lite - client/perf.js; docs/PERF_PLAN.md etapa 5) ==========
+   Nekonečné pulzy, ktoré animujú box-shadow/filter/background, prekresľujú prvok každý frame (paint + GPU).
+   V lite ich nahrádzajú statické verzie alebo pulz priehľadnosti (opacity beží v kompozítore bez prekresľovania).
+   Desktop (full) ostáva bez zmeny. */
+@keyframes lite-blink { 0%, 100% { opacity: 1; } 50% { opacity: .72; } }
+@keyframes lite-fade  { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+/* zasahované bunky specialu / démona: rovnaký vzhľad, ale bliká pseudo-element cez opacity */
+.perf-lite .cell.preview-red { animation: none; }
+.perf-lite .cell.preview-red::after {
+  content: ""; position: absolute; inset: 0; border-radius: 10px; pointer-events: none;
+  box-shadow: inset 0 0 0 3px rgba(255,0,0,.65); background: rgba(255,0,0,.15);
+  animation: lite-fade 600ms linear infinite;
+}
+.perf-lite .cell.esc-burst-cell { animation: none; box-shadow: inset 0 0 0 4px rgba(255,220,60,.8); background: rgba(255,170,20,.4); }
+/* HP/mana bary v zlatom (Last Stand) a červenom (Last Hope) stave - statická žiara */
+.perf-lite .hud-box.death-golden .bar { animation: none; box-shadow: 0 0 0 2px #000, 0 0 10px 1px rgba(255,210,74,.8); }
+.perf-lite .hud-box.hope-red .bar     { animation: none; box-shadow: 0 0 0 2px #000, 0 0 10px 1px rgba(255,70,70,.8); }
+/* IK dlaždice (sú na ploche skoro stále) - bez pulzu jasu */
+.perf-lite .cell.tile-ik { animation: none; }
+/* portrét pri kritickom HP a max level ikony - statické */
+.perf-lite .hud-char.critical { animation: none;
+  filter: saturate(.35) brightness(.62) sepia(.85) hue-rotate(-35deg) drop-shadow(0 0 12px rgba(255,20,20,.8)); }
+.perf-lite .ca-pride.pride-max img, .perf-lite .ca-moon.pride-max img, .perf-lite .ca-luffy.gear3-max img { animation: none;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.8)) drop-shadow(0 0 5px rgba(255,210,74,.9)); }
+/* výzvy na ťah (LOCK IN, „your move", prázdne sloty fronty, TAP AGAIN) - statický lem + pulz priehľadnosti */
+.perf-lite .btn-lock.ready { animation: lite-blink 1.1s ease-in-out infinite;
+  box-shadow: 0 0 0 2px #000, inset 0 2px 0 rgba(255,255,255,.18), inset 0 -2px 0 rgba(0,0,0,.35), 0 0 0 4px rgba(76,175,80,.6); }
+.perf-lite .turn-status.waiting   { animation: lite-blink 1.1s ease-in-out infinite; box-shadow: 0 0 0 2px #000, 0 0 0 4px rgba(76,175,80,.55); }
+.perf-lite .turn-status.your-move { animation: lite-blink 1.1s ease-in-out infinite; box-shadow: 0 0 0 2px #000, 0 0 0 4px rgba(255,213,79,.55); }
+.perf-lite .q-badge.main.mine.q-slot:not(.revealed) { animation: lite-blink 1.4s ease-in-out infinite; border-color: rgba(255,213,79,.85); }
+.perf-lite #touch-confirm { animation: lite-blink .9s ease-in-out infinite; }
+/* labyrint: stmavenie arény tmavou vrstvou (opacity) namiesto filtra na celé pozadie */
+.perf-lite body.labyrinth-mode #arena { filter: none; }
+.perf-lite .arena::before {
+  content: ""; position: absolute; inset: 0; z-index: 9; pointer-events: none;
+  background: rgba(6,6,10,.8); opacity: 0; transition: opacity .6s ease;
+}
+.perf-lite body.labyrinth-mode .arena::before { opacity: 1; }

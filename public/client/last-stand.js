@@ -8,6 +8,19 @@ import { HEAD_CX } from "/chars/index.js";
 import { deathFog, deathCenter, hopeFog, hopeCenter, deathBehind } from "/client/overlays.js";
 import { DEATH_SEQ } from "/client/demon-sprites.js";
 import { appSize } from "/client/viewport.js";
+import { perf } from "/client/perf.js";
+
+// VÝKON (docs/PERF_PLAN.md etapa 5): rozmazanie (filter blur) veľkého stredového canvasu a hmly je na mobile drahé.
+// V úspornom režime (perf.lite) nástup/odchod hrá len opacity + scale a hmla je samotný radiálny gradient bez blur.
+// Po nástupe sa filter pripne na "none" (nie blur(0px)) - vizuálne rovnaké, ale bez trvalého filtra na canvase.
+const blur = (px) => (perf.lite ? {} : { filter: `blur(${px}px)` });
+// hmla: blur len vo full; po dobehnutí puffu sa schová (display none), nech neostane neviditeľne v strome vrstiev
+function fogPuff(el, keyframes, ms, easing) {
+  el.style.display = "block";
+  el.style.filter = perf.lite ? "none" : "blur(28px)";
+  const a = el.animate(keyframes, { duration: ms, easing });
+  a.onfinish = () => { if (!el.getAnimations().some(x => x !== a && x.playState === "running")) el.style.display = "none"; };
+}
 
 /* ---------- Last Stand - vizuál (démon v strede + za postavou, golden stav); riadené serverom cez timeline ---------- */
 
@@ -26,7 +39,6 @@ function computeDeathBound(slot) {
 
 // hmlový puff v strede (in = nábeh, out = reverz)
 function _deathFogPuff(ms, dir) {
-  deathFog.style.display = "block";
   const a = dir === "in"
     ? [{ opacity: 0, transform: "translate(-50%,-50%) scale(.35)" },
        { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .55 },
@@ -34,7 +46,7 @@ function _deathFogPuff(ms, dir) {
     : [{ opacity: 0, transform: "translate(-50%,-50%) scale(1.5)" },
        { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .45 },
        { opacity: 0, transform: "translate(-50%,-50%) scale(.35)" }];
-  deathFog.animate(a, { duration: ms, easing: dir === "in" ? "ease-out" : "ease-in" });
+  fogPuff(deathFog, a, ms, dir === "in" ? "ease-out" : "ease-in");
 }
 
 /* ---------- Last Stand - napojenie na server timeline ---------- */
@@ -56,16 +68,16 @@ export function lsCenterAppear() {
   deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
   _deathFogPuff(1400, "in");
   const a = deathCenter.animate([
-    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
-    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
+    { opacity: 0, ...blur(18), transform: "translate(-50%,-50%) scale(.55)" },
+    { opacity: 1, ...blur(0),  transform: "translate(-50%,-50%) scale(1)" },
   ], { duration: 700, easing: "ease-out", fill: "forwards" });
-  pinOnFinish(deathCenter, a, { opacity: "1", filter: "blur(0px)", transform: "translate(-50%,-50%) scale(1)" });
+  pinOnFinish(deathCenter, a, { opacity: "1", filter: "none", transform: "translate(-50%,-50%) scale(1)" });
 }
 export function lsCenterDisappear() {
   _deathFogPuff(700, "out");
   const a = deathCenter.animate([
-    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
-    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
+    { opacity: 1, ...blur(0),  transform: "translate(-50%,-50%) scale(1)" },
+    { opacity: 0, ...blur(18), transform: "translate(-50%,-50%) scale(.55)" },
   ], { duration: 700, easing: "ease-in", fill: "forwards" });
   pinOnFinish(deathCenter, a, { opacity: "0" });
 }
@@ -78,23 +90,22 @@ export function demonCenterAppear() {
   deathFog.style.left = cx + "px"; deathFog.style.top = cy + "px";
   _deathFogPuff(1000, "in");
   const a = deathCenter.animate([
-    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(1.1)" },
-    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(2)" },
+    { opacity: 0, ...blur(18), transform: "translate(-50%,-50%) scale(1.1)" },
+    { opacity: 1, ...blur(0),  transform: "translate(-50%,-50%) scale(2)" },
   ], { duration: 700, easing: "ease-out", fill: "forwards" });
-  pinOnFinish(deathCenter, a, { opacity: "1", filter: "blur(0px)", transform: "translate(-50%,-50%) scale(2)" });
+  pinOnFinish(deathCenter, a, { opacity: "1", filter: "none", transform: "translate(-50%,-50%) scale(2)" });
 }
 export function demonCenterDisappear() {
   _deathFogPuff(700, "out");
   const a = deathCenter.animate([
-    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(2)" },
-    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(1.4)" },
+    { opacity: 1, ...blur(0),  transform: "translate(-50%,-50%) scale(2)" },
+    { opacity: 0, ...blur(18), transform: "translate(-50%,-50%) scale(1.4)" },
   ], { duration: 700, easing: "ease-in", fill: "forwards" });
   pinOnFinish(deathCenter, a, { opacity: "0" });
 }
 
 // Last Hope - červená „hope" postava v strede (analógia k lsCenterAppear, len červená hmla a hope sprite)
 function _hopeFogPuff(ms, dir) {
-  hopeFog.style.display = "block";
   const a = dir === "in"
     ? [{ opacity: 0, transform: "translate(-50%,-50%) scale(.35)" },
        { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .55 },
@@ -102,7 +113,7 @@ function _hopeFogPuff(ms, dir) {
     : [{ opacity: 0, transform: "translate(-50%,-50%) scale(1.5)" },
        { opacity: .85, transform: "translate(-50%,-50%) scale(1.05)", offset: .45 },
        { opacity: 0, transform: "translate(-50%,-50%) scale(.35)" }];
-  hopeFog.animate(a, { duration: ms, easing: dir === "in" ? "ease-out" : "ease-in" });
+  fogPuff(hopeFog, a, ms, dir === "in" ? "ease-out" : "ease-in");
 }
 export function hopeCenterAppear() {
   const { w, h } = appSize(), cx = w / 2, cy = h / 2;
@@ -111,16 +122,16 @@ export function hopeCenterAppear() {
   hopeFog.style.left = cx + "px"; hopeFog.style.top = cy + "px";
   _hopeFogPuff(1400, "in");
   const a = hopeCenter.animate([
-    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
-    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
+    { opacity: 0, ...blur(18), transform: "translate(-50%,-50%) scale(.55)" },
+    { opacity: 1, ...blur(0),  transform: "translate(-50%,-50%) scale(1)" },
   ], { duration: 700, easing: "ease-out", fill: "forwards" });
-  pinOnFinish(hopeCenter, a, { opacity: "1", filter: "blur(0px)", transform: "translate(-50%,-50%) scale(1)" });
+  pinOnFinish(hopeCenter, a, { opacity: "1", filter: "none", transform: "translate(-50%,-50%) scale(1)" });
 }
 export function hopeCenterDisappear() {
   _hopeFogPuff(700, "out");
   const a = hopeCenter.animate([
-    { opacity: 1, filter: "blur(0px)",  transform: "translate(-50%,-50%) scale(1)" },
-    { opacity: 0, filter: "blur(18px)", transform: "translate(-50%,-50%) scale(.55)" },
+    { opacity: 1, ...blur(0),  transform: "translate(-50%,-50%) scale(1)" },
+    { opacity: 0, ...blur(18), transform: "translate(-50%,-50%) scale(.55)" },
   ], { duration: 700, easing: "ease-in", fill: "forwards" });
   pinOnFinish(hopeCenter, a, { opacity: "0" });
 }
