@@ -107,17 +107,30 @@
   padding: calc(3px * var(--ui-k, 1)) 0; background: #ffd54f; color: #2a1c00; font-size: calc(8px * var(--ui-k, 1));
 }
 /* málo many: červený štítok (nedá sa zaradiť) */
-#touch-label.no-mana { background: rgba(110, 10, 10, .95); box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #ff5252, 0 4px 10px rgba(0,0,0,.5); animation: touch-label-red .5s steps(2) infinite; }
+#touch-label.no-mana { background: rgb(110, 10, 10); box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #ff5252, 0 4px 10px rgba(0,0,0,.5); }
 #touch-label.no-mana::after { border-top-color: #ff5252; }
-@keyframes touch-label-red { 50% { opacity: .7; } }
-/* ...a vlastný mana bar bliká červeným obrysom (len obrys - výplň sa nemení) */
+/* pulzuje len červený rámik okolo štítku - štítok sám ostáva plný a čitateľný */
+#touch-label.no-mana::before {
+  content: ""; position: absolute; inset: -5px; pointer-events: none;
+  box-shadow: 0 0 0 4px #ff3b3b; animation: no-mana-pulse 1.8s ease-in-out infinite;
+}
+/* ...a vlastný mana bar pomaly pulzuje červeným obrysom (len obrys - výplň sa nemení) */
 .phone .mana-bar.no-mana-flash::after {
   content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
-  box-shadow: inset 0 0 0 9px #ff3b3b; animation: no-mana-blink .5s steps(2) infinite;
+  box-shadow: inset 0 0 0 9px #ff3b3b; animation: no-mana-pulse 1.8s ease-in-out infinite;
 }
-@keyframes no-mana-blink { 50% { opacity: 0; } }
-/* tlačidlo, na ktoré na ďalšom mieste fronty nebude mana - sivé, ale ťuknuteľné (ukáže červený štítok) */
+@keyframes no-mana-pulse { 50% { opacity: .35; } }
+/* tlačidlo, na ktoré na ďalšom mieste fronty nebude mana - len sivé (bez zámku), ťuknuteľné (ukáže červený štítok) */
 .phone .btn.act.no-mana, .phone .golden-half.no-mana { filter: grayscale(.85) brightness(.6); }
+/* zablokovaná akcia (otvorený výber smeru, golden pre startera, po LOCK IN…) - veľký zámok v strede tlačidla;
+   stmavenie cez prekryv namiesto filtra, aby zámok ostal jasný a odlíšil sa od „málo many" */
+.phone .btn.locked-ui, .phone .btn.locked-perm, .phone .btn.locked-golden { filter: none; }
+.phone .btn.locked-ui::before, .phone .btn.locked-perm::before, .phone .btn.locked-golden::before {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: rgba(10, 12, 16, .62);
+}
+.phone .btn.locked-ui::after, .phone .btn.locked-perm::after, .phone .btn.locked-golden::after {
+  top: 50%; right: auto; left: 50%; z-index: 3; transform: translate(-50%, -50%); font-size: 40px;
+}
 
 /* info riadok nad lištou tlačidiel - popis označenej akcie; písmo v skutočných px displeja */
 #touch-info {

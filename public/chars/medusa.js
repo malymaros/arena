@@ -21,7 +21,7 @@ export default {
     // širší dosah melee (diagonály) za nižší dmg
     melee: { title: `Melee (−${MELEE_COST} mana, ${MEDUSA_MELEE_DMG} dmg, hits your cell + all diagonal neighbours)`, cost: `−${MELEE_COST}{💧} ${MEDUSA_MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${MEDUSA_MELEE_DMG}` },
     // žiadny dmg - skamenenie na 2 akcie (smer sa volí v pickeri)
-    special: { title: `Special (−${SPECIAL_COST} mana) - petrifying gaze: choose a direction; a hit opponent skips their next ${STONE_ACTIONS} actions`, cost: `−${SPECIAL_COST}{💧} ${STONE_ACTIONS}×🗿`, label: `{💧}${SPECIAL_COST} PETRIFY ${STONE_ACTIONS}` },
+    special: { title: `Special (−${SPECIAL_COST} mana) - petrifying gaze: choose a direction; a hit opponent skips their next ${STONE_ACTIONS} actions`, cost: `−${SPECIAL_COST}{💧} ${STONE_ACTIONS}×🗿`, label: `{💧}${SPECIAL_COST} {🗿}${STONE_ACTIONS}` },
   },
   specialTarget: "dir", // smerový special (left/right picker)
   // vlastné políčko + všetko striktne zvoleným smerom v riadkoch ±1

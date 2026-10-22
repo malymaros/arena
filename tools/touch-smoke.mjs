@@ -200,6 +200,12 @@ try {
     check(await info() === "", "telefón: textový popis sa neukazuje", await info());
     check(await ev(`getComputedStyle(document.querySelector("#attack-btn .cost")).display === "none"`), "telefón: tlačidlo nesie len piktogram");
   } else check(infoBefore.length > 0, "info riadok ukazuje popis", infoBefore);
+  if (PHONE) {
+    // zablokovaná akcia (otvorený výber) = veľký zámok v strede tlačidla, nie v rohu
+    const lk = await ev(`(() => { const b = document.getElementById("melee-btn"), a = getComputedStyle(b, "::after"), r = b.getBoundingClientRect();
+      return { locked: b.classList.contains("locked-ui"), content: a.content, cx: Math.round(parseFloat(a.left) - r.width / 2 / (r.width / b.offsetWidth)), t: a.transform }; })()`);
+    check(lk.locked && lk.content.includes("🔒") && Math.abs(lk.cx) < 2 && lk.t !== "none", "telefón: zablokovaná akcia má zámok v strede", JSON.stringify(lk));
+  }
   await shot("attack-armed");
   // otvorený výber zamyká ostatné akcie: ťuk na iné tlačidlá nič nezmení (popis, náhľad, označenie, picker)
   await tap("#melee-btn"); await tap("#special-btn"); await tap(".controls-row .btn.act.shield");

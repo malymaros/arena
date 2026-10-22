@@ -56,7 +56,7 @@ for (let moon = 0; moon < 4; moon++) {
 
 /* ---------- 3) štítky na telefóne (label) - cena a účinok z balance.js ---------- */
 const lbl = (k, slot, ui = {}) => title(k, slot, ui)?.label;
-check(lbl("medusa", "special") === `{💧}${B.SPECIAL_COST} PETRIFY ${B.STONE_ACTIONS}`, "medusa: štítok PETRIFY");
+check(lbl("medusa", "special") === `{💧}${B.SPECIAL_COST} {🗿}${B.STONE_ACTIONS}`, "medusa: štítok s kameňom 🗿");
 check(lbl("countess", "dash") === `{💧}${B.DASH_COST} {☠️}${B.VAMP_CHARGE_DMG} HEAL ${B.VAMP_CHARGE_BONUS}`
   && lbl("onre", "dash") === `{💧}${B.DASH_COST} {☠️}${B.VAMP_CHARGE_DMG} DRAIN ${B.VAMP_CHARGE_BONUS}`, "vampire/onryo: štítok chargu");
 check(lbl("jotaro", "special", { worldUsed: false }) === `{💧}${B.WORLD_COST} TIME STOP`
