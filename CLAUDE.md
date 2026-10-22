@@ -19,6 +19,7 @@ npm run golden:update   # rewrite the golden files - only for a deliberate behav
 npm run sim             # headless random-bot matches straight on the engine (tools/simulate.mjs, ~1 ms/match)
 node tools/difftest.mjs # engine at HEAD vs working tree on identical bot matches - must be 0 diffs for a pure refactor
 node tools/browser-smoke.mjs [--compare]  # CLIENT smoke test: headless Chrome/Edge spectates seeded bot matches (+ char-select hovers, a tournament) at 8× time; fails on JS errors / 4xx; --compare also runs HEAD and diffs the set of loaded sprite files
+node tools/perf-probe.mjs [--ref <commit>] [--base tmp/perf/x.json]  # CLIENT performance on an emulated phone (CPU 4×): scripted match incl. Last Stand demon + Last Hope, per-window main-thread %, FPS, slow frames, style/paint ms → tmp/perf/; plan + results in docs/PERF_PLAN.md
 node tools/touch-smoke.mjs [--shots dir]  # TOUCH controls test: real touch events in an emulated phone (TOUCH_DEVICE=tablet for iPad) - PICK, tap = select + preview / 2nd tap = queue, pickers on the board, cell picker over the board
 node tools/screens.mjs [--only phone]  # screenshots of login / char-select / game on 9 screen sizes (desktop, tablet, phone landscape + portrait) into tmp/screens/ - check after any layout change
 ```
