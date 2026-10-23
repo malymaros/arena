@@ -301,6 +301,9 @@ try {
     await tap("#undo"); await tap("#undo"); await tap("#undo");
   }
 
+  // prekrytie figúr: nižší riadok (väčšie top) je vpredu (vyšší z-index vo vrstve #figures)
+  check(await ev(`(() => { const a = [...document.querySelectorAll("#figures .sprite-actor")].filter(e => e.style.display !== "none" && !e.classList.contains("sprite-stand"));
+    return a.length >= 2 && a.every(x => a.every(y => parseFloat(x.style.top) <= parseFloat(y.style.top) || +x.style.zIndex > +y.style.zIndex)); })()`), "figúra na nižšom riadku má vyšší z-index");
   console.log("podržanie = okno „čo to robí\"");
   const armedAny = () => ev(`!!document.querySelector(".touch-armed")`);
   while ((await queue()).some(x => x !== "-")) await tap("#undo"); // tablet: special Soldiera z výberu políčka ostal vo fronte

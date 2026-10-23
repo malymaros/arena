@@ -61,7 +61,7 @@ export default function jotaroFx(C) {
       c.width = C.ACTOR_W; c.height = C.ACTOR_H;
       c.style.width = C.ACTOR_W + "px"; c.style.height = C.ACTOR_H + "px";
       c.style.display = "none";
-      C.actorsEl.appendChild(c);
+      C.figuresEl.appendChild(c); // vrstva figúr - z-index podľa riadku Jotara (position)
       standEls[slot] = c;
     }
   }
@@ -202,6 +202,8 @@ export default function jotaroFx(C) {
         if (!data || data.char !== "jotaro" || data.x == null) { el.style.display = "none"; continue; }
         const wasHidden = el.style.display === "none";
         el.style.display = "block";
+        const z = C.rowZ(data.y); // tesne za Jotarom (pri útoku tesne pred ním), stále v poradí riadkov
+        el.style.zIndex = String(standSwapActive(slot) ? z + 1 : z - 1);
         // MOVE-blip: pozíciu aj pás standu (snap starú→novú bunku + Dead_P→Summon_P) plne riadi raf - sem nezasahuj
         if (standBlip[slot]) continue;
         const { left, top } = C.cellToPx(data.x, data.y);
@@ -218,7 +220,6 @@ export default function jotaroFx(C) {
         const swap = standSwapActive(slot);
         const shift  = C.pairShift(slot, s) - (swap ? 0 : fc * STAND_OFFSET);
         const floatY = swap ? 0 : STAND_FLOAT_Y;
-        el.style.zIndex = swap ? "4" : "";
         el.style.transform = `translateX(${shift}px) translateY(${floatY}px) scaleX(${fc})`;
       }
     },
@@ -276,7 +277,7 @@ export default function jotaroFx(C) {
             el.style.transition = "none";
             el.style.left = (left - (C.ACTOR_W - C.TILE_W) / 2) + "px";
             el.style.top  = (top - (C.ACTOR_H - C.TILE_H)) + "px";
-            el.style.zIndex = "";
+            el.style.zIndex = String(C.rowZ(cy) - 1); // za Jotarom, v poradí riadkov
             el.style.transform = `translateX(${sh}px) translateY(${STAND_FLOAT_Y}px) scaleX(${fc})`;
             file = phase2 ? "Summon_P.png" : "Dead_P.png";
             drawT = phase2 ? (t - SP_BLIP_DEAD_MS) : t;

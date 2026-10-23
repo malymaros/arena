@@ -133,8 +133,11 @@
         <div id="grid" class="grid"></div>
         <!-- actors -->
         <div id="actors" class="actors">
-          <canvas id="actor-p1" class="sprite-actor" width="224" height="224"></canvas>
-          <canvas id="actor-p2" class="sprite-actor" width="224" height="224"></canvas>
+          <!-- figúry postáv (hráči, klony, stand) - vlastná vrstva, v nej poradie podľa riadku (rowZ) -->
+          <div id="figures" class="figures">
+            <canvas id="actor-p1" class="sprite-actor" width="224" height="224"></canvas>
+            <canvas id="actor-p2" class="sprite-actor" width="224" height="224"></canvas>
+          </div>
         </div>
       </div>
 

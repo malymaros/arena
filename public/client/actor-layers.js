@@ -1,7 +1,7 @@
 // public/client/actor-layers.js - canvasy figúr na doske: veľkosť hráčskych canvasov, ghost (náhľad vlastnej pozície),
 // siluety lovca v labyrinte (+ preblik na niti), canvasy tieňových klonov a ghost klona. Pridávajú sa do
 // #actors pri načítaní - PRED figúrami z registra fx (fxAll("init") v client.js), poradie vrstiev ostáva.
-import { actorP1, actorP2, actorsEl, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
+import { actorP1, actorP2, actorsEl, figuresEl, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
 import { ACTOR_W, ACTOR_H, ensureSpriteMeta, charDirFor, ANIM_DEF, drawSprite } from "/client/sprites.js";
 
 /* ---------- Figúry na doske: canvasy postáv, ghost, siluety, klony ---------- */
@@ -65,7 +65,7 @@ for (const _slot of ["p1", "p2"]) {
   c.width = ACTOR_W; c.height = ACTOR_H;
   c.style.width = ACTOR_W + "px"; c.style.height = ACTOR_H + "px";
   c.style.display = "none";
-  actorsEl.appendChild(c);
+  figuresEl.appendChild(c);
   cloneEls[_slot] = c;
 }
 // ghost klona - pri plánovaní ukáže budúcu pozíciu vlastného klona (vertikálne inverznú k mojim smerom)

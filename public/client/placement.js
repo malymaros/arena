@@ -4,7 +4,7 @@
 import { SIZE_LEVEL, PAIR_SHIFT, HEAD_TOP, HEAD_CX } from "/chars/index.js";
 import { actors } from "/client/actors.js";
 import { state, me } from "/client/session.js";
-import { actorP1, actorP2, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
+import { actorP1, actorP2, cellToPx, TILE_W, TILE_H, rowZ } from "/client/dom.js";
 import { ACTOR_W, ACTOR_H } from "/client/sprites.js";
 import { CHAR_FX, fxAll } from "/client/fx-registry.js";
 import { cloneEls, youMarker } from "/client/actor-layers.js";
@@ -88,6 +88,7 @@ export function positionActors(s, immediate = false) {
     if (!data || !data.char || data.x == null) { el.style.display = "none"; return; }
     const wasHidden = el.style.display === "none";
     el.style.display = "block";
+    el.style.zIndex = rowZ(data.y); // nižší riadok prekrýva vyšší
     const { left, top } = cellToPx(data.x, data.y);
     // canvas je väčší než bunka - horizontálne centrovať, vertikálne ukotviť na spodok bunky
     const px = left - (ACTOR_W - TILE_W) / 2;
@@ -159,6 +160,7 @@ export function positionActors(s, immediate = false) {
     const shift = foeShift + (onOwner ? STACK_OFFSET : 0);
 
     el.style.display = "block";
+    el.style.zIndex = rowZ(c.y);
     el.style.opacity = "1"; // klon nie je priehľadný ani na Narutovej bunke
     if (immediate || !actors.actorsInitialized || wasHidden) {
       // prvé zjavenie (summon) / immediate - umiestni bez slideu (nie z rohu)

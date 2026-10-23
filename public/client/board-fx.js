@@ -3,7 +3,7 @@
 // summon klona, tile flare, spotreba tile a pomocné triedy buniek.
 import { actors } from "/client/actors.js";
 import { state, me } from "/client/session.js";
-import { cellToPx, TILE_W, actorsEl, TILE_H } from "/client/dom.js";
+import { cellToPx, TILE_W, actorsEl, figuresEl, rowZ, TILE_H } from "/client/dom.js";
 import { computeFacing, positionActors, pairShift, liveActorPos } from "/client/placement.js";
 import { ACTOR_W, ACTOR_H, usesAltColor, charDirFor, CHARGE_SCALE } from "/client/sprites.js";
 import { lastStand } from "/client/last-stand-state.js";
@@ -262,7 +262,8 @@ export function spawnCloneSummonFx(slot, cell, durMs) {
   el.style.transform = `translateX(${facing * OFFSET}px) scaleX(${-facing})`; // normálna výška, len zrkadlenie
   el.style.pointerEvents = "none";
   el.classList.toggle("alt-color", usesAltColor(st.char, slot));
-  actorsEl.appendChild(el);
+  el.style.zIndex = rowZ(cell[1]); // vrstva figúr: ako Naruto na tej bunke (DOM poradie → pred ním)
+  figuresEl.appendChild(el);
   el.animate(
     [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }],
     { duration: Math.max(400, durMs), easing: "linear", fill: "forwards" }

@@ -103,11 +103,8 @@ export function renderHUD() {
 
   // tournament × labyrint: hlavy magov skryté u oboch, kým kliatba beží - renderHUD beží per frame,
   // takže skrytie/odkrytie sadne aj na labyrint začatý či ukončený uprostred prehrávania kola
-  if (state?.series?.format === "tournament") {
-    const labActive = !!(state?.p1?.labyrinth || state?.p2?.labyrinth);
-    crownsP1El.classList.toggle("lab-hidden", labActive);
-    crownsP2El.classList.toggle("lab-hidden", labActive);
-  }
+  // hlavy magov ukazujú HP/manu PRIEBEŽNE podľa práve prehrávaného framu (nie výsledok kola vopred)
+  if (state?.series?.format === "tournament" && state?.roster && state?.phase === "playing") renderMageHeads();
 
   // pravá strana (p2) má VŽDY alternatívne vykreslenie (postava na boarde, portrét aj ghost);
   // výnimka: postava s natívnou p2 paletou (Medúza) - triedy priebežne prepína raf podľa aktuálneho chara
@@ -208,8 +205,11 @@ export function renderMageHeads() {
       return `<span class="${cls}" data-slot="${slot}" data-char="${char}" title="${CHAR_META[char]?.name || char}">${statsHtml}<span class="mh-face">${face}</span></span>`;
     }).join("");
   };
-  crownsP1El.innerHTML = buildSide("p1");
-  crownsP2El.innerHTML = buildSide("p2");
+  // volá sa aj per-frame počas prehrávania kola (renderHUD) - prepíš len pri zmene (hlavy sú canvasy animované raf)
+  for (const [el, slot] of [[crownsP1El, "p1"], [crownsP2El, "p2"]]) {
+    const html = buildSide(slot);
+    if (el._headsHtml !== html || !el.querySelector(".mhead")) { el.innerHTML = html; el._headsHtml = html; }
+  }
   crownsP1El.classList.remove("hidden"); crownsP2El.classList.remove("hidden");
   crownsP1El.classList.add("mage-heads"); crownsP2El.classList.add("mage-heads");
   syncMageGlitch(); // spusti/zastav glitch ticker podľa toho, či nejaká hlava je corrupt

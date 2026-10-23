@@ -326,6 +326,8 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 
 /* ========== Actors (plynulý pohyb) ========== */
 .actors { position: absolute; inset: 0; pointer-events: none; }
+/* figúry postáv - jedna vrstva (z-index ako .sprite-actor), vnútri poradie podľa riadku (rowZ v dom.js) */
+.figures { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .sprite-actor {
   position: absolute; width: var(--tile-w); height: var(--tile-h);
   image-rendering: pixelated;

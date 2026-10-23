@@ -21,7 +21,7 @@ import "/client/touch.js";            // dotyk: ťuk = výber + náhľad, picker
 import "/client/peek.js";             // okno „čo to robí": podržanie tlačidla / portrétu (dotyk), hover portrétu (PC)
 import { actors } from "/client/actors.js";
 import { initCharFx, fxAll } from "/client/fx-registry.js";
-import { gridEl, actorsEl, TILE_W, TILE_H, GAP, cellToPx } from "/client/dom.js";
+import { gridEl, actorsEl, figuresEl, rowZ, TILE_W, TILE_H, GAP, cellToPx } from "/client/dom.js";
 import {
   ACTOR_W, ACTOR_H, spriteFrameIndex, SPECIAL_SCALE, charDirFor, usesAltColor, ANIM_DEF, ensureSpriteMeta,
   drawSprite,
@@ -47,6 +47,7 @@ import { tsOverlay, worldCenter } from "/client/the-world.js";
 const C = {
   get state() { return state; },
   get actorsEl() { return actorsEl; },
+  get figuresEl() { return figuresEl; }, get rowZ() { return rowZ; },
   get TILE_W() { return TILE_W; }, get TILE_H() { return TILE_H; },
   get ACTOR_W() { return ACTOR_W; }, get ACTOR_H() { return ACTOR_H; },
   get POSE_TAIL_MS() { return POSE_TAIL_MS; },

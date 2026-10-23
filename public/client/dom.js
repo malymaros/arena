@@ -3,6 +3,10 @@
 
 export const gridEl   = document.getElementById("grid");
 export const actorsEl = document.getElementById("actors");
+// vrstva figúr (hráči, tieňové klony, Jotarov stand) v #actors - ako celok na úrovni .sprite-actor (z-index 3),
+// vo vnútri sa figúry prekrývajú podľa riadku: nižší riadok (väčšie y) je vpredu
+export const figuresEl = document.getElementById("figures");
+export const rowZ = (y) => 10 + 10 * (Number.isFinite(y) ? y : 0);
 export const actorP1  = document.getElementById("actor-p1");
 export const actorP2  = document.getElementById("actor-p2");
 export const queueEl  = document.getElementById("queue");

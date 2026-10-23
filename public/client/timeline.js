@@ -129,6 +129,10 @@ function playNewRoundTransition(nextTurn, done) {
 // len na čítanie pre tools/browser-smoke.mjs (boti čakajú, kým divák dohrá timeline) - na hru bez vplyvu
 Object.defineProperty(window, "__arenaPlaying", { get: () => playback.playing });
 
+// turnaj: HP/mana/smrť magov na lavičke podľa framu (state event nesie už výsledok kola - spoiler v HUD hlavách)
+function applyRosterFrame(f) {
+  for (const k of ["rosterHp", "rosterMana", "mageDead"]) if (f && k in f) state[k] = f[k];
+}
 export function schedulePlayTimeline(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) return;
 
@@ -168,6 +172,7 @@ export function schedulePlayTimeline(timeline) {
   const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
   state.tiles = first.tiles; state.iks = first.iks; state.pending = first.pending;
+  applyRosterFrame(first);
   renderHUD();
   const NEXT_TURN = (first.turn ?? state.turn) + 1;
   const NEXT_STARTER = playStarter === "p1" ? "p2" : "p1"; // preklop (hru môže začínať aj p2)
@@ -259,6 +264,7 @@ export function schedulePlayTimeline(timeline) {
 
     state.p1 = frame.p1; state.p2 = frame.p2;
     state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending;
+    applyRosterFrame(frame);
     if (frame.starter !== undefined) {
       state.starter = frame.starter;
     }
