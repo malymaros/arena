@@ -155,9 +155,9 @@ function emitStateMasked(timeline = null) {
 // Globálny forceResetAll() (mimo factory) volá forceReset() na každej roomke a vyprázdni register.
 function forceReset() {
   clearTurnTimer();
-  try { if (personSockets.A) personSockets.A.disconnect(true); } catch {}
-  try { if (personSockets.B) personSockets.B.disconnect(true); } catch {}
-  for (const s of spectators) { try { s.disconnect(true); } catch {} } // odpoj aj divákov, nech nevisia na zrušenej roomke
+  // všetci v roomke (hráči aj diváci) si vynútene obnovia stránku (force_reload → location.reload) - načítajú
+  // novú verziu klienta a po reloade skončia na room-browseri; odpojenie až chvíľu po správe, nech dorazí
+  for (const s of [personSockets.A, personSockets.B, ...spectators]) forceReloadSocket(s);
   spectators.clear();
   personSockets.A = null;
   personSockets.B = null;
@@ -387,7 +387,13 @@ function broadcastRooms() {
 function forceResetAll() {
   for (const room of rooms.values()) room.forceReset();
   rooms.clear();
-  broadcastRooms(); // browsing klienti uvidia prázdny zoznam (canCreate)
+  for (const s of browsing) { try { s.emit("force_reload"); } catch {} } // reload aj pre ľudí na room-browseri
+}
+// admin reset: klient obnoví stránku; socket sa odpojí o chvíľu (emit musí odísť skôr než zatvorenie spojenia)
+function forceReloadSocket(s) {
+  if (!s) return;
+  try { s.emit("force_reload"); } catch {}
+  setTimeout(() => { try { s.disconnect(true); } catch {} }, 300);
 }
 function roomForSocket(socket) { return rooms.get(socket.data.roomId) || null; }
 

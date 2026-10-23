@@ -84,6 +84,7 @@ const peek = () => ev(`(() => { const p = document.getElementById("peek"); retur
 const waitPage = async (expr, ms, what) => {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) { if (await ev(`!!(${expr})`) === true) return; await sleep(100); }
+  console.log("  stav stránky:", await ev(`[...document.querySelectorAll("body > *:not(.hidden)")].map(e => e.id || e.className).join(" | ") + " :: " + document.body.innerText.slice(0, 300)`));
   throw new Error("timeout: " + what);
 };
 const CHAR_SELECT_READY = `!document.getElementById("char-select").classList.contains("hidden") && document.getElementById("color-roll").classList.contains("hidden")`;
@@ -92,8 +93,9 @@ const check = (ok, label, extra = "") => { console.log(`  ${ok ? "PASS" : "FAIL"
 const queue = () => ev(`[...document.querySelectorAll("#queue .q-badge.mine.main")].map(b => [...b.classList].filter(c => !["q-badge","mine","main","q-warn","q-slot"].includes(c)).join(".") || "-")`);
 const preview = () => ev(`document.querySelectorAll("#grid .preview-red").length`);
 const info = () => ev(`(() => { const e = document.getElementById("touch-info"); return e && !e.classList.contains("hidden") ? e.textContent : ""; })()`);
-// telefón: štítok cena + účinok nad tlačidlom (namiesto popisu v info riadku); tablet ostáva pri info riadku
-const PHONE = !process.env.TOUCH_DEVICE;
+// telefónne rozloženie (štítok cena + účinok nad tlačidlom, pás postáv) - od 2026-10-23 na KAŽDOM dotykovom
+// zariadení vrátane tabletu; zisťuje sa zo stránky (html.phone) po načítaní
+let PHONE = true;
 const label = () => ev(`(() => { const e = document.getElementById("touch-label"); return e && !e.classList.contains("hidden") ? e.textContent : ""; })()`);
 const labelRed = () => ev(`!!document.querySelector("#touch-label.no-mana:not(.hidden)")`);
 
@@ -105,6 +107,7 @@ try {
   await send("Page.navigate", { url }); await sleep(2000);
   await ev(`(() => { document.getElementById("login-name").value = "tapper"; /* meno nesmie obsahovať heslo - Chrome by otvoril správcu hesiel a ten zje touchEnd */ document.getElementById("login-pass").value = "${PASS}"; document.getElementById("login-form").requestSubmit(); })()`);
   await sleep(2500);
+  PHONE = await ev(`document.documentElement.classList.contains("phone")`);
   await waitPage(`document.querySelector(".room-btn.join")`, 10000, "room browser");
   await tap(".room-btn.join"); await sleep(400);
   host.emit("configure_match", { format: "bo3", tilesPerRound: 1, tileWeights: { dmg: 0, heal: 100, mana: 0, ik: 0, power: 0, block: 0 }, timer: "off", tilePreview: false });
@@ -112,11 +115,11 @@ try {
   await sleep(500);
 
   console.log("výber postavy");
-  if (!process.env.TOUCH_DEVICE) {
+  if (PHONE) {
     check(await ev(`!document.getElementById("touch-pick").classList.contains("hidden") && !document.getElementById("char-ability").classList.contains("hidden")`), "telefón: prvá karta je predvybraná (náhľad + PICK hneď)");
     check((await ev(`document.getElementById("touch-pick").textContent`)) === "PICK FIRE WIZARD", "telefón: predvybraný je Fire Wizard", await ev(`document.getElementById("touch-pick").textContent`));
   }
-  if (!process.env.TOUCH_DEVICE) {
+  if (PHONE) {
     // telefón: jeden cyklický pás postáv (char-strip.js) namiesto stránok so šípkami
     const armedChar = () => ev(`document.querySelector(".char-card.touch-armed")?.dataset.char || null`);
     const pr = await ev(`(() => { const r = document.querySelector(".char-pager").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; })()`);

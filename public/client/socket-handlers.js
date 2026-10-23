@@ -123,6 +123,8 @@ function resetGameUi() {
   renderHUD();
 }
 socket.on("reset", resetGameUi);
+// admin reset roomky (alebo všetkých): server žiada obnovenie stránky - nová verzia klienta, potom room-browser
+socket.on("force_reload", () => location.reload());
 // room-browser (opustil som roomku / skončila) - „rooms" dostáva len socket mimo roomky, takže reset
 // nikdy nezasiahne rozohranú hru; ďalšia roomka tak začne s prázdnou frontou (nie s ťahmi z poslednej hry)
 socket.on("rooms", resetGameUi);

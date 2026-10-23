@@ -17,8 +17,9 @@ let scale = 1, appW = DESIGN_W, appH = DESIGN_H;
 /** Dotykové zariadenie (mobil, tablet). */
 export const isTouch = window.matchMedia("(pointer: coarse)").matches;
 root.classList.toggle("touch", isTouch);
-/** Telefón - kratšia strana fyzického displeja ≤ 500 CSS px (nezávisí od otočenia). Tablety ostávajú pri desktope. */
-export const isPhone = isTouch && Math.min(screen.width, screen.height) <= 500;
+/** „Telefónne“ rozloženie (.phone) = KAŽDÉ dotykové zariadenie - mobil aj tablet (rozhodnutie majiteľa 2026-10-23:
+ *  rovnaké UI pre všetky dotykové zariadenia). Desktop s myšou ostáva pri desktopovom rozložení. */
+export const isPhone = isTouch;
 root.classList.toggle("phone", isPhone);
 
 function fit() {
