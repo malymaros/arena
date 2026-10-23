@@ -32,7 +32,7 @@ aj na výšku) do `tmp/screens/` (mimo gitu). `--only phone` vyberie len niektor
 
 **Pre koho:** telefóny (dotyk, kratšia strana do ~500 px) dostanú nové rozloženie. Tablet je HYBRID (rozhodnutie
 majiteľa 2026-10-23): rozloženie, HUD, vlajka a pomery ako na PC, ale z telefónu má lištu tlačidiel, štítok nad
-tlačidlom, front 1-2-3, pás postáv, lobby v dvoch stĺpcoch a zámky v strede tlačidiel (CSS `.touch`, JS `isTouch`);
+tlačidlom, front 1-2-3, pás postáv a zámky v strede tlačidiel (lobby ako na PC) (CSS `.touch`, JS `isTouch`);
 len telefónne rozloženie a zväčšenia kvôli malému displeju sú `.phone`. Desktop sa nemení.
 
 ### Krok 1 - menu ☰, reload, admin, zvukové okno (hotové)
