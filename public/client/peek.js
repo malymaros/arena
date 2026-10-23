@@ -117,11 +117,12 @@ function hostAt(x, y) {
   return null;
 }
 function initTouch() {
-  let timer = 0, start = null, holding = false, swallowUntil = 0;
+  let timer = 0, start = null, holding = false, swallowUntil = 0, keptOpen = false;
   const cancel = () => { clearTimeout(timer); timer = 0; start = null; };
   document.addEventListener("touchstart", (e) => {
     cancel();
     swallowUntil = 0; // nový dotyk = nový ťuk (poistka platí len pre klik hneď po podržaní)
+    if (keptOpen) { keptOpen = false; close(); } // okno nechané po touchcancel zavrie až ďalší dotyk
     if (e.touches.length !== 1) { if (holding) { holding = false; close(); } return; }
     const t = e.touches[0];
     const host = hostAt(t.clientX, t.clientY);
@@ -138,6 +139,9 @@ function initTouch() {
     cancel();
     if (!holding) return;
     holding = false;
+    // touchcancel = prehliadač si dotyk vzal (tablet: ťahanie obrázka pri dlhom podržaní - Last Stand / démon)
+    // → okno ostane, zavrie ho ďalší dotyk; inak by sa ukázalo a hneď zmizlo
+    if (e.type === "touchcancel") { keptOpen = true; swallowUntil = performance.now() + 700; return; }
     close();
     // zruš ťuk, ktorý by prehliadač po pustení poslal (aj s emulovanými mouse udalosťami → hover náhľady)
     if (e.cancelable) e.preventDefault();
@@ -149,6 +153,8 @@ function initTouch() {
   window.addEventListener("click", (e) => {
     if (performance.now() < swallowUntil) { swallowUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
+  // ťahanie obrázka/odkazu pri dlhom podržaní (tablet) by dotyk zrušilo - v hre sa nič neťahá
+  document.addEventListener("dragstart", (e) => e.preventDefault(), true);
   // kontextové menu prehliadača pri dlhom podržaní
   document.addEventListener("contextmenu", (e) => { if (holding || timer) e.preventDefault(); }, true);
 }

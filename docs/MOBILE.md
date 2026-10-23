@@ -68,7 +68,7 @@ len telefónne rozloženie a zväčšenia kvôli malému displeju sú `.phone`. 
 - výber postáv na telefóne: prvá viditeľná karta je vždy predvybraná bez hlasu (`arenaSilent` na syntetickom
   mouseenter) - pravý panel s náhľadom nikdy nie je prázdny. Hlas mena: dotyk pošle mouseenter dvakrát
   (prehliadač + touch.js), `char-select.js` druhý v rámci 500 ms ignoruje, inak by utol práve spustený hlas. Nové tlačidlo s náhľadom netreba nikde registrovať - stačí mu mouseenter handler ako na desktope.
-- **podržanie prsta = okno „čo to robí"** (`public/client/peek.js`, dotyk telefón aj tablet): 0,4 s na tlačidle akcie
+- **podržanie prsta = okno „čo to robí"** (zrušený dotyk `touchcancel` - napr. tablet začne ťahať obrázok Last Stand - okno nezavrie, zavrie ho až ďalší ťuk; `dragstart` je zablokovaný) (`public/client/peek.js`, dotyk telefón aj tablet): 0,4 s na tlačidle akcie
   (aj zamknutom) ukáže v strede plochy vysvetlenie tlačidla, na portréte postavy v HUD alebo hlavičke mága v turnaji
   (svojej aj súperovej) okno postavy = meno + presne náhľad specialu z výberu postáv (`showCharPeek` v
   `char-select.js` presunie `#char-ability` do okna). Pustenie okno zavrie, ťuk sa nezaráta (`touchend`

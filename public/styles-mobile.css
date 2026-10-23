@@ -40,6 +40,9 @@
 /* bez modrého záblesku pri ťuknutí, bez výberu textu a kontextovej bubliny pri podržaní (okrem polí) */
 .touch body { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .touch input, .touch textarea { -webkit-user-select: text; user-select: text; }
+/* obrázky (Last Stand, Last Hope, démon, portréty) nejdú ťahať - dlhé podržanie by inak spustilo drag a prehliadač
+   by dotyk zrušil (okno „čo to robí" by sa ukázalo a hneď zmizlo) */
+.touch img { -webkit-user-drag: none; user-drag: none; }
 /* menu ☰: ~40 skutočných px bez ohľadu na zmenšenie hry */
 .touch #menu-btn { transform: scale(calc(var(--ui-k, 1) * .9)); }
 

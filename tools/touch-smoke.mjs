@@ -315,6 +315,21 @@ try {
   check(pk?.cls.startsWith("peek-char") && pk.text.startsWith("NARUTO"), "podržanie súperovho portrétu ukáže jeho postavu", JSON.stringify(pk));
   pk = await hold("#special-btn", peek);
   check(pk?.text.startsWith("SPECIAL ATTACK") && !pk.name && pk.caTitle && pk.cells === 12, "podržanie specialu ukáže SPECIAL ATTACK (bez mena) a náhľad vlastnej postavy", JSON.stringify(pk));
+  // Last Stand (polovica zlatého tlačidla): okno ostane otvorené počas celého držania
+  pk = await hold("#gold-dual-btn .ls-half", async () => { await sleep(1200); return peek(); });
+  check(/LAST STAND/i.test(pk?.text || ""), "podržanie Last Stand ukáže vysvetlenie a ostane otvorené", JSON.stringify(pk));
+  check(!(await armedAny()) && !(await ev(`document.querySelector("#gold-dual-btn .ls-half").classList.contains("armed") || document.querySelector("#gold-dual-btn .ls-half").classList.contains("active")`)), "podržanie Last Stand ho nezaradilo");
+  // prehliadač dotyk zruší (touchcancel - na tablete ťahanie obrázka): okno ostane, zavrie ho až ďalší ťuk
+  {
+    const c = await ev(`(() => { const r = document.querySelector("#gold-dual-btn .ls-half").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    await sendT("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [c] });
+    await sleep(650);
+    await sendT("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
+    await sleep(500);
+    check(/LAST STAND/i.test((await peek())?.text || ""), "zrušený dotyk (touchcancel) okno nezavrie");
+    await tap(".hud-turn");
+    check(!(await peek()) && !(await armedAny()), "ďalší ťuk okno zavrie a nič neoznačí");
+  }
   // zamknuté tlačidlo (otvorený výber smeru): podržanie funguje, výber ostane otvorený
   await tap("#attack-btn");
   pk = await hold("#melee-btn", peek);
