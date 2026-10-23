@@ -124,7 +124,7 @@ export function positionActors(s, immediate = false) {
     } else {
       el.style.transformOrigin = "";
       // posun tela z registra fx (Jotaro pri útoku cúvne DOZADU na miesto, kde stál stand)
-      const backShift = CHAR_FX[data.char]?.bodyShift?.(slot, facing[slot] || 1) || 0;
+      const backShift = CHAR_FX[data.char]?.bodyShift?.(slot, scale || 1) || 0;
       el.style.transform = `translateX(${shift + backShift}px) scaleX(${scale})`;
     }
 

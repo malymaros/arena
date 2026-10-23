@@ -254,6 +254,12 @@ try {
       await sleep(250);
       await shot(dev, stage);
     }
+    // medzihra série (najväčší prípad = turnaj, 3 koruny na stranu)
+    await only("none");
+    await br.evaluate(`(async () => { const { showIntermission } = await import("/client/intermission.js"); showIntermission("p1", { needed: 3, winsP1: 2, winsP2: 1 }, "p1"); })()`);
+    await sleep(1000);
+    await shot(dev, "19-intermission");
+    await br.evaluate(`document.getElementById("intermission").classList.add("hidden")`);
     console.log(`${dev.name}: ok`);
     bot.sock.close();
     await br.send("Page.navigate", { url: "about:blank" });

@@ -263,6 +263,15 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .cr-wheel { width: 500px; height: 500px; }
 .phone .cr-knob { width: 44px; height: 44px; }
 .phone .cr-result { font-size: 40px; }
+/* medzihra série (BO3 / turnaj): koruny cez celú obrazovku ako koleso farieb */
+.phone .im-title { font-size: 52px; margin-bottom: 70px; }
+.phone .im-crowns { gap: 70px; margin-bottom: 70px; }
+.phone .im-col { gap: 28px; }
+.phone .im-side { gap: 28px; min-height: 160px; }
+.phone .im-side .crown { width: 160px; height: 160px; }
+.phone .im-who { font-size: 30px; }
+.phone .im-vs { font-size: 40px; }
+.phone .im-next { font-size: 30px; }
 
 /* --- výber postáv: dva stĺpce - vľavo nadpis + pás postáv (+ potvrdenie tímu v turnaji), vpravo náhľad schopnosti
    a pod ním PICK. Panel náhľadu má PEVNÚ výšku (popis na 6 riadkov, dlhší sa zmenší - char-select.js; štatistiky

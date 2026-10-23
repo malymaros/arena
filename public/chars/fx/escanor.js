@@ -72,13 +72,13 @@ export default function escanorFx(C) {
     }).catch(() => { cellEls.forEach(c => c.classList.remove("esc-burst-cell")); el.remove(); });
   }
   // veľký stredový sprite (WinSun) sa prehrá RAZ a chvíľu visí, potom onDone
-  function spawnBigOnce(file, slot, onDone) {
+  // flip = smer hodu (left -1 / right 1) - veľký sprite sa otočí na smer útoku, nie k súperovi
+  function spawnBigOnce(file, slot, flip, onDone) {
     const dir = C.charDirFor("escanor", slot);
     const px = Math.round(C.TILE_H * C.SPECIAL_SCALE * fxMul(slot)); // WinSun škáluje s Pridom (pride3 = súčasná veľkosť)
     const cvs = document.createElement("canvas");
     cvs.width = px; cvs.height = px; cvs.className = "esc-big"; // VLASTNÁ trieda - NIE .special-center (updateSpecialCenter ju maže každý frame)
     if (C.usesAltColor("escanor", slot)) cvs.classList.add("alt-color");
-    const flip = C.computeFacing(C.state?.p1, C.state?.p2)[slot] || 1;
     Object.assign(cvs.style, { position: "absolute", zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
     centerAnchor(cvs, flip); // rastie s Pridom → nohy fixné, rast nahor
     C.actorsEl.appendChild(cvs);
@@ -128,12 +128,16 @@ export default function escanorFx(C) {
     // fáza 1: malá postava WinSunBoard (zdvih so slnkom RAZ, potom len ústa + preblikávajúce slnko - loopFrom 4)
     // + veľký WinSun raz (visí dlhšie)
     C.setAnim(slot, "winsun", 60000);
-    spawnBigOnce("WinSun.png", slot, () => {
+    // malá postava pozerá na smer hodu počas CELEJ choreografie (aj let slnka)
+    const total = 1e4;
+    C.facingOverride[slot] = { sx: dx, until: performance.now() + total };
+    spawnBigOnce("WinSun.png", slot, dx, () => {
       // fáza 2: malá postava CruelSunHold - nech DOHRÁ CELÁ (raz) pred letom slnka (nech nie sú dve slnká naraz)
       C.setAnim(slot, "cruelhold", CRUELHOLD_ONCE_MS);
       setTimeout(() => {
         C.setAnim(slot, "wintalk", ESC_TRAVEL_MS + 2000); // ústa bez slnka (žiadny nový zdvih) - slnko už letí samo
         travelSunThenBurst(slot, target, zoneCells, offboard);
+        C.facingOverride[slot] = { sx: dx, until: performance.now() + ESC_TRAVEL_MS + C.POSE_TAIL_MS };
       }, CRUELHOLD_ONCE_MS);
     });
   }

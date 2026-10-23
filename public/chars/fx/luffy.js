@@ -150,10 +150,11 @@ export default function luffyFx(C) {
   //           až potom sa guľa presunie na cieľ a vybuchne.
   //   base  = Special_7 (rozbeh→kotúľ→cvaknutie) - hero-shot sprevádzajúci dogúľanie k bunke.
   let luffyCenterEl = null;
+  const rollFromX = { p1: null, p2: null };
   function luffyCenterRemove() {
     if (luffyCenterEl) { luffyCenterEl.dead = true; luffyCenterEl.remove(); luffyCenterEl = null; }
   }
-  function spawnLuffyCenter(slot, form) {
+  function spawnLuffyCenter(slot, form, flipDir = 0) {
     luffyCenterRemove();
     const dir  = C.charDirFor("luffy", slot);
     const file = form === "gear3" ? "Special_1.png" : "Special_7.png";
@@ -163,7 +164,7 @@ export default function luffyFx(C) {
     cvs.width = px; cvs.height = px;
     cvs.className = "luffy-center"; // VLASTNÁ trieda - NIE .special-center (updateSpecialCenter ju maže každý frame)
     if (C.usesAltColor("luffy", slot)) cvs.classList.add("alt-color");
-    const flip = C.computeFacing(C.state?.p1, C.state?.p2)[slot] || 1;
+    const flip = flipDir || C.currentFacing(slot, C.computeFacing(C.state?.p1, C.state?.p2)) || 1; // smer gúľania, inak k súperovi
     Object.assign(cvs.style, { position: "absolute", left: "50%", top: "50%", transform: `translate(-50%, -50%) scaleX(${flip})`, zIndex: 8, pointerEvents: "none", imageRendering: "pixelated" });
     C.actorsEl.appendChild(cvs);
     luffyCenterEl = cvs;
@@ -247,6 +248,8 @@ export default function luffyFx(C) {
     previewZone: true, // zónu náhľadu kreslí preview (cyklí s módom)
     // koniec hry/medzihra: stredový hero-shot po game over už renderGrid neuprace
     clearOverlays: luffyCenterRemove,
+    // štartová bunka posledného presunu (special roll: smer gúľania = cieľ − štart)
+    moved(slot, before) { rollFromX[slot] = before?.x; },
     effect(e, frameHold) {
       if (e.from !== "p1" && e.from !== "p2") return;
       // recharge PREPÍNA mód → prepínacia póza (base→gear3 = pumpovanie pästí, gear3→base = splasknutie)
@@ -281,7 +284,11 @@ export default function luffyFx(C) {
       if (e.kind === "luffy_roll") {
         // gear3: stredová guľa ZMIZNE → guľa na doske sa rozgúľa k cieľu; base: stredový hero-shot (Special_7)
         // sprevádza dogúľanie. Cieľová bunka bliká (rieši renderGrid cez e.target).
-        if (e.form === "gear3") luffyCenterRemove(); else spawnLuffyCenter(e.from, "base");
+        // otočenie na smer gúľania (cieľ vľavo/vpravo od Luffyho), nie k súperovi
+        const fromX = rollFromX[e.from]; // snapshot roll frame-u už nesie cieľovú bunku → štart z hooku moved
+        const sx = Array.isArray(e.target) && fromX != null ? Math.sign(e.target[0] - fromX) : 0;
+        if (sx) C.facingOverride[e.from] = { sx, until: performance.now() + frameHold + C.POSE_TAIL_MS };
+        if (e.form === "gear3") luffyCenterRemove(); else spawnLuffyCenter(e.from, "base", sx);
         C.setAnim(e.from, e.form === "gear3" ? "luffyballspin" : "luffyrolltravel", frameHold);
       }
       // gear3 special: dogúľal sa na bunku → guľa sa „rozbalí" cez Special_2 (radiálne päste) a HNEĎ potom

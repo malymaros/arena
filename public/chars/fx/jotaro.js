@@ -106,7 +106,7 @@ export default function jotaroFx(C) {
     const flip = C.currentFacing(sp.from, facing);
     const px = Math.round(C.TILE_H * C.SPECIAL_SCALE);
     const gap = Math.round(px * CENTER_GAP);
-    const fc = facing[sp.from] || 1; // p2 = -1 (tvárou k súperovi vľavo)
+    const fc = flip; // smer útoku (Special 2 aj dozadu od súpera) - stand ide dopredu v smere úderu
     const mk = (file, jfig, dx, z) => {
       const cvs = document.createElement("canvas");
       // canvas ŠIROKÝ (2×), aby sa pri ukotvení na nohy vešla vyletená päsť bez orezania (výška určuje škálu = min)
@@ -211,7 +211,7 @@ export default function jotaroFx(C) {
           el.style.transition = "none"; el.style.left = px + "px"; el.style.top = py + "px";
           void el.offsetHeight; el.style.transition = "";
         } else { el.style.left = px + "px"; el.style.top = py + "px"; }
-        const fc = facing[slot] || 1;
+        const fc = C.currentFacing(slot, facing) || 1; // pri útoku do strany smer úderu, inak k súperovi
         // Útok (melee/S1/S2): stand príde DOPREDU k Jotarovi a DOLE na zem (floatY 0), nad Jotara (z-index).
         // Inak: za Jotarom (o STAND_OFFSET) a vznáša sa hore (STAND_FLOAT_Y). Float aj swap sú v transforme,
         // aby prechod plynulo animovala CSS transition (transform 150ms).
