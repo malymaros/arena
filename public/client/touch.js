@@ -18,7 +18,7 @@
 //  6. Telefón: namiesto popisu štítok s cenou a účinkom (touch-label.js) nad tlačidlom - pri otvorenom výbere
 //     smeru nad tlačidlom, ktoré ho otvorilo; žltá linka = varovanie; málo many = červený štítok, blikajúci obrys
 //     mana baru a sivé tlačidlo - zaradiť sa dá aj tak (server ju preškrtne). Zablokované = zámok v strede.
-import { isTouch, isPhone, appScale } from "/client/viewport.js";
+import { isTouch, appScale } from "/client/viewport.js";
 import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, lockBtn, undoBtn, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
 import { specialTargetOf, uiLocked } from "/client/controls.js";
 import { ghostCharAt } from "/client/ghost.js";
@@ -166,7 +166,7 @@ function syncNoMana() {
   for (const b of MANA_BUTTONS()) b.classList.toggle("no-mana", playing && !b.disabled && labelInfo(slotOf(b), b).noMana);
 }
 function refreshLabel() {
-  if (!isPhone) return;
+  if (!isTouch) return;
   if (!labelEl) {
     labelEl = document.createElement("div");
     labelEl.id = "touch-label";
@@ -205,7 +205,7 @@ function arm(el, silent = false) {
   const enter = new MouseEvent("mouseenter");
   if (silent) enter.arenaSilent = true; // predvýber karty - náhľad bez hlasu mena (char-select.js)
   el.dispatchEvent(enter); // tie isté náhľady ako hover na desktope
-  if (isPhone) { refreshLabel(); return; } // telefón: štítok namiesto popisu
+  if (isTouch) { refreshLabel(); return; } // telefón: štítok namiesto popisu
   if (!el.classList.contains("char-card")) showInfo(describe(el));
   placeConfirm(el);
 }
@@ -230,10 +230,10 @@ function initTapSelect() {
   document.addEventListener("click", (ev) => {
     if (armed && !armed.isConnected) disarm();
     const el = ev.target.closest?.(SELECTABLE);
-    if (isPhone && selEl && !selEl.classList.contains("hidden")) setTimeout(keepCardPreview, 30);
+    if (isTouch && selEl && !selEl.classList.contains("hidden")) setTimeout(keepCardPreview, 30);
     if (!el) {
       // telefón: predvybraná karta ostáva (pravý panel výberu postáv nesmie ostať prázdny)
-      if (ev.target.closest?.("#touch-pick") || (isPhone && armed?.classList.contains("char-card"))) return;
+      if (ev.target.closest?.("#touch-pick") || (isTouch && armed?.classList.contains("char-card"))) return;
       // otvorený výber smeru: ťuk vedľa (aj na zamknuté tlačidlo - prepustí ťuk na lištu) nič neruší
       // (prehliadač pri ťuku inde poslal označenej šípke mouseleave a zmazal jej náhľad - obnov ho)
       if (planning.openPicker) { if (armed?.isConnected) armed.dispatchEvent(new MouseEvent("mouseenter")); return; }
@@ -257,7 +257,7 @@ function initTapSelect() {
       return;
     }
     if (armed === el) { disarm(); return; }                    // druhé ťuknutie → nechaj prejsť = vykonať
-    if (oneTap(el) && !uiLocked()) { disarm(); if (!isPhone) showInfo(describe(el)); return; } // otvorenie výberu / pohyb hneď
+    if (oneTap(el) && !uiLocked()) { disarm(); if (!isTouch) showInfo(describe(el)); return; } // otvorenie výberu / pohyb hneď
     ev.preventDefault(); ev.stopImmediatePropagation();         // prvé ťuknutie → len výber + náhľad
     arm(el);
     syncPickBar();
@@ -270,7 +270,7 @@ function initTapSelect() {
   // info riadok nechaj len kým je otvorený výber alebo niečo označené
   setInterval(() => { if (!armed && !planning.openPicker && infoEl && !infoEl.classList.contains("hidden")) showInfo(""); }, 400);
   // telefón: štítok, sivé tlačidlá a obrys mana baru sledujú manu a frontu (zmena stavu, golden, Last Hope…)
-  if (isPhone) setInterval(refreshLabel, 400);
+  if (isTouch) setInterval(refreshLabel, 400);
 }
 
 /* ---------- 4. výber postavy: PICK <meno> pod náhľadom schopnosti ---------- */
@@ -288,7 +288,7 @@ const visibleCard = (c) => {
 // Predvybraná karta povie meno (intro postavy) - pri otvorení výberu aj po prepnutí stránky (šípky, runa → Hidden).
 // Označená karta, ktorá ostáva (napr. draft → výber z tímu), sa znova neohlási.
 function autoArmCard() {
-  if (!isPhone || !selEl || selEl.classList.contains("hidden")) return;
+  if (!isTouch || !selEl || selEl.classList.contains("hidden")) return;
   // losovanie farieb (koleso) ešte beží nad výberom - predvýber s hlasom mena až po ňom
   if (!document.getElementById("color-roll")?.classList.contains("hidden")) { setTimeout(autoArmCard, 300); return; }
   // označená karta ostáva (napr. draft → výber z tímu): obnov PICK (ADD/REMOVE → PICK) aj náhľad, aj keď ho
@@ -307,7 +307,7 @@ function keepCardPreview() {
 }
 function initCharPick() {
   if (!selEl) return;
-  if (isPhone) {
+  if (isTouch) {
     // otvorenie výberu, zmena stránky (šípky), roster-mode → predvýber prvej karty
     const again = () => setTimeout(autoArmCard, 60);
     new MutationObserver(again).observe(selEl, { attributes: true, attributeFilter: ["class"] });

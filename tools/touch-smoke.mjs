@@ -93,8 +93,8 @@ const check = (ok, label, extra = "") => { console.log(`  ${ok ? "PASS" : "FAIL"
 const queue = () => ev(`[...document.querySelectorAll("#queue .q-badge.mine.main")].map(b => [...b.classList].filter(c => !["q-badge","mine","main","q-warn","q-slot"].includes(c)).join(".") || "-")`);
 const preview = () => ev(`document.querySelectorAll("#grid .preview-red").length`);
 const info = () => ev(`(() => { const e = document.getElementById("touch-info"); return e && !e.classList.contains("hidden") ? e.textContent : ""; })()`);
-// telefónne rozloženie (štítok cena + účinok nad tlačidlom, pás postáv) - od 2026-10-23 na KAŽDOM dotykovom
-// zariadení vrátane tabletu; zisťuje sa zo stránky (html.phone) po načítaní
+// dotykové UI z telefónu (štítok cena + účinok nad tlačidlom, pás postáv, front 1-2-3) - od 2026-10-23 na KAŽDOM dotykovom
+// zariadení vrátane tabletu (rozloženie tabletu ostáva desktopové); zisťuje sa zo stránky (html.touch)
 let PHONE = true;
 const label = () => ev(`(() => { const e = document.getElementById("touch-label"); return e && !e.classList.contains("hidden") ? e.textContent : ""; })()`);
 const labelRed = () => ev(`!!document.querySelector("#touch-label.no-mana:not(.hidden)")`);
@@ -107,7 +107,7 @@ try {
   await send("Page.navigate", { url }); await sleep(2000);
   await ev(`(() => { document.getElementById("login-name").value = "tapper"; /* meno nesmie obsahovať heslo - Chrome by otvoril správcu hesiel a ten zje touchEnd */ document.getElementById("login-pass").value = "${PASS}"; document.getElementById("login-form").requestSubmit(); })()`);
   await sleep(2500);
-  PHONE = await ev(`document.documentElement.classList.contains("phone")`);
+  PHONE = await ev(`document.documentElement.classList.contains("touch")`);
   await waitPage(`document.querySelector(".room-btn.join")`, 10000, "room browser");
   await tap(".room-btn.join"); await sleep(400);
   host.emit("configure_match", { format: "bo3", tilesPerRound: 1, tileWeights: { dmg: 0, heal: 100, mana: 0, ik: 0, power: 0, block: 0 }, timer: "off", tilePreview: false });
@@ -237,7 +237,9 @@ try {
     check(bt === "🏹", "telefón: lišta kola ukazuje len piktogram akcie (bez šípky smeru)", bt);
     const lg = await ev(`(async () => { const m = await import("/client/action-log.js"); const s = await import("/client/session.js");
       m.appendActionLog(s.me, { type: "move", dir: "left" }); const t = document.getElementById("log-" + s.me).textContent; m.clearActionLogs(); return t; })()`);
-    check(lg.includes("🚶") && !/[←→↑↓↕]/.test(lg), "telefón: zápis kola v karte hráča bez šípok smeru", lg);
+    // zápis kola v HUD: telefón bez šípok; tablet má HUD ako PC (so šípkami)
+    if (await ev(`document.documentElement.classList.contains("phone")`)) check(lg.includes("🚶") && !/[←→↑↓↕]/.test(lg), "telefón: zápis kola v karte hráča bez šípok smeru", lg);
+    else check(lg.includes("🚶") && lg.includes("←"), "tablet: zápis kola v karte hráča so šípkou smeru (HUD ako PC)", lg);
   }
   check(await ev(`document.getElementById("aim-picker").classList.contains("hidden")`), "picker sa po zaradení zavrel");
 

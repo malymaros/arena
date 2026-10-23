@@ -12,7 +12,7 @@ import { SPECIAL_FPS } from "/chars/common.js";
 import { socket } from "/client/net.js";
 import { sfx } from "/client/sound.js";
 import { cellsForSpecialPreview } from "/client/zones.js";
-import { appScale, isPhone } from "/client/viewport.js";
+import { appScale, isTouch } from "/client/viewport.js";
 
 /* ---------- Char select (preview) ---------- */
 export let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
@@ -292,7 +292,7 @@ function renderAbilityPreview(char, side = me) {
   hydratePix(caTextEl); // prípadné [data-emoji] ikony
   // telefón: blok popisu má pevnú výšku (výber nesmie skákať) - dlhý popis (Naruto) sa zmenší, kým sa doň nevojde
   const desc = caTextEl.firstElementChild;
-  if (document.documentElement.classList.contains("phone") && desc) {
+  if (document.documentElement.classList.contains("touch") && desc) {
     for (let fs = parseFloat(getComputedStyle(desc).fontSize); desc.offsetHeight > caTextEl.clientHeight && fs > 11; fs--) {
       desc.style.fontSize = `${fs - 1}px`;
     }
@@ -396,15 +396,15 @@ let hiddenFound = false; // po prvom objavení (localStorage) ostáva runa trval
 try { hiddenFound = localStorage.getItem("arenaHiddenFound") === "1"; } catch {}
 // telefón (bez šípok): na otvorenej Hidden stránke runa v rohu stále svieti a ťuk na ňu vráti hráča späť do pásu
 // postáv (char-strip.js) na miesto, kde bol
-const phoneRuneBack = () => isPhone && hiddenMode && !selEl.classList.contains("hidden");
+const phoneRuneBack = () => isTouch && hiddenMode && !selEl.classList.contains("hidden");
 function showPhoneRuneBack() {
-  if (!hiddenRune || !isPhone) return;
+  if (!hiddenRune || !isTouch) return;
   hiddenRune.style.opacity = ".6";
   hiddenRune.classList.add("near");
 }
 // zatvorenie výberu postáv (PICK skrytej postavy) alebo odchod z Hidden: svietiaca runa musí zhasnúť hneď,
 // nie až pri ďalšom dotyku (runeProximity) - inak ostane v rohu aj počas hry
-if (hiddenRune && isPhone) {
+if (hiddenRune && isTouch) {
   new MutationObserver(() => {
     if (phoneRuneBack()) return;
     // pozor: style.opacity sa číta normalizované („.6" → „0.6"), preto zhasíname podľa stavu výberu, nie podľa hodnoty

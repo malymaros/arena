@@ -30,8 +30,10 @@ aj na výšku) do `tmp/screens/` (mimo gitu). `--only phone` vyberie len niektor
 
 ## Návrh mobilného UI (dohodnutý s vlastníkom 2026-10-21)
 
-**Pre koho:** všetky dotykové zariadenia - telefóny aj tablety (rozhodnutie majiteľa 2026-10-23: jedno UI pre dotyk;
-predtým mali tablety desktopové rozloženie); desktop s myšou sa nemení.
+**Pre koho:** telefóny (dotyk, kratšia strana do ~500 px) dostanú nové rozloženie. Tablet je HYBRID (rozhodnutie
+majiteľa 2026-10-23): rozloženie, HUD, vlajka a pomery ako na PC, ale z telefónu má lištu tlačidiel, štítok nad
+tlačidlom, front 1-2-3, pás postáv, lobby v dvoch stĺpcoch a zámky v strede tlačidiel (CSS `.touch`, JS `isTouch`);
+len telefónne rozloženie a zväčšenia kvôli malému displeju sú `.phone`. Desktop sa nemení.
 
 ### Krok 1 - menu ☰, reload, admin, zvukové okno (hotové)
 - **Menu ☰** vľavo dole (`client/menu.js`), vždy dostupné aj nad zaseknutými overlaymi: **RELOAD GAME** (obnovenie
@@ -96,8 +98,8 @@ predtým mali tablety desktopové rozloženie); desktop s myšou sa nemení.
   percentá dlaždíc s veľkými −/+, veľké START vpravo dole.
 - **Zoznam roomiek, výber postáv:** na celú obrazovku, väčšie karty a tlačidlá.
 
-**Ako je to spravené:** „telefón" = každé dotykové zariadenie (`isPhone` = `isTouch` vo `viewport.js`,
-trieda `.phone` na `<html>`, aj tablet). Virtuálna obrazovka je na telefóne nižšia (`PHONE_DESIGN_H` 830 namiesto
+**Ako je to spravené:** telefón = dotyk + kratšia strana fyzického displeja ≤ 500 px (`isPhone` vo `viewport.js`,
+trieda `.phone` na `<html>`; tablet nie - ten dostane len `.touch` časti, viď vyššie). Virtuálna obrazovka je na telefóne nižšia (`PHONE_DESIGN_H` 830 namiesto
 920), takže všetko vyjde ~15 % väčšie (board ~500×270 px na 844×390). Celé rozloženie je čisté CSS v sekcii
 „Telefón" v `public/styles-mobile.css` (všetko CSS pre dotyk a telefón, načíta sa po `styles.css`; každý selektor raz, telefónne pravidlá viazané na svoju obrazovku) - ovládanie a texty sa tam v dizajnových px zväčšujú, aby mali na displeji veľkosť
 pre prst a oko. Výber postáv je dvojstĺpcový (karty | náhľad schopnosti + PICK), login je jeden riadok navrchu,

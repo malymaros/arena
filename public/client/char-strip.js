@@ -6,7 +6,7 @@
 // DOM sa nepresúva: kontajnery stránok majú v pásovom režime display: contents a karty sú absolútne v .char-pager
 // (CSS „Telefón - pás postáv" v styles.css); pozíciu karty píše len tento modul (inline transform).
 import { selEl, charPageTitle } from "/client/dom.js";
-import { isPhone, appScale } from "/client/viewport.js";
+import { isTouch, appScale } from "/client/viewport.js";
 
 const SPACING = 272;     // rozostup kariet v pase (šírka karty 250 + medzera) - virtuálne px
 const CENTER_SCALE = 1.08;
@@ -78,7 +78,7 @@ function goTo(card, arm) {
 
 /* ---------- zapnutie / vypnutie pásového režimu ---------- */
 function sync() {
-  const on = isPhone && !selEl.classList.contains("hidden") && !selEl.classList.contains("roster-mode")
+  const on = isTouch && !selEl.classList.contains("hidden") && !selEl.classList.contains("roster-mode")
     && !selEl.classList.contains("hidden-mode");
   if (on === stripActive()) return;
   if (on) {
@@ -100,7 +100,7 @@ function sync() {
   }
 }
 
-if (isPhone && selEl && pager) {
+if (isTouch && selEl && pager) {
   new MutationObserver(sync).observe(selEl, { attributes: true, attributeFilter: ["class"] });
   sync();
 

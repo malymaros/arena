@@ -115,25 +115,25 @@
   box-shadow: 0 0 0 4px #ff3b3b; animation: no-mana-pulse 1.8s ease-in-out infinite;
 }
 /* ...a vlastný mana bar pomaly pulzuje červeným obrysom (len obrys - výplň sa nemení) */
-.phone .mana-bar.no-mana-flash::after {
+.touch .mana-bar.no-mana-flash::after {
   content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
   box-shadow: inset 0 0 0 9px #ff3b3b; animation: no-mana-pulse 1.8s ease-in-out infinite;
 }
 @keyframes no-mana-pulse { 50% { opacity: .35; } }
 /* tlačidlo, na ktoré na ďalšom mieste fronty nebude mana - len sivé (bez zámku), ťuknuteľné (ukáže červený štítok) */
-.phone .btn.act.no-mana, .phone .golden-half.no-mana { filter: grayscale(.85) brightness(.6); }
+.touch .btn.act.no-mana, .touch .golden-half.no-mana { filter: grayscale(.85) brightness(.6); }
 /* zablokovaná akcia (otvorený výber smeru, golden pre startera, po LOCK IN…), už zaradená akcia (každá raz
    za kolo) a LOCK IN / ↩ pri otvorenom výbere smeru (.touch-locked, touch.js) - veľký zámok v strede tlačidla;
    stmavenie cez prekryv namiesto filtra, aby zámok ostal jasný a odlíšil sa od „málo many" (len sivé) */
-.phone .btn.locked-ui, .phone .btn.locked-perm, .phone .btn.locked-golden, .phone .btn.touch-locked,
-.phone .actions .btn.act:disabled { position: relative; filter: none; opacity: 1; }
-.phone .btn.touch-locked { pointer-events: none; }
-.phone .btn.locked-ui::before, .phone .btn.locked-perm::before, .phone .btn.locked-golden::before,
-.phone .btn.touch-locked::before, .phone .actions .btn.act:disabled::before {
+.touch .btn.locked-ui, .touch .btn.locked-perm, .touch .btn.locked-golden, .touch .btn.touch-locked,
+.touch .actions .btn.act:disabled { position: relative; filter: none; opacity: 1; }
+.touch .btn.touch-locked { pointer-events: none; }
+.touch .btn.locked-ui::before, .touch .btn.locked-perm::before, .touch .btn.locked-golden::before,
+.touch .btn.touch-locked::before, .touch .actions .btn.act:disabled::before {
   content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: rgba(10, 12, 16, .62);
 }
-.phone .btn.locked-ui::after, .phone .btn.locked-perm::after, .phone .btn.locked-golden::after,
-.phone .btn.touch-locked::after, .phone .actions .btn.act:disabled::after {
+.touch .btn.locked-ui::after, .touch .btn.locked-perm::after, .touch .btn.locked-golden::after,
+.touch .btn.touch-locked::after, .touch .actions .btn.act:disabled::after {
   content: "🔒"; position: absolute; top: 50%; right: auto; left: 50%; z-index: 3; transform: translate(-50%, -50%);
   font-size: 40px; line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,.8);
 }
@@ -191,10 +191,6 @@
 .touch #char-select.hidden-mode #touch-pick { background: #9a6ff0; color: #12061f; }
 .touch #char-select.hidden-mode .ca-title { color: #b17aff; }
 .touch #char-select.hidden-mode .ca-grid .mini-cell.caster { background: #9a6ff0; }
-/* tablet (dotyk, desktopové rozloženie): panel náhľadu a PICK s pevnou šírkou - centrovaný obsah rôznej dĺžky
-   by ich inak pri prepínaní kariet posúval do strán */
-.touch:not(.phone) #char-select .char-ability { width: 620px; }
-.touch:not(.phone) #char-select #touch-pick { width: 460px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* koniec hry: PLAY AGAIN / LEAVE ROOM v skutočnej veľkosti pre prst */
 .touch .go-buttons { gap: calc(14px * var(--ui-k, 1)); }
@@ -229,33 +225,33 @@
 /* --- nastavenie zápasu (lobby hosta) na celú obrazovku: dva stĺpce bez rolovania - vľavo voľby, vpravo percentá
    dlaždíc, START cez celú šírku dole. Voľné miesto ide do riadku nadpisu (1fr) a nadpis je v ňom vycentrovaný.
    Menu ☰ sa počas nastavovania skryje (inak by lobby muselo uhýbať jeho rohu). --- */
-html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
-.phone .lobby { padding: 0; align-items: stretch; }
-.phone .lobby-card {
+html.touch:has(#lobby:not(.hidden)) #menu-btn { display: none; }
+.touch .lobby { padding: 0; align-items: stretch; }
+.touch .lobby-card {
   width: 100%; max-width: none; padding: 30px 48px 36px; border: none; border-radius: 0; box-shadow: none;
   display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; align-content: start;
   grid-template-rows: 1fr repeat(6, auto);
   grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview weights" "timer weights" "start start";
 }
-.phone .lobby-title { grid-area: title; font-size: 52px; margin-bottom: 16px; align-self: center; }
-.phone .lobby-sub { display: none; }
-.phone .lobby-card > .lobby-section:nth-of-type(1) { grid-area: format; }
-.phone .lobby-card > .lobby-section:nth-of-type(2) { grid-area: tiles; }
-.phone .lobby-card > .lobby-section:nth-of-type(3) { grid-area: weights; align-self: start; } /* percentá nenaťahujú riadky vľavo */
-.phone .lobby-card > .lobby-section:nth-of-type(4) { grid-area: color; }
-.phone .lobby-card > .lobby-section:nth-of-type(5) { grid-area: preview; }
-.phone .lobby-card > .lobby-section:nth-of-type(6) { grid-area: timer; }
-.phone .lobby-section { margin-bottom: 20px; }
-.phone .lobby-label { font-size: 21px; margin-bottom: 12px; }
-.phone .lobby .opt { font-size: 21px; padding: 20px 12px; min-width: 70px; }
-.phone .lobby .weights { grid-template-columns: 1fr; gap: 16px; }
-.phone .lobby .weight { font-size: 22px; gap: 12px; }
-.phone .lobby .weight .w-ico { width: 34px; height: 34px; }
-.phone .lobby .weight input { width: 100px; font-size: 26px; padding: 12px; }
-.phone .lobby .weight .w-step { width: 74px; height: 60px; font-size: 32px; }
-.phone .lobby .weight .pct { font-size: 20px; }
-.phone .lobby .weights-sum { font-size: 21px; margin-top: 12px; }
-.phone .lobby-start { grid-area: start; margin: 12px 0 0; padding: 30px; font-size: 36px; }
+.touch .lobby-title { grid-area: title; font-size: 52px; margin-bottom: 16px; align-self: center; }
+.touch .lobby-sub { display: none; }
+.touch .lobby-card > .lobby-section:nth-of-type(1) { grid-area: format; }
+.touch .lobby-card > .lobby-section:nth-of-type(2) { grid-area: tiles; }
+.touch .lobby-card > .lobby-section:nth-of-type(3) { grid-area: weights; align-self: start; } /* percentá nenaťahujú riadky vľavo */
+.touch .lobby-card > .lobby-section:nth-of-type(4) { grid-area: color; }
+.touch .lobby-card > .lobby-section:nth-of-type(5) { grid-area: preview; }
+.touch .lobby-card > .lobby-section:nth-of-type(6) { grid-area: timer; }
+.touch .lobby-section { margin-bottom: 20px; }
+.touch .lobby-label { font-size: 21px; margin-bottom: 12px; }
+.touch .lobby .opt { font-size: 21px; padding: 20px 12px; min-width: 70px; }
+.touch .lobby .weights { grid-template-columns: 1fr; gap: 16px; }
+.touch .lobby .weight { font-size: 22px; gap: 12px; }
+.touch .lobby .weight .w-ico { width: 34px; height: 34px; }
+.touch .lobby .weight input { width: 100px; font-size: 26px; padding: 12px; }
+.touch .lobby .weight .w-step { width: 74px; height: 60px; font-size: 32px; }
+.touch .lobby .weight .pct { font-size: 20px; }
+.touch .lobby .weights-sum { font-size: 21px; margin-top: 12px; }
+.touch .lobby-start { grid-area: start; margin: 12px 0 0; padding: 30px; font-size: 36px; }
 
 /* --- hlášky čakania (host / súper / tím) a losovanie strán cez celú výšku obrazovky --- */
 .phone .lobby-wait { font-size: 40px; line-height: 1.9; padding: 60px 90px; color: #e4e6ea; }
@@ -276,83 +272,83 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 /* --- výber postáv: dva stĺpce - vľavo nadpis + pás postáv (+ potvrdenie tímu v turnaji), vpravo náhľad schopnosti
    a pod ním PICK. Panel náhľadu má PEVNÚ výšku (popis na 6 riadkov, dlhší sa zmenší - char-select.js; štatistiky
    1 riadok) a PICK pevnú šírku na jeden riadok → prepínanie kariet nemení mriežku a nič neskáče. --- */
-.phone #char-select:not(.hidden) { /* :not(.hidden) - id selektor by inak prebil .char-select.hidden */
+.touch #char-select:not(.hidden) { /* :not(.hidden) - id selektor by inak prebil .char-select.hidden */
   display: grid; align-content: center; justify-content: center; column-gap: 48px; row-gap: 18px;
   grid-template-columns: auto 620px; grid-template-rows: auto auto auto;
   grid-template-areas: "title ability" "pager ability" "team pick";
 }
-.phone #char-select .char-page-title { grid-area: title; font-size: 40px; justify-self: center; }
-.phone #char-select .team-bar { grid-area: team; }
-.phone #char-select .char-cards { gap: 22px; }
-.phone #char-select .char-card { width: 250px; height: 300px; }
-.phone #char-select .char-arrow { display: none; } /* bez šípok - pás sa ťahá prstom, Hidden otvára/zatvára runa */
-.phone #char-select .char-ability { grid-area: ability; height: 600px; min-height: 0; gap: 16px; align-self: center; justify-content: flex-start; }
-.phone .char-ability .ca-title { font-size: 22px; }
-.phone .char-ability .ca-grid .mini-cell { width: 66px; height: 47px; }
-.phone .char-ability .ca-text { font-size: 18px; max-width: 600px; height: calc(6 * 1.7em); min-height: 0; overflow: hidden; }
-.phone .char-ability .ca-stats { font-size: 22px; height: 34px; min-height: 0; }
-.phone .char-ability .ca-extra { height: 50px; }
-.phone .char-ability .ca-pride img, .phone .char-ability .ca-moon img, .phone .char-ability .ca-luffy img { height: 50px; }
-.phone .char-ability .ca-luffy img { width: 50px; }
-.phone .char-ability .ca-pride .pride-num, .phone .char-ability .ca-moon .ca-moon-dmg, .phone .char-ability .ca-luffy .ca-luffy-dmg { font-size: 22px; }
-.phone #char-select #touch-pick {
+.touch #char-select .char-page-title { grid-area: title; font-size: 40px; justify-self: center; }
+.touch #char-select .team-bar { grid-area: team; }
+.touch #char-select .char-cards { gap: 22px; }
+.touch #char-select .char-card { width: 250px; height: 300px; }
+.touch #char-select .char-arrow { display: none; } /* bez šípok - pás sa ťahá prstom, Hidden otvára/zatvára runa */
+.touch #char-select .char-ability { grid-area: ability; height: 600px; min-height: 0; gap: 16px; align-self: center; justify-content: flex-start; }
+.touch .char-ability .ca-title { font-size: 22px; }
+.touch .char-ability .ca-grid .mini-cell { width: 66px; height: 47px; }
+.touch .char-ability .ca-text { font-size: 18px; max-width: 600px; height: calc(6 * 1.7em); min-height: 0; overflow: hidden; }
+.touch .char-ability .ca-stats { font-size: 22px; height: 34px; min-height: 0; }
+.touch .char-ability .ca-extra { height: 50px; }
+.touch .char-ability .ca-pride img, .touch .char-ability .ca-moon img, .touch .char-ability .ca-luffy img { height: 50px; }
+.touch .char-ability .ca-luffy img { width: 50px; }
+.touch .char-ability .ca-pride .pride-num, .touch .char-ability .ca-moon .ca-moon-dmg, .touch .char-ability .ca-luffy .ca-luffy-dmg { font-size: 22px; }
+.touch #char-select #touch-pick {
   grid-area: pick; justify-self: stretch; align-self: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: calc(11px * var(--ui-k, 1)); padding: calc(12px * var(--ui-k, 1)) calc(10px * var(--ui-k, 1));
 }
 /* pás postáv (client/char-strip.js): bežné stránky tvoria jeden cyklický pás - kontajnery stránok bez boxu, karty
    absolútne v .char-pager, ich polohu (transform) píše char-strip.js; okraje pásu sa strácajú do tmy.
    Šírka pásu je rovnaká aj na Hidden stránke, nech sa panel vpravo pri prepnutí nehýbe. */
-.phone #char-select .char-pager { grid-area: pager; gap: 20px; }
-.phone #char-select:not(.roster-mode) .char-pager { width: 980px; }
-.phone #char-select.strip-mode .char-pager {
+.touch #char-select .char-pager { grid-area: pager; gap: 20px; }
+.touch #char-select:not(.roster-mode) .char-pager { width: 980px; }
+.touch #char-select.strip-mode .char-pager {
   position: relative; height: 380px; touch-action: none; overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
 }
-.phone #char-select.strip-mode .char-cards:not([data-page="hidden"]) { display: contents; }
-.phone #char-select.strip-mode .char-cards:not([data-page="hidden"]) .char-card {
+.touch #char-select.strip-mode .char-cards:not([data-page="hidden"]) { display: contents; }
+.touch #char-select.strip-mode .char-cards:not([data-page="hidden"]) .char-card {
   position: absolute; left: 50%; top: 50%; transition: box-shadow .15s ease, filter .15s ease;
 }
-.phone #char-select.strip-mode .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
+.touch #char-select.strip-mode .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
 
 /* --- hra: lišta tlačidiel cez celú šírku dole (posunutá doprava od menu ☰), bez desktopového scale(1.2);
    tlačidlá ~46 skutočných px --- */
-.phone .controls-row { bottom: 6px; left: calc(50% + 48px); transform: translateX(-50%); gap: 10px; max-width: calc(var(--app-w) - 120px); }
-.phone .controls { gap: 8px; padding: 6px 10px; }
-.phone .actions, .phone .meta { gap: 8px; }
-.phone .act-group { gap: 8px; padding-top: 26px; }
-.phone .act-group::after { font-size: 17px; }
-.phone .act-group::before { top: 19px; }
-.phone .btn.act { width: 98px; height: 84px; font-size: 38px; gap: 2px; }
+.touch .controls-row { bottom: 6px; left: calc(50% + 48px); transform: translateX(-50%); gap: 10px; max-width: calc(var(--app-w) - 120px); }
+.touch .controls { gap: 8px; padding: 6px 10px; }
+.touch .actions, .touch .meta { gap: 8px; }
+.touch .act-group { gap: 8px; padding-top: 26px; }
+.touch .act-group::after { font-size: 17px; }
+.touch .act-group::before { top: 19px; }
+.touch .btn.act { width: 98px; height: 84px; font-size: 38px; gap: 2px; }
 /* tlačidlá nesú len piktogram - cena a účinok sú v štítku po prvom ťuknutí (touch-label.js) */
-.phone .btn.act .cost { display: none; }
-.phone .btn.act > .pix-ico:not(.charge-mark), .phone .golden-half > .g-ico { width: 54px; height: 54px; }
+.touch .btn.act .cost { display: none; }
+.touch .btn.act > .pix-ico:not(.charge-mark), .touch .golden-half > .g-ico { width: 54px; height: 54px; }
 /* skryté postavy (Vampire/Onryō charge, Jotaro Special 1, Luffy Gear): fialové „???" cez celé tlačidlo */
-.phone .controls-row .btn.act > .pix-ico.charge-mark { width: 100%; height: 100%; font-size: 40px; letter-spacing: -2px; }
-.phone .btn.golden { width: 196px; }
-.phone .golden-half { font-size: 40px; padding: 10px 4px; }
-.phone .golden-half .cost { display: none; }
-.phone #undo { width: 80px; height: 84px; font-size: 36px; }
-.phone #lock { height: 84px; padding: 0 22px; font-size: 30px; }
-.phone .controls .divider { height: 72px; }
+.touch .controls-row .btn.act > .pix-ico.charge-mark { width: 100%; height: 100%; font-size: 40px; letter-spacing: -2px; }
+.touch .btn.golden { width: 196px; }
+.touch .golden-half { font-size: 40px; padding: 10px 4px; }
+.touch .golden-half .cost { display: none; }
+.touch #undo { width: 80px; height: 84px; font-size: 36px; }
+.touch #lock { height: 84px; padding: 0 22px; font-size: 30px; }
+.touch .controls .divider { height: 72px; }
 /* Last Hope a démon (útok vo FINAL kole aj Last Stand polovica zlatého tlačidla) - obrázok vyplní celé tlačidlo */
-.phone .btn.act.lasthope { padding: 3px; }
-.phone .btn.act.lasthope .lh-ico { width: 100%; height: 78px; min-height: 0; object-fit: contain; image-rendering: pixelated; }
-.phone .btn.act.demon, .phone .golden-half.ls-half { padding: 3px; }
-.phone .btn.act.demon .ls-ico, .phone .golden-half.ls-half .ls-ico { width: 100%; height: 78px; min-height: 0; object-fit: contain; image-rendering: pixelated; }
+.touch .btn.act.lasthope { padding: 3px; }
+.touch .btn.act.lasthope .lh-ico { width: 100%; height: 78px; min-height: 0; object-fit: contain; image-rendering: pixelated; }
+.touch .btn.act.demon, .touch .golden-half.ls-half { padding: 3px; }
+.touch .btn.act.demon .ls-ico, .touch .golden-half.ls-half .ls-ico { width: 100%; height: 78px; min-height: 0; object-fit: contain; image-rendering: pixelated; }
 
 /* board + zápis kola medzi ROUND nadpisom a lištou */
 .phone .stage { padding: 44px 16px 128px; }
 .phone .game { gap: 6px; }
 /* zápis kola: voliteľné zlaté bunky (golden shield/mirror/mana, Last Stand) rovnako vysoké ako hlavné akcie,
    ikona čitateľná, démon vyplní bunku - riadok je jednotný, nič netrčí ani sa nestráca */
-.phone #queue .q-badge.opt { width: 44px; height: 40px; padding: 0; font-size: 20px; align-self: auto; }
-.phone #queue .q-badge.opt .ls-badge { height: 32px; }
+.touch #queue .q-badge.opt { width: 44px; height: 40px; padding: 0; font-size: 20px; align-self: auto; }
+.touch #queue .q-badge.opt .ls-badge { height: 32px; }
 /* prázdne sloty hlavných akcií: holé čísla (bez krúžkov ①②③ - na telefóne nečitateľné), väčšie a kontrastnejšie;
    moje odlíši zlatý prerušovaný rámik (queue.js) */
-.phone #queue .q-badge.main.q-slot { font-size: 34px; font-weight: 900; line-height: 1; }
-.phone #queue .q-badge.main.mine.q-slot { color: #ffd54f; }
-.phone #queue .q-badge.main.opp.q-slot { color: rgba(255, 255, 255, .7); }
+.touch #queue .q-badge.main.q-slot { font-size: 34px; font-weight: 900; line-height: 1; }
+.touch #queue .q-badge.main.mine.q-slot { color: #ffd54f; }
+.touch #queue .q-badge.main.opp.q-slot { color: rgba(255, 255, 255, .7); }
 
 /* ROUND nadpis menší a vyššie (stred nad boardom); hláška „your move / waiting" široký pás nad boardom */
 .phone .hud-turn { top: 4px; font-size: 34px; }
