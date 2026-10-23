@@ -45,7 +45,7 @@ function buttonOf(el) {
     const d = CHAR_BUTTONS[ch]?.[slot];
     const def = typeof d === "function" ? d(buttonUi()) : d;
     if (def?.info) return { info: def.info };
-    if (slot === "special") return ch ? { char: ch, side: me } : null;
+    if (slot === "special") return ch ? { char: ch, side: me, special: true } : null; // len „SPECIAL ATTACK", bez mena
     return BUTTON_TEXT[slot]?.info ? { info: BUTTON_TEXT[slot].info } : null;
   }
   const key = staticKeyOf(el);
@@ -75,7 +75,7 @@ function place() {
 }
 function open(what) {
   if (!what) return false;
-  const key = what.info ? "i:" + what.info.name : `c:${what.char}:${what.side}`;
+  const key = what.info ? "i:" + what.info.name : `c:${what.char}:${what.side}:${!!what.special}`;
   if (key === shown) return true;
   close();
   ensureBox();
@@ -87,8 +87,10 @@ function open(what) {
     hydratePix(box);
   } else {
     if (selEl && !selEl.classList.contains("hidden")) return false; // náhľad práve používa výber postáv
-    box.className = "peek-char" + (what.side === "p2" ? " p2-side" : "");
-    box.innerHTML = `<div class="pk-head"><span class="pk-name">${plainName(CHAR_META[what.char]?.name || what.char)}</span></div><div class="pk-ability"></div>`;
+    // portrét / hlavička = meno postavy (bez nadpisu SPECIAL ATTACK); special tlačidlo = len SPECIAL ATTACK (bez mena)
+    box.className = "peek-char" + (what.special ? " pk-special" : " pk-portrait") + (what.side === "p2" ? " p2-side" : "");
+    box.innerHTML = (what.special ? "" : `<div class="pk-head"><span class="pk-name">${plainName(CHAR_META[what.char]?.name || what.char)}</span></div>`)
+      + `<div class="pk-ability"></div>`;
     if (!showCharPeek(box.querySelector(".pk-ability"), what.char, what.side)) { close(); return false; }
   }
   place();

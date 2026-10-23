@@ -80,7 +80,7 @@ const hold = async (sel, probe, ms = 650) => {
   await sleep(400);
   return out;
 };
-const peek = () => ev(`(() => { const p = document.getElementById("peek"); return p && !p.classList.contains("hidden") ? { cls: p.className, text: p.textContent.trim(), cells: p.querySelectorAll("#ca-grid .mini-cell").length } : null; })()`);
+const peek = () => ev(`(() => { const p = document.getElementById("peek"); return p && !p.classList.contains("hidden") ? { cls: p.className, text: p.textContent.trim(), cells: p.querySelectorAll("#ca-grid .mini-cell").length, caTitle: getComputedStyle(document.getElementById("ca-title")).display !== "none", name: !!p.querySelector(".pk-name") } : null; })()`);
 const waitPage = async (expr, ms, what) => {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) { if (await ev(`!!(${expr})`) === true) return; await sleep(100); }
@@ -304,12 +304,12 @@ try {
   check(!(await peek()), "pustenie prsta okno zavrie");
   check((await queue()).filter(x => x !== "-").length === 0 && !(await armedAny()), "podržanie nič nezaradilo ani neoznačilo", JSON.stringify(await queue()));
   pk = await hold("#hud-p2 .hud-char", peek);
-  check(pk?.cls.startsWith("peek-char") && pk.text.startsWith("SOLDIER") && pk.cells === 12, "podržanie vlastného portrétu ukáže okno postavy s náhľadom", JSON.stringify(pk));
+  check(pk?.cls.startsWith("peek-char") && pk.text.startsWith("SOLDIER") && pk.cells === 12 && !pk.caTitle, "podržanie vlastného portrétu ukáže meno postavy (bez SPECIAL ATTACK) a náhľad", JSON.stringify(pk));
   check(!(await peek()) && await ev(`!!document.querySelector("#char-select #char-ability")`), "po pustení sa náhľad vráti do výberu postáv");
   pk = await hold("#hud-p1 .hud-char", async () => { await sleep(1600); await shot("peek-char"); return peek(); });
   check(pk?.cls.startsWith("peek-char") && pk.text.startsWith("NARUTO"), "podržanie súperovho portrétu ukáže jeho postavu", JSON.stringify(pk));
   pk = await hold("#special-btn", peek);
-  check(pk?.text.startsWith("SOLDIER"), "podržanie specialu ukáže okno vlastnej postavy", JSON.stringify(pk));
+  check(pk?.text.startsWith("SPECIAL ATTACK") && !pk.name && pk.caTitle && pk.cells === 12, "podržanie specialu ukáže SPECIAL ATTACK (bez mena) a náhľad vlastnej postavy", JSON.stringify(pk));
   // zamknuté tlačidlo (otvorený výber smeru): podržanie funguje, výber ostane otvorený
   await tap("#attack-btn");
   pk = await hold("#melee-btn", peek);

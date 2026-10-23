@@ -2927,4 +2927,5 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 #peek.peek-char { padding: 16px 22px 10px; }
 #peek.peek-char .pk-name { font-size: 16px; margin-bottom: 4px; }
 #peek .char-ability { height: auto; }
+#peek.pk-portrait .ca-title { display: none; } /* okno z portrétu: nadpis = meno postavy */
 #peek.p2-side .mini-caster { transform: scaleX(-1); }
