@@ -315,6 +315,17 @@ try {
   check(pk?.cls.startsWith("peek-char") && pk.text.startsWith("NARUTO"), "podržanie súperovho portrétu ukáže jeho postavu", JSON.stringify(pk));
   pk = await hold("#special-btn", peek);
   check(pk?.text.startsWith("SPECIAL ATTACK") && !pk.name && pk.caTitle && pk.cells === 12, "podržanie specialu ukáže SPECIAL ATTACK (bez mena) a náhľad vlastnej postavy", JSON.stringify(pk));
+  // dlhé podržanie: prehliadač pošle tlačidlu hover (mouseover/mouseenter) → nesmie spustiť náhľad zóny na ploche
+  await ev(`(() => { window.__spEnter = 0; document.getElementById("special-btn").addEventListener("mouseenter", e => { if (e.isTrusted) window.__spEnter++; }); })()`);
+  pk = await hold("#special-btn", async () => {
+    const c = await ev(`(() => { const r = document.getElementById("special-btn").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    await sendT("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x - 30, y: c.y - 200 });
+    await sendT("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x, y: c.y });
+    await sleep(100);
+    return peek();
+  });
+  check(pk?.text.startsWith("SPECIAL ATTACK") && (await ev(`window.__spEnter`)) === 0, "hover prehliadača počas podržania specialu sa nedostal k tlačidlu (žiadny náhľad zóny)", String(await ev(`window.__spEnter`)));
+  check((await preview()) === 0, "po podržaní specialu na ploche nič nebliká");
   // Last Stand (polovica zlatého tlačidla): okno ostane otvorené počas celého držania
   pk = await hold("#gold-dual-btn .ls-half", async () => { await sleep(1200); return peek(); });
   check(/LAST STAND/i.test(pk?.text || ""), "podržanie Last Stand ukáže vysvetlenie a ostane otvorené", JSON.stringify(pk));

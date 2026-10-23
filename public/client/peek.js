@@ -117,18 +117,23 @@ function hostAt(x, y) {
   return null;
 }
 function initTouch() {
-  let timer = 0, start = null, holding = false, swallowUntil = 0, keptOpen = false;
+  let timer = 0, start = null, holding = false, swallowUntil = 0, keptOpen = false, holdHost = null;
   const cancel = () => { clearTimeout(timer); timer = 0; start = null; };
+  // po podržaní zruš hover náhľad podržaného tlačidla (napr. blikajúca zóna specialu), ak ho neoznačil ťuk
+  const dropHover = () => {
+    const el = holdHost; holdHost = null;
+    if (el?.isConnected && !el.classList.contains("touch-armed") && !el.closest(".touch-armed")) el.dispatchEvent(new MouseEvent("mouseleave"));
+  };
   document.addEventListener("touchstart", (e) => {
     cancel();
     swallowUntil = 0; // nový dotyk = nový ťuk (poistka platí len pre klik hneď po podržaní)
-    if (keptOpen) { keptOpen = false; close(); } // okno nechané po touchcancel zavrie až ďalší dotyk
+    if (keptOpen) { keptOpen = false; close(); dropHover(); } // okno nechané po touchcancel zavrie až ďalší dotyk
     if (e.touches.length !== 1) { if (holding) { holding = false; close(); } return; }
     const t = e.touches[0];
     const host = hostAt(t.clientX, t.clientY);
     if (!host) return;
     start = { x: t.clientX, y: t.clientY };
-    timer = setTimeout(() => { timer = 0; holding = open(whatFor(host)); }, HOLD_MS);
+    timer = setTimeout(() => { timer = 0; holding = open(whatFor(host)); if (holding) holdHost = host; }, HOLD_MS);
   }, { capture: true, passive: true });
   document.addEventListener("touchmove", (e) => {
     if (!start || holding) return;
@@ -143,6 +148,7 @@ function initTouch() {
     // → okno ostane, zavrie ho ďalší dotyk; inak by sa ukázalo a hneď zmizlo
     if (e.type === "touchcancel") { keptOpen = true; swallowUntil = performance.now() + 700; return; }
     close();
+    dropHover();
     // zruš ťuk, ktorý by prehliadač po pustení poslal (aj s emulovanými mouse udalosťami → hover náhľady)
     if (e.cancelable) e.preventDefault();
     swallowUntil = performance.now() + 700;
@@ -153,6 +159,13 @@ function initTouch() {
   window.addEventListener("click", (e) => {
     if (performance.now() < swallowUntil) { swallowUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
+  // hover od prehliadača počas podržania (dlhý dotyk pošle mouseover/mouseenter) by spustil náhľad na ploche
+  // (zóna specialu) - zahoď ho; náhľady pri ťuku posiela touch.js vlastnými (nedôveryhodnými) udalosťami
+  for (const type of ["mouseover", "mouseenter", "mousemove"]) {
+    window.addEventListener(type, (e) => {
+      if (e.isTrusted && (timer || holding || keptOpen || performance.now() < swallowUntil)) e.stopImmediatePropagation();
+    }, true);
+  }
   // ťahanie obrázka/odkazu pri dlhom podržaní (tablet) by dotyk zrušilo - v hre sa nič neťahá
   document.addEventListener("dragstart", (e) => e.preventDefault(), true);
   // kontextové menu prehliadača pri dlhom podržaní
