@@ -364,3 +364,7 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 /* --- koniec hry: veľké tlačidlá --- */
 .phone .go-buttons { gap: 26px; padding: 26px; }
 .phone .go-buttons .retry { min-width: 400px; font-size: 26px; padding: 30px 34px 34px; }
+
+/* telefón: okno postavy (client/peek.js) - náhľad v rovnakej veľkosti ako vo výbere postáv */
+.phone #peek.peek-char { padding: 22px 30px 16px; }
+.phone #peek.peek-char .pk-name { font-size: 26px; margin-bottom: 8px; }

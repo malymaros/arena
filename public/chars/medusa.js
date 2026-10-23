@@ -1,6 +1,6 @@
 // public/chars/medusa.js - klientské dáta postavy: Medusa - smerové skamenenie (bez dmg).
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
-import { SPECIAL_FPS } from "./common.js";
+import { SPECIAL_FPS, act } from "./common.js";
 // čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
 import { MELEE_COST, MEDUSA_MELEE_DMG, SPECIAL_COST, STONE_ACTIONS } from "../../shared/balance.js";
 
@@ -19,7 +19,7 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, dir: "right", effect: { num: `${STONE_ACTIONS}×`, emoji: "🗿" }, desc: `Own cell + everything one way (row ±1). No damage - petrifies: target skips ${STONE_ACTIONS} actions` },
   buttons: {
     // širší dosah melee (diagonály) za nižší dmg
-    melee: { title: `Melee (−${MELEE_COST} mana, ${MEDUSA_MELEE_DMG} dmg, hits your cell + all diagonal neighbours)`, cost: `−${MELEE_COST}{💧} ${MEDUSA_MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${MEDUSA_MELEE_DMG}` },
+    melee: { ...act("MELEE", `{💧}${MELEE_COST} {☠️}${MEDUSA_MELEE_DMG}`, "Tail sweep: hits your cell and all 4 diagonal neighbours."), cost: `−${MELEE_COST}{💧} ${MEDUSA_MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${MEDUSA_MELEE_DMG}` },
     // žiadny dmg - skamenenie na 2 akcie (smer sa volí v pickeri)
     special: { title: `Special (−${SPECIAL_COST} mana) - petrifying gaze: choose a direction; a hit opponent skips their next ${STONE_ACTIONS} actions`, cost: `−${SPECIAL_COST}{💧} ${STONE_ACTIONS}×🗿`, label: `{💧}${SPECIAL_COST} {🗿}${STONE_ACTIONS}` },
   },

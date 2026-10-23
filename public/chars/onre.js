@@ -1,6 +1,6 @@
 // public/chars/onre.js - klientské dáta postavy: Onryō (interný kľúč onre) - skrytá pasca, charge, drain many; viazaná na p2.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
-import { SPECIAL_FPS } from "./common.js";
+import { SPECIAL_FPS, act, DIAG_SHOT } from "./common.js";
 // čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
 import { DASH_COST, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS, SPECIAL_COST, VAMP_TRAP_DMG } from "../../shared/balance.js";
 
@@ -29,11 +29,11 @@ export default {
     // dash slot = charge (fialový „???" skin aj na pickeri), diagonálny basic s odrazom
     dash: {
       skin: "vamp-charge",
-      title: `Charge - rush in a direction; stops at the first foe and strikes for ${VAMP_CHARGE_DMG} dmg. A landed hit drains up to ${VAMP_CHARGE_BONUS} mana into yours (blocked = nothing)`,
+      ...act("CHARGE", `{💧}${DASH_COST} {☠️}${VAMP_CHARGE_DMG}`, `Rush in a direction; stops at the first opponent and strikes. A landed hit drains up to ${VAMP_CHARGE_BONUS} of their mana into yours.`),
       cost: `−${DASH_COST}{💧} ${VAMP_CHARGE_DMG}{☠️}{💧}`,
       label: `{💧}${DASH_COST} {☠️}${VAMP_CHARGE_DMG} DRAIN ${VAMP_CHARGE_BONUS}`,
     },
-    attack: { title: "Range Attack - a diagonal shot that bounces once off a wall (corners end it); damage falls off with distance" },
+    attack: { ...DIAG_SHOT },
     // pasca - teleport + bezplatný úder pri súperovom vstupe/prechode
     special: {
       title: `Special (−${SPECIAL_COST} mana, ${VAMP_TRAP_DMG} dmg) - set a hidden trap on ANY cell (even the foe's current one). When the foe crosses it, you teleport there and strike for free; a landed hit drains the foe's mana into yours. Only one trap - recasting replaces it`,

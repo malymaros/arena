@@ -1,6 +1,6 @@
 // public/chars/jotaro.js - klientské dáta postavy: Jotaro + Star Platinum - THE WORLD; viazaný na p2.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
-import { SPECIAL_FPS } from "./common.js";
+import { SPECIAL_FPS, act, DIAG_SHOT } from "./common.js";
 // čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
 import { MELEE_COST, JOTARO_MELEE_DMG, JOTARO_S1_COST, JOTARO_S1_DMG, JOTARO_S2_COST, JOTARO_S2_DMG, WORLD_COST } from "../../shared/balance.js";
 
@@ -25,14 +25,15 @@ export default {
   previewCast: { file: "Special_3_P.png", frames: 4, fps: 6, loopFrom: 3, fill: 1.31 * 160 / 144 },
   // Jotaro: THE WORLD (jednorazový time-stop) - bez konkrétnych čísel v texte (cost badge nesie 5).
   // Zóna náhľadu = celá doska (THE WORLD blik); effect ikona ⏱.
-  abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 free actions - all effects resolve when time restarts." },
+  abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, effect: { num: "", emoji: "⏱" }, desc: "THE WORLD (once/game): stop time, take 3 extra actions - all effects resolve when time restarts." },
   buttons: {
-    melee: { title: `Melee (−${MELEE_COST} mana, ${JOTARO_MELEE_DMG} dmg, hits only an opponent on your cell)`, cost: `−${MELEE_COST}{💧} ${JOTARO_MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${JOTARO_MELEE_DMG}` },
+    attack: { ...DIAG_SHOT },
+    melee: { ...act("MELEE", `{💧}${MELEE_COST} {☠️}${JOTARO_MELEE_DMG}`, "Hits only an opponent on your cell."), cost: `−${MELEE_COST}{💧} ${JOTARO_MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${JOTARO_MELEE_DMG}` },
     // mirror slot = Special 1 (Star Platinum) - fialový „???" skin + L/R picker
-    mirror: { skin: "jotaro-s1", title: `Star Platinum - a directional (left/right) strike hitting BOTH diagonal cells on that side for ${JOTARO_S1_DMG} dmg`, cost: `−${JOTARO_S1_COST}{💧} ${JOTARO_S1_DMG}{☠️}`, label: `{💧}${JOTARO_S1_COST} {☠️}${JOTARO_S1_DMG}` },
+    mirror: { skin: "jotaro-s1", ...act("STAR PLATINUM", `{💧}${JOTARO_S1_COST} {☠️}${JOTARO_S1_DMG}`, "Strikes both diagonal cells on the left or right side."), cost: `−${JOTARO_S1_COST}{💧} ${JOTARO_S1_DMG}{☠️}`, label: `{💧}${JOTARO_S1_COST} {☠️}${JOTARO_S1_DMG}` },
     // klasická ✨ ikona; mení sa len cena: pred THE WORLD hodiny (⏱), po ňom (worldUsed) Special 2 = 8 dmg
     special: (ui) => ui.worldUsed
-      ? { title: `Special 2 (−${JOTARO_S2_COST} mana, ${JOTARO_S2_DMG} dmg) - a directional (left/right) strike on the adjacent cell`, cost: `−${JOTARO_S2_COST}{💧} ${JOTARO_S2_DMG}{☠️}`, label: `{💧}${JOTARO_S2_COST} {☠️}${JOTARO_S2_DMG}` }
+      ? { ...act("SPECIAL 2", `{💧}${JOTARO_S2_COST} {☠️}${JOTARO_S2_DMG}`, "Strikes the adjacent cell left or right."), cost: `−${JOTARO_S2_COST}{💧} ${JOTARO_S2_DMG}{☠️}`, label: `{💧}${JOTARO_S2_COST} {☠️}${JOTARO_S2_DMG}` }
       : { title: `THE WORLD (−${WORLD_COST} mana, once per game) - time stops: take 3 extra actions while the foe is frozen; their effects land all at once when time resumes`, cost: `−${WORLD_COST}{💧} ⏱`, label: `{💧}${WORLD_COST} TIME STOP` },
   },
   // THE WORLD bez cieľa; po ňom Special 2 smerový (L/R picker)

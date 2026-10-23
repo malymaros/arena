@@ -18,6 +18,7 @@ import "/client/sound-ui.js";         // zvukové okno (z menu) + UI zvuky kliko
 import "/client/menu.js";             // menu ☰: reload, celá obrazovka, zvuk, admin
 import "/client/mobile-ui.js";        // dotyk: výzva otočiť na šírku
 import "/client/touch.js";            // dotyk: ťuk = výber + náhľad, pickery na boarde, PICK (po controls/char-select!)
+import "/client/peek.js";             // okno „čo to robí": podržanie tlačidla / portrétu (dotyk), hover portrétu (PC)
 import { actors } from "/client/actors.js";
 import { initCharFx, fxAll } from "/client/fx-registry.js";
 import { gridEl, actorsEl, TILE_W, TILE_H, GAP, cellToPx } from "/client/dom.js";

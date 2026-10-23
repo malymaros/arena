@@ -68,5 +68,14 @@ for (const k of ["fire", "lightning", "wanderer", "escanor"]) {
   check(lbl(k, "special") === `{💧}${B.SPECIAL_COST} {☠️}${B.SPECIAL_ZONE_DMG[k]}`, `${k}: štítok specialu`);
 }
 
+/* ---------- 4) okno pri podržaní tlačidla (client/peek.js) - cena z balance.js ---------- */
+const info = (k, slot, ui = {}) => title(k, slot, ui)?.info;
+check(info("medusa", "melee")?.cost === `{💧}${B.MELEE_COST} {☠️}${B.MEDUSA_MELEE_DMG}`, "medusa: okno melee");
+check(info("jotaro", "mirror")?.cost === `{💧}${B.JOTARO_S1_COST} {☠️}${B.JOTARO_S1_DMG}` && info("jotaro", "special", { worldUsed: true })?.cost === `{💧}${B.JOTARO_S2_COST} {☠️}${B.JOTARO_S2_DMG}`, "jotaro: okno Star Platinum + Special 2");
+check(!info("jotaro", "special", { worldUsed: false }), "jotaro: pred THE WORLD special ukáže okno postavy (bez vlastného textu)");
+for (const k of ["countess", "onre"]) check(info(k, "dash")?.cost === `{💧}${B.DASH_COST} {☠️}${B.VAMP_CHARGE_DMG}` && info(k, "dash").text.includes(String(B.VAMP_CHARGE_BONUS)), `${k}: okno chargu`);
+check(info("luffy", "attack", { gear3: true })?.name === "GIANT PISTOL" && info("luffy", "attack", { gear3: false })?.name === "RANGE ATTACK", "luffy: okno útoku podľa formy");
+check(info("luffy", "recharge")?.cost === `+${B.RECHARGE_GAIN}{💧}` && title("luffy", "recharge").title.startsWith(`SWITCH GEAR (+${B.RECHARGE_GAIN} mana)`), "luffy: okno + tooltip Switch Gear z jedného textu");
+
 console.log(fails ? `\nBALANS UI: ${fails} chýb` : "\nBALANS UI SEDÍ");
 process.exit(fails ? 1 : 0);

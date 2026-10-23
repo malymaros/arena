@@ -69,6 +69,18 @@ const tap = async (sel) => {
   await sleep(350);
   return c;
 };
+// podržanie prsta na prvku (client/peek.js): počas držania sa zavolá probe() a jeho výsledok sa vráti
+const hold = async (sel, probe, ms = 650) => {
+  const c = await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  if (!c) throw new Error("nenašiel sa prvok " + sel);
+  await sendT("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: c.x, y: c.y }] });
+  await sleep(ms);
+  const out = await probe();
+  await sendT("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(400);
+  return out;
+};
+const peek = () => ev(`(() => { const p = document.getElementById("peek"); return p && !p.classList.contains("hidden") ? { cls: p.className, text: p.textContent.trim(), cells: p.querySelectorAll("#ca-grid .mini-cell").length } : null; })()`);
 const waitPage = async (expr, ms, what) => {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) { if (await ev(`!!(${expr})`) === true) return; await sleep(100); }
@@ -283,6 +295,29 @@ try {
     await shot("shield-label");
     await tap("#undo"); await tap("#undo"); await tap("#undo");
   }
+
+  console.log("podržanie = okno „čo to robí\"");
+  const armedAny = () => ev(`!!document.querySelector(".touch-armed")`);
+  while ((await queue()).some(x => x !== "-")) await tap("#undo"); // tablet: special Soldiera z výberu políčka ostal vo fronte
+  let pk = await hold(".controls-row .btn.act.shield", async () => { await shot("peek-button"); return peek(); });
+  check(pk?.cls === "peek-btn" && pk.text.startsWith("SHIELD") && pk.text.includes("next action"), "podržanie štítu ukáže vysvetlenie tlačidla", JSON.stringify(pk));
+  check(!(await peek()), "pustenie prsta okno zavrie");
+  check((await queue()).filter(x => x !== "-").length === 0 && !(await armedAny()), "podržanie nič nezaradilo ani neoznačilo", JSON.stringify(await queue()));
+  pk = await hold("#hud-p2 .hud-char", peek);
+  check(pk?.cls.startsWith("peek-char") && pk.text.startsWith("SOLDIER") && pk.cells === 12, "podržanie vlastného portrétu ukáže okno postavy s náhľadom", JSON.stringify(pk));
+  check(!(await peek()) && await ev(`!!document.querySelector("#char-select #char-ability")`), "po pustení sa náhľad vráti do výberu postáv");
+  pk = await hold("#hud-p1 .hud-char", async () => { await sleep(1600); await shot("peek-char"); return peek(); });
+  check(pk?.cls.startsWith("peek-char") && pk.text.startsWith("NARUTO"), "podržanie súperovho portrétu ukáže jeho postavu", JSON.stringify(pk));
+  pk = await hold("#special-btn", peek);
+  check(pk?.text.startsWith("SOLDIER"), "podržanie specialu ukáže okno vlastnej postavy", JSON.stringify(pk));
+  // zamknuté tlačidlo (otvorený výber smeru): podržanie funguje, výber ostane otvorený
+  await tap("#attack-btn");
+  pk = await hold("#melee-btn", peek);
+  check(pk?.text.startsWith("MELEE"), "podržanie zamknutého tlačidla ukáže vysvetlenie", JSON.stringify(pk));
+  check(await ev(`!document.getElementById("aim-picker").classList.contains("hidden")`), "výber smeru po podržaní ostal otvorený");
+  await tap("#aim-picker .arrow.left"); await tap("#aim-picker .arrow.left");
+  await tap("#undo");
+  check((await queue()).filter(x => x !== "-").length === 0, "front je po teste podržania prázdny", JSON.stringify(await queue()));
 } catch (e) {
   console.error("CHYBA:", e.message); fails++;
 } finally {

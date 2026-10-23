@@ -18,6 +18,7 @@ import { appScale, isPhone } from "/client/viewport.js";
 export let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
 let abilityFx = null;            // náhľad specialu z registra fx (preview → { frame, close }; Luffy: cyklenie módu base↔gear3)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
+let abilitySide = null;          // strana (p1/p2), za ktorú sa náhľad kreslí - paleta a zrkadlenie (okno postavy v hre: aj súperova)
 // preview loop
 let charPreviewRaf = 0;
 // tournament: HP magov vlastného draftnutého tímu pre char-select; null mimo tournamentu
@@ -104,6 +105,27 @@ function drawPreviewCard(ctx, cvs, key, now) {
   }
 }
 
+// náhľad specialu: fx registra (cyklenie pride/mesiaca/gearu) + malý castiaci mág v bunke castera mini-dosky.
+// Volá ho slučka výberu postáv aj okno postavy v hre (showCharPeek).
+function drawAbilityCaster(now) {
+  if (abilityHoverChar) abilityFx?.frame(now);                  // register fx (Luffy: cyklí mód base↔gear3 - zóna dáma/veža + dmg 4/8)
+
+  // malý castiaci mág v bunke castera mini-dosky - animácia špeciálu (efektový sprite). Výnimka previewIdleCaster
+  // (Jotaro, Luffy): casterom na mini-doske je ON (nie stredová póza), takže kreslíme jeho IDLE (ukotvený na nohy,
+  // normalizovaný na výšku mágov cez portraitFill).
+  const isIdle = !!CHARS_BY_KEY[abilityHoverChar]?.previewIdleCaster;
+  if (abilityHoverChar && abilityCasterCanvas && (SPECIAL_ANIMS[abilityHoverChar] || isIdle)) {
+    const dir = charDirFor(abilityHoverChar, abilitySide || me);
+    const fxAnim = isIdle ? ANIM_DEF.idle : { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
+    const offX = isIdle ? 0 : (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
+    const fillUse = isIdle ? portraitFill(abilityHoverChar, 1.1) : 1.1;
+    const anchorUse = isIdle ? 0.95 : 0.5; // idle casteri (Jotaro/Luffy) vypĺňajú väčšinu framu → ukotvi na nohy
+    if (dir) ensureSpriteMeta(dir, fxAnim.file)
+      .then(meta => drawSprite(abilityCasterCanvas.getContext("2d"), meta, fxAnim, now, abilityCasterCanvas.width, abilityCasterCanvas.height, fillUse, anchorUse, true, offX))
+      .catch(() => {});
+  }
+}
+
 function drawCharSelectFrame(now) {
   const canvases = selEl.querySelectorAll("canvas.char-canvas");
   canvases.forEach((cvs) => {
@@ -146,22 +168,7 @@ function drawCharSelectFrame(now) {
       .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
   });
 
-  if (abilityHoverChar) abilityFx?.frame(now);                  // register fx (Luffy: cyklí mód base↔gear3 - zóna dáma/veža + dmg 4/8)
-
-  // malý castiaci mág v bunke castera mini-dosky - animácia špeciálu (efektový sprite). Výnimka previewIdleCaster
-  // (Jotaro, Luffy): casterom na mini-doske je ON (nie stredová póza), takže kreslíme jeho IDLE (ukotvený na nohy,
-  // normalizovaný na výšku mágov cez portraitFill).
-  const isIdle = !!CHARS_BY_KEY[abilityHoverChar]?.previewIdleCaster;
-  if (abilityHoverChar && abilityCasterCanvas && (SPECIAL_ANIMS[abilityHoverChar] || isIdle)) {
-    const dir = charDirFor(abilityHoverChar, me);
-    const fxAnim = isIdle ? ANIM_DEF.idle : { file: SPECIAL_ANIMS[abilityHoverChar].file, fps: SPECIAL_FPS, loop: true };
-    const offX = isIdle ? 0 : (FX_OFFSET_X[abilityHoverChar] || 0) * abilityCasterCanvas.width;
-    const fillUse = isIdle ? portraitFill(abilityHoverChar, 1.1) : 1.1;
-    const anchorUse = isIdle ? 0.95 : 0.5; // idle casteri (Jotaro/Luffy) vypĺňajú väčšinu framu → ukotvi na nohy
-    if (dir) ensureSpriteMeta(dir, fxAnim.file)
-      .then(meta => drawSprite(abilityCasterCanvas.getContext("2d"), meta, fxAnim, now, abilityCasterCanvas.width, abilityCasterCanvas.height, fillUse, anchorUse, true, offX))
-      .catch(() => {});
-  }
+  drawAbilityCaster(now);
 
   if (!selEl.classList.contains("hidden")) {
     charPreviewRaf = requestAnimationFrame(drawCharSelectFrame);
@@ -230,14 +237,15 @@ teamConfirmBtn?.addEventListener("click", () => {
 
 /* ---------- Náhľad špeciálu mága (hover vo výbere) ---------- */
 // pozícia castera a popis náhľadu = abilityPreview postavy v registri
-function renderAbilityPreview(char) {
+function renderAbilityPreview(char, side = me) {
   const def = ABILITY_PREVIEW[char];
   if (!def || !charAbilityEl) return;
+  abilitySide = side;
   abilityHoverChar = char; // preview loop prepne tohto mága na cyklický cast špeciálu
   abilityFx?.close(); abilityFx = null;
   const w = board.w || 4, h = board.h || 3;
   // hráč vpravo (p2): náhľad zrkadlovo - caster pri pravom okraji, smerový special (Medúza) mieri doľava
-  const mirror = me === "p2";
+  const mirror = side === "p2";
   // secret (Hidden preview): žiadny caster ani zóna - mini-doska ostáva celá prázdna
   const caster = (def.secret || !def.caster) ? { x: -1, y: -1 }
     : mirror ? { x: w - 1 - def.caster.x, y: def.caster.y } : def.caster;
@@ -300,6 +308,7 @@ function renderAbilityPreview(char) {
 }
 function clearAbilityPreview() {
   abilityHoverChar = null;
+  abilitySide = null;
   abilityCasterCanvas = null;
   abilityFx?.close(); abilityFx = null;
   charAbilityEl?.classList.add("hidden");
@@ -324,6 +333,30 @@ selEl.querySelectorAll(".char-card").forEach(card => {
   });
 });
 selEl.querySelectorAll(".char-cards").forEach(el => el.addEventListener("mouseleave", clearAbilityPreview));
+
+/* ---------- Okno postavy v hre (client/peek.js) ---------- */
+// ten istý náhľad ako vo výbere postáv: blok #char-ability sa na čas okna presunie do hostiteľa a kreslí ho
+// vlastná slučka (slučka výberu beží len pri otvorenom výbere). side = strana postavy (paleta, zrkadlenie).
+let peekRaf = 0, peekHome = null;
+export function showCharPeek(host, char, side) {
+  if (!ABILITY_PREVIEW[char] || !charAbilityEl || !host) return false;
+  if (!peekHome) peekHome = { parent: charAbilityEl.parentNode, next: charAbilityEl.nextSibling };
+  host.appendChild(charAbilityEl);
+  renderAbilityPreview(char, side);
+  cancelAnimationFrame(peekRaf);
+  const loop = (now) => { drawAbilityCaster(now); peekRaf = requestAnimationFrame(loop); };
+  peekRaf = requestAnimationFrame(loop);
+  return true;
+}
+export function hideCharPeek() {
+  cancelAnimationFrame(peekRaf); peekRaf = 0;
+  if (!peekHome) return;
+  clearAbilityPreview();
+  const desc = document.querySelector("#ca-text .ca-desc");
+  if (desc) desc.style.fontSize = ""; // telefón: zmenšenie dlhého popisu patrí len k práve zobrazenej postave
+  peekHome.parent.insertBefore(charAbilityEl, peekHome.next);
+  peekHome = null;
+}
 
 /* ---------- Stránkovanie výberu postáv ---------- */
 // str. 0 = základní magovia (Mages), str. 1 = experimentálne postavy (Experimental)

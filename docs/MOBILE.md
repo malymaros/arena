@@ -66,6 +66,14 @@ rozložení, ale dostanú nové dotykové ovládanie; desktop sa nemení.
 - výber postáv na telefóne: prvá viditeľná karta je vždy predvybraná bez hlasu (`arenaSilent` na syntetickom
   mouseenter) - pravý panel s náhľadom nikdy nie je prázdny. Hlas mena: dotyk pošle mouseenter dvakrát
   (prehliadač + touch.js), `char-select.js` druhý v rámci 500 ms ignoruje, inak by utol práve spustený hlas. Nové tlačidlo s náhľadom netreba nikde registrovať - stačí mu mouseenter handler ako na desktope.
+- **podržanie prsta = okno „čo to robí"** (`public/client/peek.js`, dotyk telefón aj tablet): 0,4 s na tlačidle akcie
+  (aj zamknutom) ukáže v strede plochy vysvetlenie tlačidla, na portréte postavy v HUD alebo hlavičke mága v turnaji
+  (svojej aj súperovej) okno postavy = meno + presne náhľad specialu z výberu postáv (`showCharPeek` v
+  `char-select.js` presunie `#char-ability` do okna). Pustenie okno zavrie, ťuk sa nezaráta (`touchend`
+  preventDefault + poistka na click). Cieľ sa hľadá podľa polohy prsta (`hostAt`), lebo zamknuté tlačidlá majú
+  `pointer-events: none`. Texty: `act()` v `public/chars/common.js` → `info` (okno) aj `title` (tooltip na PC) z
+  jedného textu; bežné v `BUTTON_TEXT` (`balance-ui.js`), postavy v `buttons.<slot>`. PC: okno postavy pri hoveri
+  portrétu / hlavičky. Overuje `tools/touch-smoke.mjs`.
 - **výber postáv na telefóne = jeden cyklický pás** (`public/client/char-strip.js`, trieda `strip-mode`): karty bežných
   stránok sa ťahajú prstom dookola (za poslednou je prvá), karta v strede sa sama označí a povie meno, ťuk na bočnú
   ju dotočí do stredu; rýchly švih dobehne ďalej. DOM sa nepresúva - kontajnery stránok majú `display: contents`,

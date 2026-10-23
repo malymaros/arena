@@ -2,7 +2,11 @@
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
 
 // čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
-import { RECHARGE_GAIN, SPECIAL_COST, LUFFY_SPECIAL_DMG } from "../../shared/balance.js";
+import { RECHARGE_GAIN, SPECIAL_COST, LUFFY_SPECIAL_DMG, BASIC_COST, BASIC_DMG_MAX } from "../../shared/balance.js";
+import { act, DIAG_SHOT } from "./common.js";
+const fall = [1, 2, 3].map(d => Math.max(1, BASIC_DMG_MAX - d)).join(" / ");
+// Gear 3 basic = Giant Pistol (vlastné okno / tooltip); Base = diagonálna strela ako Vampire
+const GIANT_PISTOL = act("GIANT PISTOL", `{💧}${BASIC_COST}`, `Punches left or right at the first opponent in line (${fall}) and pulls them next to Luffy. A shield or mirror stops the pull too.`);
 export default {
   key: "luffy",
   // Hidden preview postavy (zatiaľ NEHRATEĽNÉ - karta bez data-char, klik/draft ju ignorujú):
@@ -44,7 +48,8 @@ export default {
   abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, desc: "Recharge switches Gear. Pick a cell and Luffy rolls there to smash whoever stands on it. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge." },
   buttons: {
     // recharge slot = prepínač módu (fialový „???" skin) - doplní manu A prepne mód (aj pri plnej mane)
-    recharge: { skin: "luffy-switch", title: `Switch Gear (Base ↔ Gear 3) - also recharges mana (+${RECHARGE_GAIN}); works even at full mana`, cost: `+${RECHARGE_GAIN}{💧}<span class="luffy-swap">⇆</span>`, label: `+${RECHARGE_GAIN}{💧} GEAR ⇆` },
+    recharge: { skin: "luffy-switch", ...act("SWITCH GEAR", `+${RECHARGE_GAIN}{💧}`, "Gain mana and switch Base ↔ Gear 3. Works even at full mana."), cost: `+${RECHARGE_GAIN}{💧}<span class="luffy-swap">⇆</span>`, label: `+${RECHARGE_GAIN}{💧} GEAR ⇆` },
+    attack: (ui) => (ui.gear3 ? GIANT_PISTOL : DIAG_SHOT),
     // pohyb-a-úder ako šachová figúra: base = dáma (4 dmg), gear3 = veža (8 dmg) - podľa efektívnej formy
     special: (ui) => ui.gear3
       ? { title: `Special (−${SPECIAL_COST} mana, ${LUFFY_SPECIAL_DMG.gear3} dmg) - GEAR 3: roll like a ROOK (orthogonal lines) to a chosen cell and strike whoever is on it`, cost: `−${SPECIAL_COST}{💧} ${LUFFY_SPECIAL_DMG.gear3}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${LUFFY_SPECIAL_DMG.gear3}` }

@@ -72,7 +72,8 @@ function applyBtnSkin(slot, btn, picker, char) {
 }
 export function syncDashBtn(char) {
   applyBtnSkin("dash", dashBtn, dashPicker, char);
-  attackBtn.title = CHAR_BUTTONS[char]?.attack?.title ?? ATTACK_TITLE_DEFAULT;
+  const atk = CHAR_BUTTONS[char]?.attack; // Luffy: funkcia (ui) - Base diagonálna strela / Gear 3 Giant Pistol
+  attackBtn.title = (typeof atk === "function" ? atk(buttonUi()) : atk)?.title ?? ATTACK_TITLE_DEFAULT;
 }
 
 // Luffy: recharge slot = prepínač módu (base↔Gear3) - fialový ❔ „Hidden" skin ako vamp charge.

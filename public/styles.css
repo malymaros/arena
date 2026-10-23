@@ -2905,3 +2905,26 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   background: rgba(6,6,10,.8); opacity: 0; transition: opacity .6s ease;
 }
 .perf-lite body.labyrinth-mode .arena::before { opacity: 1; }
+
+/* ========== okno „čo to robí" (client/peek.js) - v strede plochy; dotyk: podržanie tlačidla / portrétu, PC: hover portrétu ========== */
+#peek {
+  position: fixed; z-index: 70; pointer-events: none; transform: translate(-50%, -50%);
+  background: rgba(12, 14, 18, .96); color: #fff;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #ffd54f, 0 8px 24px rgba(0,0,0,.6);
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+}
+#peek.hidden { display: none; }
+#peek .pk-head { display: flex; align-items: center; justify-content: center; gap: 14px; }
+#peek .pk-name { color: #ffd54f; letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6); }
+/* vysvetlenie tlačidla - písmo v skutočných px displeja (--ui-k), ako štítky na dotyku */
+#peek.peek-btn { width: max-content; max-width: calc(440px * var(--ui-k, 1)); padding: calc(12px * var(--ui-k, 1)) calc(16px * var(--ui-k, 1)); }
+#peek.peek-btn .pk-head { justify-content: space-between; margin-bottom: calc(10px * var(--ui-k, 1)); }
+#peek.peek-btn .pk-name { font-size: calc(13px * var(--ui-k, 1)); }
+#peek.peek-btn .pk-cost { display: inline-flex; align-items: center; gap: calc(4px * var(--ui-k, 1)); font-size: calc(12px * var(--ui-k, 1)); white-space: nowrap; }
+#peek.peek-btn .pk-cost .pix-ico.mini { width: calc(16px * var(--ui-k, 1)); height: calc(16px * var(--ui-k, 1)); margin: 0 1px; }
+#peek.peek-btn .pk-text { font-size: calc(10px * var(--ui-k, 1)); line-height: 1.75; color: #e6e6e6; }
+/* okno postavy - meno + náhľad specialu z výberu postáv (#char-ability presunutý dnu) */
+#peek.peek-char { padding: 16px 22px 10px; }
+#peek.peek-char .pk-name { font-size: 16px; margin-bottom: 4px; }
+#peek .char-ability { height: auto; }
+#peek.p2-side .mini-caster { transform: scaleX(-1); }

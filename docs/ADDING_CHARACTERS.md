@@ -100,7 +100,9 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
       `anims` (nové anim kľúče), `spriteAlias` (chýbajúce súbory), `side`/`vamp`, `teleport*`, `previewCast`.
 - [ ] **`buttons`** — tooltip + cena special/melee tlačidla ako šablóna nad `shared/balance.js`
       (``cost: `−${SPECIAL_COST}{💧} ${MOJA_DMG}{☠️}` ``, import `"../../shared/balance.js"`), prípadne skin
-      dash/mirror/recharge slotu. To isté pre `abilityPreview.dmg`.
+      dash/mirror/recharge slotu. To isté pre `abilityPreview.dmg`. Tlačidlo, ktoré postava má **inak** (iný melee,
+      charge v dash slote, útok v mirror slote…), dostane text cez `...act("NÁZOV", cena, "veta.")` z
+      `public/chars/common.js` - z neho je tooltip na PC aj okno pri podržaní tlačidla na dotyku (`client/peek.js`).
 - [ ] **`specialTarget`** (`dir` / `wolf` / `cell` / `trap` / `reach` + `specialReach` / `none`) a **`specialZone`** — náhľad
       zóny zo `shared/geometry.js` (`G.…`), tú istú, ktorú volá special na serveri.
 - [ ] Podľa potreby kreslenie a plánovanie: `boardFit`, `victoryAnim`, `sizeLevel`, `projectile`, `actionAnims`,
