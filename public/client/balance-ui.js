@@ -30,7 +30,7 @@ export const BUTTON_TEXT = {
     label: (ui) => `+${GOLDEN_MANA_GAIN}{💧} −${(ui.st?.manaRefills ?? 0) + 1}{❤️}` },
   lastStand:    { title: `Last Stand (−${START_HP} HP) - the demon kills you and revives you at full HP/mana. Next round is your LAST: you deal ${LAST_STAND_DEAL_MUL}× damage and take ½, but if you don't kill the opponent you die. The demon is shared - only one player can summon it. Locks this gold button for both next round.`, cost: `−${START_HP}{❤️}`, label: `−${START_HP}{❤️}` },
   demon:        { title: `Demon Attack (−${DEMON_COST} mana) - ${DEMON_DMG} damage to every cell except the one you stand on. Counts as one of your 3 actions; only in your FINAL ROUND.`, cost: `−${DEMON_COST}{💧}`, label: `{💧}${DEMON_COST} {☠️}${DEMON_DMG}` },
-  lastHope:     { title: `Last Hope (FINAL ROUND) - lose all HP but 1, refill mana to ${MAX_MANA}, deal ${LAST_HOPE_DEAL_MUL}× damage for the rest of the round. Resolves before everything else.`, label: `${LAST_HOPE_HP}{❤️} ${MAX_MANA}{💧}` },
+  lastHope:     { title: `Last Hope (FINAL ROUND) - lose all HP but ${LAST_HOPE_HP}, refill mana to ${MAX_MANA}, deal ${LAST_HOPE_DEAL_MUL}× damage for the rest of the round. Resolves before everything else.`, label: `{❤️} → {💧}` }, // ako odznak na PC: HP za manu, bez čísel
 };
 
 // cenovka z registra/tabuľky: {emoji} → pixelová mini ikona

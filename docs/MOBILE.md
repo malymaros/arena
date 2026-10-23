@@ -9,7 +9,7 @@ toolbar dole) a potrebuje aspoň `DESIGN_W × DESIGN_H` = **1720 × 920** CSS px
 ako na „virtuálnej" obrazovke `--app-w × --app-h` (skutočná veľkosť / scale, nikdy menšia než dizajn) a celé `<body>`
 sa zmenší jedným `transform: scale(--app-scale)`. Transform robí z body containing block aj pre `position: fixed`,
 takže HUD, toolbar a overlaye ostanú pri okrajoch obrazovky. Na obrazovke ≥ 1720×920 je scale 1 - desktop
-1920×1080 je pixelovo identický s pôvodným stavom. Bezpečné okraje (výrez kamery na šírku) sa odčítajú cez `env(safe-area-inset-*)`.
+1920×1080 je pixelovo identický s pôvodným stavom. Bezpečné okraje (výrez kamery) sa **neodčítajú** - hra ide cez celý displej vrátane výrezu kamery (`viewport-fit=cover`; rozhodnutie majiteľa 2026-10-23, inak ostal pri kamere sivý pás).
 
 **Pravidlá pre klientsky kód:**
 - nepoužívaj `window.innerWidth/innerHeight` ani `100vw/100vh` - použi `appSize()` z `viewport.js`, v CSS `var(--app-w)` / `var(--app-h)`;

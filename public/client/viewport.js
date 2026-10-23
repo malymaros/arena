@@ -21,27 +21,18 @@ root.classList.toggle("touch", isTouch);
 export const isPhone = isTouch && Math.min(screen.width, screen.height) <= 500;
 root.classList.toggle("phone", isPhone);
 
-// bezpečné okraje (výrez kamery / zaoblené rohy na mobile na šírku) - env() sa dá prečítať len cez element
-const probe = document.createElement("div");
-probe.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;" +
-  "padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
-root.appendChild(probe);
-
 function fit() {
-  const cs = getComputedStyle(probe);
-  const inset = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0,
-                  b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+  // hra ide cez celý displej aj cez výrez kamery (viewport-fit=cover, safe-area-inset sa neodčíta) - rozhodnutie
+  // majiteľa 2026-10-23: radšej celá plocha než sivý pás pri kamere; kamera môže prekryť pár px pri okraji
   // clientWidth/Height = layout viewport (nezávisí od pinch zoomu); innerWidth/Height je na niektorých mobilných
   // prehliadačoch (iOS Safari) visual viewport - pri priblížení by sa zoom „zapiekol" do výpočtu
-  const vw = Math.max(1, root.clientWidth - inset.l - inset.r);
-  const vh = Math.max(1, root.clientHeight - inset.t - inset.b);
+  const vw = Math.max(1, root.clientWidth);
+  const vh = Math.max(1, root.clientHeight);
   scale = Math.min(1, vw / DESIGN_W, vh / (isPhone ? PHONE_DESIGN_H : DESIGN_H));
   appW = vw / scale; appH = vh / scale;
   root.style.setProperty("--app-scale", String(scale));
   root.style.setProperty("--app-w", appW + "px");
   root.style.setProperty("--app-h", appH + "px");
-  root.style.setProperty("--app-x", inset.l + "px");
-  root.style.setProperty("--app-y", inset.t + "px");
   root.classList.toggle("app-scaled", scale < 1);
   // menu ☰, zvukové okno a pod. na dotyku: 1 CSS px = 1 skutočný px displeja (nezmenšuje sa s hrou, prst je
   // vždy rovnako veľký); na desktope sa zmenšujú spolu so stránkou

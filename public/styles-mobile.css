@@ -324,8 +324,9 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone #undo { width: 80px; height: 84px; font-size: 36px; }
 .phone #lock { height: 84px; padding: 0 22px; font-size: 30px; }
 .phone .controls .divider { height: 72px; }
-.phone .btn.act.lasthope .lh-ico { width: 52px; height: 56px; }
-/* démon (útok vo FINAL kole aj Last Stand polovica zlatého tlačidla) vyplní celé tlačidlo */
+/* Last Hope a démon (útok vo FINAL kole aj Last Stand polovica zlatého tlačidla) - obrázok vyplní celé tlačidlo */
+.phone .btn.act.lasthope { padding: 3px; }
+.phone .btn.act.lasthope .lh-ico { width: 100%; height: 78px; min-height: 0; object-fit: contain; image-rendering: pixelated; }
 .phone .btn.act.demon, .phone .golden-half.ls-half { padding: 3px; }
 .phone .btn.act.demon .ls-ico, .phone .golden-half.ls-half .ls-ico { width: 100%; height: 78px; min-height: 0; object-fit: contain; image-rendering: pixelated; }
 
