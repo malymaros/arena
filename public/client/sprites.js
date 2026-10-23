@@ -1,7 +1,7 @@
 // public/client/sprites.js - sprite sheety postáv: priečinky per slot (alt-color / dirP2), definície animácií
 // (ANIM_DEF + anims z registra postáv), načítanie metadát sheetu (ensureSpriteMeta, cache SPRITES) a kreslenie
 // framu do canvasu (drawSprite). Rozmery figúry na doske (ACTOR_W/H) a škály projektilu / stredového castu.
-import { CHAR_META, SIDE_CHARS, CHAR_ANIMS, SPRITE_FILE_ALIAS, PORTRAIT_SCALE } from "/chars/index.js";
+import { CHAR_META, SIDE_CHARS, CHAR_ANIMS, SPRITE_FILE_ALIAS, PORTRAIT_SCALE, SPECIAL_ANIMS, CHARS_BY_KEY } from "/chars/index.js";
 import { TILE_W, TILE_H } from "/client/dom.js";
 
 // canvasy postáv - väčšie než bunka (1.5×), v positionActors centrované na bunku
@@ -68,11 +68,14 @@ function spriteFileFor(charDir, file) {
   return file;
 }
 
+const LOADING = {}; // "dir/file" → rozbehnutý Promise (raf volá ensureSpriteMeta každý frame - nesťahuj znova)
 export function ensureSpriteMeta(charDir, file) {
   file = spriteFileFor(charDir, file);
   SPRITES[charDir] ||= {};
   if (SPRITES[charDir][file]) return Promise.resolve(SPRITES[charDir][file]);
-  return new Promise((resolve, reject) => {
+  const key = charDir + "/" + file;
+  if (LOADING[key]) return LOADING[key];
+  return (LOADING[key] = new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const frames = Math.max(1, Math.round(img.naturalWidth / img.naturalHeight));
@@ -81,9 +84,22 @@ export function ensureSpriteMeta(charDir, file) {
       SPRITES[charDir][file] = { img, frames, fw, fh };
       resolve(SPRITES[charDir][file]);
     };
-    img.onerror = reject;
+    img.onerror = (e) => { delete LOADING[key]; reject(e); };
     img.src = `/assets/${charDir}/${file}`;
-  });
+  }));
+}
+
+// Prednačítanie + dekódovanie spritov postavy, hneď ako ju klient pozná (state s char / turnajový roster).
+// Bez neho sa sprite stiahne až pri prvom použití - postava by sa pri prvom pohybe kĺzala v statickej póze,
+// kým Run.png nedorazí (na mobile stovky ms z 700 ms pohybu), a podobne prvý útok / zásah / special.
+const PRELOAD_CORE = ["Idle.png", "Run.png", "Attack_1.png", "Attack_2.png", "Hurt.png", "Dead.png", "Charge.png"];
+const preloaded = new Set();
+export function preloadChar(char, slot) {
+  const dir = charDirFor(char, slot);
+  if (!dir || preloaded.has(dir)) return;
+  preloaded.add(dir);
+  const files = [...PRELOAD_CORE, SPECIAL_ANIMS[char]?.file, ...Object.values(CHARS_BY_KEY[char]?.anims || {}).map(a => a.file)];
+  for (const f of new Set(files.filter(Boolean))) ensureSpriteMeta(dir, f).then(m => m.img.decode?.()).catch(() => {});
 }
 
 /* ---------- preskočenie zbytočného prekreslenia (výkon na mobile, docs/MOBILE.md) ---------- */

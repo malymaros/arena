@@ -6,6 +6,7 @@ import { setIdentity, me, setSpectator, setState } from "/client/session.js";
 import { colorRollEl, crResultEl, crArrowEl, selEl, intermissionEl, goOverlay, dirPicker, aimPicker, lockBtn, hudTurn, arenaEl, meleeBtn, specialBtn } from "/client/dom.js";
 import { stopCharSelectPreview } from "/client/char-select.js";
 import { playback } from "/client/playback.js";
+import { preloadChar } from "/client/sprites.js";
 import { hideConnError, syncGoldenHalves, syncGoldDualHalves, closePickers, updateUiLocks, syncDashBtn, syncMirrorBtn, syncRechargeBtn, syncButtonBadges, BTN_BASE } from "/client/controls.js";
 import { resetActorFade } from "/client/anim.js";
 import { clearProjectiles } from "/client/board-fx.js";
@@ -134,6 +135,8 @@ socket.on("state", (s) => {
     // register fx: postava sa na slote (znova) objavila - Escanor: reset premeny (nasadenie / turnajový swap),
     // Jotaro: summon intro standu znova
     fxAll("stateChar", slot, c, s);
+    if (c) preloadChar(c, slot); // sprity vopred - prvý pohyb / útok nesmie čakať na stiahnutie (sprites.js)
+    for (const rc of s?.roster?.[slot] || []) preloadChar(rc, slot); // turnaj: aj mágovia na swap
   }
   // FINAL ROUND hore podľa plánovacieho/refresh stavu (stavy s timeline = summon nechávame, prepne ho až banner)
   if (!s.timeline) playback.finalRoundActive = !!s.goldLocked;
