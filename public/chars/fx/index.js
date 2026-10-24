@@ -31,7 +31,8 @@
 //                                 oneskorí o najdlhší vrátený čas (Escanorova premena)
 //   resetActors()                 clearActors: skry/vyčisti figúry a ich stav
 // Podľa postavy na slote:
-//   centerScale(slot) → násobok   veľkosť generického stredového overlayu (Escanorovo melee rastie s Pride)
+//   centerScale(slot, sp) → násobok  veľkosť generického stredového overlayu (Escanorovo melee rastie s Pride;
+//                                 Luffy normalizuje podľa sheetu sp.file)
 //   centerPlace(cvs, flip) → true vlastné umiestnenie generického stredového overlayu (ukotvenie za nohy)
 //   projectileScale(slot) → násobok  veľkosť basic strely (prednosť pred projectile.scale z dát)
 //   levelFloat(slot, lvl, up)     po kole sa zmenil level veľkosti (sizeLevel) → float nad postavou

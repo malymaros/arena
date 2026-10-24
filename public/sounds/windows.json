@@ -1748,15 +1748,17 @@
   ]
  },
  "luffy_punch": {
-  "med": 576,
+  "med": 1512,
   "values": [
-   576
+   1512,
+   2592
   ]
  },
  "luffy_punch.luffy": {
-  "med": 576,
+  "med": 1512,
   "values": [
-   576
+   1512,
+   2592
   ]
  },
  "luffy_roll": {
@@ -2908,13 +2910,23 @@
  "voice.special2": {
   "med": 1620,
   "values": [
-   1620
+   1512,
+   1620,
+   2592
   ]
  },
  "voice.special2.jotaro": {
   "med": 1620,
   "values": [
    1620
+  ]
+ },
+ "voice.special2.luffy": {
+  "med": 1512,
+  "values": [
+   1512,
+   1620,
+   2592
   ]
  },
  "wall_bump": {

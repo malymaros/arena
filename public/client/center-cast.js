@@ -26,7 +26,7 @@ export function updateSpecialCenter(casts) {
 
     const cvs = document.createElement("canvas");
     // veľkosť z registra fx (Escanorovo melee: stredová postava škáluje s Pridom)
-    const fx = CHAR_FX[caster.char]?.centerScale?.(sp.from) ?? 1;
+    const fx = CHAR_FX[caster.char]?.centerScale?.(sp.from, sp) ?? 1;
     const px  = Math.round(TILE_H * SPECIAL_SCALE * fx);
     cvs.width = px; cvs.height = px;
     cvs.className = "special-center";

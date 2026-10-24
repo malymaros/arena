@@ -158,7 +158,7 @@ export const SOUNDS = {
   "vamp_charge":   { files: [RPG + "cloth4.ogg"], vol: 0.6, status: "default" },
   "vamp_strike":   { files: [RPG + "knifeSlice2.ogg"], vol: 0.6, status: "default" },
   "special1":      { files: vars(IMP + "impactPunch_heavy_", 5), vol: 0.6, status: "default", note: "Jotaro Special 1 (ORA)" },
-  "luffy_punch":   { files: [RPG + "creak2.ogg"], vol: 0.6, status: "default", note: "Special 1 - gumové natiahnutie ruky" },
+  "luffy_punch":   { files: [RPG + "creak2.ogg"], vol: 0.6, status: "default", note: "Luffyho Special 1 - celá ruka (natiahnutie → úder → stiahnutie)" },
   "luffy_roll":    { files: vars(IMP + "impactWood_medium_", 5), vol: 0.5, status: "default" },
   "luffy_explode": { files: [SCI + "explosionCrunch_002.ogg"], vol: 0.6, status: "default" },
 
@@ -166,7 +166,7 @@ export const SOUNDS = {
   "voice.attack":  { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku basic strely; prázdne = ticho" },
   "voice.melee":   { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku melee (raz, efekt úderu ide zvlášť pri každom švihu); prázdne = ticho" },
   "voice.special": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku špeciálu; prázdne = ticho" },
-  "voice.special2": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 2 (Jotaro po THE WORLD); prázdne = ticho" },
+  "voice.special2": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 2 (Jotaro po THE WORLD, Luffy po guli) a Special 1 (Jotaro, Luffyho ruka); prázdne = ticho" },
 
   /* ---------- hlasy mágov (vlastník, 17.10.) - custom/mages/<postava>-<intro|range|melee|special>.mp3 ---------- */
   "ui.hover_char.fire": { files: ["custom/mages/fire-intro.mp3"], vol: 1.09, fit: "keep", trim: { "custom/mages/fire-intro.mp3": [120,1120] }, status: "picked", note: "hover nad kartou pri výbere postavy" },

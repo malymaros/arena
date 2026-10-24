@@ -10,6 +10,13 @@ import luffyData from "../luffy.js";
 const LUFFY_ARM = { x: 104, y: 276, bands: ["#593520", "#f6dd9e", "#d18b20", "#111111"], band: 2, fist: 16 };
 const BODY_FRAME = 320;     // veľkosť framu Punch.png
 const BODY_CROP = 0.5;      // armCrop tela pri naťahovaní (anims luffypunch*)
+// veľkosť stredového spritu: generický stred zväčšuje celý FRAME na pevný canvas, no Luffyho sheety majú pri
+// rovnakej mierke postavy rôzne veľké framy → bez korekcie by bol v strede väčší než ostatní mágovia.
+// Násobok = výška stojaceho mága vo frame (Fire Idle 66/128) / výška stojaceho Luffyho (112 px) vo frame sheetu.
+// Special 2 (Attack_2, frame 208) vychádza ≈ 1 → bez korekcie.
+const STD_BODY = 66 / 128, LUFFY_BODY_PX = 112;
+const centerMul = (frame) => STD_BODY / (LUFFY_BODY_PX / frame);
+const CENTER_SCALE = { "Attack_1.png": centerMul(144), "Special_1.png": centerMul(160) }; // melee, guľa
 
 export default function luffyFx(C) {
   /* ---------- Special 1: naťahovacia ruka ---------- */
@@ -84,7 +91,7 @@ export default function luffyFx(C) {
     centerRemove();
     const dir = C.charDirFor("luffy", slot);
     const anim = { file: "Special_1.png", fps: 8, loopFrom: 7 };
-    const px = Math.round(C.TILE_H * C.SPECIAL_SCALE);
+    const px = Math.round(C.TILE_H * C.SPECIAL_SCALE * CENTER_SCALE["Special_1.png"]);
     const cvs = document.createElement("canvas");
     cvs.width = px; cvs.height = px;
     cvs.className = "luffy-center"; // VLASTNÁ trieda - NIE .special-center (updateSpecialCenter ju maže každý frame)
@@ -115,6 +122,8 @@ export default function luffyFx(C) {
       return null;
     },
     clearOverlays() { centerRemove(); armRemove(); },
+    // generický stred (melee Attack_1, Special 2 Attack_2) v štandardnej veľkosti mága
+    centerScale: (slot, sp) => CENTER_SCALE[sp?.file] ?? 1,
     // dash: beh (setAnim "run" z prehrávača) nahradí kotúľ Special_7 od začiatku presunu
     boardAnim({ slot, st, aSt, anim }) {
       if (st?.char === "luffy" && aSt?.key === "run" && curAction[slot] === "dash") return C.ANIM_DEF.luffydash;

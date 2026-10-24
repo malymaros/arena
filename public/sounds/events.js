@@ -38,10 +38,15 @@ export const ONCE_PER_RUN = new Set(["charge", "special", "wolf_charge", "vamp_c
 export const VOICE = {
   charge: "voice.attack", attack_swing: "voice.attack", melee: "voice.melee", special: "voice.special",
   timestop_start: "voice.special", vamp_strike: "voice.melee",
+  luffy_ball_form: "voice.special", // Luffyho guľa (jednorazový special) nie je efekt `special`
 };
 // postava, pre ktorú efekt znamená iný hlas: Jotarov `special` je vždy Special 2 (THE WORLD má timestop_start),
-// jeho Special 1 (útok v slote mirroru) hrá tiež hlas Special 2
-export const VOICE_BY_CHAR = { jotaro: { special: "voice.special2", special1: "voice.special2" } };
+// jeho Special 1 (útok v slote mirroru) hrá tiež hlas Special 2. Luffy rovnako: `special` = Special 2 (guľa má
+// luffy_ball_form), ruka v slote mirroru (luffy_punch) = hlas Special 2
+export const VOICE_BY_CHAR = {
+  jotaro: { special: "voice.special2", special1: "voice.special2" },
+  luffy: { special: "voice.special2", luffy_punch: "voice.special2" },
+};
 // postava, ktorej hlas zaznie pri KAŽDOM frame behu (nie len raz): Onryō pri melee povie hlášku pri každom
 // z 3 švihov (krátka hláška sa zmestí do beatu) - ako vlkolak, ktorého nahrávka melee má tri opakovania
 export const VOICE_EACH_BEAT = { onre: new Set(["melee"]) };
@@ -56,6 +61,7 @@ export const PHASE_SPAN = {
   demon_summon:      { until: "demon_center_out", inclusive: true },
   last_stand_banish: { until: "last_stand_banish_kill", inclusive: true },
   last_hope_summon:  { until: "last_hope_settle", inclusive: true }, // Last Hope: vynorenie → HP 1 / mana 10 → zmizne
+  luffy_punch:       { until: "luffy_punch_back", inclusive: true }, // Luffyho ruka: natiahnutie → úder → stiahnutie
 };
 function phaseWindow(timeline, i, { until, inclusive }) {
   let ms = 0;
@@ -130,7 +136,7 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
     const voiceKey = VOICE_BY_CHAR[char]?.[e.kind] || VOICE[e.kind];
     const eachBeat = VOICE_EACH_BEAT[char]?.has(e.kind);
     if (voiceKey && (firstOfRun || eachBeat) && !e.clone) {
-      out.push({ key: voiceKey, char, pan: panOf(e), windowMs: eachBeat ? win : runWindow(timeline, i, id) });
+      out.push({ key: voiceKey, char, pan: panOf(e), windowMs: eachBeat ? win : PHASE_SPAN[e.kind] ? windowMs : runWindow(timeline, i, id) });
     }
     if (ONCE_PER_RUN.has(e.kind)) {
       if (!firstOfRun) continue;
