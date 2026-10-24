@@ -38,6 +38,7 @@
 //   specialTarget  cieľ specialu: "none" (default) | "dir" (L/R) | "wolf" (8 smerov) | "cell" (vojak) |
 //                  "trap" (bunka bez blokovania) - alebo funkcia (ui) → typ
 //   victoryAnim    anim malej postavy pri výhre (default: slučka specialAnim)
+//   victoryVoiceLoop  hlas víťaza (voice.win.<postava>) sa opakuje, kým beží víťazná animácia (Luffyho smiech)
 //   headIdleFile   pás, z ktorého sa reže HUD hlava (default Idle.png; Escanor WeakIdle.png)
 //   boardFit       { fill, refH, offY } - menší fill na doske normalizovaný na výšku framu (fill × fh/refH),
 //                  ukotvený na nohy (anchorY 1) a zdvihnutý o offY px (default fill 0.95, stred) - aj ghost

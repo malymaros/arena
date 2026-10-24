@@ -39,6 +39,7 @@ export default {
   projectile: { orient: "rotate" },
   // výhra: Win.png na malej postave (Luffy nemá specialAnim)
   victoryAnim: { file: "Win.png", fps: 6, loop: true },
+  victoryVoiceLoop: true, // smiech (voice.win.luffy) sa opakuje, kým beží víťazná animácia
   // figúra cez ~0.88 framu → pri fill 0.95 by bol „obrovský": menší fill normalizovaný na výšku Idle framu (128),
   // ukotvený na nohy a zdvihnutý o 4 px na nožnú líniu mágov (mág pri fille 0.95 sedí ~8 px nad spodkom canvasu)
   boardFit: { fill: 0.58, refH: 128, offY: 4 },

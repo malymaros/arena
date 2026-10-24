@@ -112,7 +112,8 @@ mirroru (`luffy_punch`, okno celej ruky) → vlastný `voice.special1`.
 nárazu ho nenahrádza (na rozdiel od `hit.<postava>`, ktorý náraz prebije). Zatiaľ ho má Luffy.
 
 **Hlas víťaza:** `voice.win.<postava>` zaznie raz na začiatku víťaznej animácie na konci hry aj v medzihre série
-(`startVictory` v `public/client/timeline.js`, mimo timeline - okno nemá, `keep`). Zatiaľ ho má Luffy (smiech).
+(`startVictory` v `public/client/timeline.js`, mimo timeline - okno nemá, `keep`). Zatiaľ ho má Luffy (smiech);
+so `victoryVoiceLoop` v dátach postavy sa hlas opakuje dokola, kým víťazná animácia trvá (ďalšia hra / retry ho zastaví).
 
 **Hlasitosť hlasov:** `node tools/voice-loudness.mjs --write` premeria všetky hlasy (`custom/` nahrávky) v **LUFS**
 (EBU R128, v úseku `trim`) a nastaví `vol` na cieľ **−18 LUFS** s rezervou vrcholu −1 dBFS (`vol` najviac 2 =

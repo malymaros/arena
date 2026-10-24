@@ -14,7 +14,7 @@ import { hideConnError, updateUiLocks, syncGoldenHalves, syncGoldDualHalves } fr
 import { stopTurnTimer } from "/client/turn-timer.js";
 import { clearActionLogs, appendActionLog } from "/client/action-log.js";
 import { clearProjectiles, spawnFloat, cloneFloat, spawnCellFloat, spawnTrapBreak, spawnClonePuff, spawnManaFloat, spawnDamageFloat, spawnChargeAura, spawnTileConsumeFx, spawnStoneShatter, spawnCloneSummonFx } from "/client/board-fx.js";
-import { SIZE_LEVEL, ACTION_ANIMS } from "/chars/index.js";
+import { SIZE_LEVEL, ACTION_ANIMS, CHARS_BY_KEY } from "/chars/index.js";
 import { renderHUD } from "/client/hud.js";
 import { renderGrid } from "/client/grid.js";
 import { positionActors, computeFacing, currentFacing } from "/client/placement.js";
@@ -85,11 +85,30 @@ function showGameOverSequence(winner) {
   }, waitAttack);
 }
 
-// víťazná animácia + hlas víťaza (voice.win.<postava>, napr. Luffyho smiech) - raz na jej začiatku
+// víťazná animácia + hlas víťaza (voice.win.<postava>) na jej začiatku. Postava s victoryVoiceLoop (Luffyho smiech)
+// ho opakuje dokola, kým víťazná animácia trvá - keď ju niečo prepne (ďalšia hra, retry, reset), smiech stíchne.
+let victoryVoice = null; // { slot, handle, timer } práve hrajúceho opakovaného hlasu
+function stopVictoryVoice() {
+  if (!victoryVoice) return;
+  clearInterval(victoryVoice.timer);
+  victoryVoice.handle?.stop();
+  victoryVoice = null;
+}
 function startVictory(winner) {
   if (winner !== "p1" && winner !== "p2") return;
   setAnim(winner, "victory");
-  sfx("voice.win", { char: state?.[winner]?.char, pan: winner === "p1" ? -0.4 : 0.4 });
+  stopVictoryVoice();
+  const char = state?.[winner]?.char;
+  const opts = { char, pan: winner === "p1" ? -0.4 : 0.4 };
+  if (!CHARS_BY_KEY[char]?.victoryVoiceLoop) { sfx("voice.win", opts); return; }
+  const stillWinning = () => actors.animState[winner]?.key === "victory" && state?.[winner]?.char === char;
+  const v = victoryVoice = { slot: winner, handle: null, timer: setInterval(() => { if (!stillWinning()) stopVictoryVoice(); }, 250) };
+  const play = () => Promise.resolve(sfx("voice.win", opts)).then(h => {
+    if (victoryVoice !== v || !h) return; // medzitým zastavené / zvuk vypnutý
+    v.handle = h;
+    h.ended.then(() => { if (victoryVoice === v && stillWinning()) play(); });
+  });
+  play();
 }
 
 // animácia konca hry (smrť porazeného + víťazstvo) bez finálneho overlayu - pre medzihru série
