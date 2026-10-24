@@ -168,6 +168,7 @@ export const SOUNDS = {
   "voice.special": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku špeciálu; prázdne = ticho" },
   "voice.special2": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 2 (Jotaro po THE WORLD, Luffy po guli) a Jotarovho Special 1; prázdne = ticho" },
   "voice.special1": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 1 v slote mirroru (Luffyho ruka - celá ruka natiahnutie → úder → stiahnutie); prázdne = ticho" },
+  "voice.hurt":    { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas zasiahnutej postavy (vzdych) popri zvuku nárazu hit/hit_heavy; prázdne = ticho" },
   "voice.win":     { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas víťaza pri víťaznej animácii na konci hry (aj medzihra série); prázdne = ticho" },
 
   /* ---------- hlasy mágov (vlastník, 17.10.) - custom/mages/<postava>-<intro|range|melee|special>.mp3 ---------- */
@@ -214,6 +215,14 @@ export const SOUNDS = {
   "voice.melee.jotaro": { files: ["custom/mages/jotaro-melee.mp3"], vol: 0.16, fit: "keep", trim: { "custom/mages/jotaro-melee.mp3": [80,4650] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu)" },
   "voice.special.jotaro": { files: ["custom/mages/jotaro-special.mp3"], vol: 0.19, fit: "keep", trim: { "custom/mages/jotaro-special.mp3": [40,2042] }, status: "picked", note: "hlas THE WORLD (timestop_start)" },
   "voice.special2.jotaro": { files: ["custom/mages/jotaro-special2.mp3"], vol: 0.23, fit: "keep", trim: { "custom/mages/jotaro-special2.mp3": [80,2640] }, status: "picked", note: "hlas na začiatku Special 2 (po THE WORLD nahrádza special)" },
+  "ui.hover_char.luffy": { files: ["custom/mages/luffy-intro.mp3"], vol: 0.33, fit: "keep", trim: { "custom/mages/luffy-intro.mp3": [0,1340] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
+  "voice.attack.luffy": { files: ["custom/mages/luffy-range.mp3"], vol: 0.2, fit: "keep", trim: { "custom/mages/luffy-range.mp3": [40,800] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
+  "voice.melee.luffy": { files: ["custom/mages/luffy-melee.mp3"], vol: 0.37, fit: "keep", trim: { "custom/mages/luffy-melee.mp3": [20,4470] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu)" },
+  "voice.special.luffy": { files: ["custom/mages/luffy-special.mp3"], vol: 0.4, fit: "keep", trim: { "custom/mages/luffy-special.mp3": [130,2610] }, status: "picked", note: "hlas gule (special raz za hru) - na začiatku nafúknutia; guľa trvá 4,6 s" },
+  "voice.special1.luffy": { files: ["custom/mages/luffy-mirror.mp3"], vol: 0.41, fit: "keep", status: "picked", note: "hlas ruky (Special 1 v slote mirroru) - okno celej ruky 1,5 s / 2,6 s so zásahom" },
+  "voice.special2.luffy": { files: ["custom/mages/luffy-special2.mp3"], vol: 0.33, fit: "keep", trim: { "custom/mages/luffy-special2.mp3": [40,4270] }, status: "picked", note: "hlas Special 2 (po guli) - 3 údery, okno 4,86 s" },
+  "recharge.luffy": { files: ["custom/mages/luffy-recharge.mp3"], vol: 0.53, fit: "keep", status: "picked", note: "recharge = jedenie mäsa (okno 1,08 s, dohrá v pauze pred ďalšou akciou)" },
+  "voice.hurt.luffy": { files: ["custom/mages/luffy-hurt.mp3"], vol: 0.24, fit: "keep", trim: { "custom/mages/luffy-hurt.mp3": [20,450] }, status: "picked", note: "Luffyho vzdych pri zásahu (popri zvuku nárazu)" },
   "voice.win.luffy": { files: ["custom/mages/luffy-win.mp3"], vol: 0.54, fit: "keep", trim: { "custom/mages/luffy-win.mp3": [100,6180] }, status: "picked", note: "smiech pri víťaznej animácii (Win.png)" },
   "ui.hover_char.onre": { files: ["custom/mages/onre-intro.mp3"], vol: 1.82, fit: "keep", trim: { "custom/mages/onre-intro.mp3": [20,1160] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
   "voice.attack.onre": { files: ["custom/mages/onre-range.mp3"], vol: 0.66, fit: "keep", trim: { "custom/mages/onre-range.mp3": [0,1180] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },

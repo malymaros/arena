@@ -1,4 +1,5 @@
-// tools/voice-loudness.mjs - vyrovnanie hlasitosti HLASOV (voice.*, ui.hover_char.* z custom/ nahrávok + démon custom/demon/ + Last Hope custom/hope/)
+// tools/voice-loudness.mjs - vyrovnanie hlasitosti HLASOV (voice.*, ui.hover_char.* z custom/ nahrávok + démon custom/demon/ + Last Hope custom/hope/
+// + ostatné nahrávky postáv custom/mages/, napr. Luffyho recharge a zásah)
 // podľa vnímanej hlasitosti LUFS (EBU R128 / ITU-R BS.1770: K-váženie, bloky 400 ms, hradlá -70 LUFS a -10 LU),
 // meranej v úseku, ktorý hra naozaj prehráva (trim). vol = zosilnenie na cieľ TARGET_LUFS, ale vrchol nahrávky
 // nesmie prekročiť PEAK_MAX_DBFS (inak by sa skreslila) a vol najviac MAX_VOL.
@@ -31,8 +32,9 @@ const MEASURE = `(async () => {
   const { SOUNDS } = await import("/sounds/manifest.js");
   const out = [];
   for (const [key, e] of Object.entries(SOUNDS)) {
-    // hlasy postáv + vlastné nahrávky démona (REAPER, custom/demon/), Last Hope (custom/hope/) a FINAL ROUND (custom/round/)
-    if (!(/^(voice\\.|ui\\.hover_char\\.)/.test(key) || /^custom\\/(demon|hope|round)\\//.test(e.files?.[0] || "")) || !e.files?.[0]?.startsWith("custom/")) continue;
+    // hlasy postáv + vlastné nahrávky démona (REAPER, custom/demon/), Last Hope (custom/hope/), FINAL ROUND (custom/round/)
+    // a ostatné nahrávky postáv v custom/mages/ (napr. Luffyho recharge a zásah)
+    if (!(/^(voice\\.|ui\\.hover_char\\.)/.test(key) || /^custom\\/(demon|hope|round|mages)\\//.test(e.files?.[0] || "")) || !e.files?.[0]?.startsWith("custom/")) continue;
     const file = e.files[0];
     const a = await new OfflineAudioContext(1, 48000, 48000).decodeAudioData(await (await fetch("/sounds/" + file)).arrayBuffer());
     const sr = a.sampleRate, tr = e.trim?.[file] || [0, a.duration * 1000];

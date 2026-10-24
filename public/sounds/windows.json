@@ -2727,6 +2727,90 @@
    1296
   ]
  },
+ "voice.hurt": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.fire": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.jotaro": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.luffy": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.minotaur": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.naruto": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "voice.hurt.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "voice.melee": {
   "med": 4860,
   "values": [

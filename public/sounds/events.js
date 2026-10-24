@@ -79,7 +79,7 @@ export const HIT_HEAVY_DMG = 8;
 export const TILE_KINDS = ["dmg", "heal", "mana", "ik"];
 // všetky kľúče, ktoré táto mapa môže vydať (test/sounds.mjs overí, že sú v registri)
 export const PLAYED_KEYS = [...new Set([...Object.values(DIRECT), ...Object.values(VOICE),
-  ...Object.values(VOICE_BY_CHAR).flatMap(Object.values), "hit", "hit_heavy", "move", "dash", ...TILE_KINDS.map(t => `tile.${t}`)])];
+  ...Object.values(VOICE_BY_CHAR).flatMap(Object.values), "hit", "hit_heavy", "voice.hurt", "move", "dash", ...TILE_KINDS.map(t => `tile.${t}`)])];
 
 // stav medzi frame-ami jednej timeline (nová timeline → newTracker / resetTracker)
 export function newTracker() { return { prevRun: new Set(), lastAction: { p1: null, p2: null } }; }
@@ -118,7 +118,11 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
     if (e.kind === "action" && (e.from === "p1" || e.from === "p2")) tr.lastAction[e.from] = e.action?.type || null;
     if (e.kind === "hit") {
       // char = ZASIAHNUTÁ postava (hit.<char> = jej hlas)
-      if (e.dmg > 0) out.push({ key: e.dmg >= HIT_HEAVY_DMG ? "hit_heavy" : "hit", char: charOf(e.target), pan: panOf(e), windowMs: win });
+      if (e.dmg > 0) {
+        out.push({ key: e.dmg >= HIT_HEAVY_DMG ? "hit_heavy" : "hit", char: charOf(e.target), pan: panOf(e), windowMs: win });
+        // hlas zasiahnutej postavy (vzdych) - samostatná vrstva popri zvuku nárazu, ako ostatné hlasy
+        out.push({ key: "voice.hurt", char: charOf(e.target), pan: panOf(e), windowMs: win });
+      }
       continue;
     }
     if (e.kind === "tile_proc") {

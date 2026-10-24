@@ -108,6 +108,9 @@ vlastnej bunke, úder po charge, úder pasce) → `voice.melee`.
 Luffy: guľa (`luffy_ball_form`) → `voice.special`, Special 2 (efekt `special`, 3 údery) → `voice.special2`, ruka v slote
 mirroru (`luffy_punch`, okno celej ruky) → vlastný `voice.special1`.
 
+**Hlas pri zásahu:** `voice.hurt.<postava>` (vzdych zasiahnutej postavy) znie popri zvuku nárazu `hit`/`hit_heavy` -
+nárazu ho nenahrádza (na rozdiel od `hit.<postava>`, ktorý náraz prebije). Zatiaľ ho má Luffy.
+
 **Hlas víťaza:** `voice.win.<postava>` zaznie raz na začiatku víťaznej animácie na konci hry aj v medzihre série
 (`startVictory` v `public/client/timeline.js`, mimo timeline - okno nemá, `keep`). Zatiaľ ho má Luffy (smiech).
 
