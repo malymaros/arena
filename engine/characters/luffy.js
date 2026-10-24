@@ -5,9 +5,10 @@
 //   Special (guľa)          = nafúkne sa do gule, prekotúľa sa o 1 bunku ←/→ a vybuchne na 3×3 okolo dopadovej
 //                             bunky (vrátane nej, Luffyho nezraní). Kotúľ z krajného stĺpca von = spálený special
 //                             (wall rule: mana preč, guľa narazí do steny, bez výbuchu). Raz za hru (worldUsed).
-//   Special 2               = po guli: susedná bunka ←/→ (presne ako Jotarov Special 2).
+//   Special 2               = po guli: susedná bunka ←/→ (ako Jotarov Special 2), ale v SPECIAL_REPEAT úderoch ako
+//                             bežné speciály (gatling 3×, zásah po poslednom) - nie jeden krátky beat ako Jotaro.
 import { LUFFY_MELEE_DMG, LUFFY_S1_COST, LUFFY_S1_DMG, LUFFY_BALL_DMG, LUFFY_S2_COST, LUFFY_S2_DMG,
-         SPECIAL_COST, SMALL_DELAY_MS, MOVE_MS, ANIM_SLOW } from "../constants.js";
+         SPECIAL_COST, SPECIAL_REPEAT, SMALL_DELAY_MS, MOVE_MS, ANIM_SLOW } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 import { lr, zoneStrike } from "./jotaro.js";
 
@@ -88,7 +89,7 @@ export default {
       const me = ctx.game.players[slot];
       if (!lr(dir)) { ctx.pushInvalid(tl, slot); return; }
       if (!me.worldUsed) { ball(ctx, slot, tl, dir); return; }
-      zoneStrike(ctx, slot, tl, { dir, cells: G.jotaroS2Cells(ctx.game.board, me, dir), cost: LUFFY_S2_COST, dmg: LUFFY_S2_DMG, kind: "special" });
+      zoneStrike(ctx, slot, tl, { dir, cells: G.jotaroS2Cells(ctx.game.board, me, dir), cost: LUFFY_S2_COST, dmg: LUFFY_S2_DMG, kind: "special", beats: SPECIAL_REPEAT });
     },
   },
 };

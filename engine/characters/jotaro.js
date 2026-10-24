@@ -9,14 +9,15 @@ export const lr = (dir) => dir === "left" || dir === "right";
 
 // smerový úder na zónu cells (Jotaro Special 1 / Special 2, Luffyho Special 2): mana, POWER tile, cast frame
 // a zásah súpera aj jeho klona v zóne (strikeZone). Prázdna zóna (útok z krajného stĺpca von) = wall-rule
-// whiff - akcia sa vykoná, mana je preč, neprečiarkuje sa. kind = efekt cast frame-u (special / special1).
-export function zoneStrike(ctx, slot, tl, { dir, cells, cost, dmg, kind }) {
+// whiff - akcia sa vykoná, mana je preč, neprečiarkuje sa. kind = efekt cast frame-u (special / special1);
+// beats = koľkokrát sa cast frame zopakuje pred zásahom (Jotaro 1, Luffyho Special 2 ako bežné speciály 3).
+export function zoneStrike(ctx, slot, tl, { dir, cells, cost, dmg, kind, beats = 1 }) {
   const { game } = ctx;
   const actor = game.players[slot];
   actor.mana -= cost;
   const pBonus = ctx.powerBoost(slot, tl); // POWER tile: +2; spotreba pri použití (aj whiff/block/odraz)
   if (!cells.length) {
-    ctx.pushStateFrame(tl, [{ kind, from: slot, dir, cells: [], offboard: true }], SPECIAL_BEAT_MS);
+    for (let b = 0; b < beats; b++) ctx.pushStateFrame(tl, [{ kind, from: slot, dir, cells: [], offboard: true }], SPECIAL_BEAT_MS);
     return;
   }
   const foeS = ctx.other(slot);
@@ -24,7 +25,7 @@ export function zoneStrike(ctx, slot, tl, { dir, cells, cost, dmg, kind }) {
   const inZone = !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y));
   const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
   if (inZone) ctx.revealLabyrinths(tl); // istý zásah odhalí prípadný labyrint pred animáciou
-  ctx.pushStateFrame(tl, [{ kind, from: slot, dir, cells }], SPECIAL_BEAT_MS);
+  for (let b = 0; b < beats; b++) ctx.pushStateFrame(tl, [{ kind, from: slot, dir, cells }], SPECIAL_BEAT_MS);
   const raw = dmg * ctx.dealMul(slot) + pBonus;
   if (inZone || cloneStruck) ctx.strikeZone(foeS, inZone, cloneStruck, raw, tl, { kind: "special", bonus: pBonus });
   else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);

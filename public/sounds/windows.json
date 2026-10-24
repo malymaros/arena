@@ -2258,7 +2258,6 @@
  "special": {
   "med": 4860,
   "values": [
-   1620,
    2160,
    2600,
    2833,
@@ -2291,9 +2290,9 @@
   ]
  },
  "special.luffy": {
-  "med": 1620,
+  "med": 4860,
   "values": [
-   1620
+   4860
   ]
  },
  "special.medusa": {
@@ -2907,12 +2906,25 @@
    2160
   ]
  },
+ "voice.special1": {
+  "med": 1512,
+  "values": [
+   1512,
+   2592
+  ]
+ },
+ "voice.special1.luffy": {
+  "med": 1512,
+  "values": [
+   1512,
+   2592
+  ]
+ },
  "voice.special2": {
   "med": 1620,
   "values": [
-   1512,
    1620,
-   2592
+   4860
   ]
  },
  "voice.special2.jotaro": {
@@ -2922,11 +2934,9 @@
   ]
  },
  "voice.special2.luffy": {
-  "med": 1512,
+  "med": 4860,
   "values": [
-   1512,
-   1620,
-   2592
+   4860
   ]
  },
  "wall_bump": {

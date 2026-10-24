@@ -166,7 +166,8 @@ export const SOUNDS = {
   "voice.attack":  { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku basic strely; prázdne = ticho" },
   "voice.melee":   { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku melee (raz, efekt úderu ide zvlášť pri každom švihu); prázdne = ticho" },
   "voice.special": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku špeciálu; prázdne = ticho" },
-  "voice.special2": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 2 (Jotaro po THE WORLD, Luffy po guli) a Special 1 (Jotaro, Luffyho ruka); prázdne = ticho" },
+  "voice.special2": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 2 (Jotaro po THE WORLD, Luffy po guli) a Jotarovho Special 1; prázdne = ticho" },
+  "voice.special1": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 1 v slote mirroru (Luffyho ruka - celá ruka natiahnutie → úder → stiahnutie); prázdne = ticho" },
 
   /* ---------- hlasy mágov (vlastník, 17.10.) - custom/mages/<postava>-<intro|range|melee|special>.mp3 ---------- */
   "ui.hover_char.fire": { files: ["custom/mages/fire-intro.mp3"], vol: 1.09, fit: "keep", trim: { "custom/mages/fire-intro.mp3": [120,1120] }, status: "picked", note: "hover nad kartou pri výbere postavy" },

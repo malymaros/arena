@@ -2133,6 +2133,8 @@ async function main() {
   tl = await playRound(c1, c2, [R, BALL_R, S], [M("right"), R, S]);
   check(fxOf2(tl, "luffy_roll").length === 0 && fxOf2(tl, "special").some(e => e.from === "p1" && (e.cells || []).length === 1),
     "TL3: druhý special = Special 2 (susedná bunka, žiadna guľa)", `special=${JSON.stringify(fxOf2(tl, "special"))}`);
+  check(fxOf2(tl, "special").filter(e => e.from === "p1").length === 3,
+    "TL3: Special 2 má 3 údery ako bežné speciály (zásah po poslednom)", `special=${fxOf2(tl, "special").length}`);
   check(sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 8).length === 1,
     "TL3: Special 2 dáva 8 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
   invariantCheck(tl, "TL3s2");

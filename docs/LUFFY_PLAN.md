@@ -17,7 +17,7 @@ a iný jednorazový special. Čísla sú v `shared/balance.js` (`LUFFY_*`).
 | Mirror | — | **nemá**, slot je Special 1 | — |
 | **Special 1** (mirror slot) | 4 | 2 dmg na ľubovoľnú bunku okrem vlastnej (ghost) bunky | `Punch` (telo) + guma + `PunchFist` |
 | **Special = guľa** (raz za hru) | 5 | kotúľ o 1 bunku ←/→, výbuch 8 dmg na 3×3 okolo dopadovej bunky vrátane nej | `Special_1` (stred + doska) → `Special_2` |
-| **Special 2** (po guli) | 5 | 8 dmg na susednú bunku ←/→ (ako Jotaro) | `Attack_2` + stredový overlay |
+| **Special 2** (po guli) | 5 | 8 dmg na susednú bunku ←/→ (zóna ako Jotaro), 3 údery ako bežné speciály | `Attack_2` 3× + stredový overlay |
 
 ## Pravidlá a hraničné prípady
 - **Special 1** smie mieriť aj na súperovu aktuálnu bunku; zakázaná je len vlastná ghost bunka (server
@@ -28,6 +28,8 @@ a iný jednorazový special. Čísla sú v `shared/balance.js` (`LUFFY_*`).
   kotúli do steny. Kotúľ z krajného stĺpca von = spálený special (mana preč, `wall_bump`, bez výbuchu).
   Kotúľ na súperovu bunku je v poriadku (súper v strede výbuchu). Výbuch Luffyho nezraní. Mirror vráti 8.
   POWER tile sa počíta zo štartovej bunky. Kotúľ ťahá Ariadninu niť a spúšťa pasce (`trackSteps`).
+- **Zvuky/hlasy:** guľa = `voice.special`, Special 2 = `voice.special2` (okno 4,86 s), ruka = vlastný `voice.special1`
+  (okno celej ruky 1,5 s / 2,6 s so zásahom).
 - **Labyrint:** všetky Luffyho zásahy reálneho súpera volajú `revealLabyrinths` pred animáciou; prekliaty
   Luffy mieri rukou naslepo.
 - **Turnaj:** draftovateľný len P1; swap do/z Luffyho zakázaný (side-postava).

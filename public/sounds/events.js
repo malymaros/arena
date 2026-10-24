@@ -42,10 +42,10 @@ export const VOICE = {
 };
 // postava, pre ktorú efekt znamená iný hlas: Jotarov `special` je vždy Special 2 (THE WORLD má timestop_start),
 // jeho Special 1 (útok v slote mirroru) hrá tiež hlas Special 2. Luffy rovnako: `special` = Special 2 (guľa má
-// luffy_ball_form), ruka v slote mirroru (luffy_punch) = hlas Special 2
+// luffy_ball_form); ruka v slote mirroru (luffy_punch) má vlastný hlas Special 1
 export const VOICE_BY_CHAR = {
   jotaro: { special: "voice.special2", special1: "voice.special2" },
-  luffy: { special: "voice.special2", luffy_punch: "voice.special2" },
+  luffy: { special: "voice.special2", luffy_punch: "voice.special1" },
 };
 // postava, ktorej hlas zaznie pri KAŽDOM frame behu (nie len raz): Onryō pri melee povie hlášku pri každom
 // z 3 švihov (krátka hláška sa zmestí do beatu) - ako vlkolak, ktorého nahrávka melee má tri opakovania
