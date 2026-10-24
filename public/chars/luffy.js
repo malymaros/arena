@@ -34,6 +34,9 @@ export default {
   },
   // melee = Attack_1 (ako basic), recharge = jedenie mäsa
   actionAnims: { melee: "attack1_loop", recharge: "luffyeat" },
+  // letiaca päsť (Charge.png mieri doprava) - čistá rotácia podľa smeru, aj po odraze (ako Vampire/Onryō/Jotaro);
+  // bez nej sa ľavé diagonály kreslili prehodene (scaleX + rotate)
+  projectile: { orient: "rotate" },
   // výhra: Win.png na malej postave (Luffy nemá specialAnim)
   victoryAnim: { file: "Win.png", fps: 6, loop: true },
   // figúra cez ~0.88 framu → pri fill 0.95 by bol „obrovský": menší fill normalizovaný na výšku Idle framu (128),
