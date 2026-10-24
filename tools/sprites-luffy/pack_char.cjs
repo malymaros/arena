@@ -39,7 +39,6 @@ const ACTIONS = {
   Special_6: ["L_Rifle"],                                     // tocena ruka (dolava)
   Special_7: ["L_BalloonBounce"],                             // odrazenie utoku balonom
   Recharge:  ["L_Balloon"],                                   // nafuknutie balona
-  Recharge2: ["L_TwinFists"],                                 // obrie paste pri hrudi
   Charge:    ["L_FistJet"],                                   // letiaca blur-pesta — projektil
   Hurt:      ["L_Hurt"],
   Dead:      ["L_Lose"],                                      // sediaci porazeny

@@ -17,8 +17,11 @@
 // { <nová verzia>: { "starý.kľúč": "nový.kľúč" | null (zrušený) } } - staršie balíky sa tak preložia.
 // test/sound-pack.mjs drží snímku kľúčov každej verzie (test/fixtures/sound-api-<n>.json) a zmenu bez
 // zvýšenia verzie odmietne.
-export const SOUND_API_VERSION = 1;
-export const KEY_MIGRATIONS = {};
+export const SOUND_API_VERSION = 2;
+export const KEY_MIGRATIONS = {
+  // 2: Luffy prerobený na zrkadlo Jotara - bez gearov a priťahovania; gumové natiahnutie = nová ruka (Special 1)
+  2: { "luffy_pull": "luffy_punch", "luffy_gp": null, "luffy_chomp": null },
+};
 
 export const SOUND_SOURCES = {
   "kenney-impact-sounds":    { title: "Impact Sounds",    author: "Kenney", url: "https://kenney.nl/assets/impact-sounds",    license: "CC0 1.0" },
@@ -155,11 +158,9 @@ export const SOUNDS = {
   "vamp_charge":   { files: [RPG + "cloth4.ogg"], vol: 0.6, status: "default" },
   "vamp_strike":   { files: [RPG + "knifeSlice2.ogg"], vol: 0.6, status: "default" },
   "special1":      { files: vars(IMP + "impactPunch_heavy_", 5), vol: 0.6, status: "default", note: "Jotaro Special 1 (ORA)" },
-  "luffy_pull":    { files: [RPG + "creak2.ogg"], vol: 0.6, status: "default", note: "gumové natiahnutie" },
-  "luffy_gp":      { files: [RPG + "creak3.ogg"], vol: 0.6, status: "default", note: "Gear 3 nádych" },
+  "luffy_punch":   { files: [RPG + "creak2.ogg"], vol: 0.6, status: "default", note: "Special 1 - gumové natiahnutie ruky" },
   "luffy_roll":    { files: vars(IMP + "impactWood_medium_", 5), vol: 0.5, status: "default" },
   "luffy_explode": { files: [SCI + "explosionCrunch_002.ogg"], vol: 0.6, status: "default" },
-  "luffy_chomp":   { files: [RPG + "chop.ogg"], vol: 0.6, status: "default" },
 
   /* ---------- HLAS postavy (samostatná vrstva popri efekte, raz na začiatku akcie) - kľúč voice.<akcia>.<postava> ---------- */
   "voice.attack":  { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku basic strely; prázdne = ticho" },

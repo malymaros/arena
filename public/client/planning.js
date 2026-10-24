@@ -1,6 +1,5 @@
 // public/client/planning.js - stav PLÁNOVANIA kola na klientovi (čo si hráč naklikal pred lock_in).
 // Jeden objekt namiesto rozhádzaných globálnych príznakov v client.js; stav prehrávania je v playback.js.
-import { CHARS_BY_KEY } from "/chars/index.js";
 import { state, me } from "/client/session.js";
 
 export const planning = {
@@ -18,7 +17,7 @@ export const planning = {
   lastStandArmed: false,
   // objednaný Last Hope (úvodná akcia nebuffnutého hráča vo final kole)
   lastHopeArmed: false,
-  // otvorený picker: null | "move" | "attack" | "attack_diag" | "dash" | "special" | "special_cell" | "special_wolf" | "special1"
+  // otvorený picker: null | "move" | "attack" | "attack_diag" | "dash" | "special" | "special_cell" | "special_wolf" | "special1" | "special1_cell"
   openPicker: null,
 };
 
@@ -34,8 +33,8 @@ export function resetPlanning() {
   planning.lockedIn = false;
 }
 
-// kontext plánovania pre tlačidlá a pickery (planUi postavy z registra: mód, dosah, odznaky…)
+// kontext plánovania pre premenlivé tlačidlá (Special 2 po jednorazovom speciale - Jotaro, Luffy)
 export function buttonUi() {
   const st = state?.[me];
-  return { st, worldUsed: !!st?.worldUsed, ...CHARS_BY_KEY[st?.char]?.planUi?.(st, planning.myQueue) };
+  return { st, worldUsed: !!st?.worldUsed };
 }

@@ -1,15 +1,19 @@
 // engine/characters - register postáv (Etapa 4 refaktoru, docs/REFACTOR_PLAN.md).
 // Každá postava deklaruje kit (default { attack: "ortho", mirrorSlot: "mirror" }):
-//   attack:     "ortho" (4 ortogonálne smery) | "diag" (4 diagonálne, bounce strela) | "luffy" (podľa formy)
-//   mirrorSlot: "mirror" | "special1" (Jotaro - v slote mirroru má vlastnú akciu)
+//   attack:     "ortho" (4 ortogonálne smery) | "diag" (4 diagonálne, bounce strela)
+//   mirrorSlot: "mirror" | "special1" (Jotaro, Luffy - v slote mirroru majú vlastnú akciu, viď special1)
 //   meleeDmg:   dmg vlastného melee (default MELEE_DMG)
 //   healTile:   "plus1" | "full" (Lightning - heal dlaždica lieči na plné HP)
 // a svoj special: { resolve, validate? }:
 //   resolve(ctx, slot, tl, { dir, cell })  - vyhodnotenie (mana gate už prebehol v doSpecial); môže vrátiť
 //                                            PAUSE (Jotarov THE WORLD) - engine ho prepošle hore do kola
 //   validate(ctx, a, sim)                  - kontrola argumentov specialu pri lock_in (false = odmietnuť);
-//                                            sim = { x, y, form, worldUsed, foe } - GHOST stav v čase specialu,
+//                                            sim = { x, y, worldUsed, foe } - GHOST stav v čase specialu,
 //                                            foe = viditeľný súper (null, ak je hráč v labyrinte)
+// a ak má kit.mirrorSlot "special1", aj special1: { args, resolve, validate? }:
+//   args: "dir" (left/right - Jotaro) | "cell" (bunka na ploche - Luffy) - tvar argumentu akcie
+//   resolve(ctx, slot, tl, { dir, cell })  - vyhodnotenie VRÁTANE mana gate-u (cena sa líši per postava)
+//   validate(ctx, a, sim)                  - ako pri speciale (sim = ghost stav v čase akcie)
 // Háčiky on: { … } (všetky voliteľné; p = hráč, info = výsledok roundStart, ak postava nebola v kole vymenená):
 //   deploy(ctx, p)                     - nasadenie (voľba postavy / swap), po spoločnom resete stavu postáv
 //   hitTaken(ctx, p)                   - súper spôsobil hráčovi stratu HP (zásah aj odraz; nie tiles/statusy)

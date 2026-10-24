@@ -40,8 +40,8 @@ function validTimestopQueue(queue, slot) {
   const char = E.game.players[slot]?.char; // tvar basicu podľa kitu (Jotaro strieľa diagonálne)
   for (const a of queue) {
     if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
-    if (a.type === "attack" && !E.attackDirOk(char, a.dir, E.game.players[slot]?.form)) return false;
-    if (a.type === "special1" && a.dir !== "left" && a.dir !== "right") return false;
+    if (a.type === "attack" && !E.attackDirOk(char, a.dir)) return false;
+    if (a.type === "special1" && !E.special1ArgsOk(char, a)) return false;
   }
   return true;
 }

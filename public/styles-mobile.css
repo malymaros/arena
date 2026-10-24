@@ -291,9 +291,8 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .touch .char-ability .ca-text { font-size: 18px; max-width: 600px; height: calc(6 * 1.7em); min-height: 0; overflow: hidden; }
 .touch .char-ability .ca-stats { font-size: 22px; height: 34px; min-height: 0; }
 .touch .char-ability .ca-extra { height: 50px; }
-.touch .char-ability .ca-pride img, .touch .char-ability .ca-moon img, .touch .char-ability .ca-luffy img { height: 50px; }
-.touch .char-ability .ca-luffy img { width: 50px; }
-.touch .char-ability .ca-pride .pride-num, .touch .char-ability .ca-moon .ca-moon-dmg, .touch .char-ability .ca-luffy .ca-luffy-dmg { font-size: 22px; }
+.touch .char-ability .ca-pride img, .touch .char-ability .ca-moon img { height: 50px; }
+.touch .char-ability .ca-pride .pride-num, .touch .char-ability .ca-moon .ca-moon-dmg { font-size: 22px; }
 .touch #char-select #touch-pick {
   grid-area: pick; justify-self: stretch; align-self: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: calc(11px * var(--ui-k, 1)); padding: calc(12px * var(--ui-k, 1)) calc(10px * var(--ui-k, 1));
@@ -326,7 +325,7 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 /* tlačidlá nesú len piktogram - cena a účinok sú v štítku po prvom ťuknutí (touch-label.js) */
 .touch .btn.act .cost { display: none; }
 .touch .btn.act > .pix-ico:not(.charge-mark), .touch .golden-half > .g-ico { width: 54px; height: 54px; }
-/* skryté postavy (Vampire/Onryō charge, Jotaro Special 1, Luffy Gear): fialové „???" cez celé tlačidlo */
+/* skryté postavy (Vampire/Onryō charge, Special 1 Jotara a Luffyho): fialové „???" cez celé tlačidlo */
 .touch .controls-row .btn.act > .pix-ico.charge-mark { width: 100%; height: 100%; font-size: 40px; letter-spacing: -2px; }
 .touch .btn.golden { width: 196px; }
 .touch .golden-half { font-size: 40px; padding: 10px 4px; }

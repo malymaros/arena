@@ -16,7 +16,7 @@ import { appScale, isTouch } from "/client/viewport.js";
 
 /* ---------- Char select (preview) ---------- */
 export let abilityHoverChar = null;     // mág, ktorého špeciál práve vizualizujeme vo výbere (hover)
-let abilityFx = null;            // náhľad specialu z registra fx (preview → { frame, close }; Luffy: cyklenie módu base↔gear3)
+let abilityFx = null;            // náhľad specialu z registra fx (preview → { frame, close }; Escanor pride, vlkolakov mesiac)
 let abilityCasterCanvas = null;  // malý canvas v bunke castera mini-dosky (cyklický cast)
 let abilitySide = null;          // strana (p1/p2), za ktorú sa náhľad kreslí - paleta a zrkadlenie (okno postavy v hre: aj súperova)
 // preview loop
@@ -108,7 +108,7 @@ function drawPreviewCard(ctx, cvs, key, now) {
 // náhľad specialu: fx registra (cyklenie pride/mesiaca/gearu) + malý castiaci mág v bunke castera mini-dosky.
 // Volá ho slučka výberu postáv aj okno postavy v hre (showCharPeek).
 function drawAbilityCaster(now) {
-  if (abilityHoverChar) abilityFx?.frame(now);                  // register fx (Luffy: cyklí mód base↔gear3 - zóna dáma/veža + dmg 4/8)
+  if (abilityHoverChar) abilityFx?.frame(now);                  // register fx (Escanor pride, vlkolakov mesiac - cyklí sa)
 
   // malý castiaci mág v bunke castera mini-dosky - animácia špeciálu (efektový sprite). Výnimka previewIdleCaster
   // (Jotaro, Luffy): casterom na mini-doske je ON (nie stredová póza), takže kreslíme jeho IDLE (ukotvený na nohy,
@@ -256,7 +256,7 @@ function renderAbilityPreview(char, side = me) {
     : def.target
       ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
       : CHAR_FX[char]?.previewZone
-        ? new Set() // zónu kreslí náhľad z registra fx (Escanor pride, Luffy dogúľanie dáma/veža - cyklí sa)
+        ? new Set() // zónu kreslí náhľad z registra fx (Escanor pride - cyklí sa)
         : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
@@ -280,8 +280,7 @@ function renderAbilityPreview(char, side = me) {
     }
     grid.appendChild(c);
   }
-  // náhľad z registra fx (Escanor: cyklenie pride 0→3 + lev; vlkolak: fáza mesiaca + dmg; Luffy: mód base↔gear3 -
-  // zóna dáma/veža + badge + dmg 4/8)
+  // náhľad z registra fx (Escanor: cyklenie pride 0→3 + lev; vlkolak: fáza mesiaca + dmg)
   abilityFx = CHAR_FX[char]?.preview?.({ grid, caster, dir }) || null;
   document.getElementById("ca-title").textContent = "SPECIAL ATTACK";
   // desc môže obsahovať herné ikony (data-pix flame/drop) a <br> → obal do JEDNÉHO divu (.ca-text je flex,

@@ -13,5 +13,5 @@ export function initCharFx(C) {
 export const fxAll = (hook, ...args) => Object.values(CHAR_FX).filter(fx => fx[hook]).map(fx => fx[hook](...args));
 // generický stredový overlay / casting póza efektu kind sa preskočí - choreografiu vlastní register fx (Jotaro)
 export const fxOwnsCenter = (char, kind) => !!CHAR_FX[char]?.ownCenter?.includes(kind);
-// koniec hry/medzihra: uprac vlastné overlaye postáv (napr. Luffyho stredový hero-shot), ktoré renderGrid nemaže
+// koniec hry/medzihra: uprac vlastné overlaye postáv (napr. Luffyho stredová guľa a ruka), ktoré renderGrid nemaže
 export const clearCharOverlays = () => Object.values(CHAR_FX).forEach(fx => fx.clearOverlays?.());

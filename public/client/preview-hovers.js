@@ -87,7 +87,7 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   btn.addEventListener("mouseenter", () => {
     const p = ghostPos();
     if (!p) return;
-    showPreviewCells(cellsForAimPreview(p, dir, ghostCharAt())); // char kvôli Luffy gear3 (zastav na súperovi)
+    showPreviewCells(cellsForAimPreview(p, dir, ghostCharAt())); // char kvôli diagonálnej odrazovej strele side-postáv
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });

@@ -1,13 +1,13 @@
 // public/client/anim.js - animácie figúr: klientske časovanie (MOVE_MS, POSE_TAIL_MS, NEW_ROUND_MS - CSS premenné
 // --move-ms/--charge-ms), texty nevykonaných akcií (INVALID_MSG), fade figúry pri teleporte a stav animácie
 // (setAnim/currentAnim nad actors.animState).
-import { ANIM_SLOW, CHARGE_STEP_MS } from "/shared/timing.js";
+import { CHARGE_STEP_MS, MOVE_MS } from "/shared/timing.js";
 import { actorP1, actorP2 } from "/client/dom.js";
 import { ANIM_DEF } from "/client/sprites.js";
 import { actors } from "/client/actors.js";
 
 // === Timing ===
-export const MOVE_MS = Math.round(700 * ANIM_SLOW); // pohyb na boarde; CSS číta --move-ms (nastavené nižšie)
+export { MOVE_MS }; // pohyb na boarde (shared/timing.js); CSS číta --move-ms (nastavené nižšie)
 // POZN.: neslučkové animácie (attack/attack2/hurt/dead) sa kvôli drawSprite(t=now) reálne neprehrávajú
 // frame po frame - len držia poslednú pózu. Preto ich NEdržíme fixný čas (predtým 2400 ms = vizuálny „drag“),
 // ale presne po dobu daného timeline frame-u (frame.delayMs), aby póza zmizla keď začne ďalšia akcia.

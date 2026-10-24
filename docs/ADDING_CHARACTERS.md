@@ -76,7 +76,7 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
       sprístupní pre `choose_character`, `choose_team` (turnaj) aj validáciu.
 - [ ] **`engine/characters/<postava>.js`** + registrácia v `engine/characters/index.js` — postava sa
       deklaruje na jednom mieste (vzor: `escanor.js`, `soldier.js`, zónové `simple.js`):
-      - `kit`: `attack` (`ortho`/`diag`/`luffy`), `mirrorSlot` (`mirror`/`special1`), `meleeDmg`, `healTile`
+      - `kit`: `attack` (`ortho`/`diag`), `mirrorSlot` (`mirror`/`special1` + register `special1` - Jotaro smer, Luffy bunka), `meleeDmg`, `healTile`
         → validácia fronty aj auto-fill sa riadia kitom, netreba písať vetvy podľa mena;
       - `special.resolve(ctx, slot, tl, { dir, cell })` — vyhodnotenie (mana gate je v `doSpecial`);
         dmg ide VÝHRADNE cez `ctx.strikeZone` / `ctx.strikeCell` (damage pipeline - obrany, klon, labyrint,
@@ -85,7 +85,7 @@ Ak niečo z toho nevieš, **radšej sa opýtaj** — special mechanika a obrann�
       - pasívky cez háčiky `on: { deploy, hitTaken, roundStart, afterActions, roundEnd, roundEndFx }` (vzor:
         Escanor pride, vlkolak moon, Pútnikov regen); vlastný stav hráča pridaj do `newPlayer`/`cloneActor`
         a jeho reset pri nasadení do `deployReset`;
-      - iná mechanika základnej akcie = prepísanie `basic` / `recharge` / `dash` / `melee` (vzor: Luffy, Vampire).
+      - iná mechanika základnej akcie = prepísanie `dash` / `melee` (vzor: Vampire), útok v slote mirroru = `special1` (vzor: Jotaro, Luffy).
 - [ ] **Geometriu zóny** (ak ju kreslí aj klient) daj do `shared/geometry.js` a volaj ju zo special aj
       z klientského `cellsForSpecialPreview` - nikdy ju nepíš dvakrát.
 - [ ] Ak special zavádza **nový stav** hráča (napr. `stone`, `labyrinth`, `clone`) — pridaj pole do

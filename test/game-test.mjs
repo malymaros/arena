@@ -2068,6 +2068,96 @@ async function main() {
   }
   }
 
+  /* ==================== LUFFY (side-bound P1, zrkadlo Jotara) ==================== */
+  {
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const PUNCH = (x, y) => ({ type: "special1", cell: { x, y } }); // Special 1 - naťahovacia ruka na bunku
+  const BALL_R = { type: "special", dir: "right" };
+  const BALL_L = { type: "special", dir: "left" };
+  const lockAck = (c, q) => new Promise(res => c.sock.emit("lock_in", q, (r) => res(r)));
+  // c1 = p1 (luffy), c2 = p2 (fire). mana:100 tiles = žiadny dmg šum
+  async function freshLuffy(p2char = "fire") {
+    c1.sock.emit("retry");
+    await sleep(150);
+    configureMatch(c1, { tileWeights: { dmg: 0, heal: 0, mana: 100, ik: 0 } });
+    await sleep(150);
+    c1.sock.emit("choose_character", "luffy");
+    c2.sock.emit("choose_character", p2char);
+    await sleep(250);
+  }
+
+  /* ---------- TL1: side-binding — luffy len p1 ---------- */
+  {
+    c1.sock.emit("retry"); await sleep(150);
+    configureMatch(c1); await sleep(150);
+    c2.sock.emit("choose_character", "luffy"); // zlá strana (p2) — odmietnuť
+    c1.sock.emit("choose_character", "luffy");
+    await sleep(250);
+    check(c1.lastState?.p1?.char === "luffy", "TL1: luffy na p1 prijatý", `p1=${c1.lastState?.p1?.char}`);
+    check(!c2.lastState?.p2?.char, "TL1: luffy na p2 odmietnutý", `p2=${c2.lastState?.p2?.char}`);
+  }
+
+  /* ---------- TL2: Special 1 — ruka na súperovu bunku (2 dmg), vlastná ghost bunka a mirror odmietnuté ---------- */
+  await freshLuffy();
+  {
+    const own = await lockAck(c1, [PUNCH(0, 1), R, S]);
+    check(own && own.ok === false, "TL2: ruka na vlastnú bunku odmietnutá", `ack=${JSON.stringify(own)}`);
+    const ghost = await lockAck(c1, [M("right"), PUNCH(1, 1), R]);
+    check(ghost && ghost.ok === false, "TL2: ruka na vlastnú GHOST bunku (po move) odmietnutá", `ack=${JSON.stringify(ghost)}`);
+    const mir = await lockAck(c1, [MI, R, S]);
+    check(mir && mir.ok === false, "TL2: luffy nemá mirror akciu", `ack=${JSON.stringify(mir)}`);
+  }
+  // kolo1 (starter p1): luffy ruka na (3,1), kde fire STOJÍ → 2 dmg; fire potom až reaguje
+  tl = await playRound(c1, c2, [PUNCH(3, 1), R, S], [R, ML, S]);
+  check(fxOf2(tl, "luffy_punch").length === 1 && fxOf2(tl, "luffy_punch_back").length === 1,
+    "TL2: ruka sa natiahla a stiahla", `fx=${JSON.stringify(fxOf2(tl, "luffy_punch"))}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 2).length === 1,
+    "TL2: ruka dáva 2 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(tl[tl.length - 1].p1.x === 0, "TL2: luffy pri údere rukou stojí");
+  invariantCheck(tl, "TL2");
+
+  /* ---------- TL3: guľa — kotúľ na súperovu bunku, výbuch 3×3 (8 dmg); potom Special 2 (8 dmg) ---------- */
+  await freshLuffy();
+  // kolo1 (starter p1): L R (10), F dash ← na (1,1), L guľa → kotúľ (0,1)→(1,1), výbuch 3×3 okolo (1,1) zasiahne fire
+  tl = await playRound(c1, c2, [R, BALL_R, S], [D("left"), R, S]);
+  const tl3Explode = fxOf2(tl, "luffy_explode");
+  check(tl3Explode.length === 1 && (tl3Explode[0].cells || []).length === 9,
+    "TL3: výbuch na 3×3 okolo dopadovej bunky", `explode=${JSON.stringify(tl3Explode)}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 8).length === 1,
+    "TL3: guľa dáva 8 dmg súperovi na dopadovej bunke", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p1").length === 0, "TL3: výbuch luffyho nezraní");
+  check(tl[tl.length - 1].p1.x === 1 && tl[tl.length - 1].p1.worldUsed === true,
+    "TL3: luffy sa prekotúľal o bunku a guľa je spotrebovaná", `p1=${JSON.stringify({ x: tl[tl.length - 1].p1.x, worldUsed: tl[tl.length - 1].p1.worldUsed })}`);
+  invariantCheck(tl, "TL3");
+  // kolo2 (starter p2): fire M → (2,1), L R, F R, L special = Special 2 → susedná (2,1) → 8 dmg, bez kotúľa
+  tl = await playRound(c1, c2, [R, BALL_R, S], [M("right"), R, S]);
+  check(fxOf2(tl, "luffy_roll").length === 0 && fxOf2(tl, "special").some(e => e.from === "p1" && (e.cells || []).length === 1),
+    "TL3: druhý special = Special 2 (susedná bunka, žiadna guľa)", `special=${JSON.stringify(fxOf2(tl, "special"))}`);
+  check(sumEffects(tl).hits.filter(h => h.target === "p2" && h.dmg === 8).length === 1,
+    "TL3: Special 2 dáva 8 dmg", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "TL3s2");
+
+  /* ---------- TL4: guľa z krajného stĺpca von = spálený special (mana preč, bez výbuchu) ---------- */
+  await freshLuffy();
+  tl = await playRound(c1, c2, [BALL_L, R, S], [R, S, M("up")]);
+  const tl4Last = tl[tl.length - 1].p1;
+  check(fxOf2(tl, "luffy_explode").length === 0 && fxOf2(tl, "wall_bump").some(e => e.from === "p1"),
+    "TL4: guľa narazila do steny, nevybuchla", `fx=${JSON.stringify(fxOf2(tl, "wall_bump"))}`);
+  check(tl4Last.worldUsed === true && tl4Last.x === 0 && tl4Last.mana === 6 - 5 + 4 - 2,
+    "TL4: special spálený (worldUsed, mana minutá, luffy na mieste)", `p1=${JSON.stringify({ x: tl4Last.x, mana: tl4Last.mana, worldUsed: tl4Last.worldUsed })}`);
+
+  /* ---------- TL5: mirror odrazí guľu (8) na luffyho ---------- */
+  await freshLuffy();
+  // kolo1 (starter p1): luffy R, S, M↓ → (0,2); fire dash ← na (1,1)
+  await playRound(c1, c2, [R, S, M("down")], [D("left"), R, S]);
+  // kolo2 (starter p2): fire mirror PRED guľou; luffy guľa → (1,2), zóna 3×3 zasiahne fire na (1,1) → odraz 8
+  tl = await playRound(c1, c2, [BALL_R, R, S], [MI, R, S]);
+  check(fxOf2(tl, "mirror").length === 1 && sumEffects(tl).hits.filter(h => h.target === "p1" && h.dmg === 8).length === 1
+    && sumEffects(tl).hits.filter(h => h.target === "p2").length === 0,
+    "TL5: mirror odrazil guľu (8) na luffyho", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
+  invariantCheck(tl, "TL5");
+  }
+
   /* ---------- TR: viac roomiek naraz — izolácia broadcastov ---------- */
   // druhá roomka: c3 (host = p1) + c4 (p2). MAX_ROOMS=2 → musí sa dať vytvoriť.
   const c3 = await connect();

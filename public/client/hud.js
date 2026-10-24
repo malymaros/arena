@@ -111,7 +111,7 @@ export function renderHUD() {
   actorP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   hudCharP2.classList.toggle("alt-color", usesAltColor(state?.p2?.char, "p2"));
   actorGhost.classList.toggle("alt-color", me === "p2" && usesAltColor(ghostCharAt() || state?.p2?.char, "p2"));
-  // vlastné HUD prvky postáv z registra fx (Escanor pride, vlkolakov mesiac, Luffy mód) - každá postava, pri inom charaktere ich skryje
+  // vlastné HUD prvky postáv z registra fx (Escanor pride, vlkolakov mesiac) - každá postava, pri inom charaktere ich skryje
   fxAll("hud", "p1", state?.p1); fxAll("hud", "p2", state?.p2);
   syncDynamicSpecialBtn(); // dmg na special tlačidle drž v sync s HUD fázou mesiaca (aj per-frame počas kola)
   updateGoldenButton();

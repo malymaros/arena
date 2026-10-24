@@ -99,8 +99,10 @@ export function renderGrid(s, effects = []) {
     }
     // vlkolakovo seknutie - zvýrazni bunku terča (ako melee)
     if (e?.kind === "wolf_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
-    // Luffy special: cieľová bunka bliká, kam sa guľa/Luffy dogúľa a vybuchne (počas roll → explode/chomp)
-    if ((e?.kind === "luffy_roll" || e?.kind === "luffy_explode" || e?.kind === "luffy_chomp") && Array.isArray(e.target)) previewSet.add(`${e.target[0]},${e.target[1]}`);
+    // Luffy: guľa - dopadová bunka bliká počas kotúľa, pri výbuchu celá zóna 3×3; ruka - cieľová bunka pri naťahovaní a údere
+    if (e?.kind === "luffy_roll" && Array.isArray(e.target)) previewSet.add(`${e.target[0]},${e.target[1]}`);
+    if (e?.kind === "luffy_explode" && Array.isArray(e.cells)) e.cells.forEach(([x, y]) => previewSet.add(`${x},${y}`));
+    if ((e?.kind === "luffy_punch" || e?.kind === "luffy_punch_hold") && Array.isArray(e.target)) previewSet.add(`${e.target[0]},${e.target[1]}`);
     // Countess/Onre: seknutie po charge/teleporte - zvýrazni bunku terča; trigger pasce - bunka sa rozžiari
     if (e?.kind === "vamp_strike" && Array.isArray(e.cell)) previewSet.add(`${e.cell[0]},${e.cell[1]}`);
     // efekt autora zrkadlený do veľkého stredového spritu (register fx centerCast; Countess: úder A1 a liečivé

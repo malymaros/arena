@@ -1,38 +1,39 @@
-// public/chars/luffy.js - klientské dáta postavy: Luffy - Gear 3 prepínanie, valivý special; viazaný na p1.
+// public/chars/luffy.js - klientské dáta postavy: Luffy - zrkadlo Jotara, viazaný na p1. Diagonálny basic, slabšie
+// melee, v mirror slote Special 1 (naťahovacia ruka na ľubovoľnú bunku), special = guľa raz za hru, potom Special 2.
 // Polia a ich význam: public/chars/index.js (skladá z nich tabuľky, ktoré používa client.js).
-
-// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
-import { RECHARGE_GAIN, SPECIAL_COST, LUFFY_SPECIAL_DMG, BASIC_COST, BASIC_DMG_MAX } from "../../shared/balance.js";
 import { act, DIAG_SHOT } from "./common.js";
-const fall = [1, 2, 3].map(d => Math.max(1, BASIC_DMG_MAX - d)).join(" / ");
-// Gear 3 basic = Giant Pistol (vlastné okno / tooltip); Base = diagonálna strela ako Vampire
-const GIANT_PISTOL = act("GIANT PISTOL", `{💧}${BASIC_COST}`, `Punches left or right at the first opponent in line (${fall}) and pulls them next to Luffy. A shield or mirror stops the pull too.`);
+// čísla balansu - jediný zdroj (relatívna cesta funguje v prehliadači aj v Node)
+import { MELEE_COST, SPECIAL_COST, LUFFY_MELEE_DMG, LUFFY_S1_COST, LUFFY_S1_DMG, LUFFY_BALL_DMG, LUFFY_S2_COST, LUFFY_S2_DMG } from "../../shared/balance.js";
+import { MOVE_MS } from "../../shared/timing.js";
+
 export default {
   key: "luffy",
-  // Hidden preview postavy (zatiaľ NEHRATEĽNÉ - karta bez data-char, klik/draft ju ignorujú):
-  // Luffy len P1, Jotaro len P2; Jotaro vpravo v natívnej palete (dirP2 = ten istý priečinok).
-  meta: { name: "Luffy",   dir: "luffy" },
+  meta: { name: "Luffy", dir: "luffy" },
   side: "p1",
+  mirrorSlot: "special1",  // mirror slot = Special 1 (naťahovacia ruka)
+  special1Target: "cell",  // ... s mini mapou buniek (Jotaro má L/R šípky)
+  special1Cost: LUFFY_S1_COST,
   anims: {
-    // Luffy: pumpovanie pästí (Recharge2, 7f) = prepnutie base→gear3 + windup gear3 basicu; Special_3 (12f) = splasknutie
-    // gear3→base. maxFrame = bez posledných 2 framov (skončí v pumpnutej póze, nie v uvoľnení späť).
-    luffypump: { file: "Recharge2.png", fps: 10, loop: false, maxFrame: 4, fromStart: true },
-    luffydeflate: { file: "Special_3.png", fps: 10, loop: false, maxFrame: 9, fromStart: true },
-    // Gear3 basic (Giant Pistol) telové pózy: windup (päsť vzad) → úder (natiahnutá ruka) → priťiahnutie (reeluje) / minutie (stiahne)
-    luffygiantrocket: { file: "L_GiantRocket.png",  fps: 8,  loop: false, fromStart: true }, // 2f - nabratie, giant päsť vzad
-    luffygiantpunch: { file: "L_GiantPunch.png",   fps: 10, loop: false, fromStart: true, armCrop: 0.56 }, // 3f - vystrelenie päste vpred
-    luffyrocketpull: { file: "L_RocketPull.png",   fps: 12, loop: false, fromStart: true, armCrop: 0.5 }, // 5f - ruka sa sťahuje, ťahá súpera
-    luffygiantretract: { file: "L_GiantRetract.png", fps: 12, loop: false, fromStart: true }, // 4f - minutie: stiahnutie naprázdno
-    // Luffy special roll: base = Special_7 (rozbeh→kotúľ→puf-hlava bounce); gear3 = balón (Recharge round frame)
-    // + Special_2 impact (radiálne päste) na cieľovej bunke
-    // base special 2 fázy: dogúľanie (run/roll f0–6) počas cesty, potom cvaknutie na cieľovej bunke (f7+).
-    luffyrolltravel: { file: "Special_7.png", fps: 14, loop: false, maxFrame: 6, fromStart: true }, // dogúľanie k bunke
-    luffychomp: { file: "Special_7.png", fps: 10, loop: false, startFrame: 7, fromStart: true }, // cvaknutie + zotavenie (minutie)
-    luffychomphit: { file: "Special_7.png", fps: 10, loop: false, startFrame: 7, maxFrame: 9, fromStart: true }, // cvaknutie, zastaví (zásah)
-    luffyball: { file: "Special_1.png", fps: 8, loopFrom: 7, fromStart: true }, // gear3: premena na guľu (transform + spin) NA štartovacej bunke
-    luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7, loop: true, fromStart: true }, // gear3: gúľajúca sa guľa počas presunu k cieľu - LOOPuje guľové framy 7–8 (nie statický frame)
-    luffyimpact: { file: "Special_2.png", fps: 8,  loop: false, fromStart: true },
+    // Special 1 - telo z Punch.png (L_RocketPull s odmazanou pečenou rukou, tools/sprites-luffy/punch.cjs):
+    // f0 naťahovanie, f1 úder, f2 sťahovanie, f3–4 návrat do stoja. Ruku a päsť kreslí fx/luffy.js (guma).
+    // armCrop 0.5 = kreslí sa len ľavá polovica framu (telo), figúra ostane vycentrovaná na bunke.
+    luffypunch0: { file: "Punch.png", fps: 1, frameIndex: 0, armCrop: 0.5 },
+    luffypunch1: { file: "Punch.png", fps: 1, frameIndex: 1, armCrop: 0.5 },
+    luffypunch2: { file: "Punch.png", fps: 1, frameIndex: 2, armCrop: 0.5 },
+    luffypunchback: { file: "Punch.png", fps: 8, loop: false, startFrame: 3, fromStart: true, armCrop: 0.5 },
+    // special guľa: premena (Special_1, raz celé, potom sa točia guľové framy 7–8) → kotúľ (len f7–8) → výbuch (Special_2)
+    luffyball: { file: "Special_1.png", fps: 8, loopFrom: 7, fromStart: true },
+    luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7, loop: true, fromStart: true },
+    luffyimpact: { file: "Special_2.png", fps: 8, loop: false, fromStart: true },
+    // Special 2 - gatling (Attack_2) raz od začiatku
+    luffys2: { file: "Attack_2.png", fps: 10, loop: false, fromStart: true },
+    // dash - beh → kotúľ (Special_7, 12 framov) cez celý presun
+    luffydash: { file: "Special_7.png", fps: Math.round(12 * 1000 / MOVE_MS), loop: false, fromStart: true },
+    // recharge - jedenie mäsa (Special_3, 12 framov) cez celý recharge frame
+    luffyeat: { file: "Special_3.png", fps: 11, loop: false, fromStart: true },
   },
+  // melee = Attack_1 (ako basic), recharge = jedenie mäsa
+  actionAnims: { melee: "attack1_loop", recharge: "luffyeat" },
   // výhra: Win.png na malej postave (Luffy nemá specialAnim)
   victoryAnim: { file: "Win.png", fps: 6, loop: true },
   // figúra cez ~0.88 framu → pri fill 0.95 by bol „obrovský": menší fill normalizovaný na výšku Idle framu (128),
@@ -42,34 +43,25 @@ export default {
   portraitScale: 0.59,
   headCrop: { cx: 0.49, cy: 0.21, size: 0.33 }, // slamák + tvár z Idle.png (128² frame): figúra x38–89 y8–119, hlava/klobúk r8–44 (strieška x42–83) → stred (x62,y26)
   pairShift: 78,
-  previewCast: { file: "Special_1.png",   frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
-  // Luffy: recharge prepína mód (base ↔ Gear 3). Zóna specialu (dáma base / veža gear3) + dmg (4/8) cyklí
-  // pod mini-doskou (náhľad preview v public/chars/fx/luffy.js - ako Escanorov pride / vlkolakov moon), preto žiadny effect/stats riadok.
-  abilityPreview: { caster: { x: 1, y: 1 }, dmg: null, desc: "Recharge switches Gear. Pick a cell and Luffy rolls there to smash whoever stands on it. Base: nimble, a Queen's reach. Gear 3: massive, a Rook's charge." },
+  previewCast: { file: "Special_1.png", frames: 9, fps: 6, loopFrom: 7, fill: 1.31 * 160 / 128 }, // krútený balón → škrabance, vrtuliak cyklí
+  abilityPreview: { caster: { x: 1, y: 1 }, dmg: LUFFY_BALL_DMG, dir: "right", desc: "Once per game: inflate into a ball, roll one cell left or right and burst on everything around. Afterwards the special strikes the adjacent cell." },
   buttons: {
-    // recharge slot = prepínač módu (fialový „???" skin) - doplní manu A prepne mód (aj pri plnej mane)
-    recharge: { skin: "luffy-switch", ...act("SWITCH GEAR", `+${RECHARGE_GAIN}{💧}`, "Gain mana and switch Base ↔ Gear 3. Works even at full mana."), cost: `+${RECHARGE_GAIN}{💧}<span class="luffy-swap">⇆</span>`, label: `+${RECHARGE_GAIN}{💧} GEAR ⇆` },
-    attack: (ui) => (ui.gear3 ? GIANT_PISTOL : DIAG_SHOT),
-    // pohyb-a-úder ako šachová figúra: base = dáma (4 dmg), gear3 = veža (8 dmg) - podľa efektívnej formy
-    special: (ui) => ui.gear3
-      ? { title: `Special (−${SPECIAL_COST} mana, ${LUFFY_SPECIAL_DMG.gear3} dmg) - GEAR 3: roll like a ROOK (orthogonal lines) to a chosen cell and strike whoever is on it`, cost: `−${SPECIAL_COST}{💧} ${LUFFY_SPECIAL_DMG.gear3}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${LUFFY_SPECIAL_DMG.gear3}` }
-      : { title: `Special (−${SPECIAL_COST} mana, ${LUFFY_SPECIAL_DMG.base} dmg) - roll like a QUEEN (any line) to a chosen cell and strike whoever is on it`, cost: `−${SPECIAL_COST}{💧} ${LUFFY_SPECIAL_DMG.base}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${LUFFY_SPECIAL_DMG.base}` },
+    attack: { ...DIAG_SHOT },
+    melee: { ...act("MELEE", `{💧}${MELEE_COST} {☠️}${LUFFY_MELEE_DMG}`, "Hits only an opponent on your cell."), cost: `−${MELEE_COST}{💧} ${LUFFY_MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${LUFFY_MELEE_DMG}` },
+    // mirror slot = Special 1 (naťahovacia ruka) - fialový „???" skin + mini mapa buniek
+    mirror: { skin: "luffy-s1", ...act("GOMU GOMU PISTOL", `{💧}${LUFFY_S1_COST} {☠️}${LUFFY_S1_DMG}`, "Stretches an arm to any cell except your own and hits whoever stands there."), cost: `−${LUFFY_S1_COST}{💧} ${LUFFY_S1_DMG}{☠️}`, label: `{💧}${LUFFY_S1_COST} {☠️}${LUFFY_S1_DMG}` },
+    // guľa (raz za hru) → po nej natrvalo Special 2
+    special: (ui) => ui.worldUsed
+      ? { ...act("SPECIAL 2", `{💧}${LUFFY_S2_COST} {☠️}${LUFFY_S2_DMG}`, "Strikes the adjacent cell left or right."), cost: `−${LUFFY_S2_COST}{💧} ${LUFFY_S2_DMG}{☠️}`, label: `{💧}${LUFFY_S2_COST} {☠️}${LUFFY_S2_DMG}` }
+      : { ...act("GOMU GOMU BALLOON", `{💧}${SPECIAL_COST} {☠️}${LUFFY_BALL_DMG}`, "Once per game: rolls one cell left or right and bursts on all cells around (and under) it. Rolling off the board wastes it."), cost: `−${SPECIAL_COST}{💧} ${LUFFY_BALL_DMG}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${LUFFY_BALL_DMG}` },
   },
-  specialTarget: "reach", // mini mapa s bunkami len na platnej línii (dáma / veža)
-  // dosiahne special bunku (x,y) z ghost pozície g? Zrkadlí server luffySpecialReaches (dáma base / veža gear3)
-  specialReach: ({ G, board, ui, g, x, y }) => G.luffySpecialReaches(board, g.x, g.y, x, y, ui.gear3 ? "gear3" : "base"),
-  // efektívny mód pri plánovaní = aktuálna forma, prepnutá, ak je v tomto kole už naplánovaný recharge
-  // (ten prepína mód a vyhodnotí sa pred basicom/specialom)
-  planUi: (st, queue) => {
-    let f = st?.form || "base";
-    if (queue.some(a => a.type === "recharge")) f = f === "gear3" ? "base" : "gear3";
-    return { gear3: f === "gear3" };
+  specialTarget: "dir", // guľa aj Special 2 sú smerové (L/R picker)
+  // guľa: 3×3 okolo dopadovej bunky (kotúľ o bunku); Special 2: jediná susedná bunka
+  specialZone: ({ G, board, me, dir }) => me.worldUsed ? G.jotaroS2Cells(board, me, dir) : G.luffyBallCells(board, me, dir),
+  // ⚠ pri plánovaní: guľa / Special 2 mimo plochy
+  planSpecialWarn: ({ p, dir, inB, mine }) => {
+    const dx = dir === "left" ? -1 : dir === "right" ? 1 : 0;
+    if (!dx || inB(p.x + dx, p.y)) return null;
+    return mine.worldUsed ? "Special off the board - mana is spent, no effect" : "Rolling off the board - the once-per-game ball is wasted";
   },
-  // basic: base = diagonálny picker, gear3 = ortogonálny len ←/→ (Giant Pistol ruka sa zastaví na prvej figúre)
-  attackPicker: (ui) => ui.gear3 ? "lr" : "diag",
-  aimStopsAtFoe: (ui) => ui.gear3,
-  // odznak módu (gear3.png) v rohu gear-závislých tlačidiel - len v gear3 (aj po naplánovanom rechargi)
-  buttonBadge: { cls: ["luffy-gear", "luffy-gear3"], slots: ["attack", "special"], on: (ui) => ui.gear3 },
-  // plánovanie: recharge prepína gear, takže nie je zbytočný ani pri plnej mane (žiadne ⚠)
-  planRechargeAlwaysUseful: true,
 };

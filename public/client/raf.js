@@ -100,7 +100,7 @@ export function raf() {
     anim = CHAR_FX[st.char]?.boardAnim?.({ slot, st, aSt, now, stoned, lyingDead, anim }) ?? anim;
     // počas Special_2 summon pózy orežeme prázdny bočný okraj (rovnako ako kópiu), nech sa obaja zmestia do bunky
     const poseCrop = (actors.cloneSummonPose[slot] && performance.now() < actors.cloneSummonPose[slot].until) ? SUMMON_CROP : 0;
-    // anim.armCrop (Luffy Gear3 basic): odrež zapečenú natiahnutú ruku+päsť z tela (dosah kreslí procedurálna guma)
+    // anim.armCrop (Luffy Special 1): kreslí sa len ľavá časť framu (telo), ruku kreslí procedurálna guma
     const armCrop = anim.armCrop || 0;
     // THE WORLD: čas stojí → všetci OKREM Jotara majú zmrazený drawT (statický frame, žiadne cyklenie idle)
     const tsFrozenActor = playback.tsActive && slot !== playback.tsJotaroSlot;

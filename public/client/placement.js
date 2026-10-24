@@ -48,7 +48,6 @@ export const ESC_FEET_FRAC = 0.973;
 // vlkolakova ZÁKLADNÁ forma (nov) je zmenšená na 0.7× a rastie z nej (spln ≈ 1.21×), Escanor od 1×.
 // actors.escPrideDisplay drží počas prehrávania kola STARÝ level pre oba prípady (nová veľkosť až po floate)
 export const escPrideMul = a => {
-  // Luffy: veľkosť sa medzi módmi NEMENÍ (žiadny size tell) - normalizuje ju boardFit.
   const sl = SIZE_LEVEL[a?.char]; // register: sizeLevel { stat, base }
   if (!sl) return 1;
   const lvl = a[sl.stat] || 0;

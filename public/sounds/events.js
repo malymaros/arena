@@ -20,8 +20,7 @@ export const DIRECT = {
   demon_summon: "demon_summon", last_stand_summon: "last_stand", last_hope_summon: "last_hope",
   soldier_beam: "soldier_beam", wolf_charge: "wolf_charge", wolf_strike: "wolf_strike",
   vamp_charge: "vamp_charge", vamp_strike: "vamp_strike", special1: "special1",
-  luffy_pull: "luffy_pull", luffy_gp: "luffy_gp", luffy_roll: "luffy_roll",
-  luffy_explode: "luffy_explode", luffy_chomp: "luffy_chomp",
+  luffy_punch: "luffy_punch", luffy_roll: "luffy_roll", luffy_explode: "luffy_explode",
   stoned: "stoned", labyrinth_reveal: "labyrinth_reveal", thread_mark: "thread_mark",
   clone_born: "clone_born", clone_hit: "clone_hit", teleport_in: "teleport_in", trap_tp_in: "teleport_in",
   demon_attack: "demon_attack", last_stand_kill: "last_stand_kill", last_stand_revive: "last_stand_revive",
@@ -69,7 +68,7 @@ function phaseWindow(timeline, i, { until, inclusive }) {
   return ms;
 }
 // frame s týmto efektom nesie vlastný zvuk presunu - zmena pozície v ňom nie je krok/dash
-export const OWN_LOCO = new Set(["wolf_charge", "vamp_charge", "luffy_pull", "luffy_roll", "trap_tp_in", "trap_tp_out", "teleport_in"]);
+export const OWN_LOCO = new Set(["wolf_charge", "vamp_charge", "luffy_roll", "trap_tp_in", "trap_tp_out", "teleport_in"]);
 export const HIT_HEAVY_DMG = 8;
 export const TILE_KINDS = ["dmg", "heal", "mana", "ik"];
 // všetky kľúče, ktoré táto mapa môže vydať (test/sounds.mjs overí, že sú v registri)

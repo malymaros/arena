@@ -74,7 +74,7 @@ export const DIAG_DIR_KEYS = Object.keys(DIAG_DIRS);
 
 // Démon útok - dostupný LEN buffnutému hráčovi v poslednom (Last Stand) kole; zaberá jeden z 3 akčných slotov
 
-// special1 = Jotarov útok v mirror slote (len Jotaro; ostatné postavy ho vo validQueue/fillFromDraft odmietnu)
+// special1 = útok v mirror slote (Jotaro, Luffy - register special1; ostatné postavy ho vo validQueue/fillFromDraft odmietnu)
 export const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash", "special1"]);
 export const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 

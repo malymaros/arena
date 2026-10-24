@@ -10,8 +10,8 @@ import { cellsForVampChargePreview, cellsForSpecialPreview, cellsForJotaroS1, ce
 import { state, otherSlot, me, isSpectator } from "/client/session.js";
 import { playback } from "/client/playback.js";
 import { planning } from "/client/planning.js";
-import { queueEl, moveBtn, dirPicker, attackBtn, aimPicker, dashBtn, dashPicker, aimPickerDiag, meleeBtn, specialBtn, specialPicker, cellPicker, wolfPicker, lockBtn } from "/client/dom.js";
-import { syncGoldenHalves, updateGoldenButton, syncButtonBadges, updateUiLocks } from "/client/controls.js";
+import { queueEl, moveBtn, dirPicker, attackBtn, aimPicker, dashBtn, dashPicker, aimPickerDiag, meleeBtn, specialBtn, specialPicker, cellPicker, wolfPicker, s1Picker, s1CellPicker, lockBtn } from "/client/dom.js";
+import { syncGoldenHalves, updateGoldenButton, updateUiLocks } from "/client/controls.js";
 import { qCursor } from "/client/actor-layers.js";
 import { renderMageHeads } from "/client/hud.js";
 import { socket } from "/client/net.js";
@@ -31,7 +31,7 @@ function actionBadgeView(a, ownerSlot) {
     case "attack":        return { cls: "attack",  text: `🏹${dd}` };
     case "melee":         return { cls: "melee",   text: "🗡️" };
     case "special":       return { cls: "special", text: `✨${arrow[a.dir] || ""}` }; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje - bunku ukáže hover
-    case "special1":      return { cls: "mirror",  text: "🪞" }; // Jotarov útok v mirror slote sa tvári ako mirror (analógia k charge=dash u Vampire/Onryō)
+    case "special1":      return { cls: "mirror",  text: "🪞" }; // Special 1 (Jotaro, Luffy) v mirror slote sa tvári ako mirror (analógia k charge=dash u Vampire/Onryō)
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
@@ -68,12 +68,15 @@ function attachQueueHover(el, a, idx) {
     el.addEventListener("mouseenter", () => {
       if (a.cell) { showPreviewCells([[a.cell.x, a.cell.y]]); return; }
       const char = ghostCharAt(idx); const p = ghostPos(idx);
-      if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, foe: state?.[otherSlot()] }, a.dir));
+      if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, worldUsed: state?.[me]?.worldUsed, foe: state?.[otherSlot()] }, a.dir));
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special1") {
-    // Jotarov Special 1 - obe diagonálne bunky zvolenej strany z ghost pozície
-    el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForJotaroS1(p, a.dir)); });
+    // Special 1: Luffy nesie cieľovú bunku (zvýrazni ju), Jotaro smer - obe diagonálne bunky strany z ghost pozície
+    el.addEventListener("mouseenter", () => {
+      if (a.cell) { showPreviewCells([[a.cell.x, a.cell.y]]); return; }
+      const p = ghostPos(idx); if (p) showPreviewCells(cellsForJotaroS1(p, a.dir));
+    });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "melee") {
     el.addEventListener("mouseenter", () => {
@@ -140,7 +143,6 @@ export function renderQueue() {
   // THE WORLD plánovanie: NEprestavuj pôvodnú lištu (ostáva „executing"), zadávaj do samostatného placeholdera
   if (playback.tsPlanning) { renderTsQueue(); updateActionButtons(); syncGoldenHalves(); updateGoldenButton(); updateLockButton(); return; }
   hideTsQueue();
-  syncButtonBadges(ghostCharAt()); // Luffy: gear odznak na range/special reaguje aj na naplánovaný recharge
   ensureStonePrefix();
   queueEl.innerHTML = "";
   qBeatEls = [];
@@ -299,7 +301,7 @@ function sendDraft() {
 function updateActionButtons() {
   document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     const type = btn.dataset.act.split(":")[0];
-    // mirror slot = Special 1 (register mirrorSlot - Jotaro) → „used" podľa special1 a golden mirror ho NEZAMYKÁ
+    // mirror slot = Special 1 (register mirrorSlot - Jotaro, Luffy) → „used" podľa special1 a golden mirror ho NEZAMYKÁ
     const isJotaroMirror = type === "mirror" && CHARS_BY_KEY[ghostCharAt()]?.mirrorSlot === "special1";
     const effType = isJotaroMirror ? "special1" : type;
     const used = planning.myQueue.some(a => a.type === effType);
@@ -324,6 +326,7 @@ function updateActionButtons() {
   const specialUsed = planning.myQueue.some(a => a.type === "special");
   specialBtn.disabled = specialUsed;
   if (specialUsed) { specialPicker.classList.add("hidden"); cellPicker?.classList.add("hidden"); wolfPicker?.classList.add("hidden"); }
+  if (planning.myQueue.some(a => a.type === "special1")) { s1Picker?.classList.add("hidden"); s1CellPicker?.classList.add("hidden"); }
 }
 export function updateLockButton() {
   // Jotaro THE WORLD: počas plánovania zmrazenej trojice je button „EXECUTE" (ignoruj stale state[me].locked

@@ -38,7 +38,7 @@ function actionIcon(action, ownerSlot) {
     case "golden_mana": return "🙏";
     case "last_stand": return "💀";
     case "special":  return `✨${isPhone ? "" : ARROW_DIR[action.dir] || ""}`; // smer: Medúza/Escanor/Jotaro(S2); Vojakov cieľ (cell) sa neukazuje - len čistý badge
-    // Jotarov útok v mirror slote sa v zápise kola tvári ako obyčajný mirror (🪞, bez smeru) -
+    // Special 1 (Jotaro, Luffy) sa v zápise kola tvári ako obyčajný mirror (🪞, bez smeru/cieľa) -
     // analógia k Vampire/Onryō, ktorých charge v dash slote sa ukazuje ako obyčajný dash (nemaskuje smer útoku)
     case "special1": return "🪞";
     case "stoned":   return "🗿";

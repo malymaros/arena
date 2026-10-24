@@ -7,7 +7,7 @@ import { colorRollEl, crResultEl, crArrowEl, selEl, intermissionEl, goOverlay, d
 import { stopCharSelectPreview } from "/client/char-select.js";
 import { playback } from "/client/playback.js";
 import { preloadChar } from "/client/sprites.js";
-import { hideConnError, syncGoldenHalves, syncGoldDualHalves, closePickers, updateUiLocks, syncDashBtn, syncMirrorBtn, syncRechargeBtn, syncButtonBadges, BTN_BASE } from "/client/controls.js";
+import { hideConnError, syncGoldenHalves, syncGoldDualHalves, closePickers, updateUiLocks, syncDashBtn, syncMirrorBtn, BTN_BASE } from "/client/controls.js";
 import { resetActorFade } from "/client/anim.js";
 import { clearProjectiles } from "/client/board-fx.js";
 import { actors, resetPoses } from "/client/actors.js";
@@ -178,12 +178,8 @@ socket.on("state", (s) => {
 
   // dash/attack tlačidlá podľa mága - Vampire/Onryō: dash = fialový charge, attack = strela s odrazom
   syncDashBtn(s[me]?.char);
-  // mirror slot podľa mága - Jotaro tu má Special 1 (fialový ❔ skin + L/R picker)
+  // mirror slot podľa mága - Jotaro a Luffy tu majú Special 1 (fialový ❔ skin + vlastný picker)
   syncMirrorBtn(s[me]?.char);
-  // recharge slot podľa mága - Luffy tu má prepínač módu (fialový ❔ skin)
-  syncRechargeBtn(s[me]?.char);
-  // odznak stavu na tlačidlách (Luffy: mód na range attack + special)
-  syncButtonBadges(s[me]?.char);
   // label melee podľa mága - Medúza má širší dosah (diagonály) za nižší dmg; Vampire/Onryō majú center strike bez bonusu
   const mineMelee = s[me];
   if (mineMelee?.char && meleeBtn) {

@@ -90,7 +90,7 @@ export function openerOf(pickerEl) {
   if (id === "dir-picker") return moveBtn;
   if (id === "dash-picker") return dashBtn;
   if (id === "aim-picker" || id === "aim-picker-diag") return attackBtn;
-  if (id === "s1-picker") return mirrorBtn;
+  if (id === "s1-picker" || id === "s1-cell-picker") return mirrorBtn;
   if (id === "special-picker" || id === "wolf-picker" || id === "cell-picker") return specialBtn;
   return null;
 }

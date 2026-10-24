@@ -2,12 +2,12 @@
 // fronty (shared/geometry.js simulateQueue), akou server validuje ciele.
 import * as G from "/shared/geometry.js";
 import { state, me, board, otherSlot } from "/client/session.js";
-import { planning, buttonUi } from "/client/planning.js";
+import { planning } from "/client/planning.js";
 import { VAMP_CHARS, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
 import { WOLF_DIRS_CLIENT } from "/client/zones.js";
 import { gridEl } from "/client/dom.js";
 import { playback } from "/client/playback.js";
-import { MAX_MANA, RECHARGE_GAIN, BASIC_COST, MELEE_COST, DASH_COST, SPECIAL_COST, JOTARO_S1_COST, SHIELD_COST, MIRROR_COST, DEMON_COST, GOLDEN_COST, GOLDEN_MIRROR_COST } from "/shared/balance.js";
+import { MAX_MANA, RECHARGE_GAIN, BASIC_COST, MELEE_COST, DASH_COST, SPECIAL_COST, SHIELD_COST, MIRROR_COST, DEMON_COST, GOLDEN_COST, GOLDEN_MIRROR_COST } from "/shared/balance.js";
 
 /* ---------- Ghost - simulácia vlastnej pozície počas naplánovaného kola ---------- */
 // pozícia po každej akcii vo fronte; movy mimo board pozíciu nemenia (zrkadlí server)
@@ -15,7 +15,7 @@ function simulatedPositions(){
   const mine = state?.[me];
   if (!mine) return [];
   // skrytý súper v labyrinte má x null → charge beží na okraj (shared figureAt ho ignoruje)
-  const sim = G.simulateQueue(board, { x: mine.x, y: mine.y, char: mine.char, form: mine.form || "base" },
+  const sim = G.simulateQueue(board, { x: mine.x, y: mine.y, char: mine.char, worldUsed: !!mine.worldUsed },
     planning.myQueue, state?.[otherSlot()], VAMP_CHARS);
   return sim.slice(1).map(({ x, y }) => ({ x, y }));
 }
@@ -50,7 +50,7 @@ export function ghostCharAt(idx = planning.myQueue.length) {
 // Ceny a wall pravidlo MUSIA sedieť so serverovými do* funkciami. Vracia pole dôvodov (null = ok) podľa planning.myQueue.
 const PLAN_MAX_MANA = MAX_MANA;
 const PLAN_RECHARGE = RECHARGE_GAIN;
-const PLAN_COST = { attack: BASIC_COST, melee: MELEE_COST, dash: DASH_COST, special: SPECIAL_COST, special1: JOTARO_S1_COST, shield: SHIELD_COST, mirror: MIRROR_COST, demon: DEMON_COST };
+const PLAN_COST = { attack: BASIC_COST, melee: MELEE_COST, dash: DASH_COST, special: SPECIAL_COST, shield: SHIELD_COST, mirror: MIRROR_COST, demon: DEMON_COST };
 // súper Vampire/Onryō je mirror-imúnny: mirror (aj golden) sa voči jeho dmg správa len ako štít
 // (súper v turnaji nemôže z/do side-postavy swapnúť, takže jeho postava platí celé kolo)
 export function foeMirrorImmune() {
@@ -77,11 +77,11 @@ export function planWarnings() {
     const char = ghostCharAt(i);
     const def = CHARS_BY_KEY[char];
     const p = ghostPos(i);
-    const cost = PLAN_COST[a.type] || 0;
+    const cost = (a.type === "special1" ? def?.special1Cost : PLAN_COST[a.type]) || 0; // Special 1: cena z registra postavy
     if (cost > mana) { out[i] = `Not enough mana (planned ${mana}, needs ${cost}) - this action will fail`; continue; }
     mana -= cost;
     if (a.type === "recharge") {
-      if (!def?.planRechargeAlwaysUseful && mana >= PLAN_MAX_MANA) out[i] = "Mana will already be full - recharge has no effect";
+      if (mana >= PLAN_MAX_MANA) out[i] = "Mana will already be full - recharge has no effect";
       mana = Math.min(PLAN_MAX_MANA, mana + PLAN_RECHARGE);
       continue;
     }
@@ -136,14 +136,10 @@ export function cellsForAimPreview(meState, dir, char){
   if (!meState) return [];
   const delta = WOLF_DIRS_CLIENT[dir];
   if (!delta) return [];
-  // diagonálny smer u side-postavy → lomená bounce dráha; ortogonálny (Luffy gear3) → priama strela.
-  // (Riadime sa smerom, nie formou - picker ponúka diag v base, ortogonálne v gear3.)
+  // diagonálny smer u side-postavy → lomená bounce dráha; ostatné priamo po okraj
   const isDiag = delta[0] !== 0 && delta[1] !== 0;
   if (SIDE_CHARS[char] && isDiag) return vampShotRoute(meState.x, meState.y, dir);
-  // register aimStopsAtFoe (Luffy GEAR 3 basic = naťahovacia ruka) - dráha sa ZASTAVÍ na prvej figúre súpera
-  const stopAtFoe = !!CHARS_BY_KEY[char]?.aimStopsAtFoe?.(buttonUi());
-  const foe = stopAtFoe ? state?.[me === "p1" ? "p2" : "p1"] : null;
-  return G.runPath(board, meState.x, meState.y, delta, foe).path;
+  return G.runPath(board, meState.x, meState.y, delta).path;
 }
 export function showPreviewCells(cells){
   const kids = gridEl.children;

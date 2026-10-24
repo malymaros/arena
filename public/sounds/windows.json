@@ -48,7 +48,7 @@
   ]
  },
  "attack.luffy": {
-  "med": 432,
+  "med": 864,
   "values": [
    432,
    864,
@@ -142,6 +142,12 @@
   ]
  },
  "attack_whiff.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "attack_whiff.luffy": {
   "med": 1080,
   "values": [
    1080
@@ -393,6 +399,12 @@
    1620
   ]
  },
+ "demon_attack.luffy": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
  "demon_attack.minotaur": {
   "med": 1620,
   "values": [
@@ -440,6 +452,13 @@
  "demon_summon.lightning": {
   "med": 8020,
   "values": [
+   8020
+  ]
+ },
+ "demon_summon.luffy": {
+  "med": 8020,
+  "values": [
+   6940,
    8020
   ]
  },
@@ -1272,12 +1291,6 @@
    3300
   ]
  },
- "last_hope.luffy": {
-  "med": 3300,
-  "values": [
-   3300
-  ]
- },
  "last_hope.werewolf": {
   "med": 3300,
   "values": [
@@ -1722,18 +1735,6 @@
    1620
   ]
  },
- "luffy_chomp": {
-  "med": 612,
-  "values": [
-   612
-  ]
- },
- "luffy_chomp.luffy": {
-  "med": 612,
-  "values": [
-   612
-  ]
- },
  "luffy_explode": {
   "med": 612,
   "values": [
@@ -1746,45 +1747,29 @@
    612
   ]
  },
- "luffy_gp": {
-  "med": 648,
+ "luffy_punch": {
+  "med": 576,
   "values": [
-   576,
-   648,
-   1080
+   576
   ]
  },
- "luffy_gp.luffy": {
-  "med": 648,
+ "luffy_punch.luffy": {
+  "med": 576,
   "values": [
-   576,
-   648,
-   1080
-  ]
- },
- "luffy_pull": {
-  "med": 1440,
-  "values": [
-   1440
-  ]
- },
- "luffy_pull.luffy": {
-  "med": 1440,
-  "values": [
-   1440
+   576
   ]
  },
  "luffy_roll": {
   "med": 1260,
   "values": [
-   612,
+   1080,
    1260
   ]
  },
  "luffy_roll.luffy": {
   "med": 1260,
   "values": [
-   612,
+   1080,
    1260
   ]
  },
@@ -1884,6 +1869,12 @@
    460
   ]
  },
+ "mirror.fire": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
  "mirror.lightning": {
   "med": 460,
   "values": [
@@ -1939,12 +1930,6 @@
   ]
  },
  "mirror_on.lightning": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
- "mirror_on.luffy": {
   "med": 1080,
   "values": [
    1080
@@ -2091,8 +2076,7 @@
  "recharge": {
   "med": 1080,
   "values": [
-   1080,
-   1260
+   1080
   ]
  },
  "recharge.countess": {
@@ -2126,10 +2110,9 @@
   ]
  },
  "recharge.luffy": {
-  "med": 1260,
+  "med": 1080,
   "values": [
-   1080,
-   1260
+   1080
   ]
  },
  "recharge.medusa": {
@@ -2273,6 +2256,7 @@
  "special": {
   "med": 4860,
   "values": [
+   1620,
    2160,
    2600,
    2833,
@@ -2302,6 +2286,12 @@
   "med": 4860,
   "values": [
    4860
+  ]
+ },
+ "special.luffy": {
+  "med": 1620,
+  "values": [
+   1620
   ]
  },
  "special.medusa": {
@@ -2665,10 +2655,11 @@
   ]
  },
  "voice.attack.luffy": {
-  "med": 432,
+  "med": 864,
   "values": [
    432,
    864,
+   1080,
    1296
   ]
  },
@@ -2828,6 +2819,7 @@
   "med": 4860,
   "values": [
    900,
+   1620,
    2160,
    2600,
    2833,
@@ -2863,6 +2855,12 @@
   "med": 4860,
   "values": [
    4860
+  ]
+ },
+ "voice.special.luffy": {
+  "med": 1620,
+  "values": [
+   1620
   ]
  },
  "voice.special.medusa": {
@@ -2960,6 +2958,7 @@
  "wall_bump.luffy": {
   "med": 1440,
   "values": [
+   1080,
    1440
   ]
  },

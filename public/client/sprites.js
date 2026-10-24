@@ -106,7 +106,7 @@ export function preloadChar(char, slot) {
 // Slučka kreslenia (raf.js) volá drawSprite pre každý canvas 60× za sekundu, no sprity menia frame ~10× za sekundu.
 // drawSprite si preto pamätá, čo naposledy nakreslil do canvasu (kľúč = obrázok + frame + geometria), a rovnaký
 // obsah znova nekreslí. Pamäť canvasu sa zmaže pri AKOMKOĽVEK inom kreslení doň (priame clearRect/drawImage/… mimo
-// drawSprite, napr. Luffyho guma, char-select) aj pri zmene width/height (tá canvas vymaže), takže prípadné
+// drawSprite, napr. char-select) aj pri zmene width/height (tá canvas vymaže), takže prípadné
 // priame kreslenie nikdy nezostane prekryté starým obsahom. Vrstvenie (clear=false) sa nepamätá nikdy.
 const lastDraw = new WeakMap(); // canvas → kľúč posledného vykreslenia
 let inDrawSprite = false;
@@ -135,17 +135,16 @@ export function drawSprite(ctx, meta, anim, t, dstW=TILE_W, dstH=TILE_H, fill=0.
   // anim.loopFrom: prehraj RAZ celé (0..N-1), potom cykli len chvost od loopFrom (napr. Escanorov WinSunBoard -
   // zdvih ruky raz, ďalej len ústa + preblikávajúce slnko). Vyžaduje t relatívny od štartu animácie.
   const elapsedF = Math.floor(t / (1000 / anim.fps));
-  // maxFrame: neloopová animácia sa zastaví (drží) na tomto frame; startFrame: začne od tohto framu (napr.
-  // Luffy chomp = len druhá polovica Special_7). Oboje kombinovateľné (napr. chomp 7..9).
-  const lastIdx = anim.maxFrame != null ? Math.min(total - 1, anim.maxFrame) : total - 1;
+  // startFrame: prehrávanie / loop začne od tohto framu (Luffyho gúľajúca sa guľa = len guľové framy Special_1)
+  const lastIdx = total - 1;
   const startF = anim.startFrame || 0;
   const idx = anim.frameIndex != null ? Math.max(0, Math.min(total - 1, anim.frameIndex))
             : anim.loopFrom != null ? (elapsedF < total ? elapsedF : anim.loopFrom + ((elapsedF - anim.loopFrom) % (total - anim.loopFrom)))
-            : anim.loop ? startF + (elapsedF % (lastIdx - startF + 1)) // loop RESPEKTUJE startFrame/maxFrame (startFrame 0 → identické s pôvodným elapsedF % total)
+            : anim.loop ? startF + (elapsedF % (lastIdx - startF + 1)) // loop RESPEKTUJE startFrame (startFrame 0 → identické s pôvodným elapsedF % total)
                         : Math.min(lastIdx, startF + elapsedF);
   // cropXFrac: odreže prázdny (transparentný) okraj po bokoch framu - kreslí sa len stredový pás postavy
   // cropRightFrac: NAVYŠE odreže časť SPRAVA v sprite-priestore (sprite mieri doprava, flip rieši CSS) -
-  //   napr. Luffyho zapečená natiahnutá ruka+päsť: necháme len telo, dosah kreslí procedurálna guma
+  //   napr. Luffy pri naťahovaní ruky: kreslí sa len telo (ľavá polovica framu), ruku kreslí procedurálna guma
   const cropPx  = Math.round(fw * Math.max(0, Math.min(0.45, cropXFrac)));
   const cropRPx = Math.round(fw * Math.max(0, Math.min(0.9, cropRightFrac)));
   const sx = (cols ? idx % cols : idx) * fw + cropPx;

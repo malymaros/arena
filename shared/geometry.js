@@ -7,7 +7,7 @@ export const DIR4 = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 export const DIAG_DIRS = { up_left: [-1, -1], up_right: [1, -1], down_left: [-1, 1], down_right: [1, 1] };
 export const DIR8 = { ...DIR4, ...DIAG_DIRS }; // vlkolakov charge + smer basicu (ortogonálny aj diagonálny)
 export const DIAG_NAME = { "-1,-1": "up_left", "1,-1": "up_right", "-1,1": "down_left", "1,1": "down_right" };
-export const VAMP_SHOT_RANGE = 3; // diagonálna bounce strela (Vampire/Onryō/Jotaro/Luffy base): max 3 bunky
+export const VAMP_SHOT_RANGE = 3; // diagonálna bounce strela (Vampire/Onryō/Jotaro/Luffy): max 3 bunky
 
 export function inBounds(board, x, y) {
   return x >= 0 && y >= 0 && x < board.w && y < board.h;
@@ -27,7 +27,7 @@ export function figureAt(foe, x, y) {
 
 // beh/strela z (x,y) smerom delta po okraj; ak je daný súper, zastaví sa na PRVEJ jeho figúre.
 // Vracia { path: [[x,y]…] (bez štartovej bunky), target: figureAt na poslednej bunke | null }.
-// Vlkolakov charge, charge Vampire/Onryō, Luffyho gear3 ruka, ghost simulácia aj ich náhľady.
+// Vlkolakov charge, charge Vampire/Onryō, ghost simulácia aj ich náhľady.
 export function runPath(board, x, y, delta, foe = null) {
   const path = [];
   let target = null;
@@ -154,34 +154,33 @@ export function vampShotRoute(board, x, y, dir) {
 }
 
 /* ---------- Luffy ---------- */
-// dosiahne special cieľovú bunku? base = dáma (riadok/stĺpec/diagonála), gear3 = veža; vlastná bunka platí
-export function luffySpecialReaches(board, fx, fy, tx, ty, form) {
-  if (!inBounds(board, tx, ty)) return false;
-  const dx = tx - fx, dy = ty - fy;
-  if (dx === 0 && dy === 0) return true;
-  const rook = dx === 0 || dy === 0;
-  const diag = Math.abs(dx) === Math.abs(dy);
-  return form === "gear3" ? rook : (rook || diag);
+// guľa (special pred prvým použitím v hre): kotúľ o 1 bunku ←/→ a výbuch na 3×3 okolo dopadovej bunky
+// (vrátane nej). Dopadová bunka mimo plochy (kotúľ z krajného stĺpca von) → null / prázdna zóna = spálený special.
+export function luffyBallLanding(board, me, dir) {
+  const dx = dir === "left" ? -1 : dir === "right" ? 1 : 0;
+  if (!dx || !inBounds(board, me.x + dx, me.y)) return null;
+  return { x: me.x + dx, y: me.y };
 }
-// bunky po priamke z (fx,fy) do (tx,ty) bez štartovej (cieľ je na línii - overené luffySpecialReaches)
-export function luffyLinePath(fx, fy, tx, ty) {
-  const dx = Math.sign(tx - fx), dy = Math.sign(ty - fy);
-  const path = []; let x = fx, y = fy;
-  while ((x !== tx || y !== ty) && path.length < 8) { x += dx; y += dy; path.push([x, y]); }
-  return path;
+export function luffyBallCells(board, me, dir) {
+  const c = luffyBallLanding(board, me, dir);
+  if (!c) return [];
+  const cells = [];
+  for (let y = c.y - 1; y <= c.y + 1; y++) for (let x = c.x - 1; x <= c.x + 1; x++) if (inBounds(board, x, y)) cells.push([x, y]);
+  return cells;
 }
 
 /* ---------- simulácia vlastnej fronty (ghost) ---------- */
 // Pozícia hráča počas naplánovaného kola - klient z nej kreslí ghost a náhľady, server ňou validuje
 // ciele (Vojak, Luffy). Mana sa NEsimuluje (pohyb sa ráta, akoby vyšla); súperove akcie tiež nie.
-// start = { x, y, char, form }, foe = VIDITEĽNÝ súper (skrytý v labyrinte → null alebo x null).
-// Vracia pole stavov dĺžky queue.length + 1: [0] = štart, [i + 1] = po akcii i ({ x, y, char, form }).
+// start = { x, y, char, worldUsed }, foe = VIDITEĽNÝ súper (skrytý v labyrinte → null alebo x null).
+// worldUsed = jednorazový special tejto hry už padol (Jotaro THE WORLD, Luffyho guľa).
+// Vracia pole stavov dĺžky queue.length + 1: [0] = štart, [i + 1] = po akcii i ({ x, y, char, worldUsed }).
 export function simulateQueue(board, start, queue, foe, vampChars) {
-  let { x, y, char, form } = start;
-  const out = [{ x, y, char, form }];
+  let { x, y, char } = start;
+  let worldUsed = !!start.worldUsed;
+  const out = [{ x, y, char, worldUsed }];
   for (const a of queue || []) {
     if (a?.type === "swap" && a.to) char = a.to;                                   // turnajový swap mení maga
-    if (a?.type === "recharge" && char === "luffy") form = form === "gear3" ? "base" : "gear3"; // Luffy: recharge prepína mód
     const d = DIR4[a?.dir];
     if (a?.type === "move" && d && inBounds(board, x + d[0], y + d[1])) { x += d[0]; y += d[1]; }
     if (a?.type === "dash" && d) {
@@ -189,9 +188,13 @@ export function simulateQueue(board, start, queue, foe, vampChars) {
       else for (let s = 0; s < 2; s++) if (inBounds(board, x + d[0], y + d[1])) { x += d[0]; y += d[1]; }
     }
     if (a?.type === "special" && char === "werewolf" && DIR8[a.dir]) ({ x, y } = endOf(runPath(board, x, y, DIR8[a.dir], foe), x, y));
-    // Luffy: special ho presunie na cieľovú bunku (ak je na platnej línii)
-    if (a?.type === "special" && char === "luffy" && a.cell && luffySpecialReaches(board, x, y, a.cell.x, a.cell.y, form)) { x = a.cell.x; y = a.cell.y; }
-    out.push({ x, y, char, form });
+    // Luffy: guľa (pred prvým použitím v hre) ho prekotúľa o bunku ←/→; Special 2 po nej nehýbe
+    if (a?.type === "special" && char === "luffy" && !worldUsed) {
+      const c = luffyBallLanding(board, { x, y }, a.dir);
+      if (c) ({ x, y } = c);
+    }
+    if (a?.type === "special" && (char === "luffy" || char === "jotaro")) worldUsed = true;
+    out.push({ x, y, char, worldUsed });
   }
   return out;
 }

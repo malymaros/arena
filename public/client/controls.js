@@ -1,9 +1,8 @@
 // public/client/controls.js - akčné tlačidlá a pickery (move/dash/attack/melee/special/mirror/recharge, golden,
 // Last Stand/Hope, démon), skiny z registra postáv, odoslanie lock_in.
-import * as G from "/shared/geometry.js";
-import { dirPicker, aimPicker, aimPickerDiag, dashPicker, specialPicker, cellPicker, wolfPicker, s1Picker, moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, rechargeBtn, meleeBtn, undoBtn, goldenBtn, goldDualBtn, demonBtn, lastHopeBtn, gmCostEl, connErrorEl, lockBtn } from "/client/dom.js";
+import { dirPicker, aimPicker, aimPickerDiag, dashPicker, specialPicker, cellPicker, wolfPicker, s1Picker, s1CellPicker, moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, meleeBtn, undoBtn, goldenBtn, goldDualBtn, demonBtn, lastHopeBtn, gmCostEl, connErrorEl, lockBtn } from "/client/dom.js";
 import { BUTTON_TEXT } from "/client/balance-ui.js";
-import { CHAR_BUTTONS, CHAR_LIST, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
+import { CHAR_BUTTONS, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
 import { pixelizeEmoji, hydratePix, miniPix } from "/client/pix.js";
 import { costHtml } from "/client/hud.js";
 import { buttonUi, planning } from "/client/planning.js";
@@ -23,8 +22,8 @@ function shakeBtn(btn) {
 
 // otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
 // odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
-const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker, special1: s1Picker };
-const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn, special1: mirrorBtn };
+const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker, special1: s1Picker, special1_cell: s1CellPicker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn, special1: mirrorBtn, special1_cell: mirrorBtn };
 
 // Vampire/Onryō: dash slot = CHARGE - tlačidlo dostane fialový „Hidden" skin s preblikávaním a ???
 // namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
@@ -33,13 +32,12 @@ const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, 
 // (texty a ceny zo shared/balance.js cez public/client/balance-ui.js)
 export const BTN_BASE = {
   dash:     { emoji: "🏃", ...BUTTON_TEXT.dash },
-  recharge: { emoji: "🙏", ...BUTTON_TEXT.recharge },
   mirror:   { emoji: "🪞", ...BUTTON_TEXT.mirror },
   melee:    { ...BUTTON_TEXT.melee },
 };
 const ATTACK_TITLE_DEFAULT = BUTTON_TEXT.attack.title;
 // skin tlačidla podľa postavy: def.skin = trieda tlačidla aj jeho pickera + fialová „???" ikona
-// (Vampire/Onryō charge, Jotarov Special 1, Luffyho prepínač gearu); bez skinu bežná ikona/cena/tooltip
+// (Vampire/Onryō charge, Special 1 Jotara a Luffyho); bez skinu bežná ikona/cena/tooltip
 function applyBtnSkin(slot, btn, picker, char) {
   if (!btn) return;
   const base = BTN_BASE[slot], def = CHAR_BUTTONS[char]?.[slot];
@@ -72,28 +70,16 @@ function applyBtnSkin(slot, btn, picker, char) {
 }
 export function syncDashBtn(char) {
   applyBtnSkin("dash", dashBtn, dashPicker, char);
-  const atk = CHAR_BUTTONS[char]?.attack; // Luffy: funkcia (ui) - Base diagonálna strela / Gear 3 Giant Pistol
-  attackBtn.title = (typeof atk === "function" ? atk(buttonUi()) : atk)?.title ?? ATTACK_TITLE_DEFAULT;
+  attackBtn.title = CHAR_BUTTONS[char]?.attack?.title ?? ATTACK_TITLE_DEFAULT;
 }
 
-// Luffy: recharge slot = prepínač módu (base↔Gear3) - fialový ❔ „Hidden" skin ako vamp charge.
-// Doplní manu A prepne mód (aj pri plnej mane). Pre ostatných mágov vráti bežný recharge.
-export function syncRechargeBtn(char) { applyBtnSkin("recharge", rechargeBtn, null, char); }
-
-// odznak stavu postavy na tlačidlách z registra (buttonBadge - Luffy: gear3.png na range attack + special,
-// aj keď je v tomto kole naplánovaný recharge, aby hráč videl, že basic/special budú v gear3)
-export function syncButtonBadges(char) {
-  const btns = { attack: attackBtn, special: specialBtn };
-  for (const c of CHAR_LIST) {
-    const bb = c.buttonBadge; if (!bb) continue;
-    const on = c.key === char && !!bb.on(buttonUi());
-    for (const sl of bb.slots) { const b = btns[sl]; if (b) bb.cls.forEach(k => b.classList.toggle(k, on)); }
-  }
+// Jotaro a Luffy nemajú mirror - tento slot je Special 1: fialový ❔ skin a vlastný picker (Jotaro L/R,
+// Luffy bunka). Pre ostatné postavy vráti bežný mirror. Volané zo state handlera pri každom snapshote.
+export function syncMirrorBtn(char) {
+  applyBtnSkin("mirror", mirrorBtn, s1Picker, char);
+  const sk = CHAR_BUTTONS[char]?.mirror?.skin;
+  for (const k of new Set(Object.values(CHAR_BUTTONS).map(b => b.mirror?.skin).filter(Boolean))) s1CellPicker?.classList.toggle(k, sk === k);
 }
-
-// Jotaro nemá mirror - tento slot je Special 1 (Star Platinum): fialový ❔ skin, cost 4, L/R picker.
-// Pre ostatné postavy vráti bežný mirror. Volané zo state handlera pri každom snapshote.
-export function syncMirrorBtn(char) { applyBtnSkin("mirror", mirrorBtn, s1Picker, char); }
 
 // po LOCK IN aj počas prehrávania kola sú všetky tlačidlá zamknuté a stmavené
 export function uiLocked() {
@@ -151,12 +137,7 @@ moveBtn.addEventListener("click",   () => togglePicker("move", moveBtn, "move"))
 // Countess/Onre strieľajú diagonálne - attack otvára diagonálny picker namiesto ortogonálneho
 attackBtn.addEventListener("click", () => {
   const c = ghostCharAt();
-  // typ pickera z registra (attackPicker - Luffy: base diag, gear3 len ←/→); inak side-postavy diagonálne
-  const ap = CHARS_BY_KEY[c]?.attackPicker;
-  const pk = (typeof ap === "function" ? ap(buttonUi()) : ap) || (SIDE_CHARS[c] ? "diag" : "ortho");
-  const kind = pk === "diag" ? "attack_diag" : "attack";
-  aimPicker.classList.toggle("lr-only", pk === "lr"); // lr = ortogonálny picker bez ↑/↓
-  togglePicker(kind, attackBtn, "attack");
+  togglePicker(SIDE_CHARS[c] ? "attack_diag" : "attack", attackBtn, "attack"); // side-postavy strieľajú diagonálne
 });
 dashBtn.addEventListener("click",   () => togglePicker("dash", dashBtn, "dash"));
 // Melee: priama akcia bez pickera (Vampire/Onryō sekajú tiež len na vlastnej bunke)
@@ -167,57 +148,38 @@ meleeBtn?.addEventListener("click", () => {
   planning.myQueue.push({ type: "melee" });
   renderQueue();
 });
-// Vojak: mini mapa plochy pod special tlačidlom - klik vyberie cieľovú bunku lúča. Blokované:
-// vlastná GHOST pozícia (kde budem v čase specialu po naplánovaných move/dash) a súperova aktuálna
-// bunka + jeho tieňový klon (obe figúry - blokovanie len pravej by prezradilo, ktorá je skutočná).
-// V labyrinte má súper x=null (server rediguje) → neblokuje sa nič okrem vlastnej bunky (streľba naslepo).
-// reach (register specialReach - Luffy): len bunky, kam special z ghost pozície dosiahne
-function buildCellPicker(freeAll = false, reach = null) {
-  if (!cellPicker) return;
-  cellPicker.innerHTML = "";
-  cellPicker.style.gridTemplateColumns = `repeat(${board.w}, auto)`;
-  const gp = ghostPos(); // pozícia, z ktorej sa special vykoná (po akciách už vo fronte)
+// mini mapa plochy - klik vyberie cieľovú bunku akcie (type = special / special1). Režimy:
+//   "cell"  (Vojak) - blokovaná vlastná GHOST pozícia (kde budem v čase akcie po naplánovaných move/dash)
+//           a súperova aktuálna bunka + jeho tieňový klon (obe figúry - blokovanie len pravej by prezradilo,
+//           ktorá je skutočná). V labyrinte má súper x=null (server rediguje) → streľba naslepo.
+//   "trap"  (pasca Countess/Onre) - ŽIADNE blokované bunky, značka existujúcej pasce
+//   "own"   (Luffyho ruka) - blokovaná len vlastná ghost pozícia, súperova bunka je platný cieľ
+function buildCellPicker(el, mode, type) {
+  if (!el) return;
+  el.innerHTML = "";
+  el.style.gridTemplateColumns = `repeat(${board.w}, auto)`;
+  const gp = ghostPos(); // pozícia, z ktorej sa akcia vykoná (po akciách už vo fronte)
   const opp = state?.[otherSlot()];
   const myTrap = state?.[me]?.trap || null; // Countess/Onre: kde už leží moja pasca (recast ju nahradí)
   for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "btn mini-target";
-    // reach (Luffy): cieľ musí ležať na platnej línii (dáma/veža) z ghost pozície; ostatné bunky zamknuté.
-    // Vlastná aj súperova bunka SÚ platné ciele (dogúľa sa naň a udrie, kto tam stojí).
-    if (reach) {
-      // len rozlíšenie platná línia vs mimo - ŽIADNE značky mojej/súperovej pozície
-      // (tie dávajú zmysel u Soldiera, nie tu - Luffy sa smie dogúľať aj na vlastnú aj na súperovu bunku).
-      const ok = !!(gp && reach({ G, board, ui: buttonUi(), g: gp, x, y }));
-      if (!ok) { b.disabled = true; b.classList.add("off-line"); }
-      b.addEventListener("mouseenter", () => showPreviewCells([[x, y]]));
-      b.addEventListener("mouseleave", clearPreviewCells);
-      b.addEventListener("click", () => {
-        if (uiLocked() || b.disabled) return;
-        if (planning.myQueue.length >= 3 || planning.myQueue.some(a => a.type === "special")) return;
-        planning.myQueue.push({ type: "special", cell: { x, y } });
-        closePickers();
-        renderQueue();
-      });
-      cellPicker.appendChild(b);
-      continue;
-    }
-    // freeAll (pasca Countess/Onre): ŽIADNE blokované bunky - aj súperova aktuálna, aj vlastná
-    const isMe  = !freeAll && !!(gp && gp.x === x && gp.y === y);
-    const isFoe = !freeAll && (!!(opp && opp.x === x && opp.y === y) || !!(opp?.clone && opp.clone.x === x && opp.clone.y === y));
+    const isMe  = mode !== "trap" && !!(gp && gp.x === x && gp.y === y);
+    const isFoe = mode === "cell" && (!!(opp && opp.x === x && opp.y === y) || !!(opp?.clone && opp.clone.x === x && opp.clone.y === y));
     if (isMe)       { b.disabled = true; b.classList.add("own"); b.textContent = "▲"; b.title = "Your position at that point of the queue"; }
     else if (isFoe) { b.disabled = true; b.classList.add("foe"); b.textContent = "✕"; b.title = "Opponent's current cell - they're hit only if they move"; }
-    else if (freeAll && myTrap && myTrap.x === x && myTrap.y === y) { b.classList.add("trap-here"); b.textContent = "◆"; b.title = "Your current trap - recasting replaces it"; }
+    else if (mode === "trap" && myTrap && myTrap.x === x && myTrap.y === y) { b.classList.add("trap-here"); b.textContent = "◆"; b.title = "Your current trap - recasting replaces it"; }
     b.addEventListener("mouseenter", () => showPreviewCells([[x, y]]));
     b.addEventListener("mouseleave", clearPreviewCells);
     b.addEventListener("click", () => {
       if (uiLocked() || b.disabled) return;
-      if (planning.myQueue.length >= 3 || planning.myQueue.some(a => a.type === "special")) return;
-      planning.myQueue.push({ type: "special", cell: { x, y } });
+      if (planning.myQueue.length >= 3 || planning.myQueue.some(a => a.type === type)) return;
+      planning.myQueue.push({ type, cell: { x, y } });
       closePickers();
       renderQueue();
     });
-    cellPicker.appendChild(b);
+    el.appendChild(b);
   }
 }
 // Special: Medúza/Escanor si najprv vyberú smer pohľadu (←/→), Vlkolak jeden z 8 smerov charge,
@@ -231,20 +193,9 @@ specialBtn.addEventListener("click", () => {
   const target = specialTargetOf(ghostCharAt());
   if (target === "dir") { togglePicker("special", specialBtn, "special"); return; } // smerový special (left/right)
   if (target === "wolf") { togglePicker("special_wolf", specialBtn, "special"); return; } // charge - 8 smerov
-  if (target === "cell") {
-    if (planning.openPicker !== "special_cell") buildCellPicker(); // obsah podľa aktuálnych pozícií + ghost fronty
-    togglePicker("special_cell", specialBtn, "special");
-    return;
-  }
-  if (target === "reach") {
-    // mini mapa s bunkami len tam, kam special dosiahne (Luffy: pohyb-a-úder ako dáma base / veža gear3)
-    if (planning.openPicker !== "special_cell") buildCellPicker(false, CHARS_BY_KEY[ghostCharAt()].specialReach);
-    togglePicker("special_cell", specialBtn, "special");
-    return;
-  }
-  if (target === "trap") {
-    // pasca: rovnaká mini mapa ako Vojak, ale BEZ blokovaných buniek (aj súperova aktuálna, aj vlastná)
-    if (planning.openPicker !== "special_cell") buildCellPicker(true);
+  if (target === "cell" || target === "trap") {
+    // Vojak: obsah podľa aktuálnych pozícií + ghost fronty; pasca: rovnaká mini mapa BEZ blokovaných buniek
+    if (planning.openPicker !== "special_cell") buildCellPicker(cellPicker, target, "special");
     togglePicker("special_cell", specialBtn, "special");
     return;
   }
@@ -409,10 +360,14 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
   btn.addEventListener("click", () => {
     const [type, arg] = btn.dataset.act.split(":");
 
-    // mirror slot je Special 1 (register mirrorSlot - Jotaro) → klik TOGGLUJE L/R picker (togglePicker rieši
-    // open→close aj „iný picker otvorený"); musí byť PRED guardom otvoreného pickera, inak by re-klik len shakoval
+    // mirror slot je Special 1 (register mirrorSlot - Jotaro, Luffy) → klik TOGGLUJE picker (togglePicker rieši
+    // open→close aj „iný picker otvorený"); musí byť PRED guardom otvoreného pickera, inak by re-klik len shakoval.
+    // Jotaro: L/R šípky; Luffy (special1Target "cell"): mini mapa bez vlastnej ghost bunky
     if (type === "mirror" && CHARS_BY_KEY[ghostCharAt()]?.mirrorSlot === "special1") {
-      togglePicker("special1", mirrorBtn, "special1");
+      if (CHARS_BY_KEY[ghostCharAt()]?.special1Target === "cell") {
+        if (planning.openPicker !== "special1_cell") buildCellPicker(s1CellPicker, "own", "special1");
+        togglePicker("special1_cell", mirrorBtn, "special1");
+      } else togglePicker("special1", mirrorBtn, "special1");
       return;
     }
 

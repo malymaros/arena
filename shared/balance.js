@@ -64,5 +64,11 @@ export const JOTARO_S1_DMG  = 4;
 export const WORLD_COST     = 5;
 export const JOTARO_S2_COST = 5;
 export const JOTARO_S2_DMG  = 8;
-// Luffy: special (pohyb-a-úder ako šachová figúra) podľa formy - base = dáma, gear3 = veža
-export const LUFFY_SPECIAL_DMG = { base: 4, gear3: 8 };
+// Luffy: slabšie melee, Special 1 (mirror slot) = naťahovacia ruka na ľubovoľnú bunku okrem vlastnej,
+// guľa raz za hru (kotúľ o bunku ←/→ + výbuch 3×3, cena SPECIAL_COST), potom Special 2 (susedná bunka ←/→, ako Jotaro)
+export const LUFFY_MELEE_DMG = 4;
+export const LUFFY_S1_COST   = 4;
+export const LUFFY_S1_DMG    = 2;
+export const LUFFY_BALL_DMG  = 8;
+export const LUFFY_S2_COST   = 5;
+export const LUFFY_S2_DMG    = 8;

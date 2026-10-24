@@ -45,7 +45,9 @@ check(title("medusa", "special").cost.includes(`${B.STONE_ACTIONS}×`), "medusa:
 check(title("jotaro", "melee").cost.includes(`${B.JOTARO_MELEE_DMG}{☠️}`) && title("jotaro", "mirror").cost === `−${B.JOTARO_S1_COST}{💧} ${B.JOTARO_S1_DMG}{☠️}`, "jotaro: melee + Special 1");
 check(title("jotaro", "special", { worldUsed: true }).cost === `−${B.JOTARO_S2_COST}{💧} ${B.JOTARO_S2_DMG}{☠️}`, "jotaro: Special 2 po THE WORLD");
 check(title("jotaro", "special", { worldUsed: false }).cost.startsWith(`−${B.WORLD_COST}{💧}`), "jotaro: THE WORLD cena");
-check(title("luffy", "special", { gear3: true }).cost.includes(`${B.LUFFY_SPECIAL_DMG.gear3}{☠️}`) && title("luffy", "special", { gear3: false }).cost.includes(`${B.LUFFY_SPECIAL_DMG.base}{☠️}`), "luffy: special dmg podľa formy");
+check(title("luffy", "melee").cost === `−${B.MELEE_COST}{💧} ${B.LUFFY_MELEE_DMG}{☠️}` && title("luffy", "mirror").cost === `−${B.LUFFY_S1_COST}{💧} ${B.LUFFY_S1_DMG}{☠️}`, "luffy: melee + Special 1 (ruka)");
+check(title("luffy", "special", { worldUsed: false }).cost === `−${B.SPECIAL_COST}{💧} ${B.LUFFY_BALL_DMG}{☠️}` && ABILITY_PREVIEW.luffy.dmg === B.LUFFY_BALL_DMG, "luffy: guľa (cena, dmg, náhľad)");
+check(title("luffy", "special", { worldUsed: true }).cost === `−${B.LUFFY_S2_COST}{💧} ${B.LUFFY_S2_DMG}{☠️}`, "luffy: Special 2 po guli");
 for (const k of ["countess", "onre"]) {
   check(title(k, "dash").cost.startsWith(`−${B.DASH_COST}{💧} ${B.VAMP_CHARGE_DMG}{☠️}`) && title(k, "special").cost.startsWith(`−${B.SPECIAL_COST}{💧} ${B.VAMP_TRAP_DMG}{☠️}`), `${k}: charge + pasca`);
 }
@@ -74,8 +76,8 @@ check(info("medusa", "melee")?.cost === `{💧}${B.MELEE_COST} {☠️}${B.MEDUS
 check(info("jotaro", "mirror")?.cost === `{💧}${B.JOTARO_S1_COST} {☠️}${B.JOTARO_S1_DMG}` && info("jotaro", "special", { worldUsed: true })?.cost === `{💧}${B.JOTARO_S2_COST} {☠️}${B.JOTARO_S2_DMG}`, "jotaro: okno Star Platinum + Special 2");
 check(!info("jotaro", "special", { worldUsed: false }), "jotaro: pred THE WORLD special ukáže okno postavy (bez vlastného textu)");
 for (const k of ["countess", "onre"]) check(info(k, "dash")?.cost === `{💧}${B.DASH_COST} {☠️}${B.VAMP_CHARGE_DMG}` && info(k, "dash").text.includes(String(B.VAMP_CHARGE_BONUS)), `${k}: okno chargu`);
-check(info("luffy", "attack", { gear3: true })?.name === "GIANT PISTOL" && info("luffy", "attack", { gear3: false })?.name === "RANGE ATTACK", "luffy: okno útoku podľa formy");
-check(info("luffy", "recharge")?.cost === `+${B.RECHARGE_GAIN}{💧}` && title("luffy", "recharge").title.startsWith(`SWITCH GEAR (+${B.RECHARGE_GAIN} mana)`), "luffy: okno + tooltip Switch Gear z jedného textu");
+check(info("luffy", "attack")?.name === "RANGE ATTACK" && !CHAR_BUTTONS.luffy.recharge, "luffy: diagonálny basic, bežný recharge");
+check(info("luffy", "mirror")?.cost === `{💧}${B.LUFFY_S1_COST} {☠️}${B.LUFFY_S1_DMG}` && info("luffy", "special", { worldUsed: true })?.cost === `{💧}${B.LUFFY_S2_COST} {☠️}${B.LUFFY_S2_DMG}`, "luffy: okno ruky + Special 2");
 
 console.log(fails ? `\nBALANS UI: ${fails} chýb` : "\nBALANS UI SEDÍ");
 process.exit(fails ? 1 : 0);

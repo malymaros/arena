@@ -1,144 +1,94 @@
-// Luffy SPECIAL = pohyb-a-úder ako šachová figúra. Base = DÁMA (4 dmg, Special_7 roll-bounce), gear3 = VEŽA
-// (8 dmg, balón + Special_2 impact). Cieľová bunka na platnej línii (aj vlastná); Luffy sa NA ňu dogúľa a dá
-// dmg tomu, kto na nej stojí (súper / klon). Ide cez obrany ako každý dmg special.
-import { LUFFY_SPECIAL_DMG, SPECIAL_COST, SMALL_DELAY_MS, ANIM_SLOW, BASIC_COST, BASIC_DMG_MAX, MOVE_DELAY_MS, MAX_MANA, RECHARGE_GAIN } from "../constants.js";
+// Luffy (skrytá postava viazaná na p1) - zrkadlo Jotara: diagonálny basic, slabšie melee, v mirror slote Special 1,
+// special raz za hru a po ňom natrvalo Special 2.
+//   Special 1 (mirror slot) = naťahovacia ruka: úder na ĽUBOVOĽNÚ bunku okrem vlastnej (aj na súperovu aktuálnu),
+//                             zasiahne toho, kto na nej stojí v momente úderu. Cez obrany ako každý dmg special.
+//   Special (guľa)          = nafúkne sa do gule, prekotúľa sa o 1 bunku ←/→ a vybuchne na 3×3 okolo dopadovej
+//                             bunky (vrátane nej, Luffyho nezraní). Kotúľ z krajného stĺpca von = spálený special
+//                             (wall rule: mana preč, guľa narazí do steny, bez výbuchu). Raz za hru (worldUsed).
+//   Special 2               = po guli: susedná bunka ←/→ (presne ako Jotarov Special 2).
+import { LUFFY_MELEE_DMG, LUFFY_S1_COST, LUFFY_S1_DMG, LUFFY_BALL_DMG, LUFFY_S2_COST, LUFFY_S2_DMG,
+         SPECIAL_COST, SMALL_DELAY_MS, MOVE_MS, ANIM_SLOW } from "../constants.js";
 import * as G from "../../shared/geometry.js";
+import { lr, zoneStrike } from "./jotaro.js";
 
-const LUFFY_BALL_FORM_MS = Math.round(900 * ANIM_SLOW); // gear3: STREDOVÁ premena na guľu + rotácia (Special_1: ~1.1s premena + viditeľné rolovanie; Luffy ešte stojí, guľa sa na doske rozgúľa až potom)
-const LUFFY_ROLL_MS = Math.round(700 * ANIM_SLOW);   // gear3 balón roll
-const LUFFY_TRAVEL_MS = Math.round(340 * ANIM_SLOW); // base: dogúľanie k bunke (run/roll)
-const LUFFY_CHOMP_MS  = Math.round(340 * ANIM_SLOW); // base: cvaknutie NA bunke
+const LUFFY_BALL_FORM_MS   = Math.round(900 * ANIM_SLOW); // premena na guľu (Special_1) - veľká v strede aj malá na doske
+const LUFFY_ROLL_MS        = MOVE_MS;                     // kotúľ o bunku = sklz figúry na klientovi
+const LUFFY_EXPLODE_MS     = Math.round(340 * ANIM_SLOW); // výbuch (Special_2) na dopadovej bunke, potom zásah
+const LUFFY_PUNCH_REACH_MS = Math.round(320 * ANIM_SLOW); // ruka sa naťahuje k cieľovej bunke
+const LUFFY_PUNCH_HIT_MS   = 360;                         // úder + záblesk na cieli (zásah padne v tomto frame)
+const LUFFY_PUNCH_BACK_MS  = Math.round(320 * ANIM_SLOW); // ruka sa sťahuje späť
 
-const reaches = (ctx, fx, fy, c, form) =>
-  !!c && Number.isInteger(c.x) && Number.isInteger(c.y) && G.luffySpecialReaches(ctx.game.board, fx, fy, c.x, c.y, form);
+const validCell = (ctx, c) => !!c && Number.isInteger(c.x) && Number.isInteger(c.y) && ctx.inBounds(c.x, c.y);
+// kto zo súpera stojí na bunke: hráč a/alebo jeho klon (strikeZone rieši návnadu aj stacknutý pár)
+function foeOn(ctx, slot, cells) {
+  const foe = ctx.game.players[ctx.other(slot)];
+  return {
+    inZone: !!(foe && cells.some(([x, y]) => x === foe.x && y === foe.y)),
+    cloneStruck: !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y)),
+  };
+}
 
-// Luffy GEAR 3 basic = Giant Pistol s priťiahnutím súpera. Luffy STOJÍ; naťahovacia ruka letí ortogonálne
-// po prvú figúru súpera (klon-návnada / hráč). Pri zásahu dmg (falloff ako base 3/2/1) + PRIŤIAHNE súpera
-// na bunku hneď vedľa Luffyho (pos+dir). Obrana (shield/mirror) blokuje dmg AJ priťiahnutie.
-const GP_WINDUP_MS = Math.round(360 * ANIM_SLOW); // nafúknutie pästí (Recharge2)
-const GP_REACH_MS  = Math.round(320 * ANIM_SLOW); // naťahovanie ruky (L_GiantPunch)
-function doLuffyGear3Basic(ctx, slot, dir, tl) {
+// Special 1: ruka sa natiahne z Luffyho bunky na cieľ, udrie, stiahne sa. Luffy stojí.
+function punch(ctx, slot, tl, { cell }) {
   const me = ctx.game.players[slot];
-  const opS = ctx.other(slot);
-  const op  = ctx.game.players[opS];
-  const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir];
-  if (!delta) { ctx.pushInvalid(tl, slot); return; }
-  if (me.mana < BASIC_COST) { ctx.pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
-  me.mana -= BASIC_COST;
+  // vlastná bunka nie je cieľ (validQueue ju odmietne podľa ghost pozície; sem sa dostane, len ak sa Luffy
+  // nepohol podľa plánu - napr. dash bez many) → neprebehne, mana ostáva
+  if (!validCell(ctx, cell) || (cell.x === me.x && cell.y === me.y)) { ctx.pushInvalid(tl, slot); return; }
+  if (me.mana < LUFFY_S1_COST) { ctx.pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  me.mana -= LUFFY_S1_COST;
   const pBonus = ctx.powerBoost(slot, tl);
+  const cells = [[cell.x, cell.y]];
+  const { inZone, cloneStruck } = foeOn(ctx, slot, cells);
+  if (inZone) ctx.revealLabyrinths(tl); // istý zásah reálneho hráča odhalí labyrint pred animáciou
+  const origin = [me.x, me.y], target = [cell.x, cell.y];
+  ctx.pushStateFrame(tl, [{ kind: "luffy_punch", from: slot, origin, target }], LUFFY_PUNCH_REACH_MS);
+  ctx.pushStateFrame(tl, [{ kind: "luffy_punch_hold", from: slot, origin, target }], LUFFY_PUNCH_HIT_MS);
+  const dmg = LUFFY_S1_DMG * ctx.dealMul(slot) + pBonus;
+  if (inZone || cloneStruck) ctx.strikeZone(ctx.other(slot), inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus });
+  ctx.pushStateFrame(tl, [{ kind: "luffy_punch_back", from: slot, origin, target }], LUFFY_PUNCH_BACK_MS);
+}
 
-  // scan po prvú figúru súpera (hráč / klon) alebo okraj. Klon STACKNUTÝ na majiteľovej bunke = "stacked":
-  // pohltí len CLONE_DMG, zvyšok prejde na Naruta (rovnaké pravidlo ako basic/melee/werewolf charge) - nie
-  // plný bait ako klon-návnada mimo majiteľovej bunky.
-  let x = me.x, y = me.y, dist = 0, hit = false, cloneDecoy = false, stacked = false;
-  while (ctx.inBounds(x + delta[0], y + delta[1])) {
-    x += delta[0]; y += delta[1]; dist++;
-    const cloneHere  = !!(op?.clone && op.clone.x === x && op.clone.y === y);
-    const playerHere = !!(op && op.x === x && op.y === y);
-    if (cloneHere && playerHere) { hit = true; stacked = true; break; }
-    if (playerHere) { hit = true; break; }
-    if (cloneHere) { hit = true; cloneDecoy = true; break; }
-  }
-  const target = [x, y];
-
-  // nafúknutie pästí + naťahovanie ruky (FX na klientovi kreslí gumu + L_GiantPunch podľa origin/target/dir)
-  ctx.pushStateFrame(tl, [{ kind: "luffy_gp", phase: "windup", from: slot, dir, ms: GP_WINDUP_MS }], GP_WINDUP_MS);
-  ctx.pushStateFrame(tl, [{ kind: "luffy_gp", phase: "reach", from: slot, dir, origin: [me.x, me.y], target, hit, ms: GP_REACH_MS }], GP_REACH_MS);
-
-  if (!hit) { ctx.pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS); return; }
-
-  const dmg = Math.max(1, BASIC_DMG_MAX - dist) * ctx.dealMul(slot) * ctx.labyrinthMul(slot) + pBonus;
-
-  // klon-návnada (mimo majiteľovej bunky): pohltí úder, žiadny pull
-  if (cloneDecoy) {
-    ctx.strikeCell(opS, "clone", dmg, tl, { kind: "luffy_gp" });
-    ctx.pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS);
+// Special (guľa, raz za hru): premena → kotúľ o bunku ←/→ → výbuch 3×3 → zásah
+function ball(ctx, slot, tl, dir) {
+  const me = ctx.game.players[slot];
+  me.mana -= SPECIAL_COST;
+  me.worldUsed = true; // special sa natrvalo mení na Special 2 (aj keď guľa narazí do steny)
+  const pBonus = ctx.powerBoost(slot, tl); // POWER tile sa počíta zo ŠTARTOVEJ bunky (kotúľ až potom)
+  const landing = G.luffyBallLanding(ctx.game.board, me, dir);
+  const cells = G.luffyBallCells(ctx.game.board, me, dir);
+  const { inZone, cloneStruck } = foeOn(ctx, slot, cells);
+  if (inZone) ctx.revealLabyrinths(tl);
+  ctx.pushStateFrame(tl, [{ kind: "luffy_ball_form", from: slot, dir }], LUFFY_BALL_FORM_MS);
+  if (!landing) {
+    // kotúľ z krajného stĺpca von: guľa narazí do steny, nevybuchne - special je spálený
+    ctx.pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, dir, wall: true }, { kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
     return;
   }
-
-  // reálny hráč (aj stacknutý pár s klonom): istý zásah → odhaľ labyrint pred úderom; obrana v resolveStrike
-  ctx.revealLabyrinths(tl);
-  const defended = op.shield || op.mirror; // shield/mirror blokuje dmg AJ pull
-  // stacknutý pár: so zdieľanou obranou reaguje ako jedna postava, bez nej klon pohltí CLONE_DMG a zvyšok
-  // prejde na Naruta - potom (ak žije) pull
-  ctx.strikeCell(opS, stacked ? "stacked" : "player", dmg, tl, { kind: "luffy_gp", bonus: pBonus });
-
-  // PRIŤIAHNUTIE: len keď zásah dopadol (nebránený) a súper žije - na bunku hneď vedľa Luffyho.
-  // Inak (obrana / smrť / už stojí vedľa) sa ruka len STIAHNE späť - klient tak vždy korektne uzavrie
-  // súvislú naťahovaciu ruku (žiadne visiace držanie po zásahu).
-  if (!defended && op.hp > 0) {
-    const px = me.x + delta[0], py = me.y + delta[1];
-    if (px !== op.x || py !== op.y) {
-      const from = [op.x, op.y];
-      op.x = px; op.y = py;
-      ctx.pushStateFrame(tl, [{ kind: "luffy_pull", from: slot, foe: opS, fromCell: from, toCell: [px, py], dir }], MOVE_DELAY_MS);
-      return;
-    }
-  }
-  ctx.pushStateFrame(tl, [{ kind: "luffy_gp", phase: "retract", from: slot, dir }], SMALL_DELAY_MS);
+  me.x = landing.x; me.y = landing.y;
+  ctx.pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, dir, target: [landing.x, landing.y] }, ...ctx.trackSteps(slot, [[landing.x, landing.y]])], LUFFY_ROLL_MS);
+  ctx.pushStateFrame(tl, [{ kind: "luffy_explode", from: slot, target: [landing.x, landing.y], cells }], LUFFY_EXPLODE_MS);
+  const dmg = LUFFY_BALL_DMG * ctx.dealMul(slot) + pBonus;
+  if (inZone || cloneStruck) ctx.strikeZone(ctx.other(slot), inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus });
+  else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
 }
 
 export default {
   key: "luffy",
-  // basic v gear3 = Giant Pistol (vráti true = vyriešené), v base bežný diagonálny basic enginu
-  basic(ctx, slot, dir, tl) {
-    if (ctx.game.players[slot].form !== "gear3") return false;
-    doLuffyGear3Basic(ctx, slot, dir, tl);
-    return true;
+  kit: { attack: "diag", mirrorSlot: "special1", meleeDmg: LUFFY_MELEE_DMG }, // ako Jotaro: diagonálny basic, Special 1 v mirror slote, slabšie melee
+  special1: {
+    args: "cell",
+    // cieľ nesmie byť vlastná GHOST bunka (pozícia v čase úderu); súperova aktuálna bunka je platný cieľ
+    validate: (ctx, a, { x, y }) => !(a.cell.x === x && a.cell.y === y),
+    resolve: punch,
   },
-  // recharge = jeho „glitch" akcia: doplní manu (ak nie je plná) A VŽDY prepne mód (base↔gear3), aj pri plnej mane
-  recharge(ctx, slot, tl) {
-    const a = ctx.game.players[slot];
-    const before = a.mana;
-    a.mana = Math.min(MAX_MANA, a.mana + RECHARGE_GAIN);
-    const gained = a.mana - before;
-    a.form = a.form === "gear3" ? "base" : "gear3";
-    const cells = a.clone ? [[a.x, a.y], [a.clone.x, a.clone.y]] : [[a.x, a.y]];
-    // dlhší frame, nech sa prepínacia póza (Recharge2 base→gear3 / Special_3 gear3→base) stihne prehrať
-    ctx.pushStateFrame(tl, [{ kind: "recharge", from: slot, cells, amount: gained, luffyForm: a.form }], Math.round(700 * ANIM_SLOW));
-    return true;
-  },
-  kit: { attack: "luffy" }, // basic diagonálny v base, ortogonálny (len ←/→) v gear3 - recharge prepína formu
   special: {
-    // cieľ na platnej línii (dáma base / veža gear3) z GHOST pozície a formy v čase specialu
-    validate: (ctx, a, { x, y, form }) => reaches(ctx, x, y, a.cell, form),
-    resolve(ctx, slot, tl, { cell }) {
-      const { game } = ctx;
-      const me = game.players[slot];
-      const opS = ctx.other(slot);
-      const op = game.players[opS];
-      if (!reaches(ctx, me.x, me.y, cell, me.form)) { ctx.pushInvalid(tl, slot); return; }
-      me.mana -= SPECIAL_COST;
-      const pBonus = ctx.powerBoost(slot, tl);
-      const gear3 = me.form === "gear3";
-      const dmg = LUFFY_SPECIAL_DMG[gear3 ? "gear3" : "base"] * ctx.dealMul(slot) * ctx.labyrinthMul(slot) + pBonus;
-
-      const foeOnTarget = !!(op && op.x === cell.x && op.y === cell.y);
-      const cloneOnCell = !!(op?.clone && op.clone.x === cell.x && op.clone.y === cell.y);
-      const stacked = foeOnTarget && cloneOnCell;            // Naruto + klon na cieľovej bunke
-      const cloneDecoyOnTarget = cloneOnCell && !foeOnTarget; // klon-návnada sám na bunke
-
-      if (foeOnTarget) ctx.revealLabyrinths(tl); // istý zásah reálneho hráča (aj stacknutý) → odhaľ pred rolovaním
-
-      const willHit = foeOnTarget || cloneOnCell; // na cieľovej bunke stojí súper/klon (aj keď má štít/mirror)
-      const path = G.luffyLinePath(me.x, me.y, cell.x, cell.y);
-      if (gear3) {
-        // gear3: najprv STREDOVÁ premena na guľu + rotácia, POTOM sa guľa na doske dogúľa k cieľu, potom VÝBUCH
-        ctx.pushStateFrame(tl, [{ kind: "luffy_ball_form", from: slot }], LUFFY_BALL_FORM_MS);
-        me.x = cell.x; me.y = cell.y;
-        ctx.pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, form: "gear3", target: [cell.x, cell.y], ...ctx.trackSteps(slot, path) }], LUFFY_ROLL_MS);
-        ctx.pushStateFrame(tl, [{ kind: "luffy_explode", from: slot, target: [cell.x, cell.y], hit: willHit }], LUFFY_CHOMP_MS);
-      } else {
-        // base: najprv DOGÚĽANIE (beh/kotúľ) k bunke, potom CVAKNUTIE zubami NA bunke (hit=zastaví na cvaknutí)
-        me.x = cell.x; me.y = cell.y;
-        ctx.pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, form: "base", target: [cell.x, cell.y], ...ctx.trackSteps(slot, path) }], LUFFY_TRAVEL_MS);
-        ctx.pushStateFrame(tl, [{ kind: "luffy_chomp", from: slot, target: [cell.x, cell.y], hit: willHit }], LUFFY_CHOMP_MS);
-      }
-
-      // stacknutý pár / hráč / klon-návnada na cieľovej bunke (rovnaké pravidlo ako basic/melee/werewolf charge)
-      const who = stacked ? "stacked" : foeOnTarget ? "player" : cloneDecoyOnTarget ? "clone" : null;
-      if (who) ctx.strikeCell(opS, who, dmg, tl, { kind: "luffy_special", bonus: pBonus });
-      // miss = čistý presun (roll/chomp frame už odohral)
+    // guľa aj Special 2 sú smerové (left/right)
+    validate: (ctx, a) => lr(a.dir),
+    resolve(ctx, slot, tl, { dir }) {
+      const me = ctx.game.players[slot];
+      if (!lr(dir)) { ctx.pushInvalid(tl, slot); return; }
+      if (!me.worldUsed) { ball(ctx, slot, tl, dir); return; }
+      zoneStrike(ctx, slot, tl, { dir, cells: G.jotaroS2Cells(ctx.game.board, me, dir), cost: LUFFY_S2_COST, dmg: LUFFY_S2_DMG, kind: "special" });
     },
   },
 };

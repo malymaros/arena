@@ -58,14 +58,25 @@ akcie sa lepia priamo z buniek do jednotnej veľkosti framu (kotva per-segment):
 | `Special_6` | L_Rifle (9, doľava) |
 | `Special_7` | L_BalloonBounce (12 — odrazenie útoku balónom) |
 | `Recharge` | L_Balloon (9) |
-| `Recharge2` | L_TwinFists (7) |
 | `Charge` (projektil) | L_FistJet (1) |
 | `Hurt` | L_Hurt (4) |
 | `Dead` | L_Lose (4 — sediaci porazený) |
 | `Win` | L_Win (4) |
 
-Mapovanie Special_1–6 / Recharge2 na konkrétne herné mechaniky (a P1/P2
-paleta) sa rozhodne pri integrácii postavy.
+Použitie v hre (kit od 2026-10-24, zrkadlo Jotara): `Attack_1` basic aj melee, `Attack_2` Special 2,
+`Special_1` + `Special_2` guľa (premena/kotúľ + výbuch), `Special_3` recharge (hostina), `Special_7` dash.
+`Special_4`–`6` a `Recharge` hra zatiaľ nepoužíva.
+
+## Special 1 - naťahovacia ruka (`punch.cjs`)
+
+```
+node punch.cjs   # out/L_RocketPull.png -> public/assets/luffy/Punch.png + PunchFist.png
+```
+
+`Punch.png` = `L_RocketPull` s odmazanou pečenou rukou vo framoch 0–2 (od x = 104), telo pri naťahovaní;
+framy 3–4 = návrat do stoja. `PunchFist.png` = malá päsť z konca ruky (16×16). Ruku ku ľubovoľnej bunke
+kreslí `public/chars/fx/luffy.js` v pôvodných 4 farebných pásoch zo sheetu - geometria (`ARM_X`, os ruky,
+päsť) musí sedieť s `LUFFY_ARM` tam.
 
 ## Pásy (`out/`, prefix `L_`)
 

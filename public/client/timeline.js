@@ -17,7 +17,7 @@ import { clearProjectiles, spawnFloat, cloneFloat, spawnCellFloat, spawnTrapBrea
 import { SIZE_LEVEL, ACTION_ANIMS } from "/chars/index.js";
 import { renderHUD } from "/client/hud.js";
 import { renderGrid } from "/client/grid.js";
-import { positionActors, computeFacing } from "/client/placement.js";
+import { positionActors, computeFacing, currentFacing } from "/client/placement.js";
 import { hideDeathCenter, hideDeathBehind, demonCenterAppear, demonCenterDisappear, hopeCenterAppear, hopeCenterDisappear, lsCenterAppear, lsCenterDisappear, placeDeathBehind } from "/client/last-stand.js";
 import { showIntermission } from "/client/intermission.js";
 import { planning } from "/client/planning.js";
@@ -274,12 +274,8 @@ export function schedulePlayTimeline(timeline) {
     const cloneMoved = (b, f) => !!(b?.clone && f?.clone && (b.clone.x !== f.clone.x || b.clone.y !== f.clone.y));
     // pohyb postavy pre register fx (Jotarov stand: dash = beh za Jotarom, MOVE = zmizne a zjaví sa na novej bunke)
     const noteStandLoco = (slot, before, frm) => CHAR_FX[frm?.char]?.moved?.(slot, before, frm);
-    // Luffy priťiahnutie: ťahaný súper sa NEmá rozbehnúť (nech to nevyzerá, že tam sám beží) - drž ho
-    // v idle, len sa sklzne k Luffymu. Ťahaný = súper toho, kto pull vyvolal (e.from).
-    const pullEff = (frame.effects || []).find(e => e.kind === "luffy_pull" && (e.from === "p1" || e.from === "p2"));
-    const pulledSlot = pullEff ? (pullEff.from === "p1" ? "p2" : "p1") : null;
-    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", pulledSlot === "p1" ? "idle" : "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
-    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", pulledSlot === "p2" ? "idle" : "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
+    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
+    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
 
     const shooters = new Set(); // basic strela - jednorazová póza
     const casters  = new Set(); // special - looping, malá postava sa animuje súbežne s veľkým sprite-om
@@ -450,8 +446,9 @@ export function schedulePlayTimeline(timeline) {
         // aj diagonálne smery - vlkolakov charge do steny z okrajovej bunky (wall pravidlo)
         const d = WOLF_DIRS_CLIENT[e.dir] || [0,0];
         // translate sa skladá „add" na základný transform (translateX(shift) scaleX(scale)) - scaleX prevracia X,
-        // preto horizontálny náraz násobíme znamienkom facingu, aby smeroval do skutočnej steny
-        const scale = computeFacing(state?.p1, state?.p2)[e.from] || 1;
+        // preto horizontálny náraz násobíme znamienkom facingu (vrátane dočasného otočenia - Luffyho guľa),
+        // aby smeroval do skutočnej steny
+        const scale = currentFacing(e.from, computeFacing(state?.p1, state?.p2)) || 1;
         const nx = d[0] * 14 * scale, ny = d[1] * 14;
         if (el && el.style.display !== "none") {
           el.animate(

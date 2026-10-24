@@ -10,7 +10,7 @@
 //  2. Výbery smeru sa presunú do vrstvy nad boardom (#touch-layer) a otvárajú sa na postave (jej ghost pozícii
 //     po naplánovaných akciách), zväčšené na prst. Šípka útoku / specialu a políčko = rovnako ako akcia: prvé
 //     ťuknutie ukáže zónu zásahu + TAP AGAIN, druhé zaradí. Šípky pohybu ležia na cieľovom políčku → jedno ťuknutie.
-//  3. Výber políčka (Soldier, pasca, Luffy) sa prekryje presne cez board - ťuká sa priamo na políčka.
+//  3. Výber políčka (Soldier, pasca, Luffyho ruka) sa prekryje presne cez board - ťuká sa priamo na políčka.
 //  4. Výber postavy: ťuk na kartu = schopnosť + náhľad (aj opakovaný - kartou sa NIKDY nevyberá), postavu
 //     vyberie len tlačidlo PICK <meno> (v turnajovom drafte ADD / REMOVE). Na telefóne je prvá
 //     karta predvybraná (bez hlasu), aby pravý panel s náhľadom nikdy nebol prázdny.
@@ -51,7 +51,7 @@ function stripHoverRules() {
 }
 
 /* ---------- 2+3. pickery na boarde ---------- */
-const PICKER_IDS = ["dir-picker", "dash-picker", "aim-picker", "aim-picker-diag", "special-picker", "wolf-picker", "s1-picker", "cell-picker"];
+const PICKER_IDS = ["dir-picker", "dash-picker", "aim-picker", "aim-picker-diag", "special-picker", "wolf-picker", "s1-picker", "cell-picker", "s1-cell-picker"];
 let layer = null;
 function initPickerLayer() {
   const boardEl = document.querySelector(".board");
@@ -77,7 +77,7 @@ function initPickerLayer() {
   syncLayer();
 }
 function placePicker(el) {
-  if (el.id === "cell-picker") {
+  if (el.id === "cell-picker" || el.id === "s1-cell-picker") {
     // políčka pickera = presne políčka boardu
     Object.assign(el.style, { left: "0px", top: "0px", gap: GAP + "px",
       gridTemplateColumns: `repeat(${board.w}, ${TILE_W}px)`, gridAutoRows: `${TILE_H}px` });
@@ -113,7 +113,7 @@ const previewOnly = (el) => el.classList.contains("q-badge");
 
 // šípka / políčko pickera: vlastný popis („Shoot Left") + popis akcie z jej tlačidla (cena, dmg)
 const PICKER_OPENER = { "dir-picker": moveBtn, "dash-picker": dashBtn, "aim-picker": attackBtn, "aim-picker-diag": attackBtn,
-  "special-picker": specialBtn, "wolf-picker": specialBtn, "cell-picker": specialBtn, "s1-picker": mirrorBtn };
+  "special-picker": specialBtn, "wolf-picker": specialBtn, "cell-picker": specialBtn, "s1-picker": mirrorBtn, "s1-cell-picker": mirrorBtn };
 function describe(el) {
   const clean = (t) => (t || "").replace(/\s+/g, " ").trim();
   const own = clean(el.title || el.closest("[title]")?.title);

@@ -58,12 +58,6 @@
       <!-- Vlkolak: fáza mesiaca (ikona bez čísla) vľavo od postavy, dmg specialu pri danej fáze vpravo -->
       <div class="moon-badge hidden" id="moon-p1"><img src="/assets/moon_0.png" alt="Moon" /></div>
       <div class="moon-dmg hidden" id="mdmg-p1"></div>
-      <!-- Luffy: odznak módu (Base / Gear 3) vľavo od postavy (ako mesiac) -->
-      <div class="luffy-badge hidden" id="luffy-p1"><img src="/assets/luffy/base.png" alt="Mode" /></div>
-      <!-- Luffy: info o basic (šípky diag/orto) a speciali (šípky dáma/veža + dmg) vpravo od postavy -->
-      <div class="luffy-info hidden" id="luffy-info-p1">
-        <div class="li-row"><img class="li-arrows li-spec" alt=""><span class="li-dmg"></span></div>
-      </div>
       <div class="hud-stats">
         <div class="hud-stat">
           <span class="bar-label" title="HP"><span class="ico ico-hp pix-ico" data-pix="heart"></span><span class="bar-num hp-num">–</span></span>
@@ -105,11 +99,6 @@
       <!-- Vlkolak: fáza mesiaca (ikona bez čísla) vľavo od postavy, dmg specialu pri danej fáze vpravo -->
       <div class="moon-badge hidden" id="moon-p2"><img src="/assets/moon_0.png" alt="Moon" /></div>
       <div class="moon-dmg hidden" id="mdmg-p2"></div>
-      <!-- Luffy: odznak módu (Base / Gear 3) -->
-      <div class="luffy-badge hidden" id="luffy-p2"><img src="/assets/luffy/base.png" alt="Mode" /></div>
-      <div class="luffy-info hidden" id="luffy-info-p2">
-        <div class="li-row"><img class="li-arrows li-spec" alt=""><span class="li-dmg"></span></div>
-      </div>
       <div class="hud-stats">
         <div class="hud-stat">
           <span class="bar-label" title="HP"><span class="ico ico-hp pix-ico" data-pix="heart"></span><span class="bar-num hp-num">–</span></span>
@@ -236,7 +225,7 @@
 
       <div class="act-group" data-label="DEFEND">
         <button class="btn act shield" data-act="shield"><span class="pix-ico" data-emoji="🛡️"></span><span class="cost"></span></button>
-        <!-- Mirror - Jotaro tento slot nemá: syncMirrorBtn ho premení na Special 1 (fialový ❔ skin + L/R picker) -->
+        <!-- Mirror - Jotaro a Luffy tento slot nemajú: syncMirrorBtn ho premení na Special 1 (fialový ❔ skin + picker) -->
         <div class="move-wrap">
           <button id="mirror-btn" class="btn act mirror" data-act="mirror"><span class="pix-ico" data-emoji="🪞"></span><span class="cost"></span></button>
           <!-- Jotaro Special 1: smer left/right (Star Platinum udrie na obe diagonály strany) -->
@@ -244,6 +233,8 @@
             <button class="btn arrow left"  data-act="special1:left"  title="Star Platinum - Left">←</button>
             <button class="btn arrow right" data-act="special1:right" title="Star Platinum - Right">→</button>
           </div>
+          <!-- Luffy Special 1: naťahovacia ruka - mini mapa, cieľ = ľubovoľná bunka okrem vlastnej -->
+          <div id="s1-cell-picker" class="dir-picker cell-picker hidden"></div>
         </div>
       </div>
 
@@ -352,8 +343,8 @@
           <div class="char-stats hidden" data-char="jotaro"><span class="char-hp"></span><span class="char-mana"></span></div>
           <div class="char-name">Jotaro</div>
         </div>
-        <!-- Luffy (One Piece) - HRATEĽNÝ (WIP), viazaný na P1 ako Vampire. WIP páska ostáva,
-             kým nebude hotový (base/gear3 módy, gear3 pull, chess special). -->
+        <!-- Luffy (One Piece) - HRATEĽNÝ, viazaný na P1 ako Vampire (zrkadlo Jotara). WIP páska ostáva,
+             kým majiteľ neodsúhlasí nový kit v hre. -->
         <div class="char-card hidden-char" data-char="luffy" data-side="p1">
           <canvas class="char-canvas" width="220" height="240" data-char="luffy"></canvas>
           <div class="char-stats hidden" data-char="luffy"><span class="char-hp"></span><span class="char-mana"></span></div>
@@ -380,8 +371,6 @@
         <div class="ca-pride hidden" id="ca-pride"><img src="/assets/pride_lion_0.png" alt="Pride" /><span class="pride-num">0</span></div>
         <!-- Vlkolak: fáza mesiaca + dmg pod mini-doskou - cyklí 0→3 (naplní client.js syncCaMoon) -->
         <div class="ca-moon hidden" id="ca-moon"><img src="/assets/moon_0.png" alt="Moon" /><span class="ca-moon-dmg"></span></div>
-        <!-- Luffy: mód (base/gear3) + dmg pod mini-doskou - cyklí base↔gear3 spolu so zónou (naplní syncCaLuffy) -->
-        <div class="ca-luffy hidden" id="ca-luffy"><img src="/assets/luffy/base.png" alt="Gear" /><span class="ca-luffy-dmg"></span></div>
       </div>
       <div class="ca-text" id="ca-text"></div>
       <div class="ca-stats" id="ca-stats"></div>

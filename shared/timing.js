@@ -6,6 +6,7 @@
 // celkové spomalenie animácií kola (1 = pôvodné tempo)
 export const ANIM_SLOW = 1.8;
 export const MOVE_DELAY_MS    = Math.round(800 * ANIM_SLOW); // posun postavy + malý buffer
+export const MOVE_MS          = Math.round(700 * ANIM_SLOW); // klientský sklz figúry po doske (CSS --move-ms); kotúľ Luffyho gule
 export const SMALL_DELAY_MS   = Math.round(600 * ANIM_SLOW);
 export const ACTION_GAP_MS    = Math.round(350 * ANIM_SLOW); // pokojová pauza medzi jednotlivými akciami, nech sa dá sledovať každý ťah
 export const SPECIAL_REPEAT   = 3;

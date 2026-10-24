@@ -58,6 +58,7 @@ export const wolfPicker    = document.getElementById("wolf-picker");    // Vlkol
 export const aimPickerDiag = document.getElementById("aim-picker-diag"); // Countess/Onre/Jotaro - diagonálny basic (4 smery)
 export const mirrorBtn = document.getElementById("mirror-btn"); // pre Jotara sa mení na Special 1
 export const s1Picker  = document.getElementById("s1-picker");  // Jotarov Special 1 - smer left/right
+export const s1CellPicker = document.getElementById("s1-cell-picker"); // Luffyho Special 1 - cieľová bunka
 export const meleeBtn = document.getElementById("melee-btn"); // melee má picker (Countess/Onre) → vlastné id a handler
 export const rechargeBtn = document.querySelector('.btn.act.mana[data-act="recharge"]');
 export const goldenBtn = document.getElementById("golden-btn");
