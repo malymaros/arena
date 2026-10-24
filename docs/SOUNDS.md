@@ -105,6 +105,11 @@ Narutov klon hlas nemá. Hlas mena pri výbere postavy = `ui.hover_char.<postava
 Výnimky (`VOICE` / `VOICE_BY_CHAR`): Jotarov THE WORLD (`timestop_start`) → `voice.special`, jeho Special 2 (efekt
 `special`) → `voice.special2`, Special 1 (slot mirroru) → tiež `voice.special2`; úder Vampire/Onryō `vamp_strike` (melee na
 vlastnej bunke, úder po charge, úder pasce) → `voice.melee`.
+Luffy: guľa (`luffy_ball_form`) → `voice.special`, Special 2 (efekt `special`, 3 údery) → `voice.special2`, ruka v slote
+mirroru (`luffy_punch`, okno celej ruky) → vlastný `voice.special1`.
+
+**Hlas víťaza:** `voice.win.<postava>` zaznie raz na začiatku víťaznej animácie na konci hry aj v medzihre série
+(`startVictory` v `public/client/timeline.js`, mimo timeline - okno nemá, `keep`). Zatiaľ ho má Luffy (smiech).
 
 **Hlasitosť hlasov:** `node tools/voice-loudness.mjs --write` premeria všetky hlasy (`custom/` nahrávky) v **LUFS**
 (EBU R128, v úseku `trim`) a nastaví `vol` na cieľ **−18 LUFS** s rezervou vrcholu −1 dBFS (`vol` najviac 2 =

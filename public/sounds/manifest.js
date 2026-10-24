@@ -168,6 +168,7 @@ export const SOUNDS = {
   "voice.special": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku špeciálu; prázdne = ticho" },
   "voice.special2": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 2 (Jotaro po THE WORLD, Luffy po guli) a Jotarovho Special 1; prázdne = ticho" },
   "voice.special1": { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas na začiatku Special 1 v slote mirroru (Luffyho ruka - celá ruka natiahnutie → úder → stiahnutie); prázdne = ticho" },
+  "voice.win":     { files: [], vol: 0.9, fit: "keep", status: "default", note: "hlas víťaza pri víťaznej animácii na konci hry (aj medzihra série); prázdne = ticho" },
 
   /* ---------- hlasy mágov (vlastník, 17.10.) - custom/mages/<postava>-<intro|range|melee|special>.mp3 ---------- */
   "ui.hover_char.fire": { files: ["custom/mages/fire-intro.mp3"], vol: 1.09, fit: "keep", trim: { "custom/mages/fire-intro.mp3": [120,1120] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
@@ -213,6 +214,7 @@ export const SOUNDS = {
   "voice.melee.jotaro": { files: ["custom/mages/jotaro-melee.mp3"], vol: 0.16, fit: "keep", trim: { "custom/mages/jotaro-melee.mp3": [80,4650] }, status: "picked", note: "hlas na začiatku melee (raz, nie pri každom švihu)" },
   "voice.special.jotaro": { files: ["custom/mages/jotaro-special.mp3"], vol: 0.19, fit: "keep", trim: { "custom/mages/jotaro-special.mp3": [40,2042] }, status: "picked", note: "hlas THE WORLD (timestop_start)" },
   "voice.special2.jotaro": { files: ["custom/mages/jotaro-special2.mp3"], vol: 0.23, fit: "keep", trim: { "custom/mages/jotaro-special2.mp3": [80,2640] }, status: "picked", note: "hlas na začiatku Special 2 (po THE WORLD nahrádza special)" },
+  "voice.win.luffy": { files: ["custom/mages/luffy-win.mp3"], vol: 0.54, fit: "keep", trim: { "custom/mages/luffy-win.mp3": [100,6180] }, status: "picked", note: "smiech pri víťaznej animácii (Win.png)" },
   "ui.hover_char.onre": { files: ["custom/mages/onre-intro.mp3"], vol: 1.82, fit: "keep", trim: { "custom/mages/onre-intro.mp3": [20,1160] }, status: "picked", note: "hover nad kartou pri výbere postavy" },
   "voice.attack.onre": { files: ["custom/mages/onre-range.mp3"], vol: 0.66, fit: "keep", trim: { "custom/mages/onre-range.mp3": [0,1180] }, status: "picked", note: "hlas na začiatku basic strely (aj mimo plochy)" },
   "voice.melee.onre": { files: ["custom/mages/onre-melee.mp3"], vol: 1.33, fit: "keep", trim: { "custom/mages/onre-melee.mp3": [0,1520] }, status: "picked", note: "hlas melee (raz, nie pri každom švihu) aj pri údere pasce" },

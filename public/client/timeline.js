@@ -78,11 +78,18 @@ function showGameOverSequence(winner) {
       // uprac overlay z poslednej akcie (special/melee cast) - po game over ho už renderGrid neuprace
       actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
       clearCharOverlays();
-      // víťazova postavička spamuje cast animáciu priamo na svojom políčku (žiadny extra sprite)
-      if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
+      // víťazova postavička spamuje cast animáciu priamo na svojom políčku (žiadny extra sprite) + jeho hlas víťaza
+      startVictory(winner);
       goOverlay.classList.remove("hidden");
     }, afterDeathWait);
   }, waitAttack);
+}
+
+// víťazná animácia + hlas víťaza (voice.win.<postava>, napr. Luffyho smiech) - raz na jej začiatku
+function startVictory(winner) {
+  if (winner !== "p1" && winner !== "p2") return;
+  setAnim(winner, "victory");
+  sfx("voice.win", { char: state?.[winner]?.char, pan: winner === "p1" ? -0.4 : 0.4 });
 }
 
 // animácia konca hry (smrť porazeného + víťazstvo) bez finálneho overlayu - pre medzihru série
@@ -97,7 +104,7 @@ function playGameEndAnim(winner, after) {
     sfx(me && winner !== me && winner !== "draw" ? "game.lose" : "game.win");
     actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
     clearCharOverlays();
-    if (winner === "p1" || winner === "p2") setAnim(winner, "victory");
+    startVictory(winner);
     setTimeout(() => { if (after) after(); }, afterDeathWait);
   }, waitAttack);
 }
