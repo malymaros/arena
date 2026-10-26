@@ -23,7 +23,7 @@ export default {
     // žiadny dmg - skamenenie na 2 akcie (smer sa volí v pickeri)
     special: { title: `Special (−${SPECIAL_COST} mana) - petrifying gaze: choose a direction; a hit opponent skips their next ${STONE_ACTIONS} actions`, cost: `−${SPECIAL_COST}{💧} ${STONE_ACTIONS}×🗿`, label: `{💧}${SPECIAL_COST} {🗿}${STONE_ACTIONS}` },
   },
-  specialTarget: "dir", // smerový special (left/right picker)
+  specialTarget: (ui) => ui.st?.labyrinth ? "none" : "dir", // smerový (left/right picker); v labyrinte bez smeru
   // vlastné políčko + všetko striktne zvoleným smerom v riadkoch ±1
   specialZone: ({ G, board, me, dir }) => G.medusaCells(board, me, dir),
   // melee = šľah celým telom (Attack_1), basic strela = Attack_2

@@ -41,10 +41,12 @@ export function runPath(board, x, y, delta, foe = null) {
 }
 
 /* ---------- zóny specialov ---------- */
-// Medúza: vlastné políčko + všetko striktne zvoleným smerom (left/right) v riadkoch y±1
+// Medúza: vlastné políčko + všetko striktne zvoleným smerom (left/right) v riadkoch y±1;
+// bez smeru (stratená v labyrinte - je tma) skamení len na jej vlastnom políčku
 export function medusaCells(board, me, dir) {
-  const sgn = dir === "left" ? -1 : 1;
   const cells = [[me.x, me.y]];
+  if (dir !== "left" && dir !== "right") return cells;
+  const sgn = dir === "left" ? -1 : 1;
   for (let y = me.y - 1; y <= me.y + 1; y++) {
     if (y < 0 || y >= board.h) continue;
     for (let x = me.x + sgn; x >= 0 && x < board.w; x += sgn) cells.push([x, y]);
