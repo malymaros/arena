@@ -11,6 +11,7 @@ import {
   ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS,
   MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS,
   MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, VAMP_TRAP_STRIKE_MS, QUICKDRAW_MS, PASS_MANA_COST,
+  charRollMs, COLOR_ROLL_MS,
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
@@ -1550,7 +1551,14 @@ function startMatch(config) {
   emitYouAre();
   // ruleta jin-yang beží len keď farbu naozaj losujeme (random); pri pevnej voľbe hosta ju preskočíme
   roomEmit("color_roll", { animate: config.colorPref === "random" });
-  if (config.format === "tournament") {
+  if (config.format === "tournament" && config.randomChars) {
+    // náhodný výber: tímy vylosuje server (bez draftu); klient ich zinscenuje (char_roll), potom
+    // hráč vyberá štartovacieho maga z tímu ako zvyčajne (roster char-select)
+    game.roster = { A: null, B: null };
+    for (const slot of ["p1", "p2"]) game.roster[game.seats[slot]] = rollTeam(slot);
+    roomEmit("char_roll", { team: true, picks: { p1: rosterFor("p1"), p2: rosterFor("p2") }, afterColor: config.colorPref === "random" });
+    finishTeamSelect();
+  } else if (config.format === "tournament") {
     // slepý draft tímov: pred hrou 1 si každý vyberie TEAM_SIZE postáv z celého poolu (choose_team);
     // mageHp/mageMana vzniknú až po potvrdení oboch (finishTeamSelect → startGame(1))
     game.roster = { A: null, B: null };
@@ -1595,7 +1603,37 @@ function startGame(gameIndex) {
   game.phase = "playing";
 
   emitYouAre();
+  // náhodný výber postáv (mimo turnaja - tam sa losuje tím v startMatch): server pridelí postavy hneď,
+  // klient to zinscenuje (char_roll ide PRED stavom, nech overlay zakryje plochu skôr, než sa vykreslí);
+  // časovač ťahu sa odloží o dĺžku animácie (v hre 1 aj o ruletu farieb, ktorá ide pred ňou)
+  if (game.config?.randomChars && !game.mageHp) {
+    for (const slot of ["p1", "p2"]) {
+      game.players[slot].char = rollChar(slot);
+      deployReset(slot);
+    }
+    const afterColor = gameIndex === 1 && game.config.colorPref === "random";
+    roomEmit("char_roll", { team: false, picks: { p1: [game.players.p1.char], p2: [game.players.p2.char] }, afterColor });
+    beginPlanningTimer(charRollMs() + (afterColor ? COLOR_ROLL_MS : 0));
+  }
   emitStateMasked(); // char-select potrebuje per-osoba mageHp (tournament)
+}
+
+// pool náhodného výberu pre slot: bežné postavy + side-postavy viazané na túto stranu (ako mriežka losovania)
+function rollPool(slot) {
+  return [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
+}
+function rollChar(slot) {
+  const pool = rollPool(slot);
+  return pool[Math.floor(rand() * pool.length)];
+}
+// tím TEAM_SIZE rôznych postáv; poradie losovania = poradie tímu (kurzory 1-2-3)
+function rollTeam(slot) {
+  const pool = rollPool(slot), team = [];
+  while (team.length < TEAM_SIZE) {
+    const k = pool[Math.floor(rand() * pool.length)];
+    if (!team.includes(k)) team.push(k);
+  }
+  return team;
 }
 
 // očisti a zvaliduj nastavenia z lobby; pri nezmysle vráti null
@@ -1615,7 +1653,10 @@ function sanitizeConfig(raw) {
   if (sum !== 100) return null; // percentá musia dať presne 100
   // farba hosta (osoby A): white/black si host vyberie pevne, random = losuje sa (default)
   const colorPref = ["white", "black"].includes(raw.colorPref) ? raw.colorPref : "random";
-  return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref };
+  // náhodný výber postáv (lobby „RANDOM CHARACTERS“) - default vypnutý; kľúč len keď je zapnutý
+  // (snapshot nesie config - bez neho ostávajú golden timeline nezmenené)
+  return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref,
+    ...(raw.randomChars ? { randomChars: true } : {}) };
 }
 
 // vypršal čas na ťah: kto nie je locknutý, zahrá rozpracovaný draft doplnený náhodne; potom vyhodnoť kolo

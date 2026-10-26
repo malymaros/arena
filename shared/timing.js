@@ -75,3 +75,28 @@ export const LS_B_KILL_MS   = 700;  // banish: smrť + duch zmizne
 export const LH_APPEAR_MS = 1000; // hope postava sa vynorí v strede
 export const LH_DRAIN_MS  = 1400; // HP→1, mana→10
 export const LH_SETTLE_MS = 900;  // postava zmizne, červený ultra mód zostáva
+
+// Losovanie (lobby voľba „RANDOM CHARACTERS“): pred hrou kurzor poskakuje po mriežke postáv a dobehne na
+// vylosovanú (server ju už pridelil, animácia je divadlo ako ruleta farieb). Skoky spomaľujú:
+// i-ty skok (1..TICKS) čaká min(MAX, BASE × GROWTH^i); posledný skok dôjde na cieľ, kurzor tam chvíľu postojí
+// (ďalší „neodohraný“ skok) a až potom sa postava potvrdí (meno + zvuk + intro hlas).
+// Turnaj: 3 kurzory, dopadajú postupne o ROLL_TEAM_STAGGER skokov.
+export const ROLL_TICKS        = 25;
+export const ROLL_TICK_BASE_MS = 55;
+export const ROLL_TICK_GROWTH  = 1.095;
+export const ROLL_TICK_MAX_MS  = 430;
+export const ROLL_TEAM_STAGGER = 5;
+export const ROLL_LINGER_MS    = 2200; // po potvrdení: meno + intro hlas, potom overlay zmizne
+export const ROLL_FADE_MS      = 450;
+export const rollTickMs = (i) => Math.min(ROLL_TICK_MAX_MS, ROLL_TICK_BASE_MS * Math.pow(ROLL_TICK_GROWTH, i));
+// celá animácia losovania postáv (od zobrazenia po zmiznutie overlayu)
+export function charRollMs() {
+  let t = 0;
+  for (let i = 1; i <= ROLL_TICKS + 1; i++) t += rollTickMs(i); // +1 = zdržanie na cieli pred potvrdením
+  return Math.round(t + ROLL_LINGER_MS + ROLL_FADE_MS);
+}
+// ruleta farieb (public/client/socket-handlers.js): roztočenie + výsledok + fade - losovanie postáv ide až po nej
+export const COLOR_ROLL_SPIN_MS   = 3400;
+export const COLOR_ROLL_RESULT_MS = 1700;
+export const COLOR_ROLL_FADE_MS   = 450;
+export const COLOR_ROLL_MS = COLOR_ROLL_SPIN_MS + COLOR_ROLL_RESULT_MS + COLOR_ROLL_FADE_MS;

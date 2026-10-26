@@ -2,6 +2,7 @@
 // Spustenie: node test/game-test.mjs
 import { spawn } from "child_process";
 import { io } from "socket.io-client";
+import { charRollMs } from "../shared/timing.js";
 
 const PORT = 3996;
 const URL = `http://localhost:${PORT}`;
@@ -38,6 +39,8 @@ function connect(pass = "testpass") {
     sock.on("rooms", (r) => { ctx.rooms = r; });                 // zoznam roomiek (room-browser)
     sock.on("spectator", () => { ctx.spectator = true; });
     sock.on("color_roll", () => { ctx.colorRolls++; }); // ruleta farieb po configure_match (klient ju animuje)
+    ctx.charRolls = [];
+    sock.on("char_roll", (r) => { ctx.charRolls.push(r); }); // losovanie postáv (randomChars)
     sock.on("game_result", (g) => { ctx.gameResult = g; });
     sock.on("turn_timer", (t) => { ctx.lastTimer = t; });
     sock.on("new_game", () => { /* séria: ďalšia hra — sloty prídu cez you_are */ });
@@ -131,6 +134,7 @@ function configureMatch(host, opts = {}) {
     tilesPerRound: opts.tilesPerRound ?? 1,
     tileWeights: opts.tileWeights || { dmg: 75, heal: 12, mana: 8, ik: 5 },
     timer: opts.timer || "off",
+    ...(opts.randomChars ? { randomChars: true } : {}),
   });
 }
 
@@ -2158,6 +2162,56 @@ async function main() {
     && sumEffects(tl).hits.filter(h => h.target === "p2").length === 0,
     "TL5: mirror odrazil guľu (8) na luffyho", `hits=${JSON.stringify(sumEffects(tl).hits)}`);
   invariantCheck(tl, "TL5");
+  }
+
+  /* ---------- RC: náhodný výber postáv (lobby „RANDOM CHARACTERS“) ---------- */
+  {
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const pool = (slot) => ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor", "soldier", "werewolf",
+      ...(slot === "p1" ? ["countess", "luffy"] : ["onre", "jotaro"])];
+    // RC1: single - server pridelí postavy hneď, char_roll príde obom, ručný výber je odmietnutý, časovač odložený
+    c1.sock.emit("retry"); await sleep(150);
+    c1.charRolls = []; c2.charRolls = [];
+    configureMatch(c1, { randomChars: true, timer: "30" }); await sleep(300);
+    const r1 = c1.charRolls[0], r2 = c2.charRolls[0];
+    check(!!r1 && !!r2 && r1.team === false, "RC1: char_roll prišiel obom hráčom (single)", JSON.stringify(r1));
+    const st = c1.lastState;
+    check(st?.phase === "playing" && !!st.p1?.char && !!st.p2?.char, "RC1: postavy pridelené hneď (bez char-selectu)", `p1=${st?.p1?.char} p2=${st?.p2?.char}`);
+    check(r1?.picks?.p1?.[0] === st?.p1?.char && r1?.picks?.p2?.[0] === st?.p2?.char, "RC1: char_roll = pridelené postavy", JSON.stringify(r1?.picks));
+    check(pool("p1").includes(st?.p1?.char) && pool("p2").includes(st?.p2?.char), "RC1: postavy z poolu svojej strany (vrátane side-postáv)");
+    check(st?.config?.randomChars === true, "RC1: config nesie randomChars");
+    const before = st?.[c1.slot]?.char;
+    c1.sock.emit("choose_character", before === "fire" ? "lightning" : "fire"); await sleep(150);
+    check(c1.lastState?.[c1.slot]?.char === before, "RC1: ručný výber postavy odmietnutý");
+    // časovač ťahu je odložený o ruletu farieb + animáciu losovania (30 s + ~14 s)
+    check((c1.lastTimer?.ms ?? 0) > 30000 + charRollMs(), "RC1: časovač odložený o animáciu losovania", `ms=${c1.lastTimer?.ms}`);
+    const PS = { type: "pass" };
+    const tl = await playRound(c1, c2, [R, PS, PS], [R, PS, PS]);
+    check(tl.length > 0, "RC1: kolo sa dá odohrať");
+
+    // RC2: turnaj - tímy 3 rôznych postáv vylosované, draft preskočený, štartéra si hráč vyberá z tímu
+    c1.sock.emit("retry"); await sleep(150);
+    c1.charRolls = []; c2.charRolls = [];
+    configureMatch(c1, { format: "tournament", randomChars: true }); await sleep(300);
+    const t1 = c1.charRolls[0];
+    const st2 = c1.lastState;
+    check(t1?.team === true && t1.picks.p1.length === 3 && t1.picks.p2.length === 3, "RC2: char_roll nesie 2 tímy po 3", JSON.stringify(t1?.picks));
+    check(new Set(t1?.picks?.p1).size === 3 && new Set(t1?.picks?.p2).size === 3, "RC2: tím bez duplicít");
+    check(t1?.picks?.p1.every(k => pool("p1").includes(k)) && t1?.picks?.p2.every(k => pool("p2").includes(k)), "RC2: tímy z poolu svojej strany");
+    check(st2?.phase === "playing" && !st2.p1?.char && !st2.p2?.char, "RC2: po losovaní char-select štartéra (postavy ešte nevybrané)", `phase=${st2?.phase}`);
+    check(JSON.stringify(st2?.roster?.[c1.slot]) === JSON.stringify(t1?.picks?.[c1.slot]), "RC2: roster = vylosovaný tím v poradí 1-2-3");
+    c1.sock.emit("choose_team", ["fire", "lightning", "wanderer"]); await sleep(150);
+    check(JSON.stringify(c1.lastState?.roster?.[c1.slot]) === JSON.stringify(t1?.picks?.[c1.slot]), "RC2: ručný draft odmietnutý");
+    c1.sock.emit("choose_character", t1.picks[c1.slot][1]);
+    c2.sock.emit("choose_character", t1.picks[c2.slot][0]);
+    await sleep(250);
+    check(c1.lastState?.[c1.slot]?.char === t1.picks[c1.slot][1], "RC2: štartér vybraný z vylosovaného tímu");
+
+    // RC3: vypnutá voľba - žiadny char_roll, bežný char-select
+    c1.sock.emit("retry"); await sleep(150);
+    c1.charRolls = []; c2.charRolls = [];
+    configureMatch(c1, {}); await sleep(300);
+    check(c1.charRolls.length === 0 && !c1.lastState?.p1?.char, "RC3: bez voľby žiadne losovanie");
   }
 
   /* ---------- TR: viac roomiek naraz — izolácia broadcastov ---------- */

@@ -62,6 +62,7 @@ export const SOUNDS = {
   "ui.hover_char":  { files: [],                            vol: 0.8,  status: "default", note: "myš nad kartou postavy - hlas mena (ui.hover_char.<postava>); prázdne = ticho" },
   "ui.timer_tick":  { files: [UI + "tick_002.ogg"],         vol: 0.5,  status: "default", note: "posledných 5 s ťahu" },
   "ui.color_roll":  { files: [UI + "scroll_003.ogg"],       vol: 0.5,  status: "default", note: "roztočenie yin-yang šípky" },
+  "ui.random_hop":  { files: [UI + "tick_002.ogg"],         vol: 0.5,  status: "default", note: "losovanie postáv: skok kurzora po mriežke (potvrdenie = ui.pick + ui.hover_char.<postava>)" },
   "round.start":    { files: [JIN + "jingles_HIT03.ogg"],   vol: 0.5,  status: "default", note: "banner ROUND N" },
   "round.final":    { files: ["custom/round/final-round.mp3"], vol: 0.78, fit: "keep", trim: { "custom/round/final-round.mp3": [80,2180] }, status: "picked", note: "banner FINAL ROUND (1,9 s; súbor 2,1 s)" },
 

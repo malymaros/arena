@@ -29,6 +29,8 @@ import { hydratePix, pixelizeEmoji } from "/client/pix.js";
 import { ghostCharAt } from "/client/ghost.js";
 import { sfx } from "/client/sound.js";
 import { syncMusic } from "/client/sound-map.js";
+import { startCharRoll, stopCharRoll } from "/client/char-roll.js";
+import { COLOR_ROLL_SPIN_MS, COLOR_ROLL_RESULT_MS, COLOR_ROLL_FADE_MS } from "/shared/timing.js";
 
 /* ---------- Sockets ---------- */
 // you_are nesie slot (ľavá/pravá rola, fixná na celú sériu: host=p1) aj či som host
@@ -58,7 +60,7 @@ socket.on("color_roll", (info) => {
   crArrowEl.getAnimations().forEach(a => a.cancel());
   const spin = crArrowEl.animate(
     [{ transform: "rotate(0deg)" }, { transform: `rotate(${4 * 360 + target}deg)` }],
-    { duration: 3400, easing: "cubic-bezier(.12,.68,.18,1)", fill: "forwards" }
+    { duration: COLOR_ROLL_SPIN_MS, easing: "cubic-bezier(.12,.68,.18,1)", fill: "forwards" }
   );
   spin.onfinish = () => {
     crResultEl.innerHTML = white
@@ -66,14 +68,18 @@ socket.on("color_roll", (info) => {
       : `YOU PLAY <span class="cr-black">⚫ BLACK</span> - YOU GO SECOND`;
     crResultEl.classList.remove("hidden");
     setTimeout(() => {
-      const fade = colorRollEl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: "ease-in", fill: "forwards" });
+      const fade = colorRollEl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: COLOR_ROLL_FADE_MS, easing: "ease-in", fill: "forwards" });
       fade.onfinish = () => {
         colorRollEl.classList.add("hidden");
         fade.cancel(); // fill:forwards by inak držal opacity 0 aj pri ďalšom zápase
       };
-    }, 1700);
+    }, COLOR_ROLL_RESULT_MS);
   };
 });
+
+/* ---------- Losovanie postáv (lobby „RANDOM CHARACTERS“) ---------- */
+// server postavy / turnajový tím už pridelil; char_roll prišiel PRED stavom → overlay zakryje plochu
+socket.on("char_roll", (info) => { startCharRoll(info); });
 
 // hra je plná - divák hru sleduje, ale nemá výber postavy ani ovládanie (box s hláškou dole)
 socket.on("spectator", () => {
@@ -89,6 +95,7 @@ socket.on("spectator", () => {
 // úplný reset herného UI (plánovaná fronta, golden/Last Stand voľby, game-over stavy, figúry): server ho
 // pošle pri retry; volá sa aj pri návrate na room-browser - nová roomka nesmie zdediť ťahy z poslednej hry
 function resetGameUi() {
+  stopCharRoll();            // rozbehnuté losovanie postáv nesmie prežiť reset / odchod z roomky
   playback.playGen++;        // zruš prípadné bežiace prehrávanie
   playback.playing = false;
   hideConnError();

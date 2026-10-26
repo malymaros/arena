@@ -64,6 +64,7 @@ export function showLobby() {
       timer: pick("lobby-timer") || "off",
       tilePreview: (pick("lobby-preview") || "on") === "on",
       colorPref: pick("lobby-color") || "random",
+      randomChars: pick("lobby-random") === "on",
     };
     if (Object.values(weights).reduce((a, b) => a + b, 0) !== 100) return;
     socket.emit("configure_match", config);

@@ -1061,6 +1061,59 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .cr-result .cr-black { color: #9aa0ab; text-shadow: 0 0 10px rgba(0,0,0,.9), 2px 2px 0 rgba(0,0,0,.7); }
 @keyframes cr-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+/* ========== Losovanie postáv (lobby „RANDOM CHARACTERS“, public/client/char-roll.js) ========== */
+/* NEPRIEHĽADNÝ overlay POD ruletou farieb (tá ide v hre 1 prvá) a NAD char-selectom/plochou - plocha s už
+   pridelenými postavami sa odkryje až fade-outom. Mriežka hláv vo vlastnej palete, kurzory 1-2-3. */
+.color-roll { z-index: 10001; }
+.char-roll {
+  position: fixed; inset: 0; z-index: 10000; background: #08090c;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+}
+.char-roll.hidden { display: none; }
+.rr-title { font-size: 22px; letter-spacing: 3px; text-shadow: 3px 3px 0 #000; }
+.rr-title.white { color: #f4f4f4; } .rr-title.black { color: #b9b9c4; }
+.rr-grid { position: relative; display: grid; grid-template-columns: repeat(4, 112px); gap: 16px; }
+.rr-cell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; transition: opacity .3s; }
+.rr-face { position: relative; width: 112px; height: 112px; border-radius: 10px; overflow: hidden; background: rgba(12,14,18,.8); }
+.rr-face canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.rr-face::after { content: ""; position: absolute; inset: 0; border-radius: 10px; pointer-events: none;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #000, inset 0 0 0 5px rgba(255,255,255,.12); }
+.rr-name { font-size: 9px; color: #cfd2d6; text-shadow: 2px 2px 0 #000; min-height: 10px; white-space: nowrap; }
+.char-roll.p2-side .rr-face canvas { transform: scaleX(-1); } /* čierny = pravá strana, hlava pozerá doľava ako v HUD */
+/* budúca postava - stlmená, kurzor na ňu nikdy nevstúpi */
+.rr-cell.future { opacity: .32; filter: grayscale(1); }
+.rr-cell.future .rr-face { background: repeating-linear-gradient(45deg, #15171d 0 8px, #1b1e26 8px 16px); display: flex; align-items: center; justify-content: center; }
+.rr-cell.future .rr-face::after { box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #000, inset 0 0 0 5px rgba(255,255,255,.06); }
+.rr-cell.future .rr-q { font-size: 30px; color: #6b6f7a; text-shadow: 3px 3px 0 #000; }
+/* skryté (side) postavy - fialový glitch ako corrupt hlavy v turnajovom HUD; meno tiež glitchuje */
+.rr-cell.corrupt .rr-face { animation: mhead-glitch .55s steps(1, end) infinite; }
+.rr-cell.corrupt .rr-face canvas { filter: hue-rotate(255deg) saturate(2.2) brightness(.92); }
+.rr-cell.corrupt .rr-face::after { box-shadow: 0 0 0 2px #000, inset 0 0 0 4px rgba(177,122,255,.9), 0 0 16px rgba(160,90,255,.7); }
+.rr-cell.corrupt.flash .rr-face { animation: none; transform: translate(2px, -1px); }
+.rr-cell.corrupt.flash .rr-face::after { box-shadow: 0 0 0 2px #000, inset 0 0 0 5px rgba(122,255,242,.85), 0 0 20px rgba(255,91,214,.8); }
+.rr-cell.corrupt .rr-name { color: #d8c2ff; animation: hidden-question-glitch .6s steps(1, end) infinite, hidden-flicker 3.2s linear infinite; }
+/* kurzory (turnaj: 1 zlatý, 2 modrý, 3 zelený) */
+.rr-cursor { position: absolute; left: 0; top: 0; width: 112px; height: 112px; border-radius: 12px; pointer-events: none; z-index: 3;
+  box-shadow: 0 0 0 3px #000, inset 0 0 0 5px #ffd54f, 0 0 18px rgba(255,200,60,.7); }
+.rr-cursor .rr-num { position: absolute; top: -10px; left: -10px; width: 24px; height: 22px; border-radius: 5px;
+  background: #ffd54f; color: #000; font-size: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #000; }
+.rr-cursor.c2 { box-shadow: 0 0 0 3px #000, inset 0 0 0 5px #4fc3ff, 0 0 18px rgba(80,180,255,.7); } .rr-cursor.c2 .rr-num { background: #4fc3ff; }
+.rr-cursor.c3 { box-shadow: 0 0 0 3px #000, inset 0 0 0 5px #7dff8a, 0 0 18px rgba(110,255,130,.65); } .rr-cursor.c3 .rr-num { background: #7dff8a; }
+.rr-cursor.landed { animation: rr-land .55s ease-out; }
+@keyframes rr-land { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.rr-cell.picked .rr-face { animation: rr-flash .6s ease-out; }
+@keyframes rr-flash { 0% { filter: brightness(2.4); } 100% { filter: brightness(1); } }
+.char-roll.done .rr-cell:not(.picked):not(.future) { opacity: .45; }
+/* výsledok = len meno postavy (turnaj: 3 mená v poradí 1-2-3), objaví sa pri potvrdení */
+.rr-result { display: flex; gap: 28px; justify-content: center; align-items: center; min-height: 40px; }
+.rr-res-name { font-size: 28px; color: #ffd54f; letter-spacing: 2px; white-space: nowrap;
+  text-shadow: 3px 3px 0 #000, 0 0 18px rgba(255,200,60,.45); animation: rr-name-pop .45s ease-out; }
+.rr-result.team .rr-res-name { font-size: 18px; }
+.rr-res-name.c2 { color: #4fc3ff; } .rr-res-name.c3 { color: #7dff8a; }
+.rr-res-name.corrupt { color: #d8c2ff; animation: rr-name-pop .45s ease-out, hidden-question-glitch .6s steps(1, end) infinite; }
+@keyframes rr-name-pop { 0% { transform: scale(1.8); opacity: 0; } 60% { transform: scale(.95); opacity: 1; } 100% { transform: scale(1); } }
+
 .char-card {
   width: 220px; height: 240px; padding: 0; border-radius: 2px;
   background: #5a6473; color: #fff; border: none; cursor: pointer; text-align: center;
@@ -1513,6 +1566,8 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.5); letter-spacing: 3px; }
 .lobby-sub{ font-size: 11px; color: #9aa; text-align: center; margin: 0 0 18px; letter-spacing: 1px; }
 .lobby-section{ margin-bottom: 18px; }
+/* dva prepínače v jednom riadku (TILE PREVIEW | RANDOM CHARACTERS) */
+.lobby-pair{ display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .lobby-label{ font-size: 10px; color: #cfd2d6; letter-spacing: 1px; margin-bottom: 8px; }
 .opt-row{ display: flex; flex-wrap: wrap; gap: 8px; }
 .opt{
