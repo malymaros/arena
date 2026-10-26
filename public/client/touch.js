@@ -287,7 +287,8 @@ const visibleCard = (c) => {
   return stripActive() ? !c.closest('[data-page="hidden"]') : !c.closest(".char-cards.hidden");
 };
 // Predvybraná karta povie meno (intro postavy) - pri otvorení výberu aj po prepnutí stránky (šípky, runa → Hidden).
-// Označená karta, ktorá ostáva (napr. draft → výber z tímu), sa znova neohlási.
+// Označená karta, ktorá ostáva (napr. prepnutie stránky), sa znova neohlási - výnimka je turnajové „Your Team":
+// pri každom jeho otvorení sa označí mág na pozícii 1 a povie intro.
 let rosterArmed = false; // „Your Team" už pri tomto otvorení označil pozíciu 1
 function autoArmCard() {
   if (!isTouch || !selEl) return;

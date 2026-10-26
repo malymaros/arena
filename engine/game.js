@@ -1656,7 +1656,7 @@ function sanitizeConfig(raw) {
   // náhodný výber postáv (lobby „RANDOM CHARACTERS“) - default vypnutý; kľúč len keď je zapnutý
   // (snapshot nesie config - bez neho ostávajú golden timeline nezmenené)
   return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref,
-    ...(raw.randomChars ? { randomChars: true } : {}) };
+    ...(raw.randomChars === true ? { randomChars: true } : {}) };
 }
 
 // vypršal čas na ťah: kto nie je locknutý, zahrá rozpracovaný draft doplnený náhodne; potom vyhodnoť kolo

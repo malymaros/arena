@@ -30,6 +30,9 @@ let active = false;   // overlay je hore (turn-timer počas neho neukazuje odpo�
 let rafId = 0, glitchTimer = 0;
 
 export const charRollActive = () => active;
+// po zmiznutí overlayu (hracia plocha je vidieť) - napr. hudba sa až teraz prepne na bojovú (sound-map.js)
+const endListeners = [];
+export function onCharRollEnd(fn) { endListeners.push(fn); }
 
 function build() {
   if (rootEl) return;
@@ -187,7 +190,9 @@ function reveal(landed, layout, myGen) {
 // skry overlay a zruš bežiace losovanie (koniec animácie, reset roomky, návrat do room-browsera)
 export function stopCharRoll() {
   gen++;
+  const was = active;
   active = false;
+  if (was) endListeners.forEach(fn => { try { fn(); } catch {} });
   if (!rootEl) return;
   rootEl.classList.add("hidden");
   gridEl.innerHTML = "";

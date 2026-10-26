@@ -199,13 +199,25 @@ export function selectOverlayBusy() {
 }
 // desktop nemá „označenú" kartu - pozícia 1 dostane vzhľad hoveru + náhľad špeciálu + intro hlas,
 // kým myš nenadíde na inú kartu
-let preselectTimer = 0;
+// startCharSelectPreview beží pri KAŽDOM stave počas výberu (aj keď si súper vyberie) - predvýber len raz na otvorenie
+let preselectTimer = 0, preselectDone = false;
 function desktopRosterPreselect() {
   clearTimeout(preselectTimer);
   if (selEl.classList.contains("hidden") || !selEl.classList.contains("roster-mode")) return;
+  if (preselectDone) {
+    // nový stav skryl náhľad - kým myš neprešla na inú kartu, obnov ho potichu (bez hlasu)
+    const kept = selEl.querySelector(".char-card.preselected");
+    if (kept) {
+      const enter = new MouseEvent("mouseenter"); enter.arenaSilent = true;
+      kept.dispatchEvent(enter);
+      kept.classList.add("preselected");
+    }
+    return;
+  }
   if (selectOverlayBusy()) { preselectTimer = setTimeout(desktopRosterPreselect, 300); return; }
   const card = rosterFirstCard();
   if (!card) return;
+  preselectDone = true;
   card.dispatchEvent(new MouseEvent("mouseenter"));
   card.classList.add("preselected");
 }
@@ -214,6 +226,7 @@ export function stopCharSelectPreview() {
   charPreviewRaf = 0;
   syncRosterGlitch(); // zastav glitch mena side-postavy pri zatvorení výberu (a vráť originál)
   clearTimeout(preselectTimer);
+  preselectDone = false; // ďalšie otvorenie „Your Team" (ďalšia hra) označí pozíciu 1 znova
   selEl.querySelectorAll(".char-card.preselected").forEach(c => c.classList.remove("preselected"));
 }
 

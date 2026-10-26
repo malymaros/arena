@@ -3,6 +3,7 @@
 import { sfx, setMusic } from "/client/sound.js";
 import { state, board } from "/client/session.js";
 import { eventsForFrame, newTracker, resetTracker } from "/sounds/events.js";
+import { charRollActive, onCharRollEnd } from "/client/char-roll.js";
 
 const tracker = newTracker();
 
@@ -21,8 +22,11 @@ export function syncMusic(s, finalRound = false) {
   const phase = s?.phase;
   if (!phase) return;
   if (phase === "match_over") return; // hudbu stíši až game-over sekvencia (po dohraní poslednej timeline)
-  const inGame = phase === "playing" && s.p1?.char && s.p2?.char;
+  // náhodný výber postáv: postavy sú pridelené hneď, ale bojová hudba hrá až po rulete farieb a losovaní,
+  // keď sa ukáže hracia plocha (onCharRollEnd nižšie)
+  const inGame = phase === "playing" && s.p1?.char && s.p2?.char && !charRollActive();
   if (!inGame) setMusic("music.menu");
   else if (finalRound) setMusic("music.final", "music.battle");
   else setMusic("music.battle");
 }
+onCharRollEnd(() => syncMusic(state));

@@ -1027,7 +1027,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 /* ========== Losovanie farieb (biely/čierny) ========== */
 /* fullscreen overlay NAD char-selectom (ten má z-index 9999) - výber postáv čaká pod ním, kým ruleta dobehne */
 .color-roll {
-  position: fixed; inset: 0; z-index: 10000;
+  position: fixed; inset: 0; z-index: 10001; /* nad losovaním postáv (#char-roll 10000), to ide až po rulete */
   /* NEPRIEHĽADNÉ pozadie - výber postáv pod ním nesmie presvitať (mirrorovaná p2 strana by prezradila,
      ktorú farbu/stranu hráč dostal). Celé začierni a odkryje sa až fade-outom po dobehnutí rulety. */
   background: #08090c;
@@ -1064,7 +1064,6 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 /* ========== Losovanie postáv (lobby „RANDOM CHARACTERS“, public/client/char-roll.js) ========== */
 /* NEPRIEHĽADNÝ overlay POD ruletou farieb (tá ide v hre 1 prvá) a NAD char-selectom/plochou - plocha s už
    pridelenými postavami sa odkryje až fade-outom. Mriežka hláv vo vlastnej palete, kurzory 1-2-3. */
-.color-roll { z-index: 10001; }
 .char-roll {
   position: fixed; inset: 0; z-index: 10000; background: #08090c;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
