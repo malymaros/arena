@@ -194,6 +194,17 @@
 .touch #char-select.hidden-mode #touch-pick { background: #9a6ff0; color: #12061f; }
 .touch #char-select.hidden-mode .ca-title { color: #b17aff; }
 .touch #char-select.hidden-mode .ca-grid .mini-cell.caster { background: #9a6ff0; }
+/* „Your Team" (turnaj): označená SKRYTÁ postava je fialová presne ako na Hidden stránke (rám, menovka, PICK,
+   nadpis náhľadu, políčko castera) */
+.touch #char-select .char-card.hidden-char.touch-armed {
+  box-shadow: 0 0 0 5px #fff, 0 0 0 9px #9a6ff0, 0 0 0 11px #000, 0 0 34px 6px rgba(177,122,255,.75);
+}
+.touch #char-select .char-card.hidden-char.touch-armed .char-name { background: #9a6ff0; color: #12061f; }
+.touch #char-select.roster-mode:has(.char-card.hidden-char.touch-armed) #touch-pick { background: #9a6ff0; color: #12061f; }
+.touch #char-select.roster-mode:has(.char-card.hidden-char.touch-armed) .ca-title { color: #b17aff; }
+.touch #char-select.roster-mode:has(.char-card.hidden-char.touch-armed) .ca-grid .mini-cell.caster { background: #9a6ff0; }
+/* „Your Team": všetci mágovia tímu ostávajú osvetlení - nestmavujú sa ako ostatné karty výberového pásu */
+.touch #char-select.roster-mode .char-cards .char-card:not(.touch-armed):not(.dead) { filter: none; }
 
 /* koniec hry: PLAY AGAIN / LEAVE ROOM v skutočnej veľkosti pre prst */
 .touch .go-buttons { gap: calc(14px * var(--ui-k, 1)); }

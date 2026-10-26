@@ -30,6 +30,7 @@ import { slotOf, labelInfo, openerOf, MANA_BUTTONS } from "/client/touch-label.j
 import { costMarkup } from "/client/balance-ui.js";
 import { hydratePix } from "/client/pix.js";
 import { state, me } from "/client/session.js";
+import { rosterFirstCard, selectOverlayBusy } from "/client/char-select.js";
 
 
 /* ---------- 5. :hover pravidlá preč (na dotyku po ťuknutí „visia") - sú len kozmetické ---------- */
@@ -287,10 +288,19 @@ const visibleCard = (c) => {
 };
 // Predvybraná karta povie meno (intro postavy) - pri otvorení výberu aj po prepnutí stránky (šípky, runa → Hidden).
 // Označená karta, ktorá ostáva (napr. draft → výber z tímu), sa znova neohlási.
+let rosterArmed = false; // „Your Team" už pri tomto otvorení označil pozíciu 1
 function autoArmCard() {
-  if (!isTouch || !selEl || selEl.classList.contains("hidden")) return;
-  // losovanie farieb (koleso) ešte beží nad výberom - predvýber s hlasom mena až po ňom
-  if (!document.getElementById("color-roll")?.classList.contains("hidden")) { setTimeout(autoArmCard, 300); return; }
+  if (!isTouch || !selEl) return;
+  if (selEl.classList.contains("hidden")) { rosterArmed = false; return; }
+  // ruleta farieb / losovanie postáv ešte beží nad výberom - predvýber s hlasom mena až po nich
+  if (selectOverlayBusy()) { setTimeout(autoArmCard, 300); return; }
+  // turnaj „Your Team": pri každom otvorení sa označí mág na pozícii 1 a ozve sa jeho intro
+  // (aj keď ostala označená karta z draftu)
+  if (!selEl.classList.contains("roster-mode")) rosterArmed = false;
+  else if (!rosterArmed) {
+    const first = rosterFirstCard();
+    if (first) { rosterArmed = true; arm(first); syncPickBar(); return; }
+  }
   // označená karta ostáva (napr. draft → výber z tímu): obnov PICK (ADD/REMOVE → PICK) aj náhľad, aj keď ho
   // char-select.js pri prepnutí režimu zmaže až po tomto volaní
   if (armed?.classList.contains("char-card") && visibleCard(armed)) { keepCardPreview(); syncPickBar(); setTimeout(keepCardPreview, 300); return; }

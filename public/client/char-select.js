@@ -182,11 +182,39 @@ export function startCharSelectPreview() {
   if (charPreviewRaf) cancelAnimationFrame(charPreviewRaf);
   charPreviewRaf = requestAnimationFrame(drawCharSelectFrame);
   syncRosterGlitch(); // spusti glitch side-postavy - tu už je výber viditeľný (updateCharSelectHp beží kým je selEl ešte .hidden)
+  if (!isTouch) desktopRosterPreselect(); // dotyk to rieši sám (touch.js autoArmCard)
+}
+
+/* ---------- „Your Team": pri otvorení sa označí mág na pozícii 1 a ozve sa jeho intro ---------- */
+// pozícia 1 = prvý ŽIVÝ mág v poradí tímu (poradie draftu / losovania = CSS order karty)
+export function rosterFirstCard() {
+  if (!charSelectHp || !selEl.classList.contains("roster-mode")) return null;
+  return [...selEl.querySelectorAll(".char-card[data-char]")]
+    .filter(c => c.dataset.char in charSelectHp && !c.classList.contains("dead") && !c.classList.contains("preview-char"))
+    .sort((a, b) => (+a.style.order || 99) - (+b.style.order || 99))[0] || null;
+}
+// ruleta farieb alebo losovanie postáv ešte zakrýva výber - predvýber s hlasom až po nich
+export function selectOverlayBusy() {
+  return ["color-roll", "char-roll"].some(id => { const el = document.getElementById(id); return !!el && !el.classList.contains("hidden"); });
+}
+// desktop nemá „označenú" kartu - pozícia 1 dostane vzhľad hoveru + náhľad špeciálu + intro hlas,
+// kým myš nenadíde na inú kartu
+let preselectTimer = 0;
+function desktopRosterPreselect() {
+  clearTimeout(preselectTimer);
+  if (selEl.classList.contains("hidden") || !selEl.classList.contains("roster-mode")) return;
+  if (selectOverlayBusy()) { preselectTimer = setTimeout(desktopRosterPreselect, 300); return; }
+  const card = rosterFirstCard();
+  if (!card) return;
+  card.dispatchEvent(new MouseEvent("mouseenter"));
+  card.classList.add("preselected");
 }
 export function stopCharSelectPreview() {
   if (charPreviewRaf) cancelAnimationFrame(charPreviewRaf);
   charPreviewRaf = 0;
   syncRosterGlitch(); // zastav glitch mena side-postavy pri zatvorení výberu (a vráť originál)
+  clearTimeout(preselectTimer);
+  selEl.querySelectorAll(".char-card.preselected").forEach(c => c.classList.remove("preselected"));
 }
 
 selEl.addEventListener("click", (e) => {
@@ -319,6 +347,7 @@ selEl.querySelectorAll(".char-card").forEach(card => {
   const key = card.dataset.char || card.querySelector("canvas.char-canvas")?.dataset.char;
   if (!key) return; // placeholder "Coming soon"
   card.addEventListener("mouseenter", (e) => {
+    selEl.querySelectorAll(".char-card.preselected").forEach(c => c.classList.remove("preselected")); // predvýber pozície 1 končí
     if (isMageDead(key)) return; // mŕtvy mág nemá náhľad špeciálu
     renderAbilityPreview(key);
     if (e.arenaSilent) return; // predvýber karty na telefóne (touch.js) - náhľad bez hlasu
