@@ -48,14 +48,14 @@
   },
   "music.battle.portal": {
    "files": [
-    "sounds/custom/ancient-magic.mp3"
+    "sounds/custom/frieren-the-slayer.mp3"
    ],
-   "vol": 0.8,
+   "vol": 0.34,
    "fit": "fade",
    "trim": {
-    "sounds/custom/ancient-magic.mp3": [
-     400,
-     131320
+    "sounds/custom/frieren-the-slayer.mp3": [
+     480,
+     149760
     ]
    }
   },
@@ -163,15 +163,15 @@
    "own": true,
    "author": ""
   },
-  "sounds/custom/ancient-magic.mp3": {
-   "own": true,
-   "author": ""
-  },
   "sounds/custom/portal-use.mp3": {
    "own": true,
    "author": ""
   },
   "sounds/custom/portal-open-close.mp3": {
+   "own": true,
+   "author": ""
+  },
+  "sounds/custom/frieren-the-slayer.mp3": {
    "own": true,
    "author": ""
   }
