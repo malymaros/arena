@@ -122,5 +122,22 @@ const keys = (evs) => evs.map(e => e.key);
   check(ev[0].pan < 0 && ev[1].pan > 0, "panoráma podľa stĺpca");
 }
 
+/* Portal Realm: prechod tela, prelet strely, nový pár, zatvorenie; Narutov pár = jeden zvuk prechodu */
+{
+  const tr = newTracker();
+  const pt = { id: "A", type: "classic", enter: { x: 0, y: 1, side: "left" }, exit: { x: 3, y: 1, side: "right" } };
+  const tl = [fr([]),
+    fr([{ kind: "portal_walk", from: "p1", clone: false, path: [[3, 1]], passes: [{ at: 0, ...pt }] },
+        { kind: "portal_walk", from: "p1", clone: true, path: [[3, 1]], passes: [{ at: 0, ...pt }] }]),
+    fr([{ kind: "portal_close", ids: ["A"] }]),
+    fr([{ kind: "charge", from: "p2", cell: [3, 1], dir: "left", portal: pt }]),
+    fr([{ kind: "portal_spawn", id: "B" }])];
+  const ev = tl.map((_, i) => eventsForFrame(tl, i, {}, tr, { board: { w: 4 } }));
+  check(ev[1].filter(e => e.key === "portal.use").length === 1, "prechod tela portálom = portal.use (pár Naruta len raz)", JSON.stringify(ev[1]));
+  check(ev[2].some(e => e.key === "portal.close"), "zatvorenie páru = portal.close");
+  check(ev[3].some(e => e.key === "portal.use") && ev[3].some(e => e.key === "attack"), "strela cez portál = portal.use popri zvuku útoku", JSON.stringify(ev[3]));
+  check(ev[4].some(e => e.key === "portal.open"), "nový pár = portal.open");
+}
+
 console.log(failures ? `\n${failures} ZLYHANÍ` : "\nsound-events: VŠETKO PREŠLO");
 if (failures) process.exit(1);

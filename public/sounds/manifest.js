@@ -51,6 +51,11 @@ export const SOUNDS = {
   "music.battle.portal": { files: [],                          vol: 0.40, status: "default", note: "hra v Portal Realm - prázdne = hrá music.battle" },
   "music.final":  { files: [],                                 vol: 0.40, status: "default", note: "FINAL ROUND (Last Stand) - prázdne = hrá ďalej music.battle" },
 
+  /* ---------- Portal Realm ---------- */
+  "portal.use":   { files: [], vol: 0.8, status: "default", note: "prechod portálom (telo aj strela) - prázdne = ticho" },
+  "portal.open":  { files: [], vol: 0.8, status: "default", note: "nový pár portálov na konci kola" },
+  "portal.close": { files: [], vol: 0.8, status: "default", note: "pár sa zatvoril po prechode" },
+
   /* ---------- koniec hry ---------- */
   "game.win":   { files: [JIN + "jingles_NES00.ogg"], vol: 0.7, status: "default" },
   "game.lose":  { files: [JIN + "jingles_NES09.ogg"], vol: 0.7, status: "default" },

@@ -27,6 +27,8 @@ export const DIRECT = {
   last_stand_banish: "last_stand_banish", last_stand_banish_kill: "last_stand_banish_kill",
   vamp_heal_cast: "vamp_heal_cast", luffy_ball_form: "luffy_ball_form", wanderer_no_regen: "wanderer_no_regen",
   charge: "attack", special: "special",
+  // Portal Realm: prechod tela (move/dash/charge/guľa), nový pár na konci kola, zatvorenie páru po prechode
+  portal_walk: "portal.use", portal_spawn: "portal.open", portal_close: "portal.close",
 };
 // efekty opakované v po sebe idúcich frame-och (let strely po bunkách, beaty castu) → zaznejú raz za beh;
 // okno = celý beh. Melee sem nepatrí - zvuk úderu znie pri každom z 3 švihov.
@@ -130,6 +132,10 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
       continue;
     }
     if (e.kind === "golden_mana" && !e.gained) continue; // odmietnutá výmena
+    // Portal Realm: strela/slnko preletí trhlinou (charge/special nesie portal) → zvuk prechodu popri zvuku útoku
+    if (e.portal && e.kind !== "portal_walk") out.push({ key: "portal.use", char: null, pan: panOf(e), windowMs: win });
+    // Narutov pár prejde tým istým portálom naraz - jeden zvuk prechodu, nie dva
+    if (e.kind === "portal_walk" && e.clone && (frame.effects || []).some(o => o.kind === "portal_walk" && o.from === e.from && !o.clone)) continue;
     const key = DIRECT[e.kind];
     if (!key) continue;
     let windowMs = PHASE_SPAN[e.kind] ? phaseWindow(timeline, i, PHASE_SPAN[e.kind]) : win;
