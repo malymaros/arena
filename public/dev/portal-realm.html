@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Portal Realm — návrh</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/styles-mobile.css" />
+<script>
+  // vnorený náhľad lobby na telefóne: triedy hry (phone + touch) ešte pred vykreslením
+  if (new URLSearchParams(location.search).has("lobbyphone")) document.documentElement.classList.add("phone", "touch", "lobby-only");
+</script>
+<style>
+  /* DOČASNÁ návrhová stránka Portal Realm (docs/PORTAL_PLAN.md, etapa 0) - nie je linkovaná z hry.
+     Nič odtiaľto nejde do hry, kým vlastník vizuál neschváli. styles.css sa načíta kvôli lobby a bunkám,
+     body/html sa tu vracia na obyčajnú scrollovateľnú stránku (hra má body ako zmenšovanú virtuálnu obrazovku). */
+  html { overflow: auto; }
+  body { position: static; transform: none; width: auto; height: auto; overflow: auto; min-height: 100%;
+    background: #0b0c10; font: 13px/1.5 system-ui, sans-serif; color: #dfe3ea; }
+  .top { position: sticky; top: 0; z-index: 50; display: flex; gap: 10px; align-items: center; padding: 10px 16px;
+    background: #0b0c10ee; border-bottom: 1px solid #23262e; flex-wrap: wrap; }
+  .top h1 { font: 14px "Press Start 2P", monospace; color: #c79bff; margin: 0 14px 0 0; letter-spacing: 1px; }
+  .tab { background: #1c1f27; color: #cfd2d6; border: 1px solid #343a47; border-radius: 4px; padding: 7px 14px; cursor: pointer; font: inherit; }
+  .tab.on { background: #7c4dff; color: #fff; border-color: #a985ff; }
+  .page { display: none; }
+  .page.on { display: block; }
+
+  /* ---------- aréna ---------- */
+  .wrap { display: flex; gap: 14px; padding: 14px 16px; align-items: flex-start; }
+  .viewport { flex: 1 1 auto; min-width: 0; }
+  .note { color: #8b93a3; font-size: 12px; margin: 0 0 8px; }
+  #caption { min-height: 44px; margin: 8px 0 0; padding: 8px 12px; background: #15171d; border: 1px solid #262a33; border-radius: 6px; color: #e6e1ff; }
+  .screen-box { position: relative; width: 100%; overflow: hidden; border-radius: 6px; box-shadow: 0 0 0 1px #262a33; }
+  .screen { position: absolute; left: 0; top: 0; width: 1720px; height: 920px; transform-origin: 0 0; overflow: hidden; }
+  .screen .arena { position: absolute; }
+  .screen .board-pos { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -46%); }
+  .board { width: 1070px; height: 575px; }
+  #fx-layer, #actors2 { position: absolute; inset: 0; pointer-events: none; }
+  #actors2 { z-index: 6; }
+  #fx-layer { z-index: 7; }
+  #portal-layer { position: absolute; inset: 0; z-index: 4; }
+  #link-svg { position: absolute; inset: 0; z-index: 3; overflow: visible; pointer-events: none; }
+  .grid .cell .cell-xy { position: absolute; right: 8px; bottom: 6px; font: 9px "Press Start 2P", monospace; color: rgba(255,255,255,.18); }
+
+  .panel { flex: 0 0 330px; background: #15171d; border: 1px solid #262a33; border-radius: 8px; padding: 12px; position: sticky; top: 64px;
+    max-height: calc(100vh - 80px); overflow: auto; }
+  .panel h3 { margin: 14px 0 6px; font-size: 12px; color: #ffb300; letter-spacing: .5px; text-transform: uppercase; }
+  .panel h3:first-child { margin-top: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .b { background: #262a33; color: #e8eaf0; border: 1px solid #3a4150; border-radius: 4px; padding: 5px 9px; cursor: pointer; font: 12px system-ui, sans-serif; }
+  .b:hover { background: #313745; }
+  .b.on { background: #ffb300; color: #2a1c00; border-color: #ffcf55; }
+  .b.anim { width: 100%; text-align: left; }
+  .b.anim small { color: #8b93a3; display: block; font-size: 11px; }
+  .b:disabled { opacity: .45; cursor: wait; }
+  .legend { display: grid; grid-template-columns: 26px 1fr; gap: 4px 8px; align-items: center; font-size: 12px; }
+  .legend .sw { width: 22px; height: 10px; border-radius: 50%; }
+
+  /* ---------- políčka portal realm: dmg = 2 ohníky ---------- */
+  .tile-marker.dmg2 { width: 52px; }
+  .tile-marker.dmg2b { width: 38px; height: 38px; }
+
+  /* ---------- portál ---------- */
+  .portal { position: absolute; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)); pointer-events: auto; cursor: pointer; }
+  .portal .p-body { position: absolute; inset: 0; transform-origin: 50% 50%; }
+  .portal .p-ring { position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+    background: radial-gradient(ellipse at center, #07020f 0 30%, var(--pc) 62%, var(--pc2) 70%, transparent 72%);
+    box-shadow: 0 0 0 2px #000, 0 0 10px 2px var(--pc), 0 0 24px 4px color-mix(in srgb, var(--pc) 45%, transparent); }
+  .portal .p-swirl { position: absolute; left: 50%; top: 50%; width: 120%; aspect-ratio: 1; transform: translate(-50%, -50%);
+    background: conic-gradient(from 0deg, transparent 0 8%, var(--pc2) 14%, transparent 24% 40%, var(--pc) 48%, transparent 58% 72%, var(--pc2) 80%, transparent 90%);
+    mix-blend-mode: screen; opacity: .8; animation: p-spin 2.2s linear infinite; }
+  @keyframes p-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+  /* pixel variant - kockatá brána, „blikajúce" pruhy (animuje sa len opacity) */
+  .portal.pv-pixel .p-ring { border-radius: 0; background: none; box-shadow: none;
+    clip-path: polygon(8% 0, 92% 0, 92% 20%, 100% 20%, 100% 80%, 92% 80%, 92% 100%, 8% 100%, 8% 80%, 0 80%, 0 20%, 8% 20%); }
+  .portal.pv-pixel .p-ring::before { content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg, var(--pc) 0 10px, var(--pc2) 10px 14px, var(--pc) 14px 24px, #0a0414 24px 28px); }
+  .portal.pv-pixel .p-ring::after { content: ""; position: absolute; inset: 28% 6%; background: #0a0414; }
+  .portal.pv-pixel .p-swirl { display: none; }
+  .portal.pv-pixel .p-body { filter: drop-shadow(0 0 6px var(--pc)); animation: p-flick 1.1s steps(2) infinite; }
+  @keyframes p-flick { 50% { opacity: .78; } }
+  /* rift variant - tenká trhlina */
+  .portal.pv-rift .p-ring { border-radius: 50% / 50%; transform: scaleY(.55);
+    background: radial-gradient(ellipse at center, #fff 0 8%, var(--pc2) 22%, var(--pc) 48%, transparent 72%); }
+  .portal.pv-rift .p-swirl { opacity: .5; }
+
+  .portal .p-ico { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    transform: translate(-50%, -50%) rotate(calc(-1 * var(--rot, 0deg))); filter: drop-shadow(0 2px 0 rgba(0,0,0,.7)); image-rendering: pixelated; }
+  .portal .p-ico svg { display: block; width: 100%; height: 100%; }
+  /* značka typu VEDĽA portálu - na začiatku jeho dĺžky: horizontálny = naľavo, vertikálny (otočený o 90°) = nad ním */
+  .portal .p-ico.side { left: -32px; width: 24px; height: 24px; padding: 3px; transform: translate(0, -50%) rotate(calc(-1 * var(--rot, 0deg)));
+    background: #0d0618; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px var(--pc), 0 0 8px var(--pc); filter: none; }
+  .portal .p-tag { position: absolute; top: 50%; width: 20px; height: 20px; display: grid; place-items: center;
+    transform: translate(0, -50%) rotate(calc(-1 * var(--rot, 0deg)));
+    font: 10px "Press Start 2P", monospace; color: #fff; background: #120a20; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px var(--pc); }
+  .portal .p-tag.end { right: -26px; }
+  .portal .p-tag.glyph { width: 24px; height: 24px; background: #0d0618; }
+  .portal .p-tag.glyph svg { display: block; width: 16px; height: 16px; filter: drop-shadow(0 0 3px var(--pc)); }
+  .portal .p-tag.glyph.end { right: -20px; }
+  .portal .p-tag.glyph.start { left: -20px; right: auto; }
+  .portal .p-tag.start { left: -26px; }
+  /* D · pixel trhlina - kockatá zubatá trhlina, 3 snímky „praskania" sa striedajú (len opacity) */
+  /* výkon: žiara je ZAPEČENÁ v obrázku snímky (žiadny CSS filter nad meniacim sa obsahom = žiadne prekresľovanie) */
+  .portal.pv-pixrift .rift-f { position: absolute; left: -14px; top: -14px; width: calc(100% + 28px); height: calc(100% + 28px);
+    opacity: 0; will-change: opacity; image-rendering: pixelated; animation: rift-crackle .42s steps(1) infinite; }
+  .portal.pv-pixrift .rift-f:nth-child(2) { animation-delay: -.14s; }
+  .portal.pv-pixrift .rift-f:nth-child(3) { animation-delay: -.28s; }
+  @keyframes rift-crackle { 0% { opacity: 1; } 33.34% { opacity: 0; } }
+  .portal.pv-pixrift .rift-spark { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; background: var(--pc2);
+    box-shadow: 0 0 4px var(--pc); opacity: 0; animation: rift-spark var(--d, 1.4s) linear infinite; animation-delay: var(--dl, 0s); }
+  @keyframes rift-spark { 0% { transform: translate(var(--sx), 0); opacity: 0; } 15% { opacity: 1; }
+    100% { transform: translate(calc(var(--sx) + var(--ex)), var(--ey)); opacity: 0; } }
+  .portal.no-tag .p-tag { display: none; }
+  .portal.hl .p-body { animation: p-hl .5s ease-in-out infinite alternate; }
+  @keyframes p-hl { to { transform: scale(1.12); filter: brightness(1.5); } }
+  #link-svg path { fill: none; stroke-width: 3; stroke-dasharray: 8 7; opacity: 0; transition: opacity .15s; }
+  #link-svg path.show { opacity: .9; }
+
+  /* ---------- figúry / FX ---------- */
+  .fig { position: absolute; image-rendering: pixelated; transform-origin: 50% 100%; }
+  .fig.p2 { filter: saturate(.22) brightness(1.4); } /* p2 albino paleta ako v hre (alt-color) */
+  .proj { position: absolute; width: 96px; height: 96px; margin: -48px 0 0 -48px; image-rendering: pixelated; }
+  .proj.aura-power { filter: drop-shadow(0 0 4px #ffd54f) drop-shadow(0 0 10px #ffb300) drop-shadow(0 0 18px #ff8f00); }
+  .proj.aura-nodef { filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #e8f4ff) drop-shadow(0 0 18px #b0d8ff); }
+  .proj.aura-power.aura-nodef { filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #ffd54f) drop-shadow(0 0 18px #ffb300); }
+  .float { position: absolute; transform: translate(-50%, -50%); font: 18px "Press Start 2P", monospace; white-space: nowrap;
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #000; z-index: 9; }
+  .flash { position: absolute; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 12%, var(--pc, #c79bff) 35%, transparent 68%); mix-blend-mode: screen; }
+  .bubble { position: absolute; border-radius: 50%; transform: translate(-50%, -100%); }
+  .bubble.shield { box-shadow: inset 0 0 20px 6px rgba(130,220,255,.55), 0 0 0 3px rgba(178,235,242,.8); background: rgba(120,210,255,.12); }
+  .bubble.mirror { box-shadow: inset 0 0 22px 6px rgba(255,236,160,.5), 0 0 0 3px #d4a017; background: rgba(200,230,255,.14); }
+  .shard { position: absolute; width: 10px; height: 10px; background: #b2ebf2; box-shadow: 0 0 0 2px #000; }
+  .beam { position: absolute; height: 8px; margin-top: -4px; transform-origin: 0 50%; border-radius: 4px;
+    background: linear-gradient(90deg, #fff, #ffe9a0 40%, #d4a017); box-shadow: 0 0 12px 3px rgba(255,220,120,.8); }
+  .spark { position: absolute; width: 8px; height: 8px; background: #ffe9a0; box-shadow: 0 0 6px #ffb300; }
+  .zone-blink { position: absolute; border-radius: 10px; background: rgba(255,60,40,.35); box-shadow: inset 0 0 0 3px #ff5a3c; animation: zb .22s linear infinite; }
+  @keyframes zb { 50% { opacity: .35; } }
+  #thread-svg { position: absolute; inset: 0; z-index: 5; overflow: visible; pointer-events: none; }
+  #thread-svg polyline { fill: none; stroke: #e8b23c; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px #e8b23c); }
+  #thread-svg circle.knot { fill: #e8b23c; stroke: #5a3a00; stroke-width: 3; }
+  #thread-svg .fray { stroke: #e8b23c; stroke-width: 3; stroke-linecap: round; }
+
+  /* ---------- živé pozadie (ambient FX nad maľbou) - animuje sa len opacity/transform ---------- */
+  #arena-fx { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+  #arena-fx.off { display: none; }
+  /* lite (telefón): bez blend módu, 3 iskry na misku, polovica svetielok, jeden vír - pulzy ohňov, rún a kruhu ostávajú */
+  #arena-fx.lite > * { mix-blend-mode: normal; } /* blend mód nútil prekresľovať celé pozadie */
+  #arena-fx.lite .afx-heavy, #arena-fx.lite .afx-vortex i + i { display: none; }
+  #arena-fx > * { position: absolute; }
+  .afx-glow { border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: screen; }
+  /* ohne v miskách: nepravidelné blikanie + jemné „dýchanie" */
+  .afx-fire { background: radial-gradient(circle, rgba(255,190,255,.95) 0 8%, rgba(214,80,255,.7) 25%, rgba(150,40,255,.25) 50%, transparent 70%);
+    animation: afx-flicker 1.7s steps(1) infinite, afx-breathe 2.6s ease-in-out infinite; }
+  @keyframes afx-flicker { 0%{opacity:.85} 12%{opacity:1} 24%{opacity:.7} 37%{opacity:.95} 51%{opacity:.78} 66%{opacity:1} 80%{opacity:.82} }
+  @keyframes afx-breathe { 50% { transform: translate(-50%, -50%) scale(1.12); } }
+  .afx-halo { background: radial-gradient(circle, rgba(190,90,255,.35) 0, rgba(150,60,255,.12) 45%, transparent 70%);
+    animation: afx-pulse 3.2s ease-in-out infinite; }
+  @keyframes afx-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .afx-ember { width: 5px; height: 5px; border-radius: 1px; background: #f2b8ff; box-shadow: 0 0 6px 2px rgba(210,90,255,.9);
+    animation: afx-rise var(--d, 2.4s) linear infinite; animation-delay: var(--dl, 0s); opacity: 0; }
+  @keyframes afx-rise { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 10% { opacity: 1; }
+    100% { transform: translate(var(--dx, 0px), -120px) scale(.3); opacity: 0; } }
+  /* vír na oblohe - sploštený rotujúci kužeľ */
+  .afx-vortex { transform: translate(-50%, -50%) scaleY(.42); mix-blend-mode: screen; }
+  .afx-vortex i { position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 0 6%, rgba(255,160,255,.55) 12%, transparent 22% 36%, rgba(170,90,255,.5) 44%, transparent 55% 68%, rgba(255,190,255,.45) 76%, transparent 86%);
+    -webkit-mask: radial-gradient(circle, transparent 0 12%, #000 30%, #000 55%, transparent 70%); mask: radial-gradient(circle, transparent 0 12%, #000 30%, #000 55%, transparent 70%);
+    animation: afx-spin 14s linear infinite; }
+  .afx-vortex i + i { animation-duration: 22s; animation-direction: reverse; opacity: .7; }
+  @keyframes afx-spin { to { transform: rotate(360deg); } }
+  /* runy - postupne sa rozžiaria */
+  .afx-rune { width: 70px; height: 70px; transform: translate(-50%, -50%) rotate(45deg) scaleY(.62); mix-blend-mode: screen;
+    background: radial-gradient(circle, rgba(255,210,255,.9) 0 10%, rgba(200,90,255,.55) 32%, transparent 62%);
+    animation: afx-rune 4.8s ease-in-out infinite; animation-delay: var(--dl, 0s); opacity: .15; }
+  @keyframes afx-rune { 0%,100% { opacity: .12; } 45%,55% { opacity: 1; } }
+  .afx-circle { border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: screen;
+    box-shadow: 0 0 0 3px rgba(220,140,255,.35), 0 0 24px 6px rgba(170,80,255,.35), inset 0 0 30px 8px rgba(170,80,255,.25);
+    animation: afx-pulse 5.5s ease-in-out infinite; }
+  /* svetielka v prázdnote */
+  .afx-mote { width: 4px; height: 4px; border-radius: 50%; background: #e7c6ff; box-shadow: 0 0 8px 3px rgba(190,100,255,.8);
+    animation: afx-drift var(--d, 9s) ease-in-out infinite; animation-delay: var(--dl, 0s); opacity: 0; }
+  @keyframes afx-drift { 0% { transform: translate(0,0); opacity: 0; } 20% { opacity: .9; } 80% { opacity: .7; }
+    100% { transform: translate(var(--dx, 20px), var(--dy, -60px)); opacity: 0; } }
+
+  /* ---------- lobby ---------- */
+  .lobby-host { display: flex; justify-content: center; padding: 22px 16px 60px; }
+  .lobby-host .lobby { position: static; inset: auto; z-index: auto; overflow: visible; background: none; padding: 0; }
+  .arena-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .arena-card { position: relative; height: 38px; cursor: pointer; border: none; padding: 0; border-radius: 2px; overflow: hidden;
+    box-shadow: 0 0 0 2px #000; background: #1c1d20; font-family: inherit; }
+  .arena-card canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: .55; transition: opacity .12s; }
+  .arena-card span { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-size: 10px; color: #fff; letter-spacing: 1px;
+    text-shadow: 2px 2px 0 #000; }
+  .arena-card:hover canvas { opacity: .8; }
+  .arena-card.active { box-shadow: 0 0 0 2px #000, 0 0 0 4px #ffb300; }
+  .arena-card.active canvas { opacity: 1; }
+  .w-portal { width: 22px !important; height: 12px !important; border-radius: 50%; box-shadow: 0 0 0 2px #000, 0 0 6px var(--pc); background: radial-gradient(ellipse, #07020f 0 30%, var(--pc) 62%, var(--pc2) 72%); }
+  .lobby-hint { font-size: 9px; color: #8b93a3; margin-top: 6px; line-height: 1.6; letter-spacing: .5px; }
+  .cfg-out { max-width: 620px; margin: 14px auto 0; white-space: pre-wrap; font: 12px ui-monospace, monospace; color: #9fe6a0;
+    background: #0f1115; border: 1px solid #262a33; border-radius: 6px; padding: 10px; display: none; }
+  .lobby-col { display: flex; flex-direction: column; align-items: center; }
+  .lobby-modes { justify-content: center; padding: 14px 16px 0; }
+  .phone-frame { display: none; margin: 14px auto 40px; border-radius: 18px; overflow: hidden; background: #000;
+    box-shadow: 0 0 0 10px #22252c, 0 0 0 11px #3a3f4a, 0 18px 50px rgba(0,0,0,.6); position: relative; }
+  .phone-frame.on { display: block; }
+  .phone-frame iframe { border: 0; position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  /* záložky váh: na počítači nikdy, na telefóne len v portal realm */
+  #wtabs, .wtabs-space { display: none; }
+  .wtabs .opt.bad { color: #ff6b6b; box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #ff6b6b; }
+
+  /* ---------- režim „lobby v telefóne" (vnorený iframe ?lobbyphone=1, html.phone.touch = štýly hry) ---------- */
+  html.lobby-only .top, html.lobby-only #page-arena, html.lobby-only .lobby-modes, html.lobby-only .phone-frame,
+  html.lobby-only .cfg-out { display: none !important; }
+  html.lobby-only #page-lobby { display: block; }
+  html.lobby-only body { font: 16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height: normal; } /* ako body hry */
+  html.lobby-only .lobby-host { padding: 0; }
+  html.lobby-only .lobby-host .lobby { position: fixed; inset: 0; z-index: 9999; overflow: auto; background: #08090c; padding: 0; }
+  /* telefón: výber arény namiesto nadpisu ARENA (jediné voľné miesto), ostatné rozloženie ako v hre */
+  html.phone .lobby-card { grid-template-rows: 1fr repeat(5, auto) auto;
+    grid-template-areas: "arena arena" "format weights" "tiles weights" "color weights" "preview weights" "timer weights" "start start"; }
+  html.phone .lobby-title { display: none; }
+  html.phone .lobby-card > #sec-arena { grid-area: arena; align-self: center; }
+  html.phone #sec-arena .lobby-label { display: none; }
+  html.phone .arena-pick { gap: 16px; }
+  html.phone .arena-card { height: 54px; }
+  html.phone .lobby-card > #sec-arena { margin-bottom: 14px; }
+  html.phone #sec-weights > .lobby-section { margin-bottom: 0; } /* obal váh už má odstup gridu - nepripočítavať druhý */
+  html.phone .lobby .weight .w-portal { width: 34px !important; height: 18px !important; }
+  html.phone .lobby .weights > span:empty { display: none; } /* výplň „Classic sám v riadku" netreba - telefón má 1 stĺpec */
+  html.phone .arena-card span { font-size: 21px; letter-spacing: 2px; }
+  html.phone .lobby-card > #sec-format { grid-area: format; }
+  html.phone .lobby-card > #sec-tiles { grid-area: tiles; }
+  html.phone .lobby-card > #sec-color { grid-area: color; }
+  html.phone .lobby-card > #sec-preview { grid-area: preview; }
+  html.phone .lobby-card > #sec-timer { grid-area: timer; }
+  html.phone .lobby-card > #sec-weights { grid-area: weights; align-self: start; }
+  html.phone #sec-weights.is-portal #wtabs { display: flex; margin-bottom: 18px; }
+  html.phone #sec-weights.is-portal .wtabs-space { display: block; }
+  html.phone #sec-weights.is-portal #wtabs .opt.active { background: #ffb300; color: #2a1c00; }
+  html.phone #sec-weights.is-portal.wtab-tiles #portal-section,
+  html.phone #sec-weights.is-portal.wtab-portals #tile-section { display: none; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>PORTAL REALM · návrh</h1>
+  <button class="tab on" data-page="arena">Aréna &amp; animácie</button>
+  <button class="tab" data-page="lobby">Vytvorenie miestnosti</button>
+  <span class="note" style="margin:0 0 0 auto">Etapa 0 — nič z toho ešte nie je v hre (docs/PORTAL_PLAN.md)</span>
+</div>
+
+<!-- ===================== ARÉNA ===================== -->
+<div class="page on" id="page-arena">
+  <div class="wrap">
+    <div class="viewport">
+      <p class="note">Hracia plocha v skutočnej veľkosti hry (1720×920 virtuálnej obrazovky, zmenšené na šírku okna). Prejdi myšou / ťukni na portál → zvýrazní sa jeho pár.</p>
+      <div class="screen-box" id="screen-box">
+        <div class="screen" id="screen">
+          <div class="arena" id="arena"></div>
+          <div id="arena-fx"></div>
+          <div class="board-pos">
+            <div class="board" id="board">
+              <svg id="link-svg"></svg>
+              <div id="grid" class="grid"></div>
+              <svg id="thread-svg"></svg>
+              <div id="portal-layer"></div>
+              <div id="actors2"></div>
+              <div id="fx-layer"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="caption">Vyber rozloženie alebo animáciu v paneli vpravo.</div>
+    </div>
+
+    <div class="panel">
+      <h3>Rozloženie portálov</h3>
+      <div class="row" id="layouts">
+        <button class="b on" data-layout="start">Štart hry (1 pár)</button>
+        <button class="b" data-layout="mid">Stred hry (4 páry)</button>
+        <button class="b" data-layout="full">Plná doska (7 párov)</button>
+        <button class="b" data-layout="corner">Rohový pár</button>
+      </div>
+
+      <h3>Vzhľad portálu</h3>
+      <div class="row" id="pstyle">
+        <button class="b on" data-v="pixrift">D · pixel trhlina</button>
+        <button class="b" data-v="oval">A · víriaci ovál</button>
+        <button class="b" data-v="pixel">B · pixel brána</button>
+        <button class="b" data-v="rift">C · trhlina</button>
+      </div>
+
+      <h3>Značka páru</h3>
+      <div class="row" id="ptag">
+        <button class="b on" data-v="glyph">Runy (spellbook)</button>
+        <button class="b" data-v="letter">Písmená A–G</button>
+      </div>
+
+      <h3>Párovanie</h3>
+      <div class="row" id="plink">
+        <button class="b on" data-v="hover">Značka + spojnica pri hoveri</button>
+        <button class="b" data-v="always">Značka + spojnica vždy</button>
+        <button class="b" data-v="letter">Len značka</button>
+        <button class="b" data-v="none">Nič (len farba typu)</button>
+      </div>
+
+      <h3>Damage políčko (2 dmg)</h3>
+      <div class="row" id="dstyle">
+        <button class="b on" data-v="pair">A · 2 ohníky vedľa seba</button>
+        <button class="b" data-v="big">B · dvojplameň</button>
+        <button class="b" data-v="one">Bridge (1 ohník) — na porovnanie</button>
+      </div>
+
+      <h3>Veľkosť</h3>
+      <div class="row" id="size">
+        <button class="b on" data-v="fit">Na šírku okna</button>
+        <button class="b" data-v="phone">Telefón (~844×390)</button>
+      </div>
+
+      <h3>Pozadie</h3>
+      <div class="row" id="bg">
+        <button class="b on" data-v="hd">Plné rozlíšenie</button>
+        <button class="b" data-v="low">320×180 pixel (ako bridge)</button>
+      </div>
+      <div class="row" id="afx" style="margin-top:6px">
+        <button class="b on" data-v="on">Živé pozadie</button>
+        <button class="b" data-v="lite">Živé lite (telefón)</button>
+        <button class="b" data-v="off">Statické</button>
+      </div>
+
+      <h3>Typy (farba = typ)</h3>
+      <div class="legend" id="legend"></div>
+
+      <h3>Animácie</h3>
+      <div class="row" id="anims"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== LOBBY ===================== -->
+<div class="page" id="page-lobby">
+  <div class="row lobby-modes" id="lobby-mode">
+    <button class="b on" data-v="desk">Počítač</button>
+    <button class="b" data-v="667x375">Telefón 667×375 (malý)</button>
+    <button class="b" data-v="844x390">Telefón 844×390 (iPhone)</button>
+  </div>
+  <div class="phone-frame" id="phone-frame"><iframe id="phone-iframe" title="Lobby na telefóne"></iframe></div>
+  <div class="lobby-host lobby-col" id="lobby-desk">
+    <div class="lobby">
+      <div class="lobby-card">
+        <h1 class="lobby-title">ARENA</h1>
+        <p class="lobby-sub">Match setup</p>
+
+        <div class="lobby-section" id="sec-arena">
+          <div class="lobby-label">ARENA</div>
+          <div class="arena-pick">
+            <button class="arena-card active" data-arena="bridge"><canvas width="320" height="180"></canvas><span>STONE BRIDGE</span></button>
+            <button class="arena-card" data-arena="portal"><canvas width="320" height="180"></canvas><span>PORTAL REALM</span></button>
+          </div>
+        </div>
+
+        <div class="lobby-section" id="sec-format">
+          <div class="lobby-label">FORMAT</div>
+          <div class="opt-row" data-field="format">
+            <button class="opt" data-val="single">Single</button>
+            <button class="opt" data-val="bo3">Best of 3</button>
+            <button class="opt" data-val="tournament">Tournament</button>
+          </div>
+        </div>
+
+        <div class="lobby-section" id="sec-tiles">
+          <div class="lobby-label">SPECIAL TILES PER ROUND</div>
+          <div class="opt-row" data-field="tilesPerRound">
+            <button class="opt" data-val="1">1</button>
+            <button class="opt" data-val="2">2</button>
+            <button class="opt" data-val="3">3</button>
+          </div>
+        </div>
+
+        <!-- váhy: na telefóne v portal realm záložky TILES | PORTALS (naraz len jeden zoznam) -->
+        <div id="sec-weights" class="wtab-tiles">
+          <div class="lobby-label wtabs-space" aria-hidden="true">&nbsp;</div> <!-- prázdny riadok veľkosti nadpisu: záložky v rovine s tlačidlami FORMAT -->
+          <div class="opt-row wtabs" id="wtabs">
+            <button class="opt" data-tab="tiles">Tiles</button>
+            <button class="opt" data-tab="portals">Portals</button>
+          </div>
+          <div class="lobby-section" id="tile-section">
+            <div class="lobby-label">TILE CHANCE (must total 100%)</div>
+            <div class="weights" id="tile-weights"></div>
+            <div class="weights-sum" id="tile-sum"></div>
+          </div>
+          <div class="lobby-section" id="portal-section">
+            <div class="lobby-label">PORTAL CHANCE (must total 100%)</div>
+            <div class="weights" id="portal-weights"></div>
+            <div class="weights-sum" id="portal-sum"></div>
+          </div>
+        </div>
+
+        <div class="lobby-section" id="sec-color">
+          <div class="lobby-label">YOUR COLOR</div>
+          <div class="opt-row" data-field="colorPref">
+            <button class="opt" data-val="random">Random</button>
+            <button class="opt" data-val="white">⚪ White</button>
+            <button class="opt" data-val="black">⚫ Black</button>
+          </div>
+        </div>
+
+        <div class="lobby-section lobby-pair" id="sec-preview">
+          <div>
+            <div class="lobby-label">TILE PREVIEW</div>
+            <div class="opt-row" data-field="tilePreview">
+              <button class="opt" data-val="on">On</button>
+              <button class="opt" data-val="off">Off</button>
+            </div>
+          </div>
+          <div>
+            <div class="lobby-label">RANDOM CHARACTERS</div>
+            <div class="opt-row" data-field="randomChars">
+              <button class="opt" data-val="on">On</button>
+              <button class="opt" data-val="off">Off</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="lobby-section" id="sec-timer">
+          <div class="lobby-label">TURN TIMER</div>
+          <div class="opt-row" data-field="timer">
+            <button class="opt" data-val="off">Off</button>
+            <button class="opt" data-val="30">30s</button>
+            <button class="opt" data-val="60">60s</button>
+            <button class="opt" data-val="120">120s</button>
+            <button class="opt" data-val="quickdraw">60s after lock</button>
+          </div>
+        </div>
+
+        <button id="lobby-start" class="lobby-start">START</button>
+      </div>
+    </div>
+    <div class="cfg-out" id="cfg-out"></div>
+  </div>
+</div>
+
+<script type="module">
+import { pixSvg } from "/client/pix.js";
+
+/* ================= konštanty dosky (ako v hre: styles.css --tile-w/--tile-h/--gap, sprites.js ACTOR_SCALE) ================= */
+const TW = 260, TH = 185, G = 10, W = 4, H = 3;
+const AW = Math.round(TW * 1.875), AH = Math.round(TH * 1.875);
+const BOARD_W = W * TW + (W - 1) * G, BOARD_H = H * TH + (H - 1) * G;
+const PT = 26;                  // hrúbka portálu
+const POFF = PT / 2 + 4;        // odsadenie stredu portálu von od hrany
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const $ = (s, r = document) => r.querySelector(s);
+
+const TYPES = {
+  classic: { name: "Klasický", en: "Classic",  pc: "#c04dff", pc2: "#f2c9ff", icon: null,      desc: "len prechod (farba plameňov arény)" },
+  hp:      { name: "HP",       en: "HP",       pc: "#ff4d5e", pc2: "#ffc2c8", icon: "heart",   desc: "telo: +1 HP (Lightning plné HP)" },
+  mana:    { name: "Mana",     en: "Mana",     pc: "#2f8bff", pc2: "#b9dcff", icon: "drop",    desc: "telo: mana na maximum" },
+  power:   { name: "Powerup",  en: "Power-up", pc: "#ffc400", pc2: "#fff3c0", icon: "sword",   desc: "útok: +2 dmg, zlatá aura" },
+  nodef:   { name: "Def-breaker", en: "Def-breaker", pc: "#f4f4f4", pc2: "#ffffff", icon: "shieldx", desc: "útok: ignoruje štít/zrkadlo, biela aura" },
+};
+const DIR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const OPP = { up: "down", down: "up", left: "right", right: "left" };
+
+/* ================= pixel ikony: 2 ohníky (16×8) ================= */
+const FLAME = ["....a...", "...aa...", "..aaaa..", "..aaaa..", ".aabbaa.", ".abbbba.", ".abbbba.", "..aaaa.."];
+function pixRows(rows, pal, w, h) {
+  let r = "";
+  rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const c = pal[row[x]]; if (c) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`; } });
+  return `<svg viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">${r}</svg>`;
+}
+const PAL = { a: "#ff7043", b: "#ffd54f" };
+const DMG2_PAIR = pixRows(FLAME.map(r => r + r), PAL, 16, 8);
+const DMG2_BIG = pixRows([
+  "...a....a...", "..aa...aa...", "..aaa..aaa..", ".aaaa.aaaa..", ".aabaaaabaa.", "aabbbaabbbaa", "aabbbbbbbbaa",
+  "aabbbbbbbbaa", ".aabbbbbbaa.", "..aaaaaaaa..",
+], PAL, 12, 10);
+
+/* ================= sprity ================= */
+const sheets = new Map();
+function sheet(src) {
+  if (!sheets.has(src)) sheets.set(src, new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = src; }));
+  return sheets.get(src);
+}
+// animácie = rovnaké súbory/fps/loopFrom ako v hre (public/chars/escanor.js, luffy.js); fit = boardFit postavy
+const CHAR = {
+  fire:    { dir: "/assets/fire",    idle: "Idle.png", run: "Run.png", attack: "Attack_1.png", hurt: "Hurt.png", charge: "/assets/fire/Charge.png" },
+  escanor: { dir: "/assets/escanor", idle: "Idle.png", run: "Run.png", attack: "Attack_1.png", hurt: "Hurt.png", charge: "/assets/escanor/Charge.png",
+    winsun: { file: "WinSunBoard.png", fps: 7, loopFrom: 4 }, cruelhold: { file: "CruelSunHold.png", fps: 11, loop: true },
+    wintalk: { file: "WinTalk.png", fps: 5, loop: true } },
+  luffy:   { dir: "/assets/luffy",   idle: "Idle.png", run: "Run.png", attack: "Attack_1.png", hurt: "Hurt.png",
+    fit: { fill: 0.58, refH: 128, offY: 4 },
+    luffyball: { file: "Special_1.png", fps: 8, loopFrom: 7 }, luffyballspin: { file: "Special_1.png", fps: 12, startFrame: 7, loop: true },
+    luffyimpact: { file: "Special_2.png", fps: 8, once: true } },
+};
+// index framu ako drawSprite: once / loopFrom / startFrame / loop
+function frameIdx(a, n, t) {
+  const k = Math.floor(t / 1000 * a.fps);
+  if (a.loopFrom != null) return k < n ? k : a.loopFrom + (k - a.loopFrom) % (n - a.loopFrom);
+  if (a.startFrame != null) return a.startFrame + k % (n - a.startFrame);
+  return a.once ? Math.min(k, n - 1) : k % n;
+}
+
+const figures = [];
+class Fig {
+  constructor(char, x, y, { p2 = false, face = 1 } = {}) {
+    this.char = char; this.x = x; this.y = y; this.face = face;
+    this.el = document.createElement("canvas");
+    this.el.width = AW; this.el.height = AH;
+    this.el.className = "fig" + (p2 ? " p2" : "");
+    this.el.style.width = AW + "px"; this.el.style.height = AH + "px";
+    $("#actors2").appendChild(this.el);
+    this.dx = 0; this.dy = 0;
+    this.place();
+    this.setAnim("idle");
+    figures.push(this);
+  }
+  setAnim(name, { once = false, fps = 10 } = {}) {
+    const c = CHAR[this.char], def = c[name];
+    this.anim = typeof def === "object"
+      ? { ...def, src: `${c.dir}/${def.file}`, t0: performance.now() }
+      : { src: `${c.dir}/${def || name}`, t0: performance.now(), once, fps };
+  }
+  place() {
+    const l = this.x * (TW + G) - (AW - TW) / 2 + this.dx, t = this.y * (TH + G) - (AH - TH) + this.dy;
+    this.el.style.left = l + "px"; this.el.style.top = t + "px";
+    this.el.style.zIndex = String(10 + this.y);
+  }
+  // feet point v súradniciach dosky
+  feet() { return { x: this.x * (TW + G) + TW / 2 + this.dx, y: this.y * (TH + G) + TH + this.dy }; }
+  async draw(now) {
+    const img = await sheet(this.anim.src);
+    const fh = img.height, n = Math.max(1, Math.round(img.width / fh));
+    const f = frameIdx(this.anim, n, now - this.anim.t0);
+    const ctx = this.el.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, AW, AH);
+    const fit = CHAR[this.char].fit;
+    ctx.save();
+    if (this.face < 0) { ctx.translate(AW, 0); ctx.scale(-1, 1); }
+    if (fit) {
+      // boardFit: mierka normalizovaná na výšku Idle framu (refH), ukotvené na nohy ako mágovia
+      const s = Math.min(AW, AH) / fit.refH * fit.fill, dw = fh * s, dh = fh * s;
+      ctx.drawImage(img, f * fh, 0, fh, fh, (AW - dw) / 2, AH * 0.975 - dh + (fit.offY || 0) - 8, dw, dh);
+    } else {
+      const s = Math.min(AW / fh, AH / fh) * 0.95; // ako drawSprite (fill 0.95, anchorY 0.5)
+      const dw = fh * s, dh = fh * s;
+      ctx.drawImage(img, f * fh, 0, fh, fh, (AW - dw) / 2, (AH - dh) / 2, dw, dh);
+    }
+    ctx.restore();
+  }
+  remove() { this.el.remove(); figures.splice(figures.indexOf(this), 1); }
+}
+(function loop(now) { figures.forEach(f => f.draw(now)); requestAnimationFrame(loop); })(performance.now());
+
+/* ================= geometria ================= */
+const cellLT = (x, y) => ({ l: x * (TW + G), t: y * (TH + G) });
+const cellC = (x, y) => ({ x: x * (TW + G) + TW / 2, y: y * (TH + G) + TH / 2 });
+function edgePt(x, y, side, out = 0) {
+  const { l, t } = cellLT(x, y);
+  const [dx, dy] = DIR[side];
+  const cx = l + TW / 2 + dx * (TW / 2 + out), cy = t + TH / 2 + dy * (TH / 2 + out);
+  return { x: cx, y: cy };
+}
+
+/* ================= rendering dosky ================= */
+let state = { portals: [], tiles: [] };
+let pstyle = "pixrift", plink = "hover", dstyle = "pair", ptag = "glyph";
+
+/* ---------- runy páru (7×7 pixel, „spellbook") - oba konce páru nesú rovnaký znak ---------- */
+const GLYPHS = {
+  A: [".a.....", ".a..a..", ".a.a...", ".aa..a.", ".a.aa..", ".a.....", ".a....."],   // Fehu
+  B: ["...a...", "..a.a..", "..a.a..", ".a.a.a.", ".a...a.", "a.....a", "aaaaaaa"],   // oko v trojuholníku
+  C: ["aaaaaaa", ".a...a.", "..a.a..", "...a...", "..a.a..", ".a...a.", "aaaaaaa"],   // presýpacie hodiny
+  D: ["..aaa..", ".a.....", "a......", "a...a..", "a......", ".a.....", "..aaa.."],   // polmesiac s bodkou
+  E: ["a..a..a", "a..a..a", "a..a..a", ".aaaaa.", "...a...", "...a...", "..aaa.."],   // trojzubec
+  F: ["aaaaaa.", "a....a.", "a.aa.a.", "a.a..a.", "a.aaaa.", "a......", "aaaaaaa"],   // špirála
+  G: ["...a...", "a..a..a", ".a.a.a.", "..aaa..", ".a.a.a.", "a..a..a", "...a..."],   // hviezdna pečať
+};
+const glyphSvg = (id, color) => pixRows(GLYPHS[id], { a: color }, 7, 7);
+
+/* ---------- pixel trhlina: zubatá šošovka z pixelov; 3 snímky s iným „zúbkovaním" ---------- */
+// snímka sa vykreslí RAZ do canvasu (pixely + zapečená žiara) a cachuje ako obrázok - v DOM je len <img>,
+// ktorému sa animuje opacity (lacné na kompozítore, aj pri 14 portáloch na telefóne)
+const RIFT_PAD = 14, riftCache = new Map();
+const darken = (hex, k) => "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, "0")).join("");
+function riftImg(len, h, pc, pc2, frame) {
+  const key = [len, h, pc, frame].join("|");
+  if (riftCache.has(key)) return riftCache.get(key);
+  const PX = 4, N = Math.round(len / PX), M = Math.round(h / PX), c = M / 2;
+  let seed = 7 + frame * 131;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const dark = darken(pc, .45);
+  const pix = document.createElement("canvas"); pix.width = N; pix.height = M;
+  const px = pix.getContext("2d");
+  for (let i = 0; i < N; i++) {
+    const t = (i + .5) / N, base = Math.pow(Math.sin(Math.PI * t), .75) * c;
+    const half = Math.max(0, base + (rnd() < .3 ? -1 : rnd() > .75 ? 1 : 0) * (base > 1.2 ? 1 : 0));
+    if (half < .5) continue;
+    const yShift = rnd() < .2 ? (rnd() < .5 ? -1 : 1) : 0; // trhlina mierne „kľukatí"
+    for (let y = 0; y < M; y++) {
+      const d = Math.abs(y + .5 - c - yShift) / half;
+      if (d > 1) continue;
+      px.fillStyle = d > .72 ? dark : d > .42 ? pc : (d > .16 || half < 1.6) ? pc2 : "#ffffff";
+      px.fillRect(i, y, 1, 1);
+    }
+  }
+  const out = document.createElement("canvas");
+  out.width = len + RIFT_PAD * 2; out.height = h + RIFT_PAD * 2;
+  const o = out.getContext("2d");
+  o.imageSmoothingEnabled = false;
+  o.shadowColor = pc;
+  for (const blur of [12, 5]) { o.shadowBlur = blur; o.drawImage(pix, RIFT_PAD, RIFT_PAD, len, h); }
+  o.shadowBlur = 0; o.drawImage(pix, RIFT_PAD, RIFT_PAD, len, h);
+  const html = `<img class="rift-f" alt="" src="${out.toDataURL()}">`;
+  riftCache.set(key, html);
+  return html;
+}
+function riftSparks(len) {
+  let s = "";
+  for (let k = 0; k < 4; k++) {
+    const sx = Math.round((k - 1.5) * len * .22), up = k % 2 ? -1 : 1;
+    s += `<i class="rift-spark" style="--sx:${sx}px;--ex:${(k % 3 - 1) * 8}px;--ey:${up * (16 + k * 4)}px;--d:${1.1 + k * .25}s;--dl:${k * .33}s"></i>`;
+  }
+  return s;
+}
+
+function renderGrid() {
+  const grid = $("#grid");
+  grid.innerHTML = "";
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.innerHTML = `<span class="cell-xy">${x},${y}</span>`;
+    const t = state.tiles.find(t => t.x === x && t.y === y);
+    if (t) {
+      cell.classList.add(t.type === "ik" ? "tile-ik" : "tile-dmg");
+      const m = document.createElement("div");
+      m.className = "tile-marker";
+      if (t.type === "ik") m.innerHTML = pixSvg("skull");
+      else if (dstyle === "pair") { m.classList.add("dmg2"); m.innerHTML = DMG2_PAIR; }
+      else if (dstyle === "big") { m.classList.add("dmg2b"); m.innerHTML = DMG2_BIG; }
+      else m.innerHTML = pixSvg("flame");
+      cell.appendChild(m);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+const portalEls = new Map(); // "A0" -> el
+function portalEl(pair, i) {
+  const end = pair.ends[i], T = TYPES[pair.type];
+  const horiz = end.side === "up" || end.side === "down";
+  const len = Math.round((horiz ? TW : TH) * 0.62);
+  const p = edgePt(end.x, end.y, end.side, POFF);
+  const el = document.createElement("div");
+  el.className = `portal pv-${pstyle}` + (plink === "none" ? " no-tag" : "");
+  const ph = pstyle === "pixrift" ? 32 : PT;
+  el.style.cssText = `left:${p.x}px;top:${p.y}px;width:${len}px;height:${ph}px;--rot:${horiz ? 0 : 90}deg;--pc:${T.pc};--pc2:${T.pc2}`;
+  const body = pstyle === "pixrift"
+    ? [0, 1, 2].map(f => riftImg(len, ph, T.pc, T.pc2, f)).join("") + riftSparks(len)
+    : `<div class="p-ring"><div class="p-swirl"></div></div>`;
+  // runa / písmeno páru na OBOCH koncoch trhliny
+  const mark = ptag === "glyph" ? glyphSvg(pair.id, T.pc2) : pair.id, gl = ptag === "glyph" ? " glyph" : "";
+  const tag = `<div class="p-tag${gl} start">${mark}</div><div class="p-tag${gl} end">${mark}</div>`;
+  el.innerHTML = `<div class="p-body">${body}${T.icon ? `<div class="p-ico">${pixSvg(T.icon)}</div>` : ""}</div>${tag}`;
+  el.dataset.pair = pair.id;
+  el.addEventListener("mouseenter", () => hlPair(pair.id, true));
+  el.addEventListener("mouseleave", () => hlPair(pair.id, false));
+  el.addEventListener("click", () => hlPair(pair.id, !el.classList.contains("hl")));
+  return el;
+}
+function linkPath(pair) {
+  const a = edgePt(pair.ends[0].x, pair.ends[0].y, pair.ends[0].side, POFF);
+  const b = edgePt(pair.ends[1].x, pair.ends[1].y, pair.ends[1].side, POFF);
+  const [ax, ay] = DIR[pair.ends[0].side], [bx, by] = DIR[pair.ends[1].side];
+  const k = 140; // oblúk ide VON z dosky, aby nekrížil políčka
+  return `M${a.x},${a.y} C${a.x + ax * k},${a.y + ay * k} ${b.x + bx * k},${b.y + by * k} ${b.x},${b.y}`;
+}
+function renderPortals() {
+  const layer = $("#portal-layer"), svg = $("#link-svg");
+  layer.innerHTML = ""; svg.innerHTML = ""; portalEls.clear();
+  state.portals.forEach(pair => {
+    pair.ends.forEach((_, i) => { const el = portalEl(pair, i); layer.appendChild(el); portalEls.set(pair.id + i, el); });
+    if (plink === "hover" || plink === "always") {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", linkPath(pair));
+      path.setAttribute("stroke", TYPES[pair.type].pc);
+      path.dataset.pair = pair.id;
+      if (plink === "always") path.classList.add("show");
+      svg.appendChild(path);
+    }
+  });
+}
+function hlPair(id, on) {
+  [0, 1].forEach(i => portalEls.get(id + i)?.classList.toggle("hl", on));
+  if (plink === "hover") $(`#link-svg path[data-pair="${id}"]`)?.classList.toggle("show", on);
+}
+function render() { renderGrid(); renderPortals(); }
+
+/* ================= rozloženia ================= */
+const P = (id, type, a, b) => ({ id, type, ends: [a, b] });
+const E = (x, y, side) => ({ x, y, side });
+const LAYOUTS = {
+  start: { portals: [P("A", "classic", E(3, 1, "right"), E(1, 0, "up"))], tiles: [] },
+  mid: {
+    portals: [
+      P("A", "classic", E(3, 1, "right"), E(1, 0, "up")),
+      P("B", "hp", E(0, 2, "left"), E(2, 2, "down")),
+      P("C", "power", E(0, 0, "up"), E(3, 2, "right")),
+      P("D", "nodef", E(2, 0, "up"), E(0, 1, "left")),
+    ],
+    tiles: [{ x: 1, y: 1, type: "dmg" }, { x: 2, y: 1, type: "dmg" }, { x: 3, y: 0, type: "dmg" }, { x: 0, y: 2, type: "ik" }],
+  },
+  full: {
+    portals: [
+      P("A", "classic", E(0, 0, "up"), E(3, 2, "down")),
+      P("B", "hp", E(1, 0, "up"), E(0, 2, "left")),
+      P("C", "mana", E(2, 0, "up"), E(3, 1, "right")),
+      P("D", "power", E(3, 0, "up"), E(0, 1, "left")),
+      P("E", "nodef", E(0, 0, "left"), E(2, 2, "down")),
+      P("F", "classic", E(3, 0, "right"), E(1, 2, "down")),
+      P("G", "mana", E(0, 2, "down"), E(3, 2, "right")),
+    ],
+    tiles: [{ x: 1, y: 1, type: "dmg" }, { x: 2, y: 1, type: "dmg" }, { x: 1, y: 0, type: "dmg" }, { x: 2, y: 2, type: "dmg" },
+      { x: 3, y: 1, type: "dmg" }, { x: 0, y: 0, type: "ik" }],
+  },
+  corner: { portals: [P("A", "classic", E(0, 0, "up"), E(0, 0, "left"))], tiles: [{ x: 2, y: 1, type: "dmg" }] },
+};
+function setLayout(k) {
+  state = structuredClone(LAYOUTS[k]);
+  clearScene();
+  render();
+}
+function clearScene() {
+  [...figures].forEach(f => f.remove());
+  $("#fx-layer").innerHTML = "";
+  $("#thread-svg").innerHTML = "";
+}
+
+/* ================= FX pomôcky ================= */
+function fx(cls, x, y, styles = {}) {
+  const el = document.createElement("div");
+  el.className = cls;
+  el.style.left = x + "px"; el.style.top = y + "px";
+  Object.assign(el.style, styles);
+  $("#fx-layer").appendChild(el);
+  return el;
+}
+async function float(text, x, y, color, ms = 1300) {
+  const el = fx("float", x, y, { color });
+  el.textContent = text;
+  await el.animate([{ opacity: 0, transform: "translate(-50%,-30%) scale(.7)" }, { opacity: 1, transform: "translate(-50%,-80%) scale(1)", offset: .15 },
+    { opacity: 1, transform: "translate(-50%,-130%)", offset: .75 }, { opacity: 0, transform: "translate(-50%,-160%)" }], { duration: ms, easing: "ease-out" }).finished;
+  el.remove();
+}
+async function portalFlash(pairId, i, ms = 380) {
+  const el = portalEls.get(pairId + i);
+  if (!el) return;
+  const pc = getComputedStyle(el).getPropertyValue("--pc");
+  const f = fx("flash", parseFloat(el.style.left), parseFloat(el.style.top), { "--pc": pc });
+  el.querySelector(".p-body").animate([{ filter: "brightness(1)" }, { filter: "brightness(2.4)" }, { filter: "brightness(1)" }], { duration: ms });
+  await f.animate([{ opacity: 0, transform: "scale(.3)" }, { opacity: 1, transform: "scale(1)", offset: .35 }, { opacity: 0, transform: "scale(1.4)" }], { duration: ms, easing: "ease-out" }).finished;
+  f.remove();
+}
+// spotreba páru - oba konce sa zatiahnu naraz
+async function consumePair(id) {
+  const els = [0, 1].map(i => portalEls.get(id + i)).filter(Boolean);
+  const path = $(`#link-svg path[data-pair="${id}"]`);
+  path?.remove();
+  await Promise.all(els.map(el => el.querySelector(".p-body").animate(
+    [{ transform: "scaleX(1)", filter: "brightness(1)" }, { transform: "scaleX(1.15)", filter: "brightness(2.5)", offset: .2 },
+     { transform: "scaleX(0) scaleY(.4)", filter: "brightness(3)" }], { duration: 520, easing: "ease-in", fill: "forwards" }).finished));
+  els.forEach(el => el.remove());
+  state.portals = state.portals.filter(p => p.id !== id);
+  [0, 1].forEach(i => portalEls.delete(id + i));
+}
+async function spawnPair(pair) {
+  state.portals.push(pair);
+  const els = [0, 1].map(i => { const el = portalEl(pair, i); $("#portal-layer").appendChild(el); portalEls.set(pair.id + i, el); return el; });
+  if (plink === "always" || plink === "hover") {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", linkPath(pair)); path.setAttribute("stroke", TYPES[pair.type].pc); path.dataset.pair = pair.id;
+    if (plink === "always") path.classList.add("show");
+    $("#link-svg").appendChild(path);
+  }
+  await Promise.all(els.map(el => el.querySelector(".p-body").animate(
+    [{ transform: "scaleX(0) scaleY(.3)", filter: "brightness(3)" }, { transform: "scaleX(1.2) scaleY(1)", filter: "brightness(2)", offset: .6 },
+     { transform: "scaleX(1)", filter: "brightness(1)" }], { duration: 700, easing: "ease-out" }).finished));
+}
+
+/* ---------- pohyb figúry (cez offset dx/dy = plynulý presun ako v hre) ---------- */
+function tweenFig(fig, toDx, toDy, ms) {
+  const fromDx = fig.dx, fromDy = fig.dy, t0 = performance.now();
+  return new Promise(res => {
+    (function step(now) {
+      const k = Math.min(1, (now - t0) / ms);
+      fig.dx = fromDx + (toDx - fromDx) * k; fig.dy = fromDy + (toDy - fromDy) * k; fig.place();
+      k < 1 ? requestAnimationFrame(step) : res();
+    })(t0);
+  });
+}
+// offset feet bodu na hranu políčka (smerom side)
+const edgeOff = (side) => ({ dx: DIR[side][0] * (TW / 2 + 4), dy: DIR[side][1] * (TH * 0.55) });
+
+// telo vojde do portálu (pair.ends[i]) a vyjde z druhého konca; skončí v strede výstupného políčka
+async function bodyThrough(fig, pairId, i, { stepMs = 300, anim = "run" } = {}) {
+  const pair = state.portals.find(p => p.id === pairId);
+  const a = pair.ends[i], b = pair.ends[1 - i];
+  if (anim) fig.setAnim(anim);
+  if (DIR[a.side][0]) fig.face = DIR[a.side][0];
+  const eo = edgeOff(a.side);
+  await tweenFig(fig, eo.dx, eo.dy, stepMs);
+  portalFlash(pairId, i);
+  await fig.el.animate([{ transform: "scale(1)", opacity: 1, filter: "brightness(1)" }, { transform: "scale(.15,.05)", opacity: 0, filter: "brightness(3)" }],
+    { duration: 220, easing: "ease-in", fill: "forwards" }).finished;
+  // výstup
+  fig.x = b.x; fig.y = b.y;
+  const xo = edgeOff(b.side);
+  fig.dx = xo.dx; fig.dy = xo.dy; fig.place();
+  const inward = OPP[b.side];
+  if (DIR[inward][0]) fig.face = DIR[inward][0];
+  portalFlash(pairId, 1 - i);
+  await fig.el.animate([{ transform: "scale(.15,.05)", opacity: 0, filter: "brightness(3)" }, { transform: "scale(1)", opacity: 1, filter: "brightness(1)" }],
+    { duration: 220, easing: "ease-out", fill: "forwards" }).finished;
+  await tweenFig(fig, 0, 0, stepMs);
+}
+async function stepFig(fig, side, ms = 300) {
+  fig.setAnim("run");
+  if (DIR[side][0]) fig.face = DIR[side][0];
+  fig.x += DIR[side][0]; fig.y += DIR[side][1];
+  fig.dx = -DIR[side][0] * (TW + G); fig.dy = -DIR[side][1] * (TH + G); fig.place();
+  await tweenFig(fig, 0, 0, ms);
+}
+
+/* ---------- projektil ---------- */
+class Proj {
+  constructor(src, x, y, side) {
+    this.el = document.createElement("canvas");
+    this.el.width = 64; this.el.height = 64;
+    this.el.className = "proj";
+    $("#fx-layer").appendChild(this.el);
+    this.src = src; this.t0 = performance.now(); this.pos = { x, y }; this.setDir(side); this.set(x, y);
+    const draw = async (now) => {
+      if (!this.el.isConnected) return;
+      const img = await sheet(this.src), fh = img.height, n = Math.round(img.width / fh), f = Math.floor((now - this.t0) / 70) % n;
+      const ctx = this.el.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, 64, 64);
+      ctx.drawImage(img, f * fh, 0, fh, fh, 0, 0, 64, 64);
+      requestAnimationFrame(draw);
+    };
+    requestAnimationFrame(draw);
+  }
+  setDir(side) { this.rot = this.noRot ? 0 : { right: 0, down: 90, left: 180, up: -90 }[side]; this.el.style.transform = `rotate(${this.rot}deg)`; }
+  set(x, y) { this.pos = { x, y }; this.el.style.left = x + "px"; this.el.style.top = y + "px"; }
+  async to(x, y, ms) {
+    const from = { ...this.pos };
+    await this.el.animate([{ left: from.x + "px", top: from.y + "px" }, { left: x + "px", top: y + "px" }], { duration: ms, easing: "linear" }).finished;
+    this.set(x, y);
+  }
+  async scaleOut(ms = 160) { await this.el.animate([{ transform: `rotate(${this.rot}deg) scale(1)`, opacity: 1 }, { transform: `rotate(${this.rot}deg) scale(.1)`, opacity: 0 }], { duration: ms, fill: "forwards" }).finished; }
+  async scaleIn(ms = 160) { await this.el.animate([{ transform: `rotate(${this.rot}deg) scale(.1)`, opacity: 0 }, { transform: `rotate(${this.rot}deg) scale(1)`, opacity: 1 }], { duration: ms, fill: "forwards" }).finished; }
+  remove() { this.el.remove(); }
+}
+const STEP = 300;
+// let strely z (x,y) smerom side cez zoznam úsekov; seg = { cells:n } alebo { portal:[id,i], aura? }
+async function shot(src, fig, side, plan) {
+  fig.setAnim("attack", { once: true, fps: 12 });
+  await sleep(250);
+  const c0 = cellC(fig.x, fig.y);
+  const pr = new Proj(src, c0.x, c0.y - 20, side);
+  let cx = fig.x, cy = fig.y, dir = side;
+  for (const seg of plan) {
+    if (seg.cells) {
+      for (let k = 0; k < seg.cells; k++) {
+        cx += DIR[dir][0]; cy += DIR[dir][1];
+        const c = cellC(cx, cy); await pr.to(c.x, c.y - 20, STEP);
+      }
+    } else if (seg.portal) {
+      const [id, i] = seg.portal, pair = state.portals.find(p => p.id === id), a = pair.ends[i], b = pair.ends[1 - i];
+      const e = edgePt(a.x, a.y, a.side, POFF); await pr.to(e.x, e.y, STEP / 2);
+      portalFlash(id, i); await pr.scaleOut();
+      const e2 = edgePt(b.x, b.y, b.side, POFF); dir = OPP[b.side]; pr.setDir(dir); pr.set(e2.x, e2.y);
+      if (seg.aura) pr.el.classList.add("aura-" + seg.aura);
+      portalFlash(id, 1 - i); await pr.scaleIn();
+      if (seg.aura === "power") float("⚡ +2", e2.x, e2.y - 30, "#ffd54f", 900);
+      if (seg.aura === "nodef") float("DEF BREAK", e2.x, e2.y - 30, "#ffffff", 900);
+      cx = b.x; cy = b.y;
+      const c = cellC(cx, cy); await pr.to(c.x, c.y - 20, STEP / 2);
+      seg.consume !== false && consumePair(id);
+    }
+  }
+  fig.setAnim("idle");
+  return pr;
+}
+async function hurt(fig, text, color = "#ff5252") {
+  fig.setAnim("hurt", { once: true });
+  const f = fig.feet();
+  float(text, f.x, f.y - AH * 0.55, color);
+  await sleep(700);
+  fig.setAnim("idle");
+}
+function bubble(fig, kind) {
+  const f = fig.feet();
+  return fx("bubble " + kind, f.x, f.y + 8, { width: "190px", height: "230px" });
+}
+async function shatter(el, color) {
+  const x = parseFloat(el.style.left), y = parseFloat(el.style.top) - 115;
+  el.animate([{ transform: "translate(-50%,-100%) scale(1)", opacity: 1 }, { transform: "translate(-50%,-100%) scale(1.25)", opacity: 0 }], { duration: 380, fill: "forwards" });
+  const shards = [...Array(10)].map((_, k) => {
+    const s = fx("shard", x, y, { background: color });
+    const a = k / 10 * Math.PI * 2, d = 90 + (k % 3) * 25;
+    s.animate([{ transform: "translate(0,0) rotate(0)", opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px,${Math.sin(a) * d}px) rotate(${180 + k * 40}deg)`, opacity: 0 }],
+      { duration: 600, easing: "ease-out", fill: "forwards" });
+    return s;
+  });
+  await sleep(620);
+  shards.forEach(s => s.remove()); el.remove();
+}
+
+/* ---------- veľký stredový sprite (ako hra: WinSun / Luffyho premena na guľu v strede dosky) ---------- */
+// feet: ukotvenie za nohy (Escanor centerAnchor - top = stred + basePx*0.45, translate -95 %), inak centrované
+function centerSprite(src, anim, px, flip, { feet = false, basePx = px } = {}) {
+  const cvs = document.createElement("canvas");
+  cvs.width = px; cvs.height = px;
+  Object.assign(cvs.style, { position: "absolute", left: "50%", zIndex: 8, imageRendering: "pixelated",
+    top: feet ? `calc(50% + ${Math.round(basePx * 0.45)}px)` : "50%",
+    transform: feet ? `translate(-50%, -95%) scaleX(${flip})` : `translate(-50%, -50%) scaleX(${flip})` });
+  $("#fx-layer").appendChild(cvs);
+  const ctx = cvs.getContext("2d"), t0 = performance.now();
+  sheet(src).then(img => {
+    const fh = img.height, n = Math.round(img.width / fh);
+    (function step(now) {
+      if (!cvs.isConnected) return;
+      const s = px / fh * 0.95, d = fh * s;
+      ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, px, px);
+      ctx.drawImage(img, frameIdx(anim, n, now - t0) * fh, 0, fh, fh, (px - d) / 2, (px - d) / 2, d, d);
+      requestAnimationFrame(step);
+    })(t0);
+  });
+  return cvs;
+}
+// sprite prehratý raz na mieste (SunBurst → SunFade)
+async function playOnceAt(src, fps, x, y, size) {
+  const img = await sheet(src), fh = img.height, n = Math.round(img.width / fh);
+  const cvs = document.createElement("canvas"); cvs.width = size; cvs.height = size;
+  Object.assign(cvs.style, { position: "absolute", left: x - size / 2 + "px", top: y - size / 2 + "px", zIndex: 8, imageRendering: "pixelated" });
+  $("#fx-layer").appendChild(cvs);
+  const ctx = cvs.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  for (let k = 0; k < n; k++) { ctx.clearRect(0, 0, size, size); ctx.drawImage(img, k * fh, 0, fh, fh, 0, 0, size, size); await sleep(1000 / fps); }
+  cvs.remove();
+}
+const gridCell = (x, y) => $("#grid").children[y * W + x];
+const ANIM_SLOW = 1.8, MOVE_MS = Math.round(700 * ANIM_SLOW); // shared/timing.js
+
+/* ================= scenáre ================= */
+const cap = (html) => { $("#caption").innerHTML = html; };
+const SCEN = [
+  { key: "move", title: "Pohyb cez portál", sub: "zmena smeru: vpravo → zhora dole", layout: "start", async run() {
+    cap("<b>MOVE</b> doprava z (3,1) do portálu <b>A</b> → vyjde z hornej hrany (1,0) smerom dole. Pár sa hneď zatiahne (spotreba).");
+    const f = new Fig("fire", 3, 1); f.face = 1; await sleep(500);
+    await bodyThrough(f, "A", 0); f.setAnim("idle"); await consumePair("A");
+  }},
+  { key: "corner", title: "Rohový pár — otočka na mieste", sub: "move hore z rohu → ostane na (0,0)", layout: "corner", async run() {
+    cap("<b>MOVE</b> hore z rohu (0,0) do portálu <b>A</b> na hornej hrane → vyjde z ľavej hrany <b>toho istého</b> rohu. Ostane na mieste, ale prehrá vstup aj výstup.");
+    const f = new Fig("fire", 0, 0); await sleep(500);
+    await bodyThrough(f, "A", 0); f.setAnim("idle"); await consumePair("A");
+  }},
+  { key: "dash", title: "Dash cez portál + krok", sub: "krok 1 cez portál, krok 2 dovnútra", layout: null, async run() {
+    state = { portals: [P("A", "classic", E(0, 2, "left"), E(3, 2, "down"))], tiles: [] }; render();
+    cap("<b>DASH</b> doľava z (0,2): krok 1 = portál <b>A</b> → vyjde zdola na (3,2), krok 2 pokračuje novým smerom hore na (3,1).");
+    const f = new Fig("fire", 0, 2); f.face = -1; await sleep(500);
+    await bodyThrough(f, "A", 0, { stepMs: 200 }); consumePair("A"); await stepFig(f, "up", 200); f.setAnim("idle");
+  }},
+  { key: "hp", title: "HP portál (telo)", sub: "+1 HP", layout: null, async run() {
+    state = { portals: [P("B", "hp", E(1, 2, "down"), E(3, 1, "right"))], tiles: [] }; render();
+    cap("<b>HP portál</b>: postava prejde → <b>+1 HP</b> (Lightning: plné HP). Strela by ho len spálila.");
+    const f = new Fig("fire", 1, 2); await sleep(500);
+    await bodyThrough(f, "B", 0); f.setAnim("idle");
+    const p = f.feet(); float("+1 HP", p.x, p.y - AH * 0.55, "#69f0ae"); await consumePair("B");
+  }},
+  { key: "mana", title: "Mana portál (telo)", sub: "mana na maximum", layout: null, async run() {
+    state = { portals: [P("C", "mana", E(2, 0, "up"), E(0, 1, "left"))], tiles: [] }; render();
+    cap("<b>Mana portál</b>: postava prejde → <b>mana na maximum</b>.");
+    const f = new Fig("fire", 2, 0); await sleep(500);
+    await bodyThrough(f, "C", 0); f.setAnim("idle");
+    const p = f.feet(); float("MANA MAX", p.x, p.y - AH * 0.55, "#82c4ff"); await consumePair("C");
+  }},
+  { key: "shot", title: "Strela cez portál", sub: "3/2/1 pokračuje, zmena smeru", layout: null, async run() {
+    state = { portals: [P("A", "classic", E(0, 0, "up"), E(3, 2, "right"))], tiles: [] }; render();
+    cap("Basic hore z (0,1): (0,0) = vzdialenosť 1 → portál <b>A</b> → vyletí sprava na (3,2) = 2 → (2,2) = 3 → zásah za <b>1 dmg</b>.");
+    const a = new Fig("fire", 0, 1), d = new Fig("fire", 2, 2, { p2: true, face: 1 }); await sleep(500);
+    const pr = await shot(CHAR.fire.charge, a, "up", [{ cells: 1 }, { portal: ["A", 0] }, { cells: 1 }]);
+    pr.remove(); await hurt(d, "-1 HP");
+  }},
+  { key: "power", title: "Strela cez powerup portál", sub: "zlatá aura, +2 dmg", layout: null, async run() {
+    state = { portals: [P("C", "power", E(3, 1, "right"), E(0, 0, "left"))], tiles: [] }; render();
+    cap("Strela prejde <b>powerup</b> portálom → <b>zlatá aura</b>, zásah +2 (samostatný zlatý float ako pri power tile).");
+    const a = new Fig("fire", 2, 1), d = new Fig("fire", 1, 0, { p2: true, face: -1 }); await sleep(500);
+    const pr = await shot(CHAR.fire.charge, a, "right", [{ cells: 1 }, { portal: ["C", 0], aura: "power" }, { cells: 1 }]);
+    pr.remove(); const p = d.feet(); float("⚡ -2", p.x + 70, p.y - AH * 0.42, "#ffd54f"); await hurt(d, "-1 HP");
+  }},
+  { key: "nodef", title: "No-def vs štít", sub: "biela aura, SHIELD DISPELLED", layout: null, async run() {
+    state = { portals: [P("D", "nodef", E(1, 2, "down"), E(3, 0, "up"))], tiles: [] }; render();
+    cap("Súper má <b>štít</b>. Strela prejde <b>no-def</b> portálom → <b>biela aura</b> → štít sa rozbije (<b>SHIELD DISPELLED</b>) a dmg dopadne.");
+    const a = new Fig("fire", 1, 1), d = new Fig("fire", 3, 1, { p2: true, face: -1 }); await sleep(300);
+    const sh = bubble(d, "shield"); await sleep(500);
+    const pr = await shot(CHAR.fire.charge, a, "down", [{ cells: 1 }, { portal: ["D", 0], aura: "nodef" }, { cells: 0 }]);
+    // z (3,0) dole na (3,1)
+    const c = cellC(3, 1); await pr.to(c.x, c.y - 20, STEP); pr.remove();
+    const p = d.feet(); float("SHIELD DISPELLED", p.x, p.y - AH * 0.72, "#ffffff", 1600);
+    await shatter(sh, "#b2ebf2"); await hurt(d, "-2 HP");
+  }},
+  { key: "mirrorwall", title: "Zrkadlo → odraz do steny", sub: "portál už nie je, strelec nedostane nič", layout: null, async run() {
+    state = { portals: [P("A", "classic", E(0, 0, "up"), E(3, 2, "right"))], tiles: [] }; render();
+    cap("Súper má <b>zrkadlo</b>. Strela prišla cez portál, ktorý sa po prelete zavrel → odraz letí späť k hrane, <b>narazí do steny</b> a zanikne. Nikto dmg.");
+    const a = new Fig("fire", 0, 1), d = new Fig("fire", 2, 2, { p2: true, face: 1 }); await sleep(300);
+    const mr = bubble(d, "mirror"); await sleep(400);
+    const pr = await shot(CHAR.fire.charge, a, "up", [{ cells: 1 }, { portal: ["A", 0] }, { cells: 1 }]);
+    pr.remove(); await sleep(150);
+    // lúč zo súpera k (zaniknutému) portálu na pravej hrane (3,2)
+    const from = cellC(2, 2), to = edgePt(3, 2, "right", POFF);
+    const len = Math.hypot(to.x - from.x, to.y - from.y);
+    const beam = fx("beam", from.x, from.y - 20, { width: len + "px" });
+    await beam.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 260, fill: "forwards" }).finished;
+    const sparks = [...Array(9)].map((_, k) => {
+      const s = fx("spark", to.x, to.y - 20); const ang = (k / 9) * Math.PI - Math.PI / 2;
+      s.animate([{ transform: "translate(0,0)", opacity: 1 }, { transform: `translate(${-Math.abs(Math.cos(ang)) * 70}px,${Math.sin(ang) * 70}px)`, opacity: 0 }], { duration: 520, fill: "forwards" });
+      return s;
+    });
+    float("LOST IN THE VOID", to.x - 120, to.y - 70, "#ffe9a0", 1700);
+    await beam.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, fill: "forwards" }).finished;
+    beam.remove(); mr.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" });
+    await sleep(700); sparks.forEach(s => s.remove()); mr.remove();
+  }},
+  { key: "selfhit", title: "Strela zasiahne strelca", sub: "rohový pár, 3 dmg sebe", layout: "corner", async run() {
+    cap("Strelec v rohu (0,0) strieľa hore do rohového portálu → strela vyjde z ľavej hrany <b>toho istého</b> políčka = vzdialenosť 1 → <b>3 dmg sebe</b>.");
+    const a = new Fig("fire", 0, 0); await sleep(500);
+    const pr = await shot(CHAR.fire.charge, a, "up", [{ portal: ["A", 0] }]);
+    pr.remove(); await hurt(a, "-3 HP");
+  }},
+  { key: "spawn", title: "Nový pár na konci kola", sub: "otvorí sa ako posledná vec kola", layout: "start", async run() {
+    cap("Koniec kola → otvorí sa nový pár (<b>B</b>, mana). Hráči ho vidia od začiatku ďalšieho kola.");
+    await sleep(400); await spawnPair(P("B", "mana", E(0, 2, "down"), E(2, 0, "up")));
+  }},
+  { key: "thread", title: "Ariadnina niť cez portál", sub: "celá niť sa stratí, nové klbko", layout: null, async run() {
+    state = { portals: [P("A", "classic", E(1, 0, "up"), E(3, 1, "right"))], tiles: [] }; render();
+    cap("Prekliaty v labyrinte ide (2,1) → (1,1) → (1,0) → portál <b>A</b>. Pri prechode sa <b>celá niť stratí</b>; <b>nové klbko</b> začína na výstupnom políčku (3,1).");
+    const svg = $("#thread-svg");
+    const ns = "http://www.w3.org/2000/svg";
+    const pts = [cellC(2, 1), cellC(1, 1)];
+    const line = document.createElementNS(ns, "polyline"); svg.appendChild(line);
+    const knot = (p) => { const c = document.createElementNS(ns, "circle"); c.setAttribute("class", "knot"); c.setAttribute("cx", p.x); c.setAttribute("cy", p.y); c.setAttribute("r", 9); svg.appendChild(c); return c; };
+    knot(pts[0]);
+    const upd = () => line.setAttribute("points", pts.map(p => `${p.x},${p.y}`).join(" "));
+    upd();
+    const f = new Fig("fire", 1, 1); f.face = -1; await sleep(500);
+    await stepFig(f, "up"); pts.push(cellC(1, 0)); upd();
+    // ku hrane
+    const e = edgePt(1, 0, "up", 0); pts.push(e); upd();
+    // niť sa stratí celá už pri vstupe do portálu (zhasne a rozpadne sa)
+    const old = [...svg.children];
+    const fade = Promise.all(old.map(n => n.animate([{ opacity: 1 }, { opacity: .2, offset: .3 }, { opacity: .7, offset: .45 }, { opacity: 0 }],
+      { duration: 700, fill: "forwards" }).finished));
+    await bodyThrough(f, "A", 0); f.setAnim("idle");
+    await fade; old.forEach(n => n.remove());
+    const k = knot(cellC(3, 1));
+    k.animate([{ r: 0 }, { r: 14 }, { r: 9 }], { duration: 400 });
+    consumePair("A");
+  }},
+  { key: "escanor", title: "Escanor: slnko cez portál", sub: "pride 2, zóna na výstupe bez pretočenia", layout: null, async run() {
+    state = { portals: [P("A", "classic", E(3, 1, "right"), E(0, 1, "left"))], tiles: [] }; render();
+    cap("Escanor na pravom okraji (3,1) hodí slnko doprava → portál <b>A</b> → F = (0,1). Pride 2 = 3×3 okolo F, <b>orezané doskou</b> → zasiahnuté stĺpce 0–1, jeho stĺpec nie.");
+    // choreografia ako v hre (public/chars/fx/escanor.js), pride 2 = všetko ×1.2² ; jediná zmena: let slnka cez portál
+    const mul = Math.pow(1.2, 2);
+    const e = new Fig("escanor", 3, 1); e.face = 1;
+    e.el.style.transformOrigin = "50% 97%"; e.el.style.transform = `scale(${mul})`; // pride = veľkosť postavy
+    await sleep(500);
+    // fáza 1: malá postava WinSunBoard + veľký WinSun raz (visí 700 ms)
+    e.setAnim("winsun");
+    const basePx = Math.round(TH * 4.8);
+    const big = centerSprite("/assets/escanor/WinSun.png", { fps: 7, once: true }, Math.round(basePx * mul), 1, { feet: true, basePx });
+    await sleep(Math.round(8 * 1000 / 7) + 700); big.remove();
+    // fáza 2: CruelSunHold raz celé
+    e.setAnim("cruelhold"); await sleep(Math.round(13 * 1000 / 11));
+    // fáza 3: WinTalk, slnko letí z držanej pozície - do portálu, z druhého konca na F
+    e.setAnim("wintalk");
+    const size = Math.round(TH * 1.25 * mul), { l: sl, t: st } = cellLT(3, 1);
+    const pr = new Proj(CHAR.escanor.charge, sl + TW / 2, st - size * 0.55 + size / 2, "right");
+    pr.noRot = true; pr.setDir("right");
+    Object.assign(pr.el.style, { width: size + "px", height: size + "px", margin: `${-size / 2}px 0 0 ${-size / 2}px` });
+    const a = edgePt(3, 1, "right", POFF); await pr.to(a.x, a.y, 330); portalFlash("A", 0); await pr.scaleOut();
+    const b = edgePt(0, 1, "left", POFF); pr.set(b.x, b.y); portalFlash("A", 1); await pr.scaleIn();
+    consumePair("A");
+    const F = cellC(0, 1); await pr.to(F.x, F.y, 270); pr.remove();
+    // slow-mo SunBurst (blikajú zasiahnuté políčka) → SunFade
+    const cells = []; for (let y = 0; y <= 2; y++) for (let x = 0; x <= 1; x++) cells.push(gridCell(x, y));
+    cells.forEach(c => c.classList.add("esc-burst-cell"));
+    const bs = Math.round(TH * 1.8 * mul);
+    await playOnceAt("/assets/escanor/SunBurst.png", 6, F.x, F.y, bs);
+    cells.forEach(c => c.classList.remove("esc-burst-cell"));
+    await playOnceAt("/assets/escanor/SunFade.png", 6, F.x, F.y, bs);
+    e.setAnim("idle");
+  }},
+  { key: "luffy", title: "Luffy: balón cez portál", sub: "pristane na výstupe, výbuch 3×3 tam", layout: null, async run() {
+    state = { portals: [P("B", "hp", E(0, 2, "left"), E(2, 0, "up"))], tiles: [] }; render();
+    cap("Luffy na (0,2) sa nafúkne a kotúľa doľava → <b>HP portál B</b> → vyjde hore na (2,0) a vybuchne 3×3 okolo (2,0). Balón = telo aj útok: dostane <b>+1 HP</b>.");
+    // choreografia ako v hre (public/chars/fx/luffy.js): premena (stred + malá figúra) → kotúľ → výbuch Special_2;
+    // jediná zmena: kotúľ ide cez portál (ako telo Fire wizarda)
+    const l = new Fig("luffy", 0, 2); l.face = -1; await sleep(400);
+    l.setAnim("luffyball");
+    const ctrPx = Math.round(TH * 4.8 * (66 / 128) / (112 / 160));
+    const ctr = centerSprite("/assets/luffy/Special_1.png", { fps: 8, loopFrom: 7 }, ctrPx, -1);
+    await sleep(Math.round(900 * ANIM_SLOW)); ctr.remove();
+    l.setAnim("luffyballspin");
+    await bodyThrough(l, "B", 0, { stepMs: Math.round((MOVE_MS - 440) / 2), anim: null });
+    consumePair("B");
+    const p = l.feet(); float("+1 HP", p.x, p.y - AH * 0.55, "#69f0ae");
+    l.setAnim("luffyimpact");
+    const cells = []; for (let y = 0; y <= 1; y++) for (let x = 1; x <= 3; x++) cells.push(gridCell(x, y));
+    cells.forEach(c => c.classList.add("esc-burst-cell"));
+    await sleep(Math.round(340 * ANIM_SLOW) + 400);
+    cells.forEach(c => c.classList.remove("esc-burst-cell")); l.setAnim("idle");
+  }},
+  { key: "naruto", title: "Dve figúry spolu jedným portálom", sub: "Naruto + klon (ukážka s 2 figúrami)", layout: null, async run() {
+    state = { portals: [P("A", "classic", E(3, 1, "right"), E(1, 2, "down"))], tiles: [] }; render();
+    cap("Vlastník a klon na spoločnom políčku prejdú <b>tým istým portálom naraz</b>; pár sa zatiahne až po oboch. (Ukážka s dvomi figúrami Fire — v hre to bude Naruto.)");
+    const a = new Fig("fire", 3, 1), b = new Fig("fire", 3, 1); b.dx = 22; b.el.style.opacity = ".7"; b.place(); await sleep(500);
+    await Promise.all([bodyThrough(a, "A", 0), (async () => { await sleep(40); await bodyThrough(b, "A", 0); b.dx = 22; b.place(); })()]);
+    a.setAnim("idle"); b.setAnim("idle"); await consumePair("A");
+  }},
+];
+
+/* ================= panel ================= */
+function legend() {
+  $("#legend").innerHTML = Object.values(TYPES).map(t =>
+    `<span class="sw" style="background:${t.pc};box-shadow:0 0 8px ${t.pc}"></span><span><b>${t.name}</b> — ${t.desc}</span>`).join("");
+}
+let busy = false;
+function animButtons() {
+  $("#anims").innerHTML = "";
+  SCEN.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "b anim";
+    b.innerHTML = `${s.title}<small>${s.sub}</small>`;
+    b.onclick = async () => {
+      if (busy) return;
+      busy = true; document.querySelectorAll(".b.anim").forEach(x => x.disabled = true);
+      if (s.layout) setLayout(s.layout); else clearScene();
+      try { await s.run(); } finally { busy = false; document.querySelectorAll(".b.anim").forEach(x => x.disabled = false); }
+    };
+    $("#anims").appendChild(b);
+  });
+}
+function group(id, fn) {
+  document.querySelectorAll(`#${id} .b`).forEach(b => b.addEventListener("click", () => {
+    if (busy) return;
+    document.querySelectorAll(`#${id} .b`).forEach(x => x.classList.toggle("on", x === b));
+    fn(b.dataset.v ?? b.dataset.layout);
+  }));
+}
+group("layouts", (k) => setLayout(k));
+group("pstyle", (v) => { pstyle = v; renderPortals(); });
+group("plink", (v) => { plink = v; renderPortals(); });
+group("ptag", (v) => { ptag = v; renderPortals(); });
+group("dstyle", (v) => { dstyle = v; renderGrid(); });
+let sizeMode = "fit";
+group("size", (v) => { sizeMode = v; fit(); });
+
+function fit() {
+  const box = $("#screen-box"), scr = $("#screen");
+  const avail = box.parentElement.clientWidth;
+  const w = sizeMode === "phone" ? Math.min(avail, 844) : avail;
+  const k = sizeMode === "phone" ? Math.min(844 / 1720, 390 / 920) : w / 1720;
+  box.style.width = (sizeMode === "phone" ? Math.round(1720 * k) : w) + "px";
+  box.style.height = Math.round(920 * k) + "px";
+  scr.style.transform = `scale(${k})`;
+}
+addEventListener("resize", fit);
+
+/* ================= pozadie arény (rovnako ako arena-bg.js: 320×180 cover, pixelated) ================= */
+function drawArena(cvs, layers) {
+  const ctx = cvs.getContext("2d");
+  return Promise.all(layers.map(src => sheet(src))).then(imgs => imgs.forEach(img => {
+    const s = Math.max(cvs.width / img.width, cvs.height / img.height), dw = img.width * s, dh = img.height * s;
+    ctx.drawImage(img, (cvs.width - dw) / 2, (cvs.height - dh) / 2, dw, dh);
+  }));
+}
+// pozadie: bridge je pixel-art kreslený v 320×180 (ARENA_RES); portal realm je maľba - tu sa porovnáva
+// low-res režim hry s plným rozlíšením (plynulé škálovanie, bez pixelated)
+function arenaBg(mode) {
+  $("#arena").innerHTML = "";
+  const hd = mode === "hd";
+  const cvs = document.createElement("canvas"); cvs.className = "layer";
+  cvs.width = hd ? 1720 : 320; cvs.height = hd ? 920 : 180;
+  if (hd) cvs.style.imageRendering = "auto";
+  $("#arena").appendChild(cvs);
+  drawArena(cvs, [hd ? "/arenas/portal-realm/portal-realm-hd.webp" : "/arenas/portal-realm/portal-realm.png"]);
+}
+arenaBg("hd");
+group("bg", (v) => arenaBg(v));
+
+// živé pozadie: body sú v pixeloch originálu (1672×941) a prepočítajú sa cez rovnaký „cover" ako canvas pozadia
+function buildArenaFx() {
+  const SRC = { w: 1672, h: 941 }, S = { w: 1720, h: 920 };
+  const k = Math.max(S.w / SRC.w, S.h / SRC.h), ox = (S.w - SRC.w * k) / 2, oy = (S.h - SRC.h * k) / 2;
+  const at = (x, y) => ({ x: ox + x * k, y: oy + y * k });
+  const root = $("#arena-fx");
+  root.innerHTML = "";
+  const add = (cls, x, y, w, h, vars = {}) => {
+    const p = at(x, y), el = document.createElement("div");
+    el.className = cls;
+    el.style.left = p.x + "px"; el.style.top = p.y + "px";
+    if (w) { el.style.width = w * k + "px"; el.style.height = (h ?? w) * k + "px"; }
+    for (const [n, v] of Object.entries(vars)) el.style.setProperty(n, v);
+    root.appendChild(el);
+    return el;
+  };
+  // vír na oblohe
+  const vx = add("afx-vortex", 830, 18, 520, 520);
+  vx.innerHTML = "<i></i><i></i>";
+  add("afx-halo afx-glow", 830, 30, 640, 260);
+  // ohne v miskách (vľavo, vpravo) + iskry
+  for (const [x, y] of [[74, 596], [1597, 596]]) {
+    add("afx-halo afx-glow", x, y + 10, 330, 330);
+    add("afx-fire afx-glow", x, y, 120, 140);
+    for (let i = 0; i < 7; i++) add("afx-ember" + (i >= 3 ? " afx-heavy" : ""), x - 18 + (i * 7) % 36, y - 4, 0, 0,
+      { "--d": (1.8 + (i % 4) * .45) + "s", "--dl": (i * .37) + "s", "--dx": ((i % 2 ? 1 : -1) * (8 + i * 3)) + "px" });
+  }
+  // runy na pilieroch a na podlahe
+  [[405, 66], [1278, 66], [380, 258], [835, 207], [1285, 258], [218, 425], [1453, 425], [290, 605], [835, 685], [1385, 605], [835, 412]]
+    .forEach(([x, y], i) => add("afx-rune", x, y, 0, 0, { "--dl": (i * .53) + "s" }));
+  // magický kruh v strede podlahy
+  add("afx-circle", 835, 420, 390, 262);
+  // svetielka v prázdnote (okraje obrazu)
+  const spots = [[40, 600], [120, 780], [260, 880], [520, 900], [1150, 905], [1420, 880], [1560, 760], [1640, 560], [30, 420], [1650, 420],
+    [300, 60], [1380, 60], [620, 40], [1040, 40], [90, 150], [1590, 150]];
+  spots.forEach(([x, y], i) => add("afx-mote" + (i % 2 ? " afx-heavy" : ""), x, y, 0, 0,
+    { "--d": (7 + (i % 5) * 1.6) + "s", "--dl": (i * .9) + "s", "--dx": ((i % 2 ? 1 : -1) * (15 + (i % 4) * 12)) + "px", "--dy": (-40 - (i % 3) * 30) + "px" }));
+}
+buildArenaFx();
+group("afx", (v) => { $("#arena-fx").classList.toggle("off", v === "off"); $("#arena-fx").classList.toggle("lite", v === "lite"); });
+
+/* ================= LOBBY ================= */
+const BRIDGE_LAYERS = ["sky-bridge.png", "clouds.png", "clouds-2.png", "tower.png", "bridge.png"].map(f => "/arenas/bridge/" + f);
+drawArena($('.arena-card[data-arena="bridge"] canvas'), BRIDGE_LAYERS);
+drawArena($('.arena-card[data-arena="portal"] canvas'), ["/arenas/portal-realm/portal-realm.png"]);
+
+const TILE_DEF = {
+  dmg:   { label: "Damage",      ico: () => pixSvg("flame") },
+  heal:  { label: "Heal",        ico: () => pixSvg("heart") },
+  mana:  { label: "Mana",        ico: () => pixSvg("drop") },
+  ik:    { label: "Insta-kill",  ico: () => pixSvg("skull") },
+  power: { label: "Power",       ico: () => pixSvg("sword") },
+  block: { label: "Def-blocker", ico: () => pixSvg("shieldx") },
+};
+const base = () => ({ format: "bo3", tilesPerRound: "1", colorPref: "random", tilePreview: "on", randomChars: "off", timer: "off" });
+// dva samostatné formuláre so spoločným základom - každý si pamätá svoje hodnoty
+const forms = {
+  bridge: { ...base(), tileWeights: { dmg: 75, heal: 5, mana: 5, ik: 5, power: 5, block: 5 } },
+  portal: { ...base(), tileWeights: { dmg: 90, ik: 10 }, portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 } },
+};
+let arena = "bridge";
+
+// poradie v mriežke 2 stĺpcov (plní sa po riadkoch): ľavý stĺpec dmg/heal/mana, pravý IK/power/block;
+// portály rovnako - klasický cez celý prvý riadok (miesto dmg + IK), potom HP|power, mana|def-breaker
+const TILE_ORDER = ["dmg", "ik", "heal", "power", "mana", "block"];
+const PORTAL_ORDER = ["classic", "hp", "power", "mana", "nodef"];
+// dotyk (ako lobby.js): −/+ po 5 % namiesto písania, pole len na čítanie
+const PHONE = document.documentElement.classList.contains("touch");
+function weightRow(key, label, icoHtml, val, kind, extraStyle = "", full = false) {
+  const st = (d, t) => PHONE ? `<button type="button" class="w-step" data-kind="${kind}" data-key="${key}" data-d="${d}">${t}</button>` : "";
+  return `<label class="weight"><span class="w-ico ${kind === "portal" ? "w-portal" : ""}" style="${extraStyle}">${icoHtml}</span>${label}
+    ${st(-5, "−")}<input type="number" min="0" max="100" step="5" data-kind="${kind}" data-key="${key}" value="${val}"${PHONE ? " readonly" : ""}>${st(5, "+")}<span class="pct">%</span></label>${full ? "<span></span>" : ""}`; // full = sám v riadku (prázdna pravá bunka), pole široké ako pod ním
+}
+function renderLobby() {
+  const f = forms[arena];
+  document.querySelectorAll(".arena-card").forEach(c => c.classList.toggle("active", c.dataset.arena === arena));
+  document.querySelectorAll(".opt-row[data-field]").forEach(row => {
+    row.querySelectorAll(".opt").forEach(o => o.classList.toggle("active", String(f[row.dataset.field]) === o.dataset.val));
+  });
+  $("#tile-weights").innerHTML = TILE_ORDER.filter(k => k in f.tileWeights).map(k => {
+    const ico = arena === "portal" && k === "dmg" ? DMG2_PAIR : TILE_DEF[k].ico();
+    return weightRow(k, TILE_DEF[k].label, ico, f.tileWeights[k], "tile", arena === "portal" && k === "dmg" ? "width:32px" : "");
+  }).join("");
+  $("#portal-section").style.display = arena === "portal" ? "" : "none";
+  $("#sec-weights").classList.toggle("is-portal", arena === "portal");
+  $("#sec-weights").classList.toggle("wtab-tiles", wtab === "tiles");
+  $("#sec-weights").classList.toggle("wtab-portals", wtab === "portals");
+  document.querySelectorAll("#wtabs .opt").forEach(o => o.classList.toggle("active", o.dataset.tab === wtab));
+  if (arena === "portal") {
+    $("#portal-weights").innerHTML = PORTAL_ORDER.map(k =>
+      weightRow(k, TYPES[k].en, "", f.portalWeights[k], "portal", `--pc:${TYPES[k].pc};--pc2:${TYPES[k].pc2}`, k === "classic")).join("");
+  }
+  sums();
+}
+function sums() {
+  const f = forms[arena];
+  const s1 = Object.values(f.tileWeights).reduce((a, b) => a + b, 0);
+  const s2 = f.portalWeights ? Object.values(f.portalWeights).reduce((a, b) => a + b, 0) : 100;
+  $("#tile-sum").textContent = `Total: ${s1}%`; $("#tile-sum").classList.toggle("bad", s1 !== 100);
+  $("#portal-sum").textContent = `Total: ${s2}%`; $("#portal-sum").classList.toggle("bad", s2 !== 100);
+  $("#lobby-start").disabled = s1 !== 100 || s2 !== 100;
+  // záložka so zlým súčtom sa zafarbí, aby chyba v skrytom zozname neušla
+  $('#wtabs [data-tab="tiles"]').classList.toggle("bad", s1 !== 100);
+  $('#wtabs [data-tab="portals"]').classList.toggle("bad", s2 !== 100);
+}
+let wtab = "tiles";
+$("#wtabs").addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) { wtab = t.dataset.tab; renderLobby(); } });
+$("#page-lobby").addEventListener("click", (e) => {
+  const b = e.target.closest(".w-step"); if (!b) return;
+  e.preventDefault();
+  const f = forms[arena], tgt = b.dataset.kind === "tile" ? f.tileWeights : f.portalWeights;
+  tgt[b.dataset.key] = Math.max(0, Math.min(100, tgt[b.dataset.key] + Number(b.dataset.d)));
+  renderLobby();
+});
+// náhľad na telefóne: vnorená stránka v skutočnej virtuálnej veľkosti hry (viewport.js: DESIGN_W 1720, PHONE_DESIGN_H 830)
+function phoneMode(v) {
+  const on = v !== "desk";
+  $("#phone-frame").classList.toggle("on", on);
+  $("#lobby-desk").style.display = on ? "none" : "";
+  if (!on) return;
+  const [pw, ph] = v.split("x").map(Number);
+  const k = Math.min(1, pw / 1720, ph / 830), vw = pw / k, vh = ph / k;
+  const show = Math.min(1.6, (innerWidth - 80) / pw); // zobrazenie väčšie ako skutočný telefón, kvôli čitateľnosti
+  const fr = $("#phone-frame"), ifr = $("#phone-iframe");
+  fr.style.width = Math.round(pw * show) + "px"; fr.style.height = Math.round(ph * show) + "px";
+  ifr.style.width = vw + "px"; ifr.style.height = vh + "px"; ifr.style.transform = `scale(${k * show})`;
+  ifr.src = `?lobbyphone=1&tab=lobby&arena=${arena}&wtab=${wtab}`;
+}
+document.querySelectorAll("#lobby-mode .b").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#lobby-mode .b").forEach(x => x.classList.toggle("on", x === b));
+  phoneMode(b.dataset.v);
+}));
+document.querySelectorAll(".arena-card").forEach(c => c.addEventListener("click", () => { arena = c.dataset.arena; renderLobby(); $("#cfg-out").style.display = "none"; }));
+document.querySelectorAll(".opt-row[data-field]").forEach(row => row.addEventListener("click", (e) => {
+  const o = e.target.closest(".opt"); if (!o) return;
+  forms[arena][row.dataset.field] = o.dataset.val; renderLobby();
+}));
+$("#page-lobby").addEventListener("input", (e) => {
+  const i = e.target.closest("input[data-kind]"); if (!i) return;
+  const f = forms[arena], tgt = i.dataset.kind === "tile" ? f.tileWeights : f.portalWeights;
+  tgt[i.dataset.key] = Math.max(0, Math.min(100, Number(i.value) || 0)); sums();
+});
+$("#lobby-start").addEventListener("click", () => {
+  const f = forms[arena];
+  const cfg = { format: f.format, tilesPerRound: Number(f.tilesPerRound), tileWeights: f.tileWeights, timer: f.timer,
+    tilePreview: f.tilePreview === "on", colorPref: f.colorPref, ...(f.randomChars === "on" ? { randomChars: true } : {}),
+    ...(arena === "portal" ? { arena: "portal", portalWeights: f.portalWeights } : {}) };
+  const out = $("#cfg-out");
+  out.style.display = "block";
+  out.textContent = "configure_match →\n" + JSON.stringify(cfg, null, 2) + (arena === "bridge" ? "\n\n(bridge: bez kľúča arena - goldeny sa nezmenia)" : "");
+});
+
+/* ================= tabs + štart ================= */
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === "page-" + t.dataset.page));
+  fit();
+}));
+legend(); animButtons(); setLayout("start"); renderLobby(); fit();
+// priame odkazy: ?tab=lobby&arena=portal | ?layout=full&pstyle=pixel&plink=always&dstyle=big&anim=shot
+{
+  const q = new URLSearchParams(location.search);
+  const click = (sel) => document.querySelector(sel)?.click();
+  if (q.get("pstyle")) click(`#pstyle .b[data-v="${q.get("pstyle")}"]`);
+  if (q.get("plink")) click(`#plink .b[data-v="${q.get("plink")}"]`);
+  if (q.get("dstyle")) click(`#dstyle .b[data-v="${q.get("dstyle")}"]`);
+  if (q.get("layout")) click(`#layouts .b[data-layout="${q.get("layout")}"]`);
+  if (q.get("tab")) click(`.tab[data-page="${q.get("tab")}"]`);
+  if (q.get("arena")) click(`.arena-card[data-arena="${q.get("arena")}"]`);
+  if (q.get("wtab")) click(`#wtabs [data-tab="${q.get("wtab")}"]`);
+  if (q.get("lmode")) click(`#lobby-mode .b[data-v="${q.get("lmode")}"]`);
+  if (q.get("anim")) { const i = SCEN.findIndex(s => s.key === q.get("anim")); if (i >= 0) document.querySelectorAll(".b.anim")[i].click(); }
+}
+</script>
+</body>
+</html>
