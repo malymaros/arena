@@ -1,29 +1,41 @@
 // tools/simulate.mjs - headless simulácia zápasov priamo cez engine (bez servera, socketov a čakania).
 // Hráči ťahajú náhodne (tools/random-bot.mjs - náhodné fronty, o platnosti rozhoduje engine),
 // takže výsledky hovoria o stabilite enginu, nie o balanse postáv.
-// Spustenie:  node tools/simulate.mjs [počet zápasov na dvojicu=20] [p1postava p2postava]
+// Spustenie:  node tools/simulate.mjs [počet zápasov na dvojicu=20] [p1postava p2postava] [--portal]
 //   napr.     node tools/simulate.mjs 50
 //             node tools/simulate.mjs 200 naruto jotaro
+//             node tools/simulate.mjs 20 --portal   (Portal Realm + kontrola invariantov portálov po každom kole)
 import { createEngine } from "../engine/game.js";
 import { CHARS } from "../engine/constants.js";
 import { playBotMatch } from "./random-bot.mjs";
 
-const N = Number(process.argv[2]) || 20;
-const pairArg = process.argv.slice(3, 5);
+const PORTAL = process.argv.includes("--portal");
+const args = process.argv.slice(2).filter(a => a !== "--portal");
+const N = Number(args[0]) || 20;
+const pairArg = args.slice(1, 3);
 const P1_POOL = [...CHARS, "countess", "luffy"]; // side-postavy viazané na p1
 const P2_POOL = [...CHARS, "onre", "jotaro"];    // side-postavy viazané na p2
 const MAX_ROUNDS = 60;
 const CONFIG = {
   format: "single", tilesPerRound: 2, timer: "off", tilePreview: true, colorPref: "white", // osoba A = p1
   tileWeights: { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 },
+  ...(PORTAL ? { arena: "portal", tileWeights: { dmg: 90, heal: 0, mana: 0, ik: 10, power: 0, block: 0 },
+    portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 } } : {}),
 };
+// Portal Realm invarianty po každom kole: max 7 párov, unikátne hrany a písmená, HP/mana v rozsahu
+function checkPortals(g, where) {
+  const ends = g.portals.flatMap(p => p.ends.map(e => `${e.x},${e.y},${e.side}`));
+  const bad = g.portals.length > 7 || new Set(ends).size !== ends.length || new Set(g.portals.map(p => p.id)).size !== g.portals.length
+    || ["p1", "p2"].some(s => { const p = g.players[s]; return p.hp < 0 || p.hp > 10 || p.mana < 0 || p.mana > 10; });
+  if (bad) throw new Error(`porušený invariant (${where}): ${JSON.stringify({ portals: g.portals, p1: [g.players.p1.hp, g.players.p1.mana], p2: [g.players.p2.hp, g.players.p2.mana] })}`);
+}
 
 function playMatch(ch1, ch2, seed) {
   let result = null, frames = 0;
   const engine = createEngine({
     seed,
     emit: (ev, payload) => { if (ev === "game_result") result = payload; },
-    emitState: (timeline) => { if (timeline) frames += timeline.length; },
+    emitState: (timeline) => { if (timeline) frames += timeline.length; if (PORTAL && timeline) checkPortals(engine.game, `${ch1}/${ch2} seed ${seed}`); },
   });
   engine.startMatch(engine.sanitizeConfig(CONFIG));
   engine.chooseCharacter("A", ch1);

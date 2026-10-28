@@ -72,3 +72,13 @@ export const LUFFY_S1_DMG    = 2;
 export const LUFFY_BALL_DMG  = 8;
 export const LUFFY_S2_COST   = 5;
 export const LUFFY_S2_DMG    = 8;
+
+/* -------------------- Portal Realm (aréna s portálmi, docs/PORTAL_PLAN.md) -------------------- */
+export const PORTAL_MAX_PAIRS = 7;          // naraz najviac 7 párov (= všetkých 14 vonkajších hrán dosky 4×3)
+export const PORTAL_REALM_TILE_DMG = 2;     // Damage dlaždica v portal realm (2 ohníky) - bridge ostáva TILE_DMG
+export const PORTAL_HP_GAIN = 1;            // HP portál (telo): +HP (Lightning: na plné HP - kit healTile "full")
+export const PORTAL_POWER_BONUS = 2;        // powerup portál (útok): flat +dmg (ako power tile), sčítava sa
+export const PORTAL_SHOT_RANGE = 3;         // rovná strela v portal realm: dolet 3 políčka spolu (3/2/1 cez portál)
+export const PORTAL_TYPES = ["classic", "hp", "mana", "power", "nodef"]; // nodef = Def-breaker
+export const PORTAL_WEIGHTS = { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 }; // default % v lobby
+export const PORTAL_TILE_WEIGHTS = { dmg: 90, ik: 10 }; // v portal realm sú len Damage a Insta-kill dlaždice

@@ -189,7 +189,7 @@ function redactTimelineFor(mySlot, tl) {
       return redactRosterMana(oppSlot, {
         ...f,
         [oppSlot]: redactHunterActor(f[oppSlot]),
-        effects: (f.effects || []).filter(e => !(e.kind === "thread_mark" && e.target === oppSlot)),
+        effects: (f.effects || []).filter(e => !((e.kind === "thread_mark" || e.kind === "thread_cut") && e.target === oppSlot)),
       });
     }
     return f;

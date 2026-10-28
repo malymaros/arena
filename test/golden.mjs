@@ -43,6 +43,13 @@ for (const pair of [["naruto", "naruto"], ["minotaur", "minotaur"], ["countess",
   if (!SCENARIOS.some(s => s[0] === pair[0] && s[1] === pair[1])) SCENARIOS.push(pair);
 // každá dvojica 2× - druhý beh má iné seedy frontov (seed závisí od indexu scenára)
 SCENARIOS.push(...SCENARIOS.map(p => [...p]));
+// Portal Realm (docs/PORTAL_PLAN.md): postavy s mechanikami cez portály - pohyb/dash, strely, charge, slnko,
+// guľa, klon, labyrint, THE WORLD. Pridané ZA bridge scenáre, takže tie si držia indexy, seedy aj súbory.
+for (const pair of [["naruto", "werewolf"], ["countess", "escanor"], ["luffy", "jotaro"], ["escanor", "onre"],
+  ["werewolf", "naruto"], ["fire", "minotaur"], ["soldier", "lightning"], ["minotaur", "medusa"]])
+  SCENARIOS.push([...pair, "portal"]);
+// aj portal realm každá dvojica 2× (iné seedy frontov)
+SCENARIOS.push(...SCENARIOS.filter(p => p[2] === "portal").map(p => [...p]));
 
 const MATCH_CONFIG = {
   format: "single",
@@ -51,6 +58,10 @@ const MATCH_CONFIG = {
   timer: "off",
   tilePreview: true,
 };
+
+const PORTAL_CONFIG = { ...MATCH_CONFIG, arena: "portal", tilesPerRound: 1,
+  tileWeights: { dmg: 90, heal: 0, mana: 0, ik: 10, power: 0, block: 0 },
+  portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 } };
 
 const BASIC_TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "mirror", "special1", "demon"];
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "special1"];
@@ -149,11 +160,11 @@ async function waitTimelines(clients, counts) {
   return clients.map((c, i) => c.timelines.slice(counts[i]));
 }
 
-async function runScenario(c1, c2, [ch1, ch2], idx) {
+async function runScenario(c1, c2, [ch1, ch2, arena], idx) {
   c1.gameResult = c2.gameResult = null;
   c1.sock.emit("retry");
   await sleep(150);
-  c1.sock.emit("configure_match", MATCH_CONFIG);
+  c1.sock.emit("configure_match", arena === "portal" ? PORTAL_CONFIG : MATCH_CONFIG);
   await waitFor(() => c1.lastState?.phase === "playing" && c2.lastState?.phase === "playing", 5000, "playing");
   c1.sock.emit("choose_character", ch1);
   c2.sock.emit("choose_character", ch2);
@@ -257,7 +268,7 @@ async function main() {
   if (UPDATE) fs.mkdirSync(GOLDEN_DIR, { recursive: true });
   let failures = 0, ran = 0;
   for (let i = 0; i < SCENARIOS.length; i++) {
-    const name = `${String(i).padStart(2, "0")}_${SCENARIOS[i][0]}_vs_${SCENARIOS[i][1]}`;
+    const name = `${String(i).padStart(2, "0")}_${SCENARIOS[i][2] ? SCENARIOS[i][2] + "_" : ""}${SCENARIOS[i][0]}_vs_${SCENARIOS[i][1]}`;
     if (FILTER.length && !FILTER.some(f => name.includes(f))) continue;
     ran++;
     const rec = await runScenario(c1, c2, SCENARIOS[i], i);

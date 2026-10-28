@@ -104,6 +104,8 @@ function applyTimestopResume() {
   // istý zásah počas zamrazenia + beží labyrint → reveal PRED aplikačnými frame-ami (hra nesmie skončiť v hmle)
   if (anyEvent) E.revealLabyrinths(tl);
   E.pushStateFrame(tl, [{ kind: "timestop_end", from: jslot }], TIMESTOP_END_MS);
+  // Portal Realm: portály použité počas zamrazenia - efekt na telo (každý pár raz) a zatvorenie až teraz
+  E.resumeFrozenPortals(tl);
 
   // odložené klonové úmrtia (decoy/absorb) - poof pri obnovení
   for (const ev of ts.cloneEvents) {

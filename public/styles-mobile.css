@@ -244,17 +244,31 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
 .phone .lobby-card {
   width: 100%; max-width: none; padding: 30px 48px 36px; border: none; border-radius: 0; box-shadow: none;
   display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; align-content: start;
-  grid-template-rows: 1fr repeat(6, auto);
-  grid-template-areas: "title title" "format weights" "tiles weights" "color weights" "preview weights" "timer weights" "start start";
+  grid-template-rows: 1fr repeat(5, auto) auto;
+  grid-template-areas: "arena arena" "format weights" "tiles weights" "color weights" "preview weights" "timer weights" "start start";
 }
-.phone .lobby-title { grid-area: title; font-size: 52px; margin-bottom: 16px; align-self: center; }
+/* výber arény nahrádza veľký nadpis ARENA (jediné voľné miesto na výšku) */
+.phone .lobby-title { display: none; }
 .phone .lobby-sub { display: none; }
-.phone .lobby-card > .lobby-section:nth-of-type(1) { grid-area: format; }
-.phone .lobby-card > .lobby-section:nth-of-type(2) { grid-area: tiles; }
-.phone .lobby-card > .lobby-section:nth-of-type(3) { grid-area: weights; align-self: start; } /* percentá nenaťahujú riadky vľavo */
-.phone .lobby-card > .lobby-section:nth-of-type(4) { grid-area: color; }
-.phone .lobby-card > .lobby-section:nth-of-type(5) { grid-area: preview; }
-.phone .lobby-card > .lobby-section:nth-of-type(6) { grid-area: timer; }
+.phone .lobby-card > #lobby-sec-arena { grid-area: arena; align-self: center; margin-bottom: 14px; }
+.phone #lobby-sec-arena .lobby-label { display: none; }
+.phone .lobby .arena-pick { gap: 16px; }
+.phone .lobby .arena-card { height: 54px; }
+.phone .lobby .arena-card span { font-size: 21px; letter-spacing: 2px; }
+.phone .lobby-card > #lobby-sec-format { grid-area: format; }
+.phone .lobby-card > #lobby-sec-tiles { grid-area: tiles; }
+.phone .lobby-card > #lobby-sec-weights { grid-area: weights; align-self: start; } /* percentá nenaťahujú riadky vľavo */
+.phone .lobby-card > #lobby-sec-color { grid-area: color; }
+.phone .lobby-card > #lobby-sec-preview { grid-area: preview; }
+.phone .lobby-card > #lobby-sec-timer { grid-area: timer; }
+.phone #lobby-sec-weights > .lobby-section { margin-bottom: 0; }
+/* portal realm: záložky TILES | PORTALS (naraz jeden zoznam), v rovine s tlačidlami FORMAT */
+.phone #lobby-sec-weights.is-portal #lobby-wtabs { display: flex; margin-bottom: 18px; }
+.phone #lobby-sec-weights.is-portal .wtabs-space { display: block; }
+.phone #lobby-sec-weights.is-portal.wtab-tiles #lobby-portal-section,
+.phone #lobby-sec-weights.is-portal.wtab-portals #lobby-tile-section { display: none !important; }
+.phone .lobby .weight .w-ico.w-portal { width: 34px; height: 18px; }
+.phone .lobby .weights > .w-fill { display: none; } /* Classic sám v riadku - na telefóne je 1 stĺpec */
 .phone .lobby-section { margin-bottom: 20px; }
 .phone .lobby-label { font-size: 21px; margin-bottom: 12px; }
 .phone .lobby .opt { font-size: 21px; padding: 20px 12px; min-width: 70px; }

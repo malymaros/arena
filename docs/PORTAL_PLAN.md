@@ -374,17 +374,17 @@ Oba v `npm test`.
 - [x] Etapa 0: dummy stránka — animácie efektov
 - [x] Etapa 0: dummy stránka — vytvorenie miestnosti (2 formuláre)
 - [x] Etapa 0: **schválené vlastníkom**, vizuálne rozhodnutia dopísané do sekcie 2 (2.14)
-- [ ] Etapa 1: konštanty + config + generovanie
-- [ ] Etapa 1: geometria + ghost (`shared/geometry.js`)
-- [ ] Etapa 1: pohyb, dash, typy na telo
-- [ ] Etapa 1: strely, powerup, def-breaker, self-hit, zrkadlo do steny
-- [ ] Etapa 1: charge, Escanor, Luffy
-- [ ] Etapa 1: Naruto
-- [ ] Etapa 1: THE WORLD
-- [ ] Etapa 1: labyrint + pasca
-- [ ] Etapa 1: goldeny + fuzz + difftest
-- [ ] Etapa 2: lobby formuláre
-- [ ] Etapa 2: kreslenie arény, portálov, políčok
-- [ ] Etapa 2: choreografia efektov
-- [ ] Etapa 2: ghost / previews
-- [ ] Etapa 2: zvuky, mobil, smoke testy
+- [x] Etapa 1: konštanty + config + generovanie
+- [x] Etapa 1: geometria + ghost (`shared/geometry.js`)
+- [x] Etapa 1: pohyb, dash, typy na telo
+- [x] Etapa 1: strely, powerup, def-breaker, self-hit, zrkadlo do steny
+- [x] Etapa 1: charge, Escanor, Luffy
+- [x] Etapa 1: Naruto
+- [x] Etapa 1: THE WORLD
+- [x] Etapa 1: labyrint + pasca
+- [x] Etapa 1: goldeny + fuzz + difftest
+- [x] Etapa 2: lobby formuláre
+- [x] Etapa 2: kreslenie arény, portálov, políčok
+- [x] Etapa 2: choreografia efektov
+- [x] Etapa 2: ghost / previews
+- [x] Etapa 2: mobil, smoke testy (browser-smoke --portal, touch-smoke, screens) — zvuky: nové efekty zatiaľ bez vlastných zvukov

@@ -8,6 +8,8 @@ import { ANIM_DEF } from "/client/sprites.js";
 import { ACTION_ANIMS } from "/chars/index.js";
 import { cellsForSpecialPreview } from "/client/zones.js";
 import { tileSvg } from "/client/pix.js";
+import { FLAME2_SVG } from "/client/portal-art.js";
+import { renderPortals } from "/client/portals.js";
 import { renderTrapMarkers, renderThreadLines } from "/client/trap-markers.js";
 import { reconcileProjectiles } from "/client/board-fx.js";
 import { updateSpecialCenter } from "/client/center-cast.js";
@@ -20,6 +22,7 @@ export function renderGrid(s, effects = []) {
   boardEl.style.width  = (board.w * TILE_W + (board.w - 1) * GAP) + "px";
   boardEl.style.height = (board.h * TILE_H + (board.h - 1) * GAP) + "px";
   gridEl.innerHTML = "";
+  const portalRealm = s?.config?.arena === "portal";
 
   // labyrint (Minotaurov special): prekliaty hráč vidí len vlastnú bunku, svoju niť, obrys na nití
   // a špeciálne tiles; dáta o súperovi už rediguje server - hmla je len vizuál nad tým.
@@ -145,7 +148,9 @@ export function renderGrid(s, effects = []) {
       if (isIK || tileType) {
         const m = document.createElement("span");
         m.className = "tile-marker";
-        m.innerHTML = tileSvg(isIK ? "ik" : tileType);
+        // Portal Realm: Damage dlaždica dáva 2 dmg → 2 ohníky
+        if (!isIK && tileType === "dmg" && portalRealm) { m.classList.add("dmg2"); m.innerHTML = FLAME2_SVG; }
+        else m.innerHTML = tileSvg(isIK ? "ik" : tileType);
         cell.appendChild(m);
       }
 
@@ -155,7 +160,8 @@ export function renderGrid(s, effects = []) {
       if (pendType) {
         const pm = document.createElement("span");
         pm.className = "tile-pending";
-        pm.innerHTML = tileSvg(pendType);
+        if (pendType === "dmg" && portalRealm) { pm.classList.add("dmg2"); pm.innerHTML = FLAME2_SVG; }
+        else pm.innerHTML = tileSvg(pendType);
         cell.appendChild(pm);
       }
 
@@ -182,6 +188,7 @@ export function renderGrid(s, effects = []) {
   }
 
   renderTrapMarkers(s); // pasca Countess/Onre - statická hlava castera v bunke (vidí ju len on)
+  renderPortals(s);     // Portal Realm: portály na hranách dosky (otvorenie/zatvorenie podľa rozdielu snapshotov)
 
   reconcileProjectiles(charges, s); // plynulé projektily kĺžu v #actors (mimo mazaného gridu)
 

@@ -11,6 +11,7 @@ import { LUFFY_MELEE_DMG, LUFFY_S1_COST, LUFFY_S1_DMG, LUFFY_BALL_DMG, LUFFY_S2_
          SPECIAL_COST, SPECIAL_REPEAT, SMALL_DELAY_MS, MOVE_MS, ANIM_SLOW } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 import { lr, zoneStrike } from "./jotaro.js";
+import { portalCharge } from "./portal-charge.js";
 
 const LUFFY_BALL_FORM_MS   = Math.round(900 * ANIM_SLOW); // premena na guľu (Special_1) - veľká v strede aj malá na doske
 const LUFFY_ROLL_MS        = MOVE_MS;                     // kotúľ o bunku = sklz figúry na klientovi
@@ -55,8 +56,11 @@ function ball(ctx, slot, tl, dir) {
   me.mana -= SPECIAL_COST;
   me.worldUsed = true; // special sa natrvalo mení na Special 2 (aj keď guľa narazí do steny)
   const pBonus = ctx.powerBoost(slot, tl); // POWER tile sa počíta zo ŠTARTOVEJ bunky (kotúľ až potom)
-  const landing = G.luffyBallLanding(ctx.game.board, me, dir);
-  const cells = G.luffyBallCells(ctx.game.board, me, dir);
+  // Portal Realm: kotúľ z krajného stĺpca cez hranu s portálom → dopad na druhom konci (guľa = telo AJ útok)
+  const landing = G.luffyBallLanding(ctx.game.board, me, dir, ctx.portalList());
+  const cells = G.luffyBallCells(ctx.game.board, me, dir, ctx.portalList());
+  const passes = landing?.portal ? [{ at: 0, ...landing.portal }] : [];
+  const pc = portalCharge(passes);
   const { inZone, cloneStruck } = foeOn(ctx, slot, cells);
   if (inZone) ctx.revealLabyrinths(tl);
   ctx.pushStateFrame(tl, [{ kind: "luffy_ball_form", from: slot, dir }], LUFFY_BALL_FORM_MS);
@@ -66,10 +70,15 @@ function ball(ctx, slot, tl, dir) {
     return;
   }
   me.x = landing.x; me.y = landing.y;
-  ctx.pushStateFrame(tl, [{ kind: "luffy_roll", from: slot, dir, target: [landing.x, landing.y] }, ...ctx.trackSteps(slot, [[landing.x, landing.y]])], LUFFY_ROLL_MS);
+  const fx = [{ kind: "luffy_roll", from: slot, dir, target: [landing.x, landing.y], ...(landing.portal ? { portal: landing.portal } : {}) }];
+  ctx.trackPath(slot, [[landing.x, landing.y]], passes, fx);
+  if (passes.length) fx.push({ kind: "portal_walk", from: slot, clone: false, dir, path: [[landing.x, landing.y]], passes, charge: "ball" });
+  ctx.pushStateFrame(tl, fx, LUFFY_ROLL_MS);
+  for (const ps of passes) ctx.bodyEffect(slot, ps, tl);
+  ctx.closePortals(passes.map(ps => ps.id), tl);
   ctx.pushStateFrame(tl, [{ kind: "luffy_explode", from: slot, target: [landing.x, landing.y], cells }], LUFFY_EXPLODE_MS);
-  const dmg = LUFFY_BALL_DMG * ctx.dealMul(slot) + pBonus;
-  if (inZone || cloneStruck) ctx.strikeZone(ctx.other(slot), inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus });
+  const dmg = LUFFY_BALL_DMG * ctx.dealMul(slot) + pBonus + pc.power;
+  if (inZone || cloneStruck) ctx.strikeZone(ctx.other(slot), inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus, ...pc.opts });
   else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
 }
 

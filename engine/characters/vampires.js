@@ -3,6 +3,7 @@
 // pasca - recast starú nahradí. Trigger rieši resolveTrapsAfterAction/triggerTrap v engine.
 import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, VAMP_CAST_MS, START_HP, MAX_MANA, MELEE_COST, MELEE_REPEAT, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS, DASH_COST, MOVE_DELAY_MS, WOLF_STRIKE_MS, VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS } from "../constants.js";
 import * as G from "../../shared/geometry.js";
+import { portalCharge } from "./portal-charge.js";
 
 const validCell = (ctx, c) => !!c && Number.isInteger(c.x) && Number.isInteger(c.y) && ctx.inBounds(c.x, c.y);
 
@@ -47,7 +48,8 @@ function vampBonus(ctx, slot, tl, amount, hpSource = amount) {
 // resolveTurn slučky (ktorá inak spotrebuje súperovu obranu za akciu castera), tak si ju spotrebuje sám.
 // Vracia true, ak úder na niečo dopadol (na rozlíšenie whiffu naprázdno).
 // powerBonus = POWER tile prídavok už obsiahnutý v raw - len na rozpis hit framu (samostatný „-2" float)
-export function vampMeleeLand(ctx, ownerSlot, raw, bonusAmount, tl, consumeDefense = false, powerBonus = 0) {
+// pt = Portal Realm voľby zásahu (Def-breaker / powerup rozpis) - len charge, ktorý prešiel portálom
+export function vampMeleeLand(ctx, ownerSlot, raw, bonusAmount, tl, consumeDefense = false, powerBonus = 0, pt = {}) {
   const me   = ctx.game.players[ownerSlot];
   const foeS = ctx.other(ownerSlot);
   const foe  = ctx.game.players[foeS];
@@ -57,18 +59,18 @@ export function vampMeleeLand(ctx, ownerSlot, raw, bonusAmount, tl, consumeDefen
   const playerHere = foeAt && !cloneAt;  // len hráč (klon inde alebo žiadny)
   const decoyHere  = cloneAt && !foeAt;  // klon-návnada sám
   const shieldArmed = foe.shield, mirrorArmed = foe.mirror;
-  const defended = shieldArmed || mirrorArmed;
+  const defended = (shieldArmed || mirrorArmed) && !pt.defBreak; // Def-breaker: obrana sa minie, bonus dopadne
   if (stacked) {
     // s obranou kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok na majiteľa (bonus zo zvyšku)
     const hpBefore = foe.hp;
-    ctx.strikeCell(foeS, "stacked", raw, tl, { kind: "melee", bonus: powerBonus });
+    ctx.strikeCell(foeS, "stacked", raw, tl, { kind: "melee", bonus: powerBonus, ...pt });
     if (!defended && bonusAmount > 0) vampBonus(ctx, ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
   } else if (playerHere) {
     const hpBefore = foe.hp;
-    ctx.strikeCell(foeS, "player", raw, tl, { kind: "melee", bonus: powerBonus });
+    ctx.strikeCell(foeS, "player", raw, tl, { kind: "melee", bonus: powerBonus, ...pt });
     if (bonusAmount > 0 && !defended) vampBonus(ctx, ownerSlot, tl, bonusAmount, hpBefore - foe.hp);
   } else if (decoyHere) {
-    ctx.strikeCell(foeS, "clone", raw, tl, { kind: "melee" }); // klon-návnada zožerie úder celý
+    ctx.strikeCell(foeS, "clone", raw, tl, { kind: "melee", ...pt }); // klon-návnada zožerie úder celý
   }
   if (consumeDefense && (playerHere || stacked || decoyHere)) {
     if (shieldArmed) { foe.shield = false; foe.shieldGold = false; }
@@ -119,8 +121,12 @@ function doVampCharge(ctx, slot, dir, tl) {
   const pBonus = ctx.powerBoost(slot, tl);
   const raw = VAMP_CHARGE_DMG * ctx.dealMul(slot) * ctx.labyrinthMul(slot) + pBonus;
 
-  // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár)
-  const { path, target } = G.runPath(ctx.game.board, me.x, me.y, delta, op);
+  // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár);
+  // Portal Realm: charge beží aj cez portály (telo dostane HP/manu, úder powerup / Def-breaker)
+  const { path, target, passes } = ctx.portalList()
+    ? G.runPathPortals(ctx.game.board, me.x, me.y, dir, op, ctx.portalList())
+    : { ...G.runPath(ctx.game.board, me.x, me.y, delta, op), passes: [] };
+  const pc = portalCharge(passes);
   const hit = !!target;
   if (!path.length) {
     ctx.pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
@@ -130,12 +136,17 @@ function doVampCharge(ctx, slot, dir, tl) {
   me.y = path[path.length - 1][1];
   // istý zásah reálneho hráča (aj stacknutého páru, aj do obrany) - odhaľ labyrint pred behom
   if (op && op.x === me.x && op.y === me.y) ctx.revealLabyrinths(tl);
-  ctx.pushStateFrame(tl, [{ kind: "vamp_charge", from: slot, dir }, ...ctx.trackSteps(slot, path)], MOVE_DELAY_MS);
+  const fx = [{ kind: "vamp_charge", from: slot, dir }];
+  ctx.trackPath(slot, path, passes, fx);
+  if (passes.length) fx.push({ kind: "portal_walk", from: slot, clone: false, dir, path, passes, charge: "vamp" });
+  ctx.pushStateFrame(tl, fx, MOVE_DELAY_MS);
+  for (const ps of passes) ctx.bodyEffect(slot, ps, tl);
+  ctx.closePortals(passes.map(ps => ps.id), tl);
   if (!hit) return; // dobehla na okraj bez terča - len presun
   // Vampire seká A1 (jednotný úder podľa attack guide), Onryō pôvodný vampstrike (alias Attack_3)
   ctx.pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y],
     ...(me.char === "countess" ? { anim: "va1" } : {}) }], WOLF_STRIKE_MS);
-  vampMeleeLand(ctx, slot, raw, VAMP_CHARGE_BONUS, tl, false, pBonus); // hráč / klon-návnada / stacknutý pár rieši helper
+  vampMeleeLand(ctx, slot, raw + pc.power, VAMP_CHARGE_BONUS, tl, false, pBonus, pc.opts); // hráč / klon-návnada / stacknutý pár rieši helper
 }
 
 const trapSpecial = (key) => ({

@@ -12,6 +12,7 @@
 //   node tools/browser-smoke.mjs --compare            → navyše ten istý beh nad HEAD (git archive) a diff assetov
 //   node tools/browser-smoke.mjs --speed 6 --only fire  (len zápasy s danou postavou)
 //   node tools/browser-smoke.mjs --compare --no-matches (len UI sonda: tlačidlá a náhľady per postava, ~2 min)
+//   node tools/browser-smoke.mjs --portal              (všetky zápasy v Portal Realm - portály, aury, prechody)
 //   Výsledok HEAD sa kešuje v tmp podľa commitu (opakované --compare počas refaktoru pustí len pracovný strom).
 import { spawn, execSync } from "node:child_process";
 import { io } from "socket.io-client";
@@ -46,7 +47,9 @@ const MATCHES = [
 ].filter(m => !ONLY || m.includes(ONLY));
 const TOURNEY = { A: ["fire", "lightning", "wanderer"], B: ["medusa", "naruto", "werewolf"] };
 const MAX_ROUNDS = 8;
-const CONFIG = { format: "single", tilesPerRound: 2, tileWeights: { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 }, timer: "off", tilePreview: true };
+const CONFIG = { format: "single", tilesPerRound: 2, tileWeights: { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 }, timer: "off", tilePreview: true,
+  ...(args.includes("--portal") ? { arena: "portal", tilesPerRound: 1, tileWeights: { dmg: 90, heal: 0, mana: 0, ik: 10, power: 0, block: 0 },
+    portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 } } : {}) };
 
 /* ---------- prehliadač cez Chrome DevTools Protocol ---------- */
 // zrýchlenie času LEN pre časovače klienta - /client.js a moduly /client/*.js (socket.io heartbeaty nechávame

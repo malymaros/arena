@@ -27,6 +27,8 @@ export function syncMusic(s, finalRound = false) {
   const inGame = phase === "playing" && s.p1?.char && s.p2?.char && !charRollActive();
   if (!inGame) setMusic("music.menu");
   else if (finalRound) setMusic("music.final", "music.battle");
+  // Portal Realm má vlastnú bojovú hudbu (bez nej hrá bežná music.battle)
+  else if (s.config?.arena === "portal") setMusic("music.battle.portal", "music.battle");
   else setMusic("music.battle");
 }
 onCharRollEnd(() => syncMusic(state));

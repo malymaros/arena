@@ -61,7 +61,7 @@ export default {
   },
   specialTarget: "dir", // guľa aj Special 2 sú smerové (L/R picker)
   // guľa: 3×3 okolo dopadovej bunky (kotúľ o bunku); Special 2: jediná susedná bunka
-  specialZone: ({ G, board, me, dir }) => me.worldUsed ? G.jotaroS2Cells(board, me, dir) : G.luffyBallCells(board, me, dir),
+  specialZone: ({ G, board, me, dir, portals }) => me.worldUsed ? G.jotaroS2Cells(board, me, dir) : G.luffyBallCells(board, me, dir, portals),
   // ⚠ pri plánovaní: guľa / Special 2 mimo plochy
   planSpecialWarn: ({ p, dir, inB, mine }) => {
     const dx = dir === "left" ? -1 : dir === "right" ? 1 : 0;

@@ -32,6 +32,7 @@ import { DEATH_SEQ } from "/client/demon-sprites.js";
 import { sfx, setMusic, musicKey } from "/client/sound.js";
 import { soundForFrame, soundTimelineStart, syncMusic } from "/client/sound-map.js";
 import { perf } from "/client/perf.js";
+import { animatePortalWalk, spawnVoidHit } from "/client/portals.js";
 
 /* ---------- GameOver sekvencia ---------- */
 function showGameOverSequence(winner) {
@@ -197,7 +198,7 @@ export function schedulePlayTimeline(timeline) {
   // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) - keď príde "invalid", prečiarkneme ju
   const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
-  state.tiles = first.tiles; state.iks = first.iks; state.pending = first.pending;
+  state.tiles = first.tiles; state.iks = first.iks; state.pending = first.pending; state.portals = first.portals;
   applyRosterFrame(first);
   renderHUD();
   const NEXT_TURN = (first.turn ?? state.turn) + 1;
@@ -294,7 +295,7 @@ export function schedulePlayTimeline(timeline) {
     }
 
     state.p1 = frame.p1; state.p2 = frame.p2;
-    state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending;
+    state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending; state.portals = frame.portals;
     applyRosterFrame(frame);
     if (frame.starter !== undefined) {
       state.starter = frame.starter;
@@ -308,6 +309,7 @@ export function schedulePlayTimeline(timeline) {
     if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
     if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
 
+    const portalWalks = [];     // Portal Realm: figúry, ktoré v tomto frame prechádzajú portálom (portal_walk)
     const shooters = new Set(); // basic strela - jednorazová póza
     const casters  = new Set(); // special - looping, malá postava sa animuje súbežne s veľkým sprite-om
     let tsWait = false;         // Jotaro THE WORLD: tento frame je koniec čiastočnej timeline → pauza
@@ -316,6 +318,23 @@ export function schedulePlayTimeline(timeline) {
       // neodchytený throw by reťaz natrvalo prerušil a UI by ostalo zamknuté uprostred kola)
       try {
       if ((e.kind === "charge" || e.kind === "attack_swing") && e.from) shooters.add(e.from);
+      if (e.kind === "portal_walk" && (e.from === "p1" || e.from === "p2") && Array.isArray(e.path)) {
+        // umiestni rovno na cieľ (portalSnap) - cestu cez trhlinu prehrá animatePortalWalk po positionActors
+        actors.portalSnap[e.clone ? "clone:" + e.from : e.from] = true;
+        const before = e.from === "p1" ? beforeP1 : beforeP2;
+        const st = e.clone ? before?.clone : before;
+        if (st && st.x != null) portalWalks.push({ e, start: [st.x, st.y] });
+      }
+      // Portal Realm: Def-breaker rozbil nabitú obranu - úlomky + SHIELD/MIRROR DISPELLED, zásah dopadne v ďalšom frame
+      if (e.kind === "dispel" && (e.target === "p1" || e.target === "p2")) {
+        spawnShieldBlock(e.target, !!e.gold, null);
+        if (Array.isArray(e.cloneCell)) spawnShieldBlock(e.target, !!e.gold, e.cloneCell);
+        const txt = e.what === "mirror" ? "MIRROR DISPELLED" : "SHIELD DISPELLED";
+        spawnFloat(e.target, txt, "dispel-float");
+        cloneFloat(e.target, txt, "dispel-float");
+      }
+      // odraz zrkadla narazil do steny (portál, ktorým útok prišiel, sa za ním zavrel)
+      if (e.kind === "reflect_void" && Array.isArray(e.cell) && e.side) spawnVoidHit({ x: e.cell[0], y: e.cell[1], side: e.side });
       // útok do steny (strela nemá kam letieť) - útočná póza sa zahrá cez `shooters`, sem len whiff float;
       // akcia sa NEprečiarkne (minula manu a „vykonala sa"), na rozdiel od starého OFF-BOARD invalidu
       if (e.kind === "attack_swing" && e.offboard && (e.from === "p1" || e.from === "p2")) {
@@ -434,7 +453,8 @@ export function schedulePlayTimeline(timeline) {
         setAnim(e.target, "hurt", frameHold);
         // POWER tile bonus: extra dmg z tile ide ako SAMOSTATNÝ zlatý „⚡-2" float (hlavný float ukazuje
         // základ bez bonusu, HP samozrejme klesli o súčet) - bonus je v e.dmg/e.parts[0] už zarátaný
-        const bonus = (typeof e.bonus === "number" && e.bonus > 0) ? e.bonus : 0;
+        // Portal Realm: powerup aura strely (portalBonus) sa vypisuje rovnako ako POWER tile
+        const bonus = ((typeof e.bonus === "number" && e.bonus > 0) ? e.bonus : 0) + ((typeof e.portalBonus === "number" && e.portalBonus > 0) ? e.portalBonus : 0);
         // stacknutý Naruto+klon = súbežné zásahy spojené do jedného úderu → vypíš rozpis „-3 -3 HP"
         if (Array.isArray(e.parts) && e.parts.length > 1 && e.parts.reduce((a, b) => a + b, 0) > 0) {
           const parts = bonus ? [Math.max(0, e.parts[0] - bonus), ...e.parts.slice(1)] : e.parts;
@@ -601,8 +621,9 @@ export function schedulePlayTimeline(timeline) {
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {
         // odraz na KLONOVI (e.cell) vychádza z klonovej bunky, nie z pravého Naruta - inak by prezradil skutočného
         // e.destCell: útok vystrelil útočníkov klon → odraz letí DO klonovej bunky (nie do pravého útočníka)
+        // e.void: útok prišiel cez portál, ktorý sa zavrel → lúč letí k výstupnému políčku (do steny), nie k útočníkovi
         spawnMirrorReflect(e.target, e.dmg, e.atk, !!e.gold, Array.isArray(e.cell) ? e.cell : null,
-          Array.isArray(e.destCell) ? e.destCell : null);
+          e.void ? [e.void.x, e.void.y] : Array.isArray(e.destCell) ? e.destCell : null);
         if (Array.isArray(e.cell)) spawnCellFloat(e.cell, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
         else spawnFloat(e.target, "🪞 REFLECTED!", e.gold ? "mirror-reflect-text gold" : "mirror-reflect-text");
       }
@@ -738,6 +759,12 @@ export function schedulePlayTimeline(timeline) {
 
     renderGrid(state, frame.effects || []);
     positionActors(state);
+    // Portal Realm: cesta cez trhlinu (figúra už stojí na cieli, animácia ide relatívne k nemu)
+    for (const { e, start } of portalWalks) {
+      const el = e.clone ? cloneEls[e.from] : (e.from === "p1" ? actorP1 : actorP2);
+      animatePortalWalk(el, start, e, Math.max(400, frameHold));
+    }
+    actors.portalSnap = {};
 
     prev = frame;
     // Jotaro THE WORLD: čiastočná timeline skončila na timestop_wait - NEplánuj ďalší krok a NEspusti koncovú

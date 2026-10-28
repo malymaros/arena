@@ -46,6 +46,19 @@
     ]
    }
   },
+  "music.battle.portal": {
+   "files": [
+    "sounds/custom/ancient-magic.mp3"
+   ],
+   "vol": 0.4,
+   "fit": "fade",
+   "trim": {
+    "sounds/custom/ancient-magic.mp3": [
+     400,
+     131320
+    ]
+   }
+  },
   "game.win": {
    "files": [
     "sounds/custom/you-win-normalized.mp3"
@@ -108,6 +121,10 @@
    "author": ""
   },
   "sounds/custom/ryu-ko-normalized.mp3": {
+   "own": true,
+   "author": ""
+  },
+  "sounds/custom/ancient-magic.mp3": {
    "own": true,
    "author": ""
   }

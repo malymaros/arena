@@ -36,7 +36,7 @@ export default {
   },
   specialTarget: "dir",
   // smerový (left/right) - rozsah podľa pride levelu (kotva mimo plochy = prázdna zóna aj pri pride 3)
-  specialZone: ({ G, board, me, dir }) => G.escanorCells(board, me, dir),
+  specialZone: ({ G, board, me, dir, portals }) => G.escanorCells(board, me, dir, portals), // Portal Realm: hod cez portál
   // veľkosť na ploche rastie s Pride (1.2^level od nôh) - verejný tell
   sizeLevel: { stat: "pride", base: 1 },
   // ⚠ pri plánovaní: smerový special mimo plochy (wall pravidlo - mana sa minie, nič sa nestane)

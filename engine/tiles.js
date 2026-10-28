@@ -2,7 +2,7 @@
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js): stav hry (E.game) a funkcie
 // ostatných sekcií. Vracia svoje funkcie; engine ich zverejní cez E a destrukturuje pre vlastný kód.
 import {
-  START_HP, MAX_MANA, POWER_TILE_BONUS, SMALL_DELAY_MS, HEAL_TILE_GAIN, IK_DMG, TILE_DMG,
+  START_HP, MAX_MANA, POWER_TILE_BONUS, SMALL_DELAY_MS, HEAL_TILE_GAIN, IK_DMG,
 } from "./constants.js";
 
 export function tilesModule(E) {
@@ -106,7 +106,7 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
     else if (E.game.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y)) {
       // Fire Wizard už NIE je imunný voči Damage dlaždiciam - dostane bežný 1 dmg;
       // výmenou mu státie na ohnivom políčku rozšíri special o riadky ±1 (viď fireOnDmgTile).
-      dmg = TILE_DMG; tileType = "dmg";
+      dmg = E.tileDmg(); tileType = "dmg"; // Portal Realm: 2 (2 ohníky), inak TILE_DMG
     }
     if (dmg > 0) {
       const d = E.recvDmg(slot, dmg);
@@ -138,7 +138,7 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       // rovnaká dramaturgia ako pri hráčovom tile zásahu: NAJPRV rozsvieť políčko (vlastný frame),
       // až POTOM kozmetický zásah na klonovi - inak sa blik políčka „stratí" v spoločnom frame
       E.pushStateFrame(tl, [{ kind: "tile_proc", tile: "dmg", cell: [x, y] }], 600);
-      E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [x, y], dmg: TILE_DMG }], SMALL_DELAY_MS);
+      E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [x, y], dmg: E.tileDmg() }], SMALL_DELAY_MS);
     }
   }
 }

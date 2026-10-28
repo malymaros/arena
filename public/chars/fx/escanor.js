@@ -23,6 +23,8 @@ const ESC_CENTER_FEET = 0.95;
 const ESC_INTRO = { file: "IntroStand.png", frames: 22, fps: 9, loopFrom: 17 }; // musí sedieť s export_escanor.cjs
 const ESC_WEAK  = { file: "WeakIdle.png", frames: 4, fps: 5, loop: true };
 
+import { edgePoint, portalFlash } from "/client/portals.js";
+
 export default function escanorFx(C) {
   // pred premenou je idle WeakIdle; pri prvom rozohraní kola (po nasadení / swape) sa RAZ prehrá Transform,
   // odvtedy je idle Stand. transformed drží, či daný slot už premenu odohral; prevChar deteguje (re)nasadenie.
@@ -97,7 +99,8 @@ export default function escanorFx(C) {
   }
   // slnko odletí Z DRŽANEJ POZÍCIE (nad postavou) do stredu cieľovej bunky, potom slow-mo SunBurst→SunFade;
   // offboard hod: cieľ je bunka MIMO plochy - slnko počas letu vyhasína, žiadny burst, nad casterom OUT OF BOUNDS
-  function travelSunThenBurst(slot, target, zoneCells, offboard = false) {
+  // portal (Portal Realm): hod mimo dosky cez hranu s portálom - slnko zmizne v trhline a vynorí sa z druhého konca
+  function travelSunThenBurst(slot, target, zoneCells, offboard = false, portal = null) {
     const c = C.state?.[slot]; if (!c) { if (!offboard) spawnSunFxAt(target, slot, zoneCells); return; }
     const dir = C.charDirFor("escanor", slot);
     const s = C.cellToPx(c.x, c.y), e = C.cellToPx(target[0], target[1]);
@@ -112,7 +115,20 @@ export default function escanorFx(C) {
     const spin = () => { if (!alive || !el.isConnected) return; C.ensureSpriteMeta(dir, "Charge.png").then(m => { C.drawSprite(ctx, m, { file: "Charge.png", frames: m.frames, frameIndex: Math.floor(performance.now() / 1000 * 12) % m.frames }, 0, size, size); }); requestAnimationFrame(spin); };
     requestAnimationFrame(spin);
     void el.offsetWidth; // commitni štartovú pozíciu, aby CSS transition animoval pohyb (inak skočí/preblikne bez pohybu)
-    el.style.left = ex + "px"; el.style.top = ey + "px"; // sklz na cieľ
+    if (portal) {
+      // let cez trhlinu: k hrane vstupu → zmiznutie → vynorenie na druhom konci → F (rovnaký prechod ako strela)
+      const a = edgePoint(portal.enter.x, portal.enter.y, portal.enter.side, 0), b = edgePoint(portal.exit.x, portal.exit.y, portal.exit.side, 0);
+      el.style.transition = "none";
+      el.style.left = ex + "px"; el.style.top = ey + "px";
+      const k = (x, y, s, o, off) => ({ offset: off, left: x + "px", top: y + "px", scale: s, opacity: o });
+      el.animate([k(sx, sy, "1", 1, 0), k(a.x - size / 2, a.y - size / 2, "1", 1, 0.4), k(a.x - size / 2, a.y - size / 2, "0.1", 0, 0.5),
+        k(b.x - size / 2, b.y - size / 2, "0.1", 0, 0.5001), k(b.x - size / 2, b.y - size / 2, "1", 1, 0.62), k(ex, ey, "1", 1, 1)],
+        { duration: ESC_TRAVEL_MS, easing: "linear" });
+      setTimeout(() => portalFlash(portal.enter, portal.type), ESC_TRAVEL_MS * 0.4);
+      setTimeout(() => portalFlash(portal.exit, portal.type), ESC_TRAVEL_MS * 0.5);
+    } else {
+      el.style.left = ex + "px"; el.style.top = ey + "px"; // sklz na cieľ
+    }
     if (offboard) el.style.opacity = "0"; // let do autu = slnko cestou vyhasne
     setTimeout(() => {
       alive = false; el.remove();
@@ -120,11 +136,13 @@ export default function escanorFx(C) {
       else spawnSunFxAt(target, slot, zoneCells);
     }, ESC_TRAVEL_MS);
   }
-  function runSpecial(slot, dir, zoneCells, offboard = false) {
+  function runSpecial(slot, dir, zoneCells, offboard = false, portal = null) {
     const c = C.state?.[slot]; if (!c) return;
     const dx = dir === "left" ? -1 : 1;
-    // offboard: cieľ NEclampovať - slnko letí na bunku za okrajom (do autu); inak clamp na plochu
-    const target = offboard ? [c.x + dx, c.y] : [Math.max(0, Math.min(C.board.w - 1, c.x + dx)), c.y];
+    // offboard: cieľ NEclampovať - slnko letí na bunku za okrajom (do autu); inak clamp na plochu;
+    // Portal Realm: F je políčko druhého konca portálu
+    const target = portal ? [portal.exit.x, portal.exit.y]
+      : offboard ? [c.x + dx, c.y] : [Math.max(0, Math.min(C.board.w - 1, c.x + dx)), c.y];
     // fáza 1: malá postava WinSunBoard (zdvih so slnkom RAZ, potom len ústa + preblikávajúce slnko - loopFrom 4)
     // + veľký WinSun raz (visí dlhšie)
     C.setAnim(slot, "winsun", 60000);
@@ -136,7 +154,7 @@ export default function escanorFx(C) {
       C.setAnim(slot, "cruelhold", CRUELHOLD_ONCE_MS);
       setTimeout(() => {
         C.setAnim(slot, "wintalk", ESC_TRAVEL_MS + 2000); // ústa bez slnka (žiadny nový zdvih) - slnko už letí samo
-        travelSunThenBurst(slot, target, zoneCells, offboard);
+        travelSunThenBurst(slot, target, zoneCells, offboard, portal);
         C.facingOverride[slot] = { sx: dx, until: performance.now() + ESC_TRAVEL_MS + C.POSE_TAIL_MS };
       }, CRUELHOLD_ONCE_MS);
     });
@@ -244,7 +262,7 @@ export default function escanorFx(C) {
       if (e.kind === "special" && !specialFired) {
         specialFired = true;
         // offboard = hod do autu: slnko odletí von z plochy a vyhasne (bez burstu), OUT OF BOUNDS float
-        runSpecial(e.from, e.dir, e.cells, !!e.offboard); // WinSun (raz) → CruelSunHold → slnko na cieľ → SunBurst (blik políčok) → dmg → SunFade
+        runSpecial(e.from, e.dir, e.cells, !!e.offboard, e.portal || null); // WinSun (raz) → CruelSunHold → slnko na cieľ → SunBurst (blik políčok) → dmg → SunFade
       }
     },
 

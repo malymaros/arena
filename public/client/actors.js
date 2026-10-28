@@ -30,6 +30,9 @@ export const actors = {
   // takže držaná veľkosť starej postavy (napr. vlkolakov mesiac) sa NESMIE aplikovať na novú (Escanor pride 0)
   escPrideDisplay: { p1: null, p2: null },
   escPrideDisplayChar: { p1: null, p2: null },
+  // Portal Realm: figúra v tomto frame prechádza portálom - positionActors ju umiestni rovno na cieľ (bez CSS
+  // sklzu naprieč doskou) a cestu cez trhlinu prehrá WAAPI (client/portals.js). Kľúč slot alebo "clone:" + slot.
+  portalSnap: {},
 };
 
 // nová hra / reset: figúry v idle, bez castu, flinchu a otočenia po streľbe

@@ -26,6 +26,47 @@ body {
   pointer-events: none;
   image-rendering: pixelated; /* tvrdé pixely pri upscale namiesto rozmazania */
 }
+/* Portal Realm: maľba v plnom rozlíšení (plynulé škálovanie, nie pixelated) */
+.arena .layer.hd { image-rendering: auto; }
+
+/* ---------- Portal Realm: živé pozadie (client/arena-bg.js) - animuje len opacity/transform ---------- */
+#arena-fx { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; transform-origin: 0 0; }
+#arena-fx > * { position: absolute; }
+#arena-fx .afx-glow { border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: screen; }
+#arena-fx .afx-fire { background: radial-gradient(circle, rgba(255,190,255,.95) 0 8%, rgba(214,80,255,.7) 25%, rgba(150,40,255,.25) 50%, transparent 70%);
+  animation: afx-flicker 1.7s steps(1) infinite, afx-breathe 2.6s ease-in-out infinite; }
+@keyframes afx-flicker { 0%{opacity:.85} 12%{opacity:1} 24%{opacity:.7} 37%{opacity:.95} 51%{opacity:.78} 66%{opacity:1} 80%{opacity:.82} }
+@keyframes afx-breathe { 50% { transform: translate(-50%, -50%) scale(1.12); } }
+#arena-fx .afx-halo { background: radial-gradient(circle, rgba(190,90,255,.35) 0, rgba(150,60,255,.12) 45%, transparent 70%);
+  animation: afx-pulse 3.2s ease-in-out infinite; }
+@keyframes afx-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+#arena-fx .afx-ember { width: 5px; height: 5px; border-radius: 1px; background: #f2b8ff; box-shadow: 0 0 6px 2px rgba(210,90,255,.9);
+  animation: afx-rise var(--d, 2.4s) linear infinite; animation-delay: var(--dl, 0s); opacity: 0; }
+@keyframes afx-rise { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 10% { opacity: 1; }
+  100% { transform: translate(var(--dx, 0px), -120px) scale(.3); opacity: 0; } }
+#arena-fx .afx-vortex { transform: translate(-50%, -50%) scaleY(.42); mix-blend-mode: screen; }
+#arena-fx .afx-vortex i { position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 6%, rgba(255,160,255,.55) 12%, transparent 22% 36%, rgba(170,90,255,.5) 44%, transparent 55% 68%, rgba(255,190,255,.45) 76%, transparent 86%);
+  -webkit-mask: radial-gradient(circle, transparent 0 12%, #000 30%, #000 55%, transparent 70%); mask: radial-gradient(circle, transparent 0 12%, #000 30%, #000 55%, transparent 70%);
+  animation: afx-spin 14s linear infinite; }
+#arena-fx .afx-vortex i + i { animation-duration: 22s; animation-direction: reverse; opacity: .7; }
+@keyframes afx-spin { to { transform: rotate(360deg); } }
+#arena-fx .afx-rune { width: 70px; height: 70px; transform: translate(-50%, -50%) rotate(45deg) scaleY(.62); mix-blend-mode: screen;
+  background: radial-gradient(circle, rgba(255,210,255,.9) 0 10%, rgba(200,90,255,.55) 32%, transparent 62%);
+  animation: afx-rune 4.8s ease-in-out infinite; animation-delay: var(--dl, 0s); opacity: .15; }
+@keyframes afx-rune { 0%,100% { opacity: .12; } 45%,55% { opacity: 1; } }
+#arena-fx .afx-circle { border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: screen;
+  box-shadow: 0 0 0 3px rgba(220,140,255,.35), 0 0 24px 6px rgba(170,80,255,.35), inset 0 0 30px 8px rgba(170,80,255,.25);
+  animation: afx-pulse 5.5s ease-in-out infinite; }
+#arena-fx .afx-mote { width: 4px; height: 4px; border-radius: 50%; background: #e7c6ff; box-shadow: 0 0 8px 3px rgba(190,100,255,.8);
+  animation: afx-drift var(--d, 9s) ease-in-out infinite; animation-delay: var(--dl, 0s); opacity: 0; }
+@keyframes afx-drift { 0% { transform: translate(0,0); opacity: 0; } 20% { opacity: .9; } 80% { opacity: .7; }
+  100% { transform: translate(var(--dx, 20px), var(--dy, -60px)); opacity: 0; } }
+/* lite (telefón / úsporná grafika): bez blend módu (nútil prekresľovať celé pozadie), 3 iskry na misku,
+   polovica svetielok, jeden vír - pulzy ohňov, rún a kruhu ostávajú */
+.perf-lite #arena-fx > * { mix-blend-mode: normal; }
+.perf-lite #arena-fx .afx-heavy, .perf-lite #arena-fx .afx-vortex i + i { display: none; }
+
 /* statický CRT overlay - jemné scanlines + tmavšie rohy; bez animácie (šetrí GPU/RDP) */
 .arena::after{
   content: "";
@@ -139,6 +180,53 @@ body {
   /* nad vrstvou postáv (#actors) - inak projektil na obsadenej bunke (súper vedľa, vzdialenosť 1) skryje sprite */
   z-index: 5;
 }
+
+/* ---------- Portal Realm: floaty (Def-breaker, odraz do steny) ---------- */
+.dispel-float, .void-float { position: absolute; z-index: 9; font-weight: 900; font-size: 18px; pointer-events: none; white-space: nowrap;
+  transform: translateX(-50%); animation: floatUp 1.1s ease-out forwards; }
+.dispel-float { color: #ffffff; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 8px rgba(190,220,255,.8); }
+.void-float { color: #ffe9a0; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 8px rgba(255,180,0,.7); }
+
+/* ---------- Portal Realm: portály na hranách dosky (client/portals.js) ---------- */
+#portal-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.portal { position: absolute; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)); pointer-events: none; }
+.portal .p-body { position: absolute; inset: 0; transform-origin: 50% 50%; }
+/* pixel trhlina: 3 snímky so zapečenou žiarou sa striedajú („praskanie") - animuje sa len opacity */
+.portal .rift-f { position: absolute; left: calc(-1 * var(--pad)); top: calc(-1 * var(--pad)); width: calc(100% + 2 * var(--pad));
+  height: calc(100% + 2 * var(--pad)); opacity: 0; will-change: opacity; image-rendering: pixelated; animation: rift-crackle .42s steps(1) infinite; }
+.portal .rift-f:nth-child(2) { animation-delay: -.14s; }
+.portal .rift-f:nth-child(3) { animation-delay: -.28s; }
+@keyframes rift-crackle { 0% { opacity: 1; } 33.34% { opacity: 0; } }
+.portal .rift-spark { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; background: var(--pc2);
+  box-shadow: 0 0 4px var(--pc); opacity: 0; animation: rift-spark var(--d, 1.4s) linear infinite; animation-delay: var(--dl, 0s); }
+@keyframes rift-spark { 0% { transform: translate(var(--sx), 0); opacity: 0; } 15% { opacity: 1; }
+  100% { transform: translate(calc(var(--sx) + var(--ex)), var(--ey)); opacity: 0; } }
+.portal .p-ico { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; image-rendering: pixelated;
+  transform: translate(-50%, -50%) rotate(calc(-1 * var(--rot, 0deg))); filter: drop-shadow(0 2px 0 rgba(0,0,0,.7)); }
+.portal .p-ico svg, .portal .p-tag svg { display: block; width: 100%; height: 100%; }
+/* runa páru na OBOCH koncoch trhliny */
+.portal .p-tag { position: absolute; top: 50%; width: 24px; height: 24px; padding: 4px; background: #0d0618;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 2px var(--pc); transform: translate(0, -50%) rotate(calc(-1 * var(--rot, 0deg))); }
+.portal .p-tag svg { filter: drop-shadow(0 0 3px var(--pc)); }
+.portal .p-tag.start { left: -20px; }
+.portal .p-tag.end { right: -20px; }
+.perf-lite .portal .rift-spark { display: none; }
+/* záblesk trhliny pri prechode (vstup/výstup) */
+.portal-flash { position: absolute; width: 140px; height: 140px; border-radius: 50%; pointer-events: none; z-index: 6;
+  background: radial-gradient(circle, #fff 0 12%, var(--pc, #c04dff) 35%, transparent 68%); transform: translate(-50%, -50%); }
+/* aury strely po prelete portálom: powerup = zlatá, Def-breaker = biela (statický filter na malom elemente) */
+#actors .projectile.aura-power { filter: drop-shadow(0 0 4px #ffd54f) drop-shadow(0 0 10px #ffb300); }
+#actors .projectile.aura-nodef { filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #cfe8ff); }
+#actors .projectile.aura-power.aura-nodef { filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #ffd54f); }
+#actors .projectile.alt-color.aura-power { filter: saturate(.22) brightness(1.4) drop-shadow(0 0 4px #ffd54f) drop-shadow(0 0 10px #ffb300); }
+#actors .projectile.alt-color.aura-nodef { filter: saturate(.22) brightness(1.4) drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #cfe8ff); }
+/* Damage dlaždica v portal realm: 2 ohníky (širšia ikona) */
+.tile-marker.dmg2 { width: 52px; }
+.tile-pending.dmg2 { width: 34px; }
+/* Def-breaker: rozbitá obrana - úlomky; odraz do steny - iskry na hrane */
+.dispel-shard { position: absolute; width: 10px; height: 10px; background: #b2ebf2; box-shadow: 0 0 0 2px #000; pointer-events: none; z-index: 8; }
+.dispel-shard.gold { background: #ffd54f; }
+.void-spark { position: absolute; width: 8px; height: 8px; background: #ffe9a0; box-shadow: 0 0 6px #ffb300; pointer-events: none; z-index: 8; }
 
 /* Plynulý projektil basic útoku - perzistentný canvas v #actors, kĺže po bunkách cez CSS transition
    (rovnako ako pohyb postavy), namiesto poskakovania/miznutia per-frame v bunke. */
@@ -1567,6 +1655,8 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
 }
 .lobby.hidden{ display: none; }
+/* počítač: karta ukotvená hore - prepnutie arény (stone bridge / portal realm má sekciu portálov navyše) nič neposunie */
+html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h, 920px) * .06); }
 .lobby-card{
   background: #121315; border: 1px solid #2a2b2e; box-shadow: 0 0 0 2px #000, 0 12px 40px rgba(0,0,0,.6);
   border-radius: 4px; padding: 24px 28px; width: min(620px, calc(var(--app-w, 100vw) * .94));
@@ -1597,6 +1687,24 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 }
 .weight .pct{ color: #888; font-size: 10px; flex: 0 0 auto; }
 .weights-sum{ margin-top: 8px; font-size: 10px; color: #ffb300; }
+/* výber arény (STONE BRIDGE / PORTAL REALM) - dve malé tlačidlá s náhľadom pozadia, výška ako ostatné voľby */
+.arena-pick{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.arena-card{ position: relative; height: 38px; cursor: pointer; border: none; padding: 0; border-radius: 2px; overflow: hidden;
+  box-shadow: 0 0 0 2px #000; background: #1c1d20; font-family: inherit; }
+.arena-card canvas{ position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: .55; transition: opacity .12s; }
+.arena-card span{ position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-size: 10px;
+  color: #fff; letter-spacing: 1px; text-shadow: 2px 2px 0 #000; }
+.arena-card:hover canvas{ opacity: .8; }
+.arena-card.active{ box-shadow: 0 0 0 2px #000, 0 0 0 4px #ffb300; }
+.arena-card.active canvas{ opacity: 1; }
+/* portal realm: ovál vo farbe typu portálu, Damage dlaždica s 2 ohníkmi */
+.weight .w-ico.w-portal{ width: 22px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 2px #000, 0 0 6px var(--pc);
+  background: radial-gradient(ellipse, #07020f 0 30%, var(--pc) 62%, var(--pc2) 72%); }
+.weight .w-ico.w-dmg2{ width: 32px; }
+.weight .w-ico svg{ display: block; width: 100%; height: 100%; }
+/* záložky TILES | PORTALS len na telefóne v portal realm (styles-mobile.css) */
+#lobby-wtabs, #lobby-sec-weights .wtabs-space{ display: none; }
+.wtabs .opt.bad{ color: #ff6b6b; box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #ff6b6b; }
 .weights-sum.bad{ color: #ff6b6b; }
 .lobby-start{
   width: 100%; margin-top: 8px; padding: 16px; cursor: pointer; border: none; border-radius: 2px;

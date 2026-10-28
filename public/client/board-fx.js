@@ -12,6 +12,7 @@ import { HEAD_CX, PROJECTILE, CHAR_META } from "/chars/index.js";
 import { CHAR_FX } from "/client/fx-registry.js";
 import { spawnExplosionAt } from "/client/explosion.js";
 import { CHARGE_STEP_MS } from "/shared/timing.js";
+import { animateProjectilePortal } from "/client/portals.js";
 import { perf } from "/client/perf.js";
 
 /* ---------- bubliny -X HP / +Y MANA ---------- */
@@ -391,7 +392,7 @@ function spawnOrMoveProjectile(c, s) {
     void el.offsetHeight; // reflow → snap na štart bez sklzu, potom zapni transition
     el.style.transition = "";
     actorsEl.appendChild(el);
-    entry = { el, retire: null };
+    entry = { el, retire: null, pos: { left: start.left, top: start.top } };
     projectiles.set(key, entry);
   }
   entry.charKey = charKey;    // Vojak: na konci letu granát vybuchne (retireProjectile)
@@ -401,9 +402,21 @@ function spawnOrMoveProjectile(c, s) {
   // Vampire/Onryō mení smer po odraze od steny (transform sa netranzicuje → okamžitý flip špicu);
   // diagonály = rotácia o 45° od horizontály.
   const orient = projectileOrient(charKey, c.dir);
-  entry.el.style.transform = `translate(-50%, -50%) ${orient}`.trim();
-  entry.el.style.left = dst.left + "px"; // nová cieľová bunka → CSS ju plynule dokĺže za --charge-ms
-  entry.el.style.top  = (dst.top + yOff) + "px";
+  // Portal Realm: aury po prelete portálom (powerup zlatá, Def-breaker biela) - ostávajú do konca letu
+  if (c.aura?.power) entry.el.classList.add("aura-power");
+  if (c.aura?.defBreak) entry.el.classList.add("aura-nodef");
+  if (c.portal) {
+    // prelet trhlinou: k hrane vstupu → zmiznutie → vynorenie na druhom konci → výstupná bunka; špic sa otočí
+    // do nového smeru až v trhline (pred ňou letí pôvodným smerom)
+    animateProjectilePortal(entry.el, entry.pos || dst, dst, c.portal, CHARGE_STEP_MS, yOff);
+    const el = entry.el;
+    setTimeout(() => { el.style.transform = `translate(-50%, -50%) ${orient}`.trim(); }, CHARGE_STEP_MS * 0.5);
+  } else {
+    entry.el.style.transform = `translate(-50%, -50%) ${orient}`.trim();
+    entry.el.style.left = dst.left + "px"; // nová cieľová bunka → CSS ju plynule dokĺže za --charge-ms
+    entry.el.style.top  = (dst.top + yOff) + "px";
+  }
+  entry.pos = dst;
 }
 function retireProjectile(key) {
   const entry = projectiles.get(key);

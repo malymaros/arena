@@ -40,6 +40,74 @@ export function runPath(board, x, y, delta, foe = null) {
   return { path, target };
 }
 
+/* ---------- portály (Portal Realm, docs/PORTAL_PLAN.md) ---------- */
+// Portál leží na VONKAJŠEJ hrane okrajového políčka: koniec { x, y, side } (side = smer von z dosky).
+// Pár { id, type, ends: [koniec, koniec] }. Figúra/strela, ktorá by ortogonálnym krokom opustila dosku cez hranu
+// s portálom, pokračuje na políčku DRUHÉHO konca smerom dovnútra (opak jeho side) - prechod = 1 krok.
+// Diagonálne pohyby do portálov nevchádzajú. Bez portálov (null / []) sa všetko správa ako stena.
+export const OPP_DIR = { up: "down", down: "up", left: "right", right: "left" };
+// všetky vonkajšie hrany dosky v pevnom poradí (žreb spawnu je tak deterministický): horná, pravá, dolná, ľavá
+export function boardEdges(board) {
+  const out = [];
+  for (let x = 0; x < board.w; x++) out.push({ x, y: 0, side: "up" });
+  for (let y = 0; y < board.h; y++) out.push({ x: board.w - 1, y, side: "right" });
+  for (let x = 0; x < board.w; x++) out.push({ x, y: board.h - 1, side: "down" });
+  for (let y = 0; y < board.h; y++) out.push({ x: 0, y, side: "left" });
+  return out;
+}
+// koniec portálu na hrane (x, y, side) → { pair, i } (i = index koncu v páre) | null
+export function portalEnd(portals, x, y, side) {
+  for (const pair of portals || []) {
+    for (let i = 0; i < 2; i++) {
+      const e = pair.ends[i];
+      if (e.x === x && e.y === y && e.side === side) return { pair, i };
+    }
+  }
+  return null;
+}
+// jeden ortogonálny krok z (x, y) smerom dir. Na doske → { x, y, dir }; mimo dosky cez portál (pár nie je
+// v `closed`) → { x, y, dir: smer dovnútra, portal: { id, type, enter, exit } }; inak null (stena)
+export function portalStep(board, portals, x, y, dir, closed = null) {
+  const d = DIR4[dir];
+  if (!d) return null;
+  if (inBounds(board, x + d[0], y + d[1])) return { x: x + d[0], y: y + d[1], dir };
+  const hit = portalEnd(portals, x, y, dir);
+  if (!hit || closed?.has(hit.pair.id)) return null;
+  const a = hit.pair.ends[hit.i], b = hit.pair.ends[1 - hit.i];
+  return { x: b.x, y: b.y, dir: OPP_DIR[b.side],
+    portal: { id: hit.pair.id, type: hit.pair.type, enter: { x: a.x, y: a.y, side: a.side }, exit: { x: b.x, y: b.y, side: b.side } } };
+}
+// beh (charge) z (x, y) ortogonálnym smerom dir cez portály po PRVÚ figúru súpera alebo stenu; každý pár
+// sa v jednom behu použije najviac raz (po prechode sa zatvára). Bez portálov = runPath.
+// Vracia { path, target, passes: [{ at, ...portal }] } - at = index výstupnej bunky v path.
+export function runPathPortals(board, x, y, dir, foe = null, portals = null) {
+  const path = [], passes = [], closed = new Set();
+  let target = null;
+  for (let guard = 0; guard < 64; guard++) {
+    const st = portalStep(board, portals, x, y, dir, closed);
+    if (!st) break;
+    x = st.x; y = st.y; dir = st.dir;
+    path.push([x, y]);
+    if (st.portal) { passes.push({ at: path.length - 1, ...st.portal }); closed.add(st.portal.id); }
+    target = figureAt(foe, x, y);
+    if (target) break;
+  }
+  return { path, target, passes };
+}
+// rovná strela (náhľad mierenia / pre-scan): dolet `range` políčok spolu, cez portály (každý pár raz).
+// Vracia [{ x, y, dir, portal? }] - bunky letu; zastavenie o figúry rieši volajúci.
+export function shotPathPortals(board, portals, x, y, dir, range) {
+  const out = [], closed = new Set();
+  while (out.length < range) {
+    const st = portalStep(board, portals, x, y, dir, closed);
+    if (!st) break;
+    x = st.x; y = st.y; dir = st.dir;
+    if (st.portal) closed.add(st.portal.id);
+    out.push(st);
+  }
+  return out;
+}
+
 /* ---------- zóny specialov ---------- */
 // Medúza: vlastné políčko + všetko striktne zvoleným smerom (left/right) v riadkoch y±1;
 // bez smeru (stratená v labyrinte - je tma) skamení len na jej vlastnom políčku
@@ -97,12 +165,21 @@ export function zoneHas(board, me, x, y, onDmg = false) {
 }
 // Escanor: zóna ukotvená na bunke F o krok zvoleným smerom; rozsah podľa pride 0-3
 // (0 = F, 1 = F + 4 diagonály, 2 = 3×3 okolo F, 3 = celá doska). F mimo dosky = prázdna zóna aj pri pride 3.
-export function escanorCells(board, me, dir) {
+// Portal Realm: hod mimo dosky cez hranu s portálom → F = políčko druhého konca (zóna sa okolo neho NEpretáča)
+export function escanorAnchor(board, me, dir, portals = null) {
+  const sd = dir === "left" ? "left" : "right";
+  const fx = me.x + (sd === "left" ? -1 : 1), fy = me.y;
+  if (fx >= 0 && fx < board.w) return { x: fx, y: fy, portal: null };
+  const st = portalStep(board, portals, me.x, me.y, sd);
+  return st ? { x: st.x, y: st.y, portal: st.portal } : null;
+}
+export function escanorCells(board, me, dir, portals = null) {
   const out = [];
   const add = (x, y) => { if (inBounds(board, x, y) && !has(out, x, y)) out.push([x, y]); };
   const pride = Math.max(0, Math.min(3, me.pride || 0));
-  const fx = me.x + (dir === "left" ? -1 : 1), fy = me.y;
-  if (fx < 0 || fx >= board.w) return out;
+  const anchor = escanorAnchor(board, me, dir, portals);
+  if (!anchor) return out;
+  const fx = anchor.x, fy = anchor.y;
   if (pride >= 3) { for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) add(x, y); return out; }
   add(fx, fy);
   if (pride === 1) { add(fx - 1, fy - 1); add(fx + 1, fy - 1); add(fx - 1, fy + 1); add(fx + 1, fy + 1); }
@@ -158,13 +235,16 @@ export function vampShotRoute(board, x, y, dir) {
 /* ---------- Luffy ---------- */
 // guľa (special pred prvým použitím v hre): kotúľ o 1 bunku ←/→ a výbuch na 3×3 okolo dopadovej bunky
 // (vrátane nej). Dopadová bunka mimo plochy (kotúľ z krajného stĺpca von) → null / prázdna zóna = spálený special.
-export function luffyBallLanding(board, me, dir) {
+// Portal Realm: kotúľ z krajného stĺpca cez hranu s portálom → dopad na políčko druhého konca (portal v návrate)
+export function luffyBallLanding(board, me, dir, portals = null) {
   const dx = dir === "left" ? -1 : dir === "right" ? 1 : 0;
-  if (!dx || !inBounds(board, me.x + dx, me.y)) return null;
-  return { x: me.x + dx, y: me.y };
+  if (!dx) return null;
+  if (inBounds(board, me.x + dx, me.y)) return { x: me.x + dx, y: me.y };
+  const st = portalStep(board, portals, me.x, me.y, dir);
+  return st ? { x: st.x, y: st.y, portal: st.portal } : null;
 }
-export function luffyBallCells(board, me, dir) {
-  const c = luffyBallLanding(board, me, dir);
+export function luffyBallCells(board, me, dir, portals = null) {
+  const c = luffyBallLanding(board, me, dir, portals);
   if (!c) return [];
   const cells = [];
   for (let y = c.y - 1; y <= c.y + 1; y++) for (let x = c.x - 1; x <= c.x + 1; x++) if (inBounds(board, x, y)) cells.push([x, y]);
@@ -177,23 +257,43 @@ export function luffyBallCells(board, me, dir) {
 // start = { x, y, char, worldUsed }, foe = VIDITEĽNÝ súper (skrytý v labyrinte → null alebo x null).
 // worldUsed = jednorazový special tejto hry už padol (Jotaro THE WORLD, Luffyho guľa).
 // Vracia pole stavov dĺžky queue.length + 1: [0] = štart, [i + 1] = po akcii i ({ x, y, char, worldUsed }).
-export function simulateQueue(board, start, queue, foe, vampChars) {
+// portals (Portal Realm) = portály na doske: pohyb/dash/charge/guľa nimi prechádza a použitý pár sa pre ďalšie
+// akcie fronty zatvorí (súperove prechody sa nesimulujú - akceptovaná neistota ako pri pasciach).
+export function simulateQueue(board, start, queue, foe, vampChars, portals = null) {
   let { x, y, char } = start;
   let worldUsed = !!start.worldUsed;
+  let open = portals ? [...portals] : null; // dostupné páry (použité vypadávajú)
+  const close = (ids) => { if (open && ids.length) open = open.filter(p => !ids.includes(p.id)); };
   const out = [{ x, y, char, worldUsed }];
   for (const a of queue || []) {
     if (a?.type === "swap" && a.to) char = a.to;                                   // turnajový swap mení maga
     const d = DIR4[a?.dir];
-    if (a?.type === "move" && d && inBounds(board, x + d[0], y + d[1])) { x += d[0]; y += d[1]; }
+    const walk = (n) => {
+      const used = [];
+      let dir = a.dir;
+      for (let s = 0; s < n; s++) {
+        const st = portalStep(board, open, x, y, dir);
+        if (!st) break;
+        ({ x, y, dir } = st);
+        if (st.portal) { used.push(st.portal.id); close([st.portal.id]); }
+      }
+      return used;
+    };
+    if (a?.type === "move" && d) walk(1);
     if (a?.type === "dash" && d) {
-      if (vampChars[char]) ({ x, y } = endOf(runPath(board, x, y, d, foe), x, y)); // charge po prvú figúru/okraj
-      else for (let s = 0; s < 2; s++) if (inBounds(board, x + d[0], y + d[1])) { x += d[0]; y += d[1]; }
+      if (vampChars[char]) {                                                       // charge po prvú figúru/okraj
+        const r = runPathPortals(board, x, y, a.dir, foe, open);
+        ({ x, y } = endOf(r, x, y)); close(r.passes.map(p => p.id));
+      } else walk(2);
     }
-    if (a?.type === "special" && char === "werewolf" && DIR8[a.dir]) ({ x, y } = endOf(runPath(board, x, y, DIR8[a.dir], foe), x, y));
+    if (a?.type === "special" && char === "werewolf" && DIR8[a.dir]) {
+      if (DIR4[a.dir]) { const r = runPathPortals(board, x, y, a.dir, foe, open); ({ x, y } = endOf(r, x, y)); close(r.passes.map(p => p.id)); }
+      else ({ x, y } = endOf(runPath(board, x, y, DIR8[a.dir], foe), x, y));       // diagonála do portálov nevchádza
+    }
     // Luffy: guľa (pred prvým použitím v hre) ho prekotúľa o bunku ←/→; Special 2 po nej nehýbe
     if (a?.type === "special" && char === "luffy" && !worldUsed) {
-      const c = luffyBallLanding(board, { x, y }, a.dir);
-      if (c) ({ x, y } = c);
+      const c = luffyBallLanding(board, { x, y }, a.dir, open);
+      if (c) { ({ x, y } = c); if (c.portal) close([c.portal.id]); }
     }
     if (a?.type === "special" && (char === "luffy" || char === "jotaro")) worldUsed = true;
     out.push({ x, y, char, worldUsed });
@@ -213,12 +313,24 @@ export function cloneSteps(board, clone, delta, maxSteps) {
   for (let s = 0; s < maxSteps; s++) if (inBounds(board, x + d[0], y + d[1])) { x += d[0]; y += d[1]; path.push([x, y]); }
   return path;
 }
-export function simulateClone(board, clone, queue) {
+export function simulateClone(board, clone, queue, portals = null) {
   if (!clone) return null;
   let c = { x: clone.x, y: clone.y };
+  let open = portals ? [...portals] : null;
   for (const a of queue || []) {
     const d = DIR4[a?.dir];
     if (!d || (a.type !== "move" && a.type !== "dash")) continue;
+    if (open?.length) {
+      // klon ide vertikálne inverzne aj cez portály
+      let dir = d[1] ? OPP_DIR[a.dir] : a.dir;
+      for (let s = 0; s < (a.type === "dash" ? 2 : 1); s++) {
+        const st = portalStep(board, open, c.x, c.y, dir);
+        if (!st) break;
+        c = { x: st.x, y: st.y }; dir = st.dir;
+        if (st.portal) open = open.filter(p => p.id !== st.portal.id);
+      }
+      continue;
+    }
     const path = cloneSteps(board, c, d, a.type === "dash" ? 2 : 1);
     if (path.length) c = { x: path[path.length - 1][0], y: path[path.length - 1][1] };
   }

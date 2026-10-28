@@ -1,7 +1,7 @@
 // Escanor: smerový (left/right) dmg special; rozsah zóny podľa pride levelu 0-3 (8 dmg). Cez obrany ako
 // ostatné dmg speciály. Hod slnka MIMO plochy (kotva von z dosky → prázdna zóna, aj pri pride 3) sa VYKONÁ
 // ako útok do steny - mana preč, choreografia prebehne, OUT OF BOUNDS, akcia sa NEprečiarkuje.
-import { SPECIAL_COST, SMALL_DELAY_MS, ESC_SPECIAL_MS } from "../constants.js";
+import { SPECIAL_COST, SMALL_DELAY_MS, ESC_SPECIAL_MS, PORTAL_POWER_BONUS } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 import { SPECIAL_ZONE_DMG } from "./zone.js";
 
@@ -27,7 +27,11 @@ export default {
       if (dir !== "left" && dir !== "right") { ctx.pushInvalid(tl, slot); return; }
       actor.mana -= SPECIAL_COST;
       const pBonus = ctx.powerBoost(slot, tl); // POWER tile: +2 k slnku; spotreba pri použití - aj pri hode do autu
-      const cells = G.escanorCells(game.board, actor, dir);
+      // Portal Realm: hod mimo dosky cez hranu s portálom → F na druhom konci (slnko = len projektil: powerup /
+      // Def-breaker; odraz zrkadla sa nemá kade vrátiť - portál sa za slnkom zavrel)
+      const anchor = G.escanorAnchor(game.board, actor, dir, ctx.portalList());
+      const portal = anchor?.portal || null;
+      const cells = G.escanorCells(game.board, actor, dir, ctx.portalList());
       if (!cells.length) {
         ctx.pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells, offboard: true }], ESC_SPECIAL_MS);
         return;
@@ -38,9 +42,12 @@ export default {
       const cloneStruck = !!(foe?.clone && cells.some(([x, y]) => x === foe.clone.x && y === foe.clone.y));
       if (inZone) ctx.revealLabyrinths(tl); // istý zásah odhalí prípadný labyrint pred animáciou
       // 1 special frame drží celú choreografiu (klient ju spustí); zásah dopadne až po nej (ESC_SPECIAL_MS)
-      ctx.pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], ESC_SPECIAL_MS);
+      ctx.pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells, ...(portal ? { portal } : {}) }], ESC_SPECIAL_MS);
+      if (portal) ctx.closePortals([portal.id], tl);
+      const power = portal?.type === "power" ? PORTAL_POWER_BONUS : 0;
+      const pt = portal ? { defBreak: portal.type === "nodef", reflectVoid: portal.exit, portalBonus: power } : {};
       const dmg = SPECIAL_ZONE_DMG.escanor; // 8
-      if (inZone || cloneStruck) ctx.strikeZone(foeS, inZone, cloneStruck, dmg * ctx.dealMul(slot) + pBonus, tl, { kind: "special", bonus: pBonus });
+      if (inZone || cloneStruck) ctx.strikeZone(foeS, inZone, cloneStruck, dmg * ctx.dealMul(slot) + pBonus + power, tl, { kind: "special", bonus: pBonus, ...pt });
       else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
     },
   },

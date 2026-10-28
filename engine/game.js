@@ -11,7 +11,7 @@ import {
   ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS,
   MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS,
   MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, VAMP_TRAP_STRIKE_MS, QUICKDRAW_MS, PASS_MANA_COST,
-  charRollMs, COLOR_ROLL_MS,
+  charRollMs, COLOR_ROLL_MS, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
@@ -21,6 +21,7 @@ import { labyrinthModule } from "./labyrinth.js";
 import { timestopModule } from "./timestop.js";
 import { lastStandModule } from "./laststand.js";
 import { tilesModule } from "./tiles.js";
+import { portalsModule } from "./portals.js";
 
 export function createEngine(io = {}) {
   // --- háčiky na vonkajší svet (server: sockety/časovač; headless simulácia ich môže vynechať) ---
@@ -54,12 +55,13 @@ export function createEngine(io = {}) {
     get rand() { return rand; }, set rand(v) { rand = v; },
     pushStateFrame, beginAct, endAct, other, attackDirOk, special1ArgsOk, winnerNow, notePrideHit, doAction,
     runRoundLoop, finishRound, pushInvalid, killClone, breakTrap, strikeZone,
-    kitOf,
+    kitOf, trackCloneSteps,
   };
   const { redactHunterActor, redactSnapshotFor, redactRosterMana, redactTimelineFor, labyrinthMul, endLabyrinths, revealLabyrinths, applyLabyrinth, loseInLabyrinth, trackSteps } = Object.assign(E, labyrinthModule(E));
   const { PAUSE, frozenActive, noteFrozenHit, noteFrozenClone, validTimestopQueue, doJotaroWorld, runTimestopActions } = Object.assign(E, timestopModule(E));
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
+  const { isPortalRealm, portalList, spawnPortalPair, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -71,6 +73,8 @@ export function createEngine(io = {}) {
     revealLabyrinths, strikeZone, strikeCell,
     applyPetrify, applyLabyrinth, applyStatusOnClone,
     killClone, trackSteps, doJotaroWorld, vampShotRoute,
+    // Portal Realm: portály pre geometriu (null mimo portal realm), efekty na telo, zatvorenie párov, niť cez prechod
+    portalList, bodyEffect, closePortals, trackPath,
   };
 
 function newPlayer(slot) {
@@ -142,6 +146,8 @@ function newGame() {
     turn: 1,
     starter: "p1", // slot, ktorý začína aktuálne kolo; hru 1 otvára p1 (biely), v sérii sa štartér hier strieda, medzi kolami sa preklápa
     tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" | "power" | "block" } - pribúdajú od konca 1. kola
+    // Portal Realm: páry portálov na hranách dosky [{ id: "A"–"G", type, ends: [{ x, y, side }, …] }]; mimo portal realm prázdne
+    portals: [],
     iks: [],       // [{ x, y }] - insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
     pending: null, // { ikMoves: [{x,y}…], spawns: [{x,y,type}…] } - VOPRED vyžrebované zmeny tiles na koniec AKTUÁLNEHO kola (preview pre hráčov)
     // séria zápasov
@@ -217,7 +223,8 @@ function cloneActor(a) {
 function snapshot() {
   return {
     phase: game.phase,
-    config: game.config ? { ...game.config, tileWeights: { ...game.config.tileWeights } } : null,
+    config: game.config ? { ...game.config, tileWeights: { ...game.config.tileWeights },
+      ...(game.config.portalWeights ? { portalWeights: { ...game.config.portalWeights } } : {}) } : null,
     series: seriesSnapshot(),
     // zobrazované mená hráčov per slot (verejné - netreba redigovať; labyrint mená nemaskuje)
     names: { p1: io.names?.()?.[game.seats.p1] || null, p2: io.names?.()?.[game.seats.p2] || null },
@@ -236,6 +243,8 @@ function snapshot() {
     goldLocked: !!(game.players.p1.lastStandBuff || game.players.p2.lastStandBuff),
     tiles: game.tiles.map(t => ({ ...t })),
     iks: game.iks.map(t => ({ ...t })),
+    // Portal Realm: portály sú verejný terén (vidí ich aj prekliaty v labyrinte); kľúč len v portal realm (bridge goldeny)
+    ...(isPortalRealm() ? { portals: game.portals.map(p => ({ id: p.id, type: p.type, ends: p.ends.map(e => ({ ...e })) })) } : {}),
     // preview zmien tiles na konci kola (len ak je zapnutý config.tilePreview) - verejná, symetrická informácia;
     // heal/mana spawny počas labyrintu rediguje redactTilesFor rovnako ako existujúce tiles
     pending: (game.config?.tilePreview && game.pending) ? {
@@ -464,7 +473,7 @@ function validQueue(queue, slot) {
     // ghost simulácia fronty (move/dash/charge/vlkolak, Luffyho guľa, swap) - tá istá funkcia ako
     // klientský ghost; v labyrinte je súper skrytý → charge beží na okraj (prekliaty ho nevidí)
     const sim = G.simulateQueue(game.board, { x: meP?.x, y: meP?.y, char: meP?.char, worldUsed: meP?.worldUsed },
-      q, meP?.labyrinth ? null : foe, DASH_IS_CHARGE);
+      q, meP?.labyrinth ? null : foe, DASH_IS_CHARGE, portalList());
     for (let i = 0; i < q.length; i++) {
       const a = q[i];
       const { x: sx, y: sy, char: simChar } = sim[i]; // stav PRED akciou i
@@ -498,6 +507,8 @@ const CLONE_DIR = { up:"down", down:"up", left:"left", right:"right", up_left:"d
 
 function doMove(slot, dir, tl) {
   const a = game.players[slot];
+  // Portal Realm: krok cez hranu s portálom pokračuje z druhého konca (majiteľ aj klon v lockstepe)
+  if (isPortalRealm() && MOVE_DIRS.has(dir)) return walkAction(slot, dir, 1, tl);
   const delta = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] }[dir] || [0,0];
   const nx = a.x + delta[0], ny = a.y + delta[1];
   const ownCan = inBounds(nx, ny);
@@ -529,6 +540,8 @@ function doDash(slot, dir, tl) {
   if (!delta) { pushInvalid(tl, slot); return; }
   if (a.mana < DASH_COST) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
 
+  // Portal Realm: dash cez portály (2 kroky, majiteľ aj klon v lockstepe); mana sa minie aj pri náraze
+  if (isPortalRealm()) { a.mana -= DASH_COST; return walkAction(slot, dir, 2, tl); }
   // posun až o 2 políčka zvoleným smerom; na okraji sa skráti na 1 (bez možného pohybu = náraz do steny nižšie)
   let nx = a.x, ny = a.y, steps = 0;
   const path = []; // aj medzibunka - labyrintná niť/obrys sa počíta na každom prejdenom políčku
@@ -611,51 +624,97 @@ function doBasic(slot, dir, tl) {
   const cloneDelta = [delta[0], -delta[1]];
   // Vampire/Onryō/Jotaro/Luffy: strela letí po lomenej diagonálnej dráhe (route) s odrazom; ostatní priamo.
   const route = kitOf(me.char).attack !== "ortho" ? vampShotRoute(me.x, me.y, dir) : null; // diagonálna bounce strela (kit)
-  const shots = [{ x: me.x, y: me.y, dist: 0, clone: false, d: delta, dir, done: false, spent: false, route }];
-  if (me.clone) shots.push({ x: me.clone.x, y: me.clone.y, dist: 0, clone: true, d: cloneDelta, dir: cloneDir, done: false, spent: false, route: null });
+  // Portal Realm: rovné strely letia cez portály (dolet PORTAL_SHOT_RANGE spolu, pár sa po prelete zatvorí);
+  // passes/power/defBreak = prejdené portály a aury (powerup +2, Def-breaker), diagonálne (route) portály ignorujú
+  const pr = isPortalRealm();
+  const shots = [{ x: me.x, y: me.y, dist: 0, clone: false, d: delta, dir, done: false, spent: false, route, passes: [], power: 0, defBreak: false }];
+  if (me.clone) shots.push({ x: me.clone.x, y: me.clone.y, dist: 0, clone: true, d: cloneDelta, dir: cloneDir, done: false, spent: false, route: null, passes: [], power: 0, defBreak: false });
 
-  // bunky, ktorými strela preletí (route = lomená dráha; inak priamo po okraj)
-  const shotScanCells = (sh) => {
-    if (sh.route) return sh.route.map(st => [st.x, st.y]);
-    const cs = []; let hx = sh.x, hy = sh.y;
-    while (inBounds(hx + sh.d[0], hy + sh.d[1])) { hx += sh.d[0]; hy += sh.d[1]; cs.push([hx, hy]); }
-    return cs;
-  };
-  // deterministický pre-scan: zásah REÁLNEHO hráča ktoroukoľvek strelou odhalí labyrint pred letom
-  // (zásah len klona-návnady labyrint neodhaľuje; stacknutý klon strelu k Narutovi pustí → to odhalí)
-  outer: for (const sh of shots) {
-    for (const [hx, hy] of shotScanCells(sh)) {
-      const cloneDecoy = op?.clone && op.clone.x === hx && op.clone.y === hy && !(op.x === hx && op.y === hy);
-      if (cloneDecoy) break; // klon-návnada strelu zožerie - ďalej nedoletí
-      if (op && op.x === hx && op.y === hy) { revealLabyrinths(tl); break outer; }
+  // jeden krok strely; vráti prejdený portál (Portal Realm) alebo null; nemožný krok nastaví done
+  const advance = (s, closed) => {
+    if (s.route) {
+      // lomená dráha (Vampire/Onryō): krok podľa route; dir sa mení po odraze (klient otáča špic)
+      const st = s.route[s.dist];
+      if (!st) { s.done = true; return null; }
+      s.x = st.x; s.y = st.y; s.dir = st.dir; s.dist++;
+      return null;
     }
+    if (pr) {
+      if (s.dist >= PORTAL_SHOT_RANGE) { s.done = true; return null; } // dolet minutý - do portálu už nevojde
+      const st = G.portalStep(game.board, game.portals, s.x, s.y, s.dir, closed);
+      if (!st) { s.done = true; return null; }
+      s.x = st.x; s.y = st.y; s.dist++;
+      if (!st.portal) return null;
+      s.dir = st.dir; s.d = G.DIR4[st.dir];
+      s.passes.push(st.portal);
+      if (!s.spent && st.portal.type === "power") s.power += PORTAL_POWER_BONUS;
+      if (!s.spent && st.portal.type === "nodef") s.defBreak = true;
+      return st.portal;
+    }
+    s.x += s.d[0]; s.y += s.d[1]; s.dist++;
+    if (!inBounds(s.x, s.y)) s.done = true;
+    return null;
+  };
+  // vlastná figúra v dráhe - strelca (aj Narutov klon) zasiahne LEN strela, ktorá už prešla portálom
+  // (bez portálu sa správanie nemení): "self" / "self_clone" / "self_stacked" | null
+  const ownAt = (s) => {
+    if (!s.passes.length) return null;
+    const selfHere = me.x === s.x && me.y === s.y;
+    const cloneHere = !!(me.clone && me.clone.x === s.x && me.clone.y === s.y);
+    return selfHere && cloneHere ? "self_stacked" : selfHere ? "self" : cloneHere ? "self_clone" : null;
+  };
+
+  // deterministický pre-scan: zásah REÁLNEHO hráča ktoroukoľvek strelou odhalí labyrint pred letom
+  // (zásah len klona-návnady labyrint neodhaľuje; stacknutý klon strelu k Narutovi pustí → to odhalí).
+  // Portal Realm: suchý beh toho istého lockstep letu (portál použitý jednou strelou je pre druhú zavretý).
+  {
+    const sim = shots.map(s => ({ ...s, passes: [] }));
+    const closed = new Set();
+    let found = false;
+    for (let g = 0; g < 16 && !found && sim.some(s => !s.done); g++) {
+      const stepUsed = [];
+      for (const s of sim) {
+        if (s.done) continue;
+        const p = advance(s, closed);
+        if (s.done) continue;
+        if (p) stepUsed.push(p.id);
+        if (s.spent) continue;
+        const decoy = op?.clone && op.clone.x === s.x && op.clone.y === s.y && !(op.x === s.x && op.y === s.y);
+        if (decoy) { s.spent = true; if (op.shield || op.mirror) s.done = true; continue; } // klon-návnada strelu zožerie
+        if (op && op.x === s.x && op.y === s.y) { found = true; break; }
+        if (ownAt(s)) s.done = true;
+      }
+      stepUsed.forEach(id => closed.add(id));
+    }
+    if (found) revealLabyrinths(tl);
   }
 
   // paralelný let: v každom kroku sa všetky živé strely posunú o bunku (jeden frame = všetky charge efekty)
   let guard = 0;
+  const closedShots = new Set();
   while (shots.some(s => !s.done) && guard++ < 16) {
     const fx = [];
     const hits = [];
+    const stepUsed = [];
     for (const s of shots) {
       if (s.done) continue;
-      if (s.route) {
-        // lomená dráha (Vampire/Onryō): krok podľa route; dir sa mení po odraze (klient otáča špic)
-        const st = s.route[s.dist];
-        if (!st) { s.done = true; continue; }
-        s.x = st.x; s.y = st.y; s.dir = st.dir; s.dist++;
-      } else {
-        s.x += s.d[0]; s.y += s.d[1]; s.dist++;
-        if (!inBounds(s.x, s.y)) { s.done = true; continue; }
-      }
-      fx.push({ kind: "charge", from: slot, dir: s.dir, cell: [s.x, s.y], clone: s.clone });
+      const passed = advance(s, closedShots);
+      if (s.done) continue;
+      const chargeFx = { kind: "charge", from: slot, dir: s.dir, cell: [s.x, s.y], clone: s.clone };
+      if (passed) { chargeFx.portal = passed; stepUsed.push(passed.id); }
+      if (s.power || s.defBreak) chargeFx.aura = { power: s.power, defBreak: s.defBreak };
+      fx.push(chargeFx);
       if (s.spent) continue; // už minutá na klona-návnadu - letí len vizuálne
       const cloneHere  = op?.clone && op.clone.x === s.x && op.clone.y === s.y;
       const playerHere = op && op.x === s.x && op.y === s.y;
       if (cloneHere && playerHere) { s.done = true; hits.push({ target: "stacked", shot: s }); }
       else if (cloneHere)         { hits.push({ target: "clone", shot: s }); }
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
+      else { const own = ownAt(s); if (own) { s.done = true; hits.push({ target: own, shot: s }); } }
     }
     if (fx.length) { anyCharge = true; pushStateFrame(tl, fx, CHARGE_STEP_MS); }
+    // portál použitý strelou sa zatvorí hneď po prelete (druhá strela ním v ďalšom kroku už neprejde)
+    if (stepUsed.length) { stepUsed.forEach(id => closedShots.add(id)); closePortals(stepUsed, tl); }
     // Vojak: granát nezasiahne v momente doletu, ale až keď na cieľovej bunke VYBUCHNE a výbuch je vidieť.
     // Keď let končí zásahom súpera (player/stacked), vlož prázdny frame: ten na klientovi stiahne granát
     // (spustí odpočet výbuchu - výbuch nabehne CHARGE_STEP_MS po ňom) a jeho delayMs = CHARGE_STEP_MS +
@@ -667,25 +726,34 @@ function doBasic(slot, dir, tl) {
     // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
     // (h.shot.dist sa počíta z klonovej bunky) × rovnaké násobiče (Last Stand ×2 / Last Hope ×4, maze ×2).
     // POWER bonus je flat a LEN na majiteľovej strele (klon z power tile neprofituje).
-    const rawOf = (h) => Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot) + (h.shot.clone ? 0 : pBonus);
+    // Portal Realm: + powerup aura strely (flat, sčítaná zo všetkých prejdených powerup portálov)
+    const rawOf = (h) => Math.max(1, BASIC_DMG_MAX - h.shot.dist) * dealMul(slot) * labyrinthMul(slot) + (h.shot.clone ? 0 : pBonus) + h.shot.power;
+    // Portal Realm: Def-breaker aura (obrana sa minie bez efektu) a odraz do steny (strela prišla cez portál,
+    // ktorý sa po nej zavrel - lúč zrkadla sa nemá kade vrátiť k strelcovi)
+    const portalOpts = (h) => h.shot.passes.length
+      ? { defBreak: h.shot.defBreak, reflectVoid: h.shot.passes[h.shot.passes.length - 1].exit, portalBonus: h.shot.power }
+      : {};
     // súperove „player" zásahy z TOHTO kroku: stacknutý Naruto+klon strieľajúci rovnakým smerom trafí
     // z jednej bunky dvakrát → na NEKRYTÉ HP to spojíme do JEDNÉHO úderu so súčtom dmg (nie dva animačne
     // oddelené); pri obrane (štít/mirror) strikeOwnerMulti vráti false a rieši sa každá strela zvlášť.
     const playerHits = hits.filter(h => h.target === "player");
     const ownerBonus = playerHits.some(h => !h.shot.clone) ? pBonus : 0; // bonus nesie len majiteľova strela
     if (playerHits.length && !strikeOwnerMulti(opS, playerHits.map(rawOf), tl, "basic", ownerBonus)) {
-      for (const h of playerHits) { strikeCell(opS, "player", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus }); if (winnerNow()) break; }
+      for (const h of playerHits) { strikeCell(opS, "player", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) }); if (winnerNow()) break; }
     }
     for (const h of hits) {
       if (h.target === "player" || winnerNow()) continue;
       const raw = rawOf(h);
       if (h.target === "stacked") {
         // stacknutý pár: obrana kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok prejde na Naruta
-        strikeCell(opS, "stacked", raw, tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus });
-      } else { // clone (návnada mimo majiteľovej bunky)
+        strikeCell(opS, "stacked", raw, tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) });
+      } else if (h.target === "clone") { // clone (návnada mimo majiteľovej bunky)
         const defended = op.shield || op.mirror; // obrana strelu zastaví (block/odraz), inak preletí cez dym
-        strikeCell(opS, "clone", raw, tl, { kind: "basic", fromClone: h.shot.clone });
-        if (defended) h.shot.done = true; else h.shot.spent = true;
+        strikeCell(opS, "clone", raw, tl, { kind: "basic", fromClone: h.shot.clone, ...portalOpts(h) });
+        if (defended && !portalOpts(h).defBreak) h.shot.done = true; else h.shot.spent = true;
+      } else {
+        // Portal Realm: strela sa cez portál vrátila na vlastnú figúru (strelec / jeho klon)
+        selfStrike(slot, h.target, raw, tl);
       }
     }
     if (winnerNow()) break; // prvá smrť končí hru - zvyšok letu sa už nehrá
@@ -888,7 +956,12 @@ function deployReset(slot) {
 // Labyrint končí, keď zásah zasiahol REÁLNEHO hráča (aj blok/odraz) alebo odraz dopadol na útočníka;
 // zásah len klona-návnady ho nekončí (súper sa nesmie dozvedieť, že trafil klona). Volá sa až PO
 // zásahových frame-och - odhalenie (revealLabyrinths) zabezpečila akcia ešte pred svojou animáciou.
-function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone = false, pair = false, soak = false } = {}) {
+// Portal Realm (len akcie, ktoré prešli portálom):
+//   defBreak:    Def-breaker aura - súperov štít/zrkadlo sa MINIE bez efektu (frame `dispel`) a zásah dopadne
+//   reflectVoid: koniec portálu {x,y,side}, ktorým útok prišiel - zrkadlo odrazí, ale portál je už zavretý, lúč
+//                narazí do steny (`reflect_void`) a strelec nedostane nič (obranca tiež nie, zrkadlo sa minie)
+//   portalBonus: powerup aura obsiahnutá v raw (len na rozpis hit framu - zlatý „+N" float)
+function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone = false, pair = false, soak = false, defBreak = false, reflectVoid = null, portalBonus = 0 } = {}) {
   const o = game.players[defSlot];
   const atkSlot = other(defSlot);
   const atk = game.players[atkSlot];
@@ -898,7 +971,7 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
   if (!hasOwner && !cloneFig) return;
   const cloneCell = cloneFig ? [o.clone.x, o.clone.y] : null;
   const stacked = !!(cloneFig && o.clone.x === o.x && o.clone.y === o.y);
-  const soakAmt = soak && stacked ? CLONE_DMG : 0;
+  let soakAmt = soak && stacked ? CLONE_DMG : 0;
 
   // --- intercept: THE WORLD - zmrazený zásah sa len ohlási a kumuluje (dopadne pri obnovení času);
   //     zásah klona sa odloží (clone_die až pri obnovení). Obranu vyhodnotí applyTimestopResume.
@@ -908,6 +981,13 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
     return;
   }
 
+  // --- Portal Realm: Def-breaker - nabitá obrana sa rozbije (minie) a zásah pokračuje ako nekrytý
+  if (defBreak && (o.shield || o.mirror)) {
+    pushStateFrame(tl, [{ kind: "dispel", target: defSlot, what: o.shield ? "shield" : "mirror",
+      gold: o.shield ? !!o.shieldGold : !!o.mirrorGold, ...(cloneFig ? { cloneCell } : {}) }], SMALL_DELAY_MS);
+    o.shield = false; o.shieldGold = false; o.mirror = false; o.mirrorGold = false;
+    if (pair && stacked) soakAmt = CLONE_DMG; // pár bez obrany: klon pohltí CLONE_DMG, zvyšok na majiteľa (ako nekrytý stacknutý pár)
+  }
   // --- obrana: štít (alebo mirror voči imúnnej Countess/Onre = obyčajný štít) - blok na každej figúre v JEDNOM beate
   if (o.shield || (o.mirror && mirrorImmune(atkSlot))) {
     const gold = o.shield ? !!o.shieldGold : !!o.mirrorGold;
@@ -933,7 +1013,14 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
       if (hasOwner) beams.push({ kind: "mirror", target: defSlot, dmg: ownerFigs[0].raw, atk: kind, gold, ...dest });
       if (cloneFig) beams.push({ kind: "mirror", target: defSlot, cell: cloneCell, dmg: cloneFig.raw, atk: kind, gold, ...dest });
     }
+    // Portal Realm: útok prišiel cez portál, ktorý sa po ňom zavrel → lúč letí k hrane a narazí do steny
+    if (reflectVoid) beams.forEach(b => { b.void = { ...reflectVoid }; });
     pushStateFrame(tl, beams, MIRROR_BEAM_MS);
+    if (reflectVoid) {
+      pushStateFrame(tl, [{ kind: "reflect_void", target: defSlot, cell: [reflectVoid.x, reflectVoid.y], side: reflectVoid.side }], SMALL_DELAY_MS);
+      if (hasOwner) endLabyrinths(tl);
+      return;
+    }
     if (fromClone) { // všetky odrazy dopadnú na útočníkovho klona - rozplynie sa, HP nikomu neklesá
       killClone(atkSlot, tl);
       endLabyrinths(tl);
@@ -967,6 +1054,8 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
     const hitFx = parts.length > 1 ? { kind: "hit", target: defSlot, dmg: d, parts } : { kind: "hit", target: defSlot, dmg: d };
     // POWER bonus rozpis len keď ho ½ prijímanie / soak neskreslí (bonus je vnútri PRVEJ - majiteľovej - časti)
     if (bonus > 0 && d === raws.reduce((a, b) => a + b, 0) && parts[0] >= bonus) hitFx.bonus = bonus;
+    // Portal Realm: powerup aura - rozpis rovnako ako POWER tile (len keď ho ½ prijímanie / soak neskreslí)
+    if (portalBonus > 0 && d === raws.reduce((a, b) => a + b, 0) && parts[0] >= portalBonus) hitFx.portalBonus = portalBonus;
     fx.push(hitFx);
   }
   if (cloneFig) { fx.push({ kind: "clone_die", target: defSlot, cell: cloneCell }); o.clone = null; }
@@ -979,27 +1068,42 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
 //   "clone"   → klon-návnada zožerie zásah celý
 //   "stacked" → s obranou pár reaguje ako JEDNA postava; bez obrany klon pohltí CLONE_DMG a ZVYŠOK prejde
 //               na majiteľa - poof klona aj zásah v JEDNOM beate (rovnako ako zóna)
-function strikeCell(defSlot, who, raw, tl, { kind = "basic", bonus = 0, fromClone = false } = {}) {
+// pt = Portal Realm voľby (defBreak / reflectVoid / portalBonus) - viď resolveStrike
+function strikeCell(defSlot, who, raw, tl, { kind = "basic", bonus = 0, fromClone = false, ...pt } = {}) {
   const o = game.players[defSlot];
   if (fromClone) bonus = 0; // POWER bonus nesie len majiteľova akcia (klon z power tile neprofituje)
-  if (who === "player") return resolveStrike(defSlot, [{ fig: "owner", raw }], tl, { kind, bonus, fromClone });
-  if (who === "clone") return resolveStrike(defSlot, [{ fig: "clone", raw }], tl, { kind, fromClone });
+  if (who === "player") return resolveStrike(defSlot, [{ fig: "owner", raw }], tl, { kind, bonus, fromClone, ...pt });
+  if (who === "clone") return resolveStrike(defSlot, [{ fig: "clone", raw }], tl, { kind, fromClone, ...pt });
   if (who !== "stacked") return;
-  if (o.shield || o.mirror) return resolveStrike(defSlot, [{ fig: "owner", raw }, { fig: "clone", raw }], tl, { kind, fromClone, pair: true });
-  resolveStrike(defSlot, [{ fig: "owner", raw }, { fig: "clone", raw }], tl, { kind, bonus, fromClone, soak: true });
+  if (o.shield || o.mirror) return resolveStrike(defSlot, [{ fig: "owner", raw }, { fig: "clone", raw }], tl, { kind, fromClone, pair: true, ...pt });
+  resolveStrike(defSlot, [{ fig: "owner", raw }, { fig: "clone", raw }], tl, { kind, bonus, fromClone, soak: true, ...pt });
 }
 
 // zóna specialu (aj démon) zasiahne hráča a/alebo jeho klona - Naruto a klon sú tá istá postava so
 // zdieľanou obranou, ich reakcie idú NARAZ v jednom beate (blok / lúče / hit + poof). Klon stacknutý na
 // majiteľovi s obranou = pár ako JEDNA postava (jeden blok/lúč), rovnako ako pri zásahu bunky.
-function strikeZone(defSlot, playerIn, cloneIn, raw, tl, { kind = "special", bonus = 0 } = {}) {
+function strikeZone(defSlot, playerIn, cloneIn, raw, tl, { kind = "special", bonus = 0, ...pt } = {}) {
   const o = game.players[defSlot];
   if (playerIn) {
     const figs = [{ fig: "owner", raw }];
     if (cloneIn && o.clone) figs.push({ fig: "clone", raw });
     const pair = figs.length > 1 && o.clone.x === o.x && o.clone.y === o.y && (o.shield || o.mirror);
-    resolveStrike(defSlot, figs, tl, { kind, bonus, soak: true, pair });
-  } else if (cloneIn) resolveStrike(defSlot, [{ fig: "clone", raw }], tl, { kind });
+    resolveStrike(defSlot, figs, tl, { kind, bonus, soak: true, pair, ...pt });
+  } else if (cloneIn) resolveStrike(defSlot, [{ fig: "clone", raw }], tl, { kind, ...pt });
+}
+
+// Portal Realm: strela sa cez portál vrátila na VLASTNÚ figúru. Bez obrán (kryjú len súperove akcie), multiplikátory
+// platia (raw už nesie dealMul/maze, prijatie ½ pri Last Stand/Hope), Escanor stráca pride, labyrint NEkončí.
+// who: "self" | "self_clone" (vlastný klon sa rozplynie) | "self_stacked" (klon pohltí CLONE_DMG, zvyšok na strelca)
+function selfStrike(slot, who, raw, tl) {
+  const p = game.players[slot];
+  if (who === "self_clone") { killClone(slot, tl); return; }
+  const d = recvDmg(slot, Math.max(0, raw - (who === "self_stacked" ? CLONE_DMG : 0)));
+  p.hp = Math.max(0, p.hp - d);
+  if (d > 0) notePrideHit(slot);
+  const fx = [{ kind: "hit", target: slot, dmg: d, self: true }];
+  if (who === "self_stacked" && p.clone) { fx.push({ kind: "clone_die", target: slot, cell: [p.clone.x, p.clone.y] }); p.clone = null; }
+  pushStateFrame(tl, fx, SMALL_DELAY_MS);
 }
 
 // stacknutý útočník (Naruto + klon z jednej bunky) zasiahne hráča viackrát JEDNOU akciou: na nekryté HP
@@ -1453,9 +1557,11 @@ function finishRound() {
     // na ďalšie kolo. Oboje nesie až finálny mini-frame, takže klient ukáže nové tiles AJ čerstvý preview
     // spolu s „ROUND N / FINAL ROUND" animáciou na začiatku nasledujúceho kola, nie uprostred dohrávania akcií.
     endOfRoundTiles();
+    // Portal Realm: nový pár portálov ako ÚPLNE posledná vec kola - hráči ho vidia od začiatku ďalšieho kola
+    const spawned = spawnPortalPair();
     const nextTurn    = game.turn + 1;
     const nextStarter = game.starter === "p1" ? "p2" : "p1"; // preklop (hru mohol začínať aj p2)
-    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: [], delayMs: 10 });
+    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: spawned ? [{ kind: "portal_spawn", id: spawned.id }] : [], delayMs: 10 });
     game.turn    = nextTurn;
     game.starter = nextStarter;
   }
@@ -1544,6 +1650,7 @@ function startMatch(config) {
   const seed = io.seed ?? ARENA_SEED;
   if (seed !== null) rand = seededRng(seed);
   game.config = config;
+  game.arena = config.arena === "portal" ? "portal-realm" : "bridge"; // pozadie (klient ARENAS_CLIENT)
   // BIELY (p1, vľavo) začína hru 1 - náhodné je, KTO je biely: osoby A/B sa vylosujú na sloty
   // ešte PRED animáciou ruletky na klientovi (color_roll nižšie je už len divadlo s hotovým výsledkom).
   // FORCE_FIRST_STARTER=A|B pripne osobu na p1/bieleho (testy). Sloty sú fixné na celú sériu;
@@ -1624,6 +1731,8 @@ function startGame(gameIndex) {
   game.iks = [];
   game.pending = null;
   rollPendingTiles(); // preview spawnov na koniec 1. kola - hráči ho vidia už pri plánovaní prvých akcií
+  game.portals = [];
+  spawnPortalPair(); // Portal Realm: jeden pár hneď pri štarte každej hry (mimo portal realm nič)
   game.phase = "playing";
 
   emitYouAre();
@@ -1668,19 +1777,31 @@ function sanitizeConfig(raw) {
   const timer = TIMER_OPTIONS.has(String(raw.timer)) ? String(raw.timer) : "off";
   const perRound = Math.max(1, Math.min(3, Math.round(Number(raw.tilesPerRound) || 1)));
   const w = raw.tileWeights || {};
+  // Portal Realm: len Damage + Insta-kill dlaždice (ostatné typy sa vynulujú), váhy typov portálov tiež spolu 100
+  const portal = raw.arena === "portal";
   const weights = {};
   let sum = 0;
   for (const k of ["dmg", "heal", "mana", "ik", "power", "block"]) {
-    const v = Math.max(0, Math.round(Number(w[k]) || 0));
+    const v = (portal && !(k in PORTAL_TILE_WEIGHTS)) ? 0 : Math.max(0, Math.round(Number(w[k]) || 0));
     weights[k] = v; sum += v;
   }
   if (sum !== 100) return null; // percentá musia dať presne 100
+  let portalWeights = null;
+  if (portal) {
+    const pw = raw.portalWeights || PORTAL_WEIGHTS;
+    portalWeights = {};
+    let psum = 0;
+    for (const k of PORTAL_TYPES) { const v = Math.max(0, Math.round(Number(pw[k]) || 0)); portalWeights[k] = v; psum += v; }
+    if (psum !== 100) return null;
+  }
   // farba hosta (osoby A): white/black si host vyberie pevne, random = losuje sa (default)
   const colorPref = ["white", "black"].includes(raw.colorPref) ? raw.colorPref : "random";
   // náhodný výber postáv (lobby „RANDOM CHARACTERS“) - default vypnutý; kľúč len keď je zapnutý
   // (snapshot nesie config - bez neho ostávajú golden timeline nezmenené)
   return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref,
-    ...(raw.randomChars === true ? { randomChars: true } : {}) };
+    ...(raw.randomChars === true ? { randomChars: true } : {}),
+    // aréna: kľúč len pre portal realm (stone bridge config ostáva bez zmeny - goldeny)
+    ...(portal ? { arena: "portal", portalWeights } : {}) };
 }
 
 // vypršal čas na ťah: kto nie je locknutý, zahrá rozpracovaný draft doplnený náhodne; potom vyhodnoť kolo

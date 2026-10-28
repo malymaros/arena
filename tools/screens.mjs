@@ -191,6 +191,15 @@ try {
     await waitPage(visible("#lobby"), 8000, "lobby");
     await sleep(500);
     await shot(dev, "03-lobby");
+    // Portal Realm formulár (obe záložky na telefóne), potom späť na stone bridge - zvyšok scenára beží na ňom
+    await br.evaluate(`document.querySelector('.arena-card[data-arena="portal"]').click()`);
+    await sleep(300);
+    await shot(dev, "03b-lobby-portal");
+    await br.evaluate(`document.querySelector('#lobby-wtabs [data-tab="portals"]')?.click()`);
+    await sleep(200);
+    await shot(dev, "03c-lobby-portal-tab");
+    await br.evaluate(`document.querySelector('#lobby-wtabs [data-tab="tiles"]')?.click(); document.querySelector('.arena-card[data-arena="bridge"]').click()`);
+    await sleep(200);
     await br.evaluate(`document.getElementById("lobby-start").click()`);
     await waitPage(visible("#host-wait"), 8000, "host-wait");
     await sleep(300);

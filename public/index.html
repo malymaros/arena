@@ -421,7 +421,16 @@
       <h1 class="lobby-title">ARENA</h1>
       <p class="lobby-sub">Match setup</p>
 
-      <div class="lobby-section">
+      <!-- aréna: dva samostatné formuláre so spoločným základom (každý si pamätá svoje hodnoty, client/lobby.js) -->
+      <div class="lobby-section" id="lobby-sec-arena">
+        <div class="lobby-label">ARENA</div>
+        <div class="arena-pick" id="lobby-arena">
+          <button class="arena-card active" data-arena="bridge"><canvas width="320" height="180"></canvas><span>STONE BRIDGE</span></button>
+          <button class="arena-card" data-arena="portal"><canvas width="320" height="180"></canvas><span>PORTAL REALM</span></button>
+        </div>
+      </div>
+
+      <div class="lobby-section" id="lobby-sec-format">
         <div class="lobby-label">FORMAT</div>
         <div class="opt-row" id="lobby-format">
           <button class="opt" data-val="single">Single</button>
@@ -430,7 +439,7 @@
         </div>
       </div>
 
-      <div class="lobby-section">
+      <div class="lobby-section" id="lobby-sec-tiles">
         <div class="lobby-label">SPECIAL TILES PER ROUND</div>
         <div class="opt-row" id="lobby-tiles-count">
           <button class="opt active" data-val="1">1</button>
@@ -439,26 +448,27 @@
         </div>
       </div>
 
-      <div class="lobby-section">
-        <div class="lobby-label">TILE CHANCE (must total 100%)</div>
-        <div class="weights" id="lobby-weights">
-          <label class="weight"><span class="w-ico pix-ico" data-pix="flame"></span>Damage
-            <input type="number" min="0" max="100" step="5" data-key="dmg" value="75"><span class="pct">%</span></label>
-          <label class="weight"><span class="w-ico pix-ico" data-pix="heart"></span>Heal
-            <input type="number" min="0" max="100" step="5" data-key="heal" value="5"><span class="pct">%</span></label>
-          <label class="weight"><span class="w-ico pix-ico" data-pix="drop"></span>Mana
-            <input type="number" min="0" max="100" step="5" data-key="mana" value="5"><span class="pct">%</span></label>
-          <label class="weight"><span class="w-ico pix-ico" data-pix="skull"></span>Insta-kill
-            <input type="number" min="0" max="100" step="5" data-key="ik" value="5"><span class="pct">%</span></label>
-          <label class="weight"><span class="w-ico pix-ico" data-pix="sword"></span>Power
-            <input type="number" min="0" max="100" step="5" data-key="power" value="5"><span class="pct">%</span></label>
-          <label class="weight"><span class="w-ico pix-ico" data-pix="shieldx"></span>Def-blocker
-            <input type="number" min="0" max="100" step="5" data-key="block" value="5"><span class="pct">%</span></label>
+      <!-- váhy dlaždíc (a v portal realm aj portálov) vykresľuje client/lobby.js; na telefóne v portal realm
+           záložky TILES | PORTALS (naraz jeden zoznam), prázdny riadok veľkosti nadpisu ich zarovná s FORMAT -->
+      <div id="lobby-sec-weights">
+        <div class="lobby-label wtabs-space" aria-hidden="true">&nbsp;</div>
+        <div class="opt-row wtabs" id="lobby-wtabs">
+          <button class="opt" data-tab="tiles">Tiles</button>
+          <button class="opt" data-tab="portals">Portals</button>
         </div>
-        <div class="weights-sum" id="lobby-weights-sum">Total: 100%</div>
+        <div class="lobby-section" id="lobby-tile-section">
+          <div class="lobby-label">TILE CHANCE (must total 100%)</div>
+          <div class="weights" id="lobby-weights"></div>
+          <div class="weights-sum" id="lobby-weights-sum">Total: 100%</div>
+        </div>
+        <div class="lobby-section" id="lobby-portal-section">
+          <div class="lobby-label">PORTAL CHANCE (must total 100%)</div>
+          <div class="weights" id="lobby-portal-weights"></div>
+          <div class="weights-sum" id="lobby-portal-sum">Total: 100%</div>
+        </div>
       </div>
 
-      <div class="lobby-section">
+      <div class="lobby-section" id="lobby-sec-color">
         <div class="lobby-label">YOUR COLOR</div>
         <div class="opt-row" id="lobby-color">
           <button class="opt active" data-val="random">Random</button>
@@ -468,7 +478,7 @@
       </div>
 
       <!-- dva prepínače v jednom riadku: náhľad tiles na ďalšie kolo + náhodný výber postáv (default Off) -->
-      <div class="lobby-section lobby-pair">
+      <div class="lobby-section lobby-pair" id="lobby-sec-preview">
         <div>
           <div class="lobby-label">TILE PREVIEW</div>
           <div class="opt-row" id="lobby-preview">
@@ -485,7 +495,7 @@
         </div>
       </div>
 
-      <div class="lobby-section">
+      <div class="lobby-section" id="lobby-sec-timer">
         <div class="lobby-label">TURN TIMER</div>
         <div class="opt-row" id="lobby-timer">
           <button class="opt active" data-val="off">Off</button>

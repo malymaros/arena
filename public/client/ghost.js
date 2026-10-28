@@ -7,6 +7,7 @@ import { VAMP_CHARS, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
 import { WOLF_DIRS_CLIENT } from "/client/zones.js";
 import { gridEl } from "/client/dom.js";
 import { playback } from "/client/playback.js";
+import { PORTAL_SHOT_RANGE } from "/shared/balance.js";
 import { MAX_MANA, RECHARGE_GAIN, BASIC_COST, MELEE_COST, DASH_COST, SPECIAL_COST, SHIELD_COST, MIRROR_COST, DEMON_COST, GOLDEN_COST, GOLDEN_MIRROR_COST } from "/shared/balance.js";
 
 /* ---------- Ghost - simulácia vlastnej pozície počas naplánovaného kola ---------- */
@@ -16,7 +17,7 @@ function simulatedPositions(){
   if (!mine) return [];
   // skrytý súper v labyrinte má x null → charge beží na okraj (shared figureAt ho ignoruje)
   const sim = G.simulateQueue(board, { x: mine.x, y: mine.y, char: mine.char, worldUsed: !!mine.worldUsed },
-    planning.myQueue, state?.[otherSlot()], VAMP_CHARS);
+    planning.myQueue, state?.[otherSlot()], VAMP_CHARS, state?.portals || null); // Portal Realm: ghost ide aj cez portály
   return sim.slice(1).map(({ x, y }) => ({ x, y }));
 }
 // pozícia, z ktorej sa vykoná akcia s indexom idx (= po akciách 0..idx-1);
@@ -34,7 +35,7 @@ export function ghostPos(idx = planning.myQueue.length){
 export function simulatedClonePos(){
   const mine = state?.[me];
   if (!mine?.clone) return null;
-  return G.simulateClone(board, mine.clone, planning.myQueue);
+  return G.simulateClone(board, mine.clone, planning.myQueue, state?.portals || null);
 }
 // mág aktívny pred akciou s indexom idx - po prejdení swapov vo fronte 0..idx-1 (kvôli special/ghost náhľadu po výmene)
 export function ghostCharAt(idx = planning.myQueue.length) {
@@ -95,13 +96,16 @@ export function planWarnings() {
     if (!p) continue;
     const wallSafe = !!def?.planClone && hasClone; // klonova figúra môže akciu vykonať aj tak
     const d = D4[a.dir];
-    if (!wallSafe && (a.type === "move" || a.type === "dash") && d && !inB(p.x + d[0], p.y + d[1])) {
+    // Portal Realm: hrana s portálom nie je stena (políčko „mimo dosky" za ňou sa berie ako dosiahnuteľné)
+    const inBp = (x, y) => inB(x, y) || (!!state?.portals && Math.abs(x - p.x) + Math.abs(y - p.y) === 1
+      && !!G.portalEnd(state.portals, p.x, p.y, Object.keys(D4).find(k => D4[k][0] === x - p.x && D4[k][1] === y - p.y)));
+    if (!wallSafe && (a.type === "move" || a.type === "dash") && d && !inBp(p.x + d[0], p.y + d[1])) {
       out[i] = "Off the board - this action has no effect";
     } else if (!wallSafe && a.type === "attack" && !cellsForAimPreview(p, a.dir, char).length) {
       out[i] = "Attack off the board - mana is spent, no effect";
     } else if (a.type === "special") {
       // varovanie specialu podľa postavy (register: planSpecialWarn - petrify na sochu, special/charge mimo plochy)
-      const w = def?.planSpecialWarn?.({ p, dir: a.dir, i, foe, mine, inB, G });
+      const w = def?.planSpecialWarn?.({ p, dir: a.dir, i, foe, mine, inB: inBp, G });
       if (w) out[i] = w;
     }
   }
@@ -139,6 +143,8 @@ export function cellsForAimPreview(meState, dir, char){
   // diagonálny smer u side-postavy → lomená bounce dráha; ostatné priamo po okraj
   const isDiag = delta[0] !== 0 && delta[1] !== 0;
   if (SIDE_CHARS[char] && isDiag) return vampShotRoute(meState.x, meState.y, dir);
+  // Portal Realm: rovná strela letí cez portály, dolet 3 políčka spolu
+  if (state?.portals && !isDiag) return G.shotPathPortals(board, state.portals, meState.x, meState.y, dir, PORTAL_SHOT_RANGE).map(c => [c.x, c.y]);
   return G.runPath(board, meState.x, meState.y, delta).path;
 }
 export function showPreviewCells(cells){

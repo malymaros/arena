@@ -94,7 +94,8 @@ export function positionActors(s, immediate = false) {
     const py = top  - (ACTOR_H - TILE_H);
 
     // wasHidden: odhalenie po labyrinte nesmie doslidovať zo starej pozície - umiestni sa okamžite
-    if (immediate || !actors.actorsInitialized || wasHidden) {
+    // portalSnap: prechod portálom - cestu cez trhlinu animuje client/portals.js (žiadny sklz naprieč doskou)
+    if (immediate || !actors.actorsInitialized || wasHidden || actors.portalSnap[slot]) {
       el.style.transition = "none";
       el.style.left = px + "px";
       el.style.top  = py + "px";
@@ -162,8 +163,8 @@ export function positionActors(s, immediate = false) {
     el.style.display = "block";
     el.style.zIndex = rowZ(c.y);
     el.style.opacity = "1"; // klon nie je priehľadný ani na Narutovej bunke
-    if (immediate || !actors.actorsInitialized || wasHidden) {
-      // prvé zjavenie (summon) / immediate - umiestni bez slideu (nie z rohu)
+    if (immediate || !actors.actorsInitialized || wasHidden || actors.portalSnap["clone:" + slot]) {
+      // prvé zjavenie (summon) / immediate / prechod portálom - umiestni bez slideu (nie z rohu)
       el.style.transition = "none";
       el.style.left = px + "px"; el.style.top = py + "px";
       void el.offsetHeight;
@@ -179,7 +180,7 @@ export function positionActors(s, immediate = false) {
   });
 
   // ďalšie figúry postáv z registra fx (Jotarov stand Star Platinum - vedľa Jotara, so slideom ako actor)
-  fxAll("position", { s, facing, snap: immediate || !actors.actorsInitialized });
+  fxAll("position", { s, facing, snap: immediate || !actors.actorsInitialized || !!actors.portalSnap.p1 || !!actors.portalSnap.p2 });
   // „YOU" značka nad vlastnou postavou - sleduje aktéra (rovnaké transition ako pohyb)
   const meData = me ? s[me] : null;
   if (meData && meData.char) {
@@ -200,7 +201,7 @@ export function positionActors(s, immediate = false) {
     const markerX = px + ACTOR_W / 2 + shift + headDx;
     youMarker.style.display = "block";
     youMarker.style.transform = "translate(-50%, -100%)";
-    if (immediate || !actors.actorsInitialized) {
+    if (immediate || !actors.actorsInitialized || actors.portalSnap[me]) {
       youMarker.style.transition = "none";
       youMarker.style.left = markerX + "px";
       youMarker.style.top  = headY + "px";
