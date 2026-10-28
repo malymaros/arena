@@ -176,7 +176,9 @@ export default function luffyFx(C) {
       if (e.kind === "luffy_roll") {
         centerRemove();
         faceTo(e.from, dirSx(e.dir), frameHold);
-        C.setAnim(e.from, "luffyballspin", frameHold);
+        // Portal Realm: za kotúľom cez portál engine vloží frame-y zatvorenia portálu (+ HP/mana portálu) pred výbuchom -
+        // guľa sa musí gúľať až do luffy_explode (ten pózu prepne), inak by z portálu na chvíľu vyšiel Luffy
+        C.setAnim(e.from, "luffyballspin", e.portal ? frameHold + 3000 : frameHold);
       }
       // výbuch na dopadovej bunke (Special_2 raz, potom idle) - zásah rieši hit frame po ňom
       if (e.kind === "luffy_explode") {

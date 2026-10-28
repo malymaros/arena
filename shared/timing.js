@@ -36,11 +36,35 @@ export const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za b
 // Portal Realm: krok strely, ktorý prechádza portálom, je dlhší - strela pri vstupe chvíľu mizne, výstup sa medzitým
 // rozsvieti a až potom sa z neho strela vynorí (oko stihne preskočiť na druhý koniec)
 export const PORTAL_SHOT_STEP_MS = Math.round(CHARGE_STEP_MS * 1.7);
+// fázy kroku strely cez portál (podiel dĺžky kroku): dolet k vstupu → zmiznutie → (skrytá) → vynorenie → výstupná bunka.
+// Klient (animateProjectilePortal) aj zvuk prechodu (public/sounds/events.js - zaznie pri vlete) čítajú tie isté hodnoty.
+export const PORTAL_SHOT_PHASES = { enter: 0.30, gone: 0.40, out: 0.58, emerged: 0.68 };
 // Portal Realm: beh cez portál (move/dash/charge) nikdy nie je rýchlejší než najrýchlejší beh na bridge
 // (charge 3 bunky za MOVE_DELAY_MS) - dlhá dráha trvá dlhšie. Každý prechod = zmiznutie + vynorenie (2× POP).
 export const PORTAL_POP_MS = 200;
 export function portalWalkMs(cells, passes) {
   return Math.max(MOVE_DELAY_MS, Math.round(cells * MOVE_DELAY_MS / 3 + passes * 2 * PORTAL_POP_MS));
+}
+// časový plán prechodu figúry (efekt portal_walk) v rámci framu dĺžky ms: steps = dĺžka dráhy, passAt = indexy
+// krokov, ktoré idú cez portál. Bunka = 1 jednotka chôdze (cez portál ½ k hrane + ½ od hrany), každý prechod
+// = zmiznutie + vynorenie (POP). Vracia značky v poradí dráhy: { kind: "edge"|"sunk"|"jump"|"emerged"|"cell", t, idx }.
+// Klient (animatePortalWalk) z nich robí keyframy, zvuk (events.js) z „edge" moment vletu - sedia na milisekundu.
+export function portalWalkPlan(steps, passAt, ms) {
+  const pass = new Set(passAt);
+  const pop = Math.min(PORTAL_POP_MS, ms * 0.14);
+  const unit = Math.max(ms * 0.3, ms - pass.size * 2 * pop) / Math.max(1, steps);
+  const marks = [];
+  let t = 0;
+  for (let idx = 0; idx < steps; idx++) {
+    if (pass.has(idx)) {
+      t += unit / 2; marks.push({ kind: "edge", t, idx });
+      t += pop;      marks.push({ kind: "sunk", t, idx });
+      marks.push({ kind: "jump", t, idx });
+      t += pop;      marks.push({ kind: "emerged", t, idx });
+      t += unit / 2; marks.push({ kind: "cell", t, idx });
+    } else { t += unit; marks.push({ kind: "cell", t, idx }); }
+  }
+  return marks;
 }
 export const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
 // Teleport (výmena maga v turnaji) - dvojfázová animácia: (1) starý mág zmizne, (2) nový sa objaví

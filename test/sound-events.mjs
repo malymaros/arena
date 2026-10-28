@@ -1,6 +1,8 @@
 // test/sound-events.mjs - čisté mapovanie timeline → zvukové udalosti (public/sounds/events.js) na syntetických
 // frame-och: raz za beh, move vs dash, skrytý súper, prah ťažkého zásahu, char zasiahnutého, okná.
 import { eventsForFrame, newTracker, resetTracker, HIT_HEAVY_DMG } from "../public/sounds/events.js";
+import { portalWalkPlan, portalWalkMs, PORTAL_SHOT_STEP_MS, PORTAL_SHOT_PHASES } from "../shared/timing.js";
+const J = JSON.stringify;
 
 let failures = 0;
 function check(cond, label, detail = "") {
@@ -137,6 +139,24 @@ const keys = (evs) => evs.map(e => e.key);
   check(ev[2].some(e => e.key === "portal.close"), "zatvorenie páru = portal.close");
   check(ev[3].some(e => e.key === "portal.use") && ev[3].some(e => e.key === "attack"), "strela cez portál = portal.use popri zvuku útoku", JSON.stringify(ev[3]));
   check(ev[4].some(e => e.key === "portal.open"), "nový pár = portal.open");
+}
+{
+  // zvuk prechodu zaznie v MOMENTE vletu (posun atMs v rámci framu), nie na začiatku framu; dlhý beh = zvuk pri každom
+  // portáli. Časy = ten istý plán, z ktorého klient animuje (portalWalkPlan / PORTAL_SHOT_PHASES)
+  const tr = newTracker();
+  const pa = { id: "A", type: "classic", enter: { x: 3, y: 1, side: "right" }, exit: { x: 0, y: 0, side: "left" } };
+  const pb = { id: "B", type: "power", enter: { x: 3, y: 0, side: "right" }, exit: { x: 0, y: 2, side: "left" } };
+  const path = [[1, 1], [2, 1], [3, 1], [0, 0], [1, 0], [2, 0], [3, 0], [0, 2], [1, 2]];
+  const walkFrame = { ...fr([{ kind: "wolf_charge", from: "p1", dir: "right" }, { kind: "portal_walk", from: "p1", clone: false, path, passes: [{ at: 3, ...pa }, { at: 7, ...pb }] }]), delayMs: portalWalkMs(9, 2) };
+  const shotFrame = { ...fr([{ kind: "charge", from: "p2", cell: [0, 0], dir: "right", portal: pa }]), delayMs: PORTAL_SHOT_STEP_MS };
+  const tl = [fr([]), walkFrame, shotFrame];
+  const ev = tl.map((_, i) => eventsForFrame(tl, i, {}, tr, { board: { w: 4 } }));
+  const uses = ev[1].filter(e => e.key === "portal.use");
+  const plan = portalWalkPlan(9, [3, 7], walkFrame.delayMs).filter(m => m.kind === "edge").map(m => Math.round(m.t));
+  check(uses.length === 2 && J(uses.map(e => e.atMs)) === J(plan) && uses[0].atMs > 0 && uses[1].atMs > uses[0].atMs,
+    "beh cez 2 portály = 2 zvuky prechodu v momentoch vletu", J(uses));
+  const su = ev[2].find(e => e.key === "portal.use");
+  check(su && su.atMs === Math.round(PORTAL_SHOT_STEP_MS * PORTAL_SHOT_PHASES.enter), "strela: zvuk prechodu pri vlete (fáza enter kroku)", J(su));
 }
 {
   // strela prejde portálom → engine vloží frame so zatvorením portálu → ďalší krok letu NIE JE nový výstrel

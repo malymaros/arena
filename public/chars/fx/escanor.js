@@ -24,6 +24,7 @@ const ESC_INTRO = { file: "IntroStand.png", frames: 22, fps: 9, loopFrom: 17 }; 
 const ESC_WEAK  = { file: "WeakIdle.png", frames: 4, fps: 5, loop: true };
 
 import { edgePoint, portalFlash } from "/client/portals.js";
+import { sfx } from "/client/sound.js";
 
 export default function escanorFx(C) {
   // pred premenou je idle WeakIdle; pri prvom rozohraní kola (po nasadení / swape) sa RAZ prehrá Transform,
@@ -124,7 +125,11 @@ export default function escanorFx(C) {
       el.animate([k(sx, sy, "1", 1, 0), k(a.x - size / 2, a.y - size / 2, "1", 1, 0.4), k(a.x - size / 2, a.y - size / 2, "0.1", 0, 0.5),
         k(b.x - size / 2, b.y - size / 2, "0.1", 0, 0.5001), k(b.x - size / 2, b.y - size / 2, "1", 1, 0.62), k(ex, ey, "1", 1, 1)],
         { duration: ESC_TRAVEL_MS, easing: "linear" });
-      setTimeout(() => portalFlash(portal.enter, portal.type), ESC_TRAVEL_MS * 0.4);
+      // vlet do trhliny: záblesk + zvuk prechodu (let slnka je klientsky časovaný - timeline frame ho nevie trafiť)
+      setTimeout(() => {
+        portalFlash(portal.enter, portal.type);
+        sfx("portal.use", { pan: C.board.w > 1 ? (portal.enter.x / (C.board.w - 1) * 2 - 1) * 0.6 : 0 });
+      }, ESC_TRAVEL_MS * 0.4);
       setTimeout(() => portalFlash(portal.exit, portal.type), ESC_TRAVEL_MS * 0.5);
     } else {
       el.style.left = ex + "px"; el.style.top = ey + "px"; // sklz na cieľ

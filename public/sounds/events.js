@@ -5,6 +5,8 @@
 // ktorá v hre zvuk spúšťa.
 // Redakcia labyrintu/pasce platí automaticky: čo server klientovi zamaskoval, v timeline nie je → nezaznie.
 
+import { portalWalkPlan, PORTAL_SHOT_PHASES } from "../../shared/timing.js";
+
 // druh efektu zo servera → kľúč registra (char = postava z e.from / e.target)
 export const DIRECT = {
   attack_swing: "attack_whiff", wall_bump: "wall_bump", melee: "melee",
@@ -27,8 +29,9 @@ export const DIRECT = {
   last_stand_banish: "last_stand_banish", last_stand_banish_kill: "last_stand_banish_kill",
   vamp_heal_cast: "vamp_heal_cast", luffy_ball_form: "luffy_ball_form", wanderer_no_regen: "wanderer_no_regen",
   charge: "attack", special: "special",
-  // Portal Realm: prechod tela (move/dash/charge/guľa), nový pár na konci kola, zatvorenie páru po prechode
-  portal_walk: "portal.use", portal_spawn: "portal.open", portal_close: "portal.close",
+  // Portal Realm: nový pár na konci kola, zatvorenie páru po prechode (prechod tela/strely = portal.use - zvlášť nižšie,
+  // s posunom v rámci framu na moment vletu)
+  portal_spawn: "portal.open", portal_close: "portal.close",
 };
 // efekty opakované v po sebe idúcich frame-och (let strely po bunkách, beaty castu) → zaznejú raz za beh;
 // okno = celý beh. Melee sem nepatrí - zvuk úderu znie pri každom z 3 švihov.
@@ -80,7 +83,7 @@ export const OWN_LOCO = new Set(["wolf_charge", "vamp_charge", "luffy_roll", "tr
 export const HIT_HEAVY_DMG = 8;
 export const TILE_KINDS = ["dmg", "heal", "mana", "ik"];
 // všetky kľúče, ktoré táto mapa môže vydať (test/sounds.mjs overí, že sú v registri)
-export const PLAYED_KEYS = [...new Set([...Object.values(DIRECT), ...Object.values(VOICE),
+export const PLAYED_KEYS = [...new Set([...Object.values(DIRECT), "portal.use", ...Object.values(VOICE),
   ...Object.values(VOICE_BY_CHAR).flatMap(Object.values), "hit", "hit_heavy", "voice.hurt", "move", "dash", ...TILE_KINDS.map(t => `tile.${t}`)])];
 
 // stav medzi frame-ami jednej timeline (nová timeline → newTracker / resetTracker)
@@ -106,7 +109,7 @@ function runWindow(timeline, i, id) {
 
 // zvukové udalosti frame-u timeline[i]; `before` = sloty pred frame-om ({p1, p2}), `tr` = tracker,
 // `board` = {w,h} (panoráma), `fallback` = stav, z ktorého sa doplní postava/pozícia, ak ich frame nemá
-// → [{ key, char, pan, windowMs }]
+// → [{ key, char, pan, windowMs, atMs? }] - atMs = posun v rámci framu (prechod portálom nastane až uprostred framu)
 export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fallback = null } = {}) {
   const frame = timeline[i];
   const out = [];
@@ -136,10 +139,25 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
       continue;
     }
     if (e.kind === "golden_mana" && !e.gained) continue; // odmietnutá výmena
-    // Portal Realm: strela/slnko preletí trhlinou (charge/special nesie portal) → zvuk prechodu popri zvuku útoku
-    if (e.portal && e.kind !== "portal_walk") out.push({ key: "portal.use", char: null, pan: panOf(e), windowMs: win });
-    // Narutov pár prejde tým istým portálom naraz - jeden zvuk prechodu, nie dva
-    if (e.kind === "portal_walk" && e.clone && (frame.effects || []).some(o => o.kind === "portal_walk" && o.from === e.from && !o.clone)) continue;
+    // Portal Realm: zvuk prechodu v MOMENTE vletu do trhliny (nie na začiatku framu) - časy sú tie isté, z ktorých
+    // klient animuje (shared/timing.js). Strela: fáza „enter" kroku. Escanorovo slnko si zvuk púšťa choreografia
+    // (fx/escanor.js) - jeho let je klientsky časovaný až po zdvihnutí slnka.
+    if (e.portal && e.kind === "charge") {
+      const at = Math.round(win * PORTAL_SHOT_PHASES.enter);
+      out.push({ key: "portal.use", char: null, pan: panOf(e), windowMs: Math.max(0, win - at), atMs: at });
+    }
+    if (e.kind === "portal_walk") {
+      // každý prechod behu zvlášť (vlkolak cez 3 portály = 3 zvuky); Narutov klon v lockstepe s majiteľom v tom
+      // istom momente zvuk nezdvojí
+      const plan = portalWalkPlan(e.path?.length || 0, (e.passes || []).map(q => q.at), win);
+      for (const m of plan) {
+        if (m.kind !== "edge") continue;
+        const at = Math.round(m.t);
+        if (out.some(o => o.key === "portal.use" && o.atMs === at)) continue;
+        out.push({ key: "portal.use", char: null, pan: panOf(e), windowMs: Math.max(0, win - at), atMs: at });
+      }
+      continue;
+    }
     const key = DIRECT[e.kind];
     if (!key) continue;
     let windowMs = PHASE_SPAN[e.kind] ? phaseWindow(timeline, i, PHASE_SPAN[e.kind]) : win;

@@ -6,7 +6,7 @@
 import { gridEl, actorsEl, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
 import { PORTAL_TYPES, riftDataUrl, glyphSvg, typeIconSvg, RIFT_PAD } from "/client/portal-art.js";
 import { board } from "/client/session.js";
-import { PORTAL_POP_MS } from "/shared/timing.js";
+import { portalWalkPlan, PORTAL_SHOT_PHASES as SP } from "/shared/timing.js";
 
 const PT = 32;              // hrúbka trhliny (8 pixelov po 4 px)
 const POFF = PT / 2 + 4;    // stred trhliny je kúsok von od hrany políčka
@@ -154,23 +154,17 @@ export function animatePortalWalk(el, start, e, ms) {
     prev = [x, y];
   });
   // čas: sklzy podľa dĺžky, zmiznutie/vynorenie pevne
-  // ms = dĺžka framu = portalWalkMs (shared/timing.js) → sklzy nikdy nie rýchlejšie než najrýchlejší beh na bridge
-  const POP = Math.min(PORTAL_POP_MS, ms * 0.14);
-  const walkLen = pts.reduce((acc, q, i) => acc + (q.kind === "walk" && i ? Math.hypot(q.p.x - pts[i - 1].p.x, q.p.y - pts[i - 1].p.y) : 0), 0) || 1;
-  const pops = pts.filter(q => q.kind === "sink" || q.kind === "emerge").length;
-  const walkMs = Math.max(ms * 0.3, ms - pops * POP);
-  let t = 0;
+  // čas každého bodu = spoločný plán (shared/timing.js portalWalkPlan) - zvuk vletu (events.js) z neho číta ten istý
+  // moment; ms = dĺžka framu = portalWalkMs → sklzy nikdy nie rýchlejšie než najrýchlejší beh na bridge
+  const plan = portalWalkPlan(e.path.length, (e.passes || []).map(q => q.at), ms);
   const kf = [];
   pts.forEach((q, i) => {
-    if (i) {
-      if (q.kind === "walk") t += walkMs * Math.hypot(q.p.x - pts[i - 1].p.x, q.p.y - pts[i - 1].p.y) / walkLen;
-      else if (q.kind === "sink" || q.kind === "emerge") t += POP;
-    }
+    const t = i ? (plan[i - 1]?.t ?? ms) : 0;
     const hidden = q.kind === "sink" || q.kind === "jump";
     kf.push({ offset: Math.min(1, t / ms), translate: `${q.p.x}px ${q.p.y}px`, scale: hidden ? "0.15 0.05" : "1", opacity: hidden ? 0 : 1 });
-    // záblesk trhliny pri vstupe a výstupe
-    if (q.kind === "sink" && pts[i - 1]?.enter) setTimeout(() => portalFlash(pts[i - 1].enter.enter, pts[i - 1].enter.type), t - POP);
-    if (q.kind === "emerge" && q.exit) setTimeout(() => portalFlash(q.exit.exit, q.exit.type), t - POP);
+    // záblesk trhliny pri vstupe (figúra na hrane) a výstupe (začiatok vynorenia)
+    if (q.kind === "walk" && q.enter) setTimeout(() => portalFlash(q.enter.enter, q.enter.type), t);
+    if (q.kind === "jump" && pts[i + 1]?.exit) setTimeout(() => portalFlash(pts[i + 1].exit.exit, pts[i + 1].exit.type), t);
   });
   // offsety musia rásť a končiť na 1
   for (let i = 1; i < kf.length; i++) if (kf[i].offset < kf[i - 1].offset) kf[i].offset = kf[i - 1].offset;
@@ -193,13 +187,13 @@ export function animateProjectilePortal(el, from, to, portal, ms, yOff = 0) {
   const k = (x, y, s, o, off) => ({ offset: off, left: x + "px", top: (y + yOff) + "px", scale: s, opacity: o });
   // k vstupu (0–30 %) → zmiznutie (30–40 %) → skrytá (výstup pulzuje) → vynorenie (58–68 %) → výstupná bunka
   const anim = el.animate([
-    k(from.left, from.top, "1", 1, 0), k(a.x, a.y, "1", 1, 0.30), k(a.x, a.y, "0.1", 0, 0.40),
-    k(b.x, b.y, "0.1", 0, 0.58), k(b.x, b.y, "1", 1, 0.68), k(to.left, to.top, "1", 1, 1),
+    k(from.left, from.top, "1", 1, 0), k(a.x, a.y, "1", 1, SP.enter), k(a.x, a.y, "0.1", 0, SP.gone),
+    k(b.x, b.y, "0.1", 0, SP.out), k(b.x, b.y, "1", 1, SP.emerged), k(to.left, to.top, "1", 1, 1),
   ], { duration: ms, easing: "linear" });
   // výstup sa rozsvieti hneď na začiatku kroku (oko vie, kam sa pozrieť, ešte kým strela letí k vstupu)
-  portalBeacon(portal.exit, portal.type, ms * 0.66);
-  setTimeout(() => portalFlash(portal.enter, portal.type), ms * 0.30);
-  setTimeout(() => portalFlash(portal.exit, portal.type), ms * 0.58);
+  portalBeacon(portal.exit, portal.type, ms * (SP.emerged - 0.02));
+  setTimeout(() => portalFlash(portal.enter, portal.type), ms * SP.enter);
+  setTimeout(() => portalFlash(portal.exit, portal.type), ms * SP.out);
   anim.onfinish = () => { el.style.transition = ""; };
   setTimeout(() => { el.style.transition = ""; }, ms + 50);
 }

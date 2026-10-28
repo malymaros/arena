@@ -13,7 +13,9 @@ export function soundTimelineStart() { resetTracker(tracker); }
 // frame timeline[i]; `before` = sloty pred frame-om (pohyb sa odvodí z rozdielu pozícií)
 export function soundForFrame(timeline, i, before) {
   for (const ev of eventsForFrame(timeline, i, before, tracker, { board, fallback: state })) {
-    sfx(ev.key, { char: ev.char, pan: ev.pan, windowMs: ev.windowMs });
+    const play = () => sfx(ev.key, { char: ev.char, pan: ev.pan, windowMs: ev.windowMs });
+    if (ev.atMs > 0) setTimeout(play, ev.atMs); // prechod portálom uprostred framu
+    else play();
   }
 }
 
