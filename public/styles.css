@@ -187,7 +187,9 @@ body {
 .void-float { color: #ffe9a0; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 8px rgba(255,180,0,.7); }
 
 /* ---------- Portal Realm: portály na hranách dosky (client/portals.js) ---------- */
-#portal-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+/* z-index 0: nad políčkami dosky, pod figúrami/strelami (#actors ide v DOM za ňou) a POD všetkým UI okolo dosky
+   (lišta kola, HUD, zástavka, tlačidlá) - portály presahujú za okraj dosky a nesmú UI prekrývať */
+#portal-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .portal { position: absolute; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)); pointer-events: none; }
 .portal .p-body { position: absolute; inset: 0; transform-origin: 50% 50%; }
 /* pixel trhlina: 3 snímky so zapečenou žiarou sa striedajú („praskanie") - animuje sa len opacity */

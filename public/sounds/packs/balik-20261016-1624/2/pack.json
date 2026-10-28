@@ -50,7 +50,7 @@
    "files": [
     "sounds/custom/ancient-magic.mp3"
    ],
-   "vol": 0.4,
+   "vol": 0.8,
    "fit": "fade",
    "trim": {
     "sounds/custom/ancient-magic.mp3": [
