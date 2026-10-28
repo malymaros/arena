@@ -164,7 +164,7 @@ function setFlash(on) {
 // sivé tlačidlá akcií, na ktoré na ďalšom mieste fronty nebude mana
 function syncNoMana() {
   const playing = state?.phase === "playing" && !!state?.[me]?.char && !uiLocked();
-  for (const b of MANA_BUTTONS()) b.classList.toggle("no-mana", playing && !b.disabled && labelInfo(slotOf(b), b).noMana);
+  for (const b of MANA_BUTTONS()) b.classList.toggle("no-mana", !!(playing && !b.disabled && labelInfo(slotOf(b), b).noMana)); // !! - undefined by triedu prepínal
 }
 function refreshLabel() {
   if (!isTouch) return;

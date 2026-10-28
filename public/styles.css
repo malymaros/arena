@@ -32,7 +32,7 @@ body {
 /* ---------- Portal Realm: živé pozadie (client/arena-bg.js) - animuje len opacity/transform ---------- */
 #arena-fx { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; transform-origin: 0 0; }
 #arena-fx > * { position: absolute; }
-#arena-fx .afx-glow { border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: screen; }
+#arena-fx .afx-glow { border-radius: 50%; transform: translate(-50%, -50%); }
 #arena-fx .afx-fire { background: radial-gradient(circle, rgba(255,190,255,.95) 0 8%, rgba(214,80,255,.7) 25%, rgba(150,40,255,.25) 50%, transparent 70%);
   animation: afx-flicker 1.7s steps(1) infinite, afx-breathe 2.6s ease-in-out infinite; }
 @keyframes afx-flicker { 0%{opacity:.85} 12%{opacity:1} 24%{opacity:.7} 37%{opacity:.95} 51%{opacity:.78} 66%{opacity:1} 80%{opacity:.82} }
@@ -44,27 +44,26 @@ body {
   animation: afx-rise var(--d, 2.4s) linear infinite; animation-delay: var(--dl, 0s); opacity: 0; }
 @keyframes afx-rise { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 10% { opacity: 1; }
   100% { transform: translate(var(--dx, 0px), -120px) scale(.3); opacity: 0; } }
-#arena-fx .afx-vortex { transform: translate(-50%, -50%) scaleY(.42); mix-blend-mode: screen; }
+#arena-fx .afx-vortex { transform: translate(-50%, -50%) scaleY(.42); }
 #arena-fx .afx-vortex i { position: absolute; inset: 0; border-radius: 50%;
   background: conic-gradient(from 0deg, transparent 0 6%, rgba(255,160,255,.55) 12%, transparent 22% 36%, rgba(170,90,255,.5) 44%, transparent 55% 68%, rgba(255,190,255,.45) 76%, transparent 86%);
   -webkit-mask: radial-gradient(circle, transparent 0 12%, #000 30%, #000 55%, transparent 70%); mask: radial-gradient(circle, transparent 0 12%, #000 30%, #000 55%, transparent 70%);
   animation: afx-spin 14s linear infinite; }
 #arena-fx .afx-vortex i + i { animation-duration: 22s; animation-direction: reverse; opacity: .7; }
 @keyframes afx-spin { to { transform: rotate(360deg); } }
-#arena-fx .afx-rune { width: 70px; height: 70px; transform: translate(-50%, -50%) rotate(45deg) scaleY(.62); mix-blend-mode: screen;
+#arena-fx .afx-rune { width: 70px; height: 70px; transform: translate(-50%, -50%) rotate(45deg) scaleY(.62);
   background: radial-gradient(circle, rgba(255,210,255,.9) 0 10%, rgba(200,90,255,.55) 32%, transparent 62%);
   animation: afx-rune 4.8s ease-in-out infinite; animation-delay: var(--dl, 0s); opacity: .15; }
 @keyframes afx-rune { 0%,100% { opacity: .12; } 45%,55% { opacity: 1; } }
-#arena-fx .afx-circle { border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: screen;
+#arena-fx .afx-circle { border-radius: 50%; transform: translate(-50%, -50%);
   box-shadow: 0 0 0 3px rgba(220,140,255,.35), 0 0 24px 6px rgba(170,80,255,.35), inset 0 0 30px 8px rgba(170,80,255,.25);
   animation: afx-pulse 5.5s ease-in-out infinite; }
 #arena-fx .afx-mote { width: 4px; height: 4px; border-radius: 50%; background: #e7c6ff; box-shadow: 0 0 8px 3px rgba(190,100,255,.8);
   animation: afx-drift var(--d, 9s) ease-in-out infinite; animation-delay: var(--dl, 0s); opacity: 0; }
 @keyframes afx-drift { 0% { transform: translate(0,0); opacity: 0; } 20% { opacity: .9; } 80% { opacity: .7; }
   100% { transform: translate(var(--dx, 20px), var(--dy, -60px)); opacity: 0; } }
-/* lite (telefón / úsporná grafika): bez blend módu (nútil prekresľovať celé pozadie), 3 iskry na misku,
-   polovica svetielok, jeden vír - pulzy ohňov, rún a kruhu ostávajú */
-.perf-lite #arena-fx > * { mix-blend-mode: normal; }
+/* žiadny mix-blend-mode: „screen" nad celým pozadím nútil prehliadač prekresľovať plochu každú snímku (~2× vyťaženie)
+   lite (telefón / úsporná grafika): 3 iskry na misku, polovica svetielok, jeden vír - pulzy ohňov, rún a kruhu ostávajú */
 .perf-lite #arena-fx .afx-heavy, .perf-lite #arena-fx .afx-vortex i + i { display: none; }
 
 /* statický CRT overlay - jemné scanlines + tmavšie rohy; bez animácie (šetrí GPU/RDP) */

@@ -294,7 +294,9 @@ export function raf() {
     // blúdiaci (labyrinth) aj skrytý Minotaur (x null): obaja si navzájom vidia len bludisko.
     // labReveal (istý zásah v tomto ťahu) widget odkryje ešte pred animáciou akcie - HP/mana sú späť.
     // labPeek: lovec odhalený akciou z mojej bunky - widget (HP/mana) ostáva zakrytý
-    const inMaze = slot !== me && ((st.labyrinth && !st.labReveal) || st.x == null || st.labPeek);
+    // !! - bez neho je výsledok undefined (labPeek chýba) a classList.toggle(…, undefined) triedu PREPÍNA každú snímku
+    // (kryt labyrintu súperovho widgetu blikal v každej hre a nútil prehliadač prepočítavať layout = sekanie)
+    const inMaze = slot !== me && !!((st.labyrinth && !st.labReveal) || st.x == null || st.labPeek);
     box.classList.toggle("in-maze", inMaze);
     if (inMaze) {
       cvs.classList.remove("wounded", "critical", "dead", "stoned", "alt-color");
