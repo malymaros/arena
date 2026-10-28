@@ -298,7 +298,7 @@ function renderAbilityPreview(char, side = me) {
       ? new Set([`${mirror ? w - 1 - def.target.x : def.target.x},${def.target.y}`])
       : CHAR_FX[char]?.previewZone
         ? new Set() // zónu kreslí náhľad z registra fx (Escanor pride - cyklí sa)
-        : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir).map(([x, y]) => `${x},${y}`));
+        : new Set(cellsForSpecialPreview({ x: caster.x, y: caster.y, char }, dir, { abstract: true }).map(([x, y]) => `${x},${y}`));
   const grid = document.getElementById("ca-grid");
   grid.style.gridTemplateColumns = `repeat(${w}, auto)`;
   grid.innerHTML = "";

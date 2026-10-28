@@ -6,9 +6,12 @@ import { board, state } from "/client/session.js";
 /* ---------- Special preview (hover) ---------- */
 // zóna specialu z registra postavy (specialZone - geometria zo shared/geometry.js, tá istá ako na serveri);
 // dir pre smerové speciály, meState.foe pre vlkolakov charge, worldUsed/pride z meState
-export function cellsForSpecialPreview(meState, dir){
+// abstract = náhľad na prázdnej mini-doske (výber postavy, okno postavy) - bez portálov a dlaždíc z bežiacej hry
+// (inak by sa napr. dráha vlkolaka v Portal Realm „zalomila" cez skutočný portál na mini-doske)
+export function cellsForSpecialPreview(meState, dir, { abstract = false } = {}){
   if (!meState || !meState.char) return [];
-  return CHARS_BY_KEY[meState.char]?.specialZone?.({ G, board, me: meState, dir, tiles: state?.tiles, portals: state?.portals || null }) || [];
+  const tiles = abstract ? [] : state?.tiles, portals = abstract ? null : (state?.portals || null);
+  return CHARS_BY_KEY[meState.char]?.specialZone?.({ G, board, me: meState, dir, tiles, portals }) || [];
 }
 // Jotarov Special 1 (mirror slot): obe diagonálne bunky zvolenej strany (x±dir, y±1) - zrkadlí jotaroS1Cells
 export function cellsForJotaroS1(p, dir){

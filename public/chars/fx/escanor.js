@@ -164,8 +164,8 @@ export default function escanorFx(C) {
   // Smer zóny = kam Escanor pozerá (na súpera). Pri inej postave sa oba prvky skryjú.
   const prideBadge = { p1: document.getElementById("pride-p1"), p2: document.getElementById("pride-p2") };
   const prideRange = { p1: document.getElementById("prange-p1"), p2: document.getElementById("prange-p2") };
-  const zoneSet = (x, y, pride, dir) =>
-    new Set(C.cellsForSpecialPreview({ x, y, char: "escanor", pride }, dir).map(([cx, cy]) => `${cx},${cy}`));
+  const zoneSet = (x, y, pride, dir, abstract = false) =>
+    new Set(C.cellsForSpecialPreview({ x, y, char: "escanor", pride }, dir, { abstract }).map(([cx, cy]) => `${cx},${cy}`));
   function hud(slot, p) {
     const badge = prideBadge[slot], range = prideRange[slot];
     if (!badge || !range) return;
@@ -211,7 +211,7 @@ export default function escanorFx(C) {
     const frame = (now) => {
       if (!s.last) s.last = now;
       if (now - s.last >= 1500) { s.last = now; s.pride = (s.pride + 1) % 4; syncCa(s.pride); } // ~1.5s na level (pomalšie, nech sa dá zóna prečítať)
-      const hit = zoneSet(caster.x, caster.y, s.pride, dir);
+      const hit = zoneSet(caster.x, caster.y, s.pride, dir, true); // mini-doska výberu: bez portálov hry
       grid.querySelectorAll(".mini-cell").forEach(c => {
         if (c.classList.contains("caster")) return;
         const on = hit.has(`${c.dataset.gx},${c.dataset.gy}`);
