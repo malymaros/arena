@@ -138,6 +138,21 @@ const keys = (evs) => evs.map(e => e.key);
   check(ev[3].some(e => e.key === "portal.use") && ev[3].some(e => e.key === "attack"), "strela cez portál = portal.use popri zvuku útoku", JSON.stringify(ev[3]));
   check(ev[4].some(e => e.key === "portal.open"), "nový pár = portal.open");
 }
+{
+  // strela prejde portálom → engine vloží frame so zatvorením portálu → ďalší krok letu NIE JE nový výstrel
+  const tr = newTracker();
+  const pt = { id: "A", type: "classic", enter: { x: 0, y: 0, side: "up" }, exit: { x: 0, y: 2, side: "down" } };
+  const tl = [fr([]),
+    fr([{ kind: "charge", from: "p1", cell: [0, 0], dir: "up" }]),
+    fr([{ kind: "charge", from: "p1", cell: [0, 2], dir: "up", portal: pt }]),
+    fr([{ kind: "portal_close", ids: ["A"] }]),
+    fr([{ kind: "charge", from: "p1", cell: [0, 1], dir: "up" }])];
+  const ev = tl.map((_, i) => eventsForFrame(tl, i, {}, tr, { board: { w: 4 } }));
+  const keys = ev.flat().map(e => e.key);
+  check(keys.filter(k => k === "attack").length === 1 && keys.filter(k => k === "voice.attack").length === 1,
+    "let strely cez portál = jeden zvuk útoku a jeden hlas (zatvorenie portálu beh neprerušuje)", JSON.stringify(keys));
+  check(ev[1].find(e => e.key === "attack")?.windowMs === 400, "okno letu zahŕňa aj frame zatvorenia portálu", JSON.stringify(ev[1]));
+}
 
 console.log(failures ? `\n${failures} ZLYHANÍ` : "\nsound-events: VŠETKO PREŠLO");
 if (failures) process.exit(1);

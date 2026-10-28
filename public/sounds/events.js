@@ -88,13 +88,17 @@ export function newTracker() { return { prevRun: new Set(), lastAction: { p1: nu
 export function resetTracker(tr) { tr.prevRun = new Set(); }
 
 const runId = (e, slot) => `${e.kind}:${slot}:${e.clone ? 1 : 0}`;
+// Portal Realm: frame, ktorý nesie LEN zatvorenie portálu, engine vkladá medzi kroky letu strely (portál sa zatvorí hneď
+// po prelete) - beh (let strely) ním NEkončí, inak by ďalší krok zaznel ako nový výstrel (hlas + zvuk útoku znova)
+const TRANSPARENT = new Set(["portal_close"]);
+const transparentFrame = (f) => (f?.effects || []).length > 0 && f.effects.every(e => TRANSPARENT.has(e?.kind));
 const slotOf = (e) => e.from || (typeof e.target === "string" ? e.target : null);
 
 // okno behu: súčet delayMs od frame-u i, kým nasledujúce frame-y nesú ten istý efekt
 function runWindow(timeline, i, id) {
   let ms = timeline[i].delayMs || 0;
   for (let j = i + 1; j < timeline.length; j++) {
-    if (!(timeline[j].effects || []).some(e => runId(e, slotOf(e)) === id)) break;
+    if (!transparentFrame(timeline[j]) && !(timeline[j].effects || []).some(e => runId(e, slotOf(e)) === id)) break;
     ms += timeline[j].delayMs || 0;
   }
   return ms;
@@ -154,7 +158,7 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
     }
     out.push({ key, char: charOf(slot), pan: panOf(e), windowMs });
   }
-  tr.prevRun = run;
+  if (!transparentFrame(frame)) tr.prevRun = run; // zatvorenie portálu uprostred letu beh neprerušuje
 
   // pohyb: zmena pozície bez vlastného zvuku presunu → krok alebo dash (podľa ohlásenej akcie)
   if (!(frame.effects || []).some(e => OWN_LOCO.has(e.kind))) {

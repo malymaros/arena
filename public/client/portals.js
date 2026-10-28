@@ -5,6 +5,7 @@
 // translate/scale cez WAAPI - skladajú sa s inline transform postavy, ktorý drží facing/pairShift/pride).
 import { gridEl, actorsEl, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
 import { PORTAL_TYPES, riftDataUrl, glyphSvg, typeIconSvg, RIFT_PAD } from "/client/portal-art.js";
+import { board } from "/client/session.js";
 
 const PT = 32;              // hrúbka trhliny (8 pixelov po 4 px)
 const POFF = PT / 2 + 4;    // stred trhliny je kúsok von od hrany políčka
@@ -36,7 +37,9 @@ function portalEl(pair, i) {
   const len = Math.round((horiz ? TILE_W : TILE_H) * 0.62);
   const p = edgePoint(end.x, end.y, end.side);
   const el = document.createElement("div");
-  el.className = "portal side-" + end.side; // side-down = pod doskou (stlmený - pás lišty kola)
+  // spodná hrana VNÚTORNÝCH stĺpcov leží v páse lišty kola pod doskou → stlmená; rohové stĺpce nič neprekrývajú
+  const underUi = end.side === "down" && end.x > 0 && end.x < board.w - 1;
+  el.className = "portal side-" + end.side + (underUi ? " under-ui" : "");
   el.dataset.pair = pair.id;
   el.style.cssText = `left:${p.x}px;top:${p.y}px;width:${len}px;height:${PT}px;--rot:${horiz ? 0 : 90}deg;--pc:${T.pc};--pc2:${T.pc2};--pad:${RIFT_PAD}px`;
   const frames = [0, 1, 2].map(f => `<img class="rift-f" alt="" src="${riftDataUrl(len, PT, pair.type, f)}">`).join("");
