@@ -32,7 +32,7 @@ import { DEATH_SEQ } from "/client/demon-sprites.js";
 import { sfx, setMusic, musicKey } from "/client/sound.js";
 import { soundForFrame, soundTimelineStart, syncMusic } from "/client/sound-map.js";
 import { perf } from "/client/perf.js";
-import { animatePortalWalk, spawnVoidHit } from "/client/portals.js";
+import { animatePortalWalk, followPortalWalk, spawnVoidHit } from "/client/portals.js";
 
 /* ---------- GameOver sekvencia ---------- */
 function showGameOverSequence(winner) {
@@ -764,7 +764,11 @@ export function schedulePlayTimeline(timeline) {
     // Portal Realm: cesta cez trhlinu (figúra už stojí na cieli, animácia ide relatívne k nemu)
     for (const { e, start } of portalWalks) {
       const el = e.clone ? cloneEls[e.from] : (e.from === "p1" ? actorP1 : actorP2);
-      animatePortalWalk(el, start, e, Math.max(400, frameHold));
+      const walk = animatePortalWalk(el, start, e, Math.max(400, frameHold), e.clone ? "clone:" + e.from : e.from);
+      if (!walk || e.clone) continue;
+      // prvky, ktoré figúru sledujú, idú tou istou cestou - inak by skočili na cieľ a prezradili ho pred animáciou
+      if (e.from === me) followPortalWalk(youMarker, walk.kf, walk.ms);
+      fxAll("portalFollowers", e.from).flat().forEach(f => followPortalWalk(f, walk.kf, walk.ms));
     }
     actors.portalSnap = {};
 

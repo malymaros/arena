@@ -7,6 +7,7 @@ import { gridEl, actorsEl, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
 import { PORTAL_TYPES, riftDataUrl, glyphSvg, typeIconSvg, RIFT_PAD } from "/client/portal-art.js";
 import { board } from "/client/session.js";
 import { portalWalkPlan, PORTAL_SHOT_PHASES as SP } from "/shared/timing.js";
+import { actors } from "/client/actors.js";
 
 const PT = 32;              // hrúbka trhliny (8 pixelov po 4 px)
 const POFF = PT / 2 + 4;    // stred trhliny je kúsok von od hrany políčka
@@ -134,8 +135,11 @@ function portalBeacon(end, type, ms) {
 // Postavu positionActors umiestni rovno na cieľovú bunku (bez CSS sklzu); cestu prehrá WAAPI na vlastnostiach
 // translate/scale/opacity relatívne k cieľu: dráha k hrane → zmiznutie v trhline → vynorenie z druhého konca → zvyšok
 // dráhy. el = canvas figúry, start = [x, y] pred akciou, e = efekt (path, passes), ms = dĺžka framu.
-export function animatePortalWalk(el, start, e, ms) {
-  if (!el || !Array.isArray(start) || !Array.isArray(e?.path) || !e.path.length) return;
+// key = "p1"/"p2"/"clone:p1"… - dráha sa zaregistruje do actors.portalPath, aby liveActorPos (démon za postavou, aury)
+// sledoval figúru cez trhlinu a nie jej cieľ. Vracia { kf, ms } pre ďalšie prvky, ktoré figúru sledujú
+// (followPortalWalk: značka YOU, Jotarov stand) - inak by prezradili cieľ behu ešte pred animáciou.
+export function animatePortalWalk(el, start, e, ms, key = null) {
+  if (!el || !Array.isArray(start) || !Array.isArray(e?.path) || !e.path.length) return null;
   const fin = cellCenter(e.path[e.path.length - 1][0], e.path[e.path.length - 1][1]);
   const rel = (p) => ({ x: p.x - fin.x, y: p.y - fin.y });
   // body dráhy: { p, kind: "walk" | "sink" | "jump" | "emerge" }
@@ -169,6 +173,13 @@ export function animatePortalWalk(el, start, e, ms) {
   // offsety musia rásť a končiť na 1
   for (let i = 1; i < kf.length; i++) if (kf[i].offset < kf[i - 1].offset) kf[i].offset = kf[i - 1].offset;
   kf[kf.length - 1].offset = 1;
+  if (key) actors.portalPath[key] = { t0: performance.now(), ms, pts: kf.map((k, i) => ({ o: k.offset, x: pts[i].p.x, y: pts[i].p.y })) };
+  followPortalWalk(el, kf, ms);
+  return { kf, ms };
+}
+// ten istý pohyb cez trhlinu pre prvok, ktorý figúru sleduje (relatívne k jeho cieľovej pozícii)
+export function followPortalWalk(el, kf, ms) {
+  if (!el || !kf) return;
   el.style.transformOrigin = el.style.transformOrigin || "50% 100%";
   el.getAnimations?.().forEach(a => { if (a.id === "portal-walk") a.cancel(); });
   const anim = el.animate(kf, { duration: ms, easing: "linear" });

@@ -191,6 +191,22 @@ export default function jotaroFx(C) {
       if (before.x !== frm.x || before.y !== frm.y) standBlip[slot] = { start: performance.now(), ox: before.x, oy: before.y };
     },
 
+    // Portal Realm: stand ide s Jotarom cez trhlinu (timeline.js - followPortalWalk), nie rovno na cieľ
+    // (MOVE-blip by stand zjavil na cieli hneď na začiatku kroku → pri prechode portálom ho zruš a stand prilep k cieľu,
+    // cestu cez trhlinu potom prehrá followPortalWalk relatívne k nemu)
+    portalFollowers(slot) {
+      const el = standEls[slot], data = C.state?.[slot];
+      if (!el || data?.char !== "jotaro" || data.x == null) return [];
+      if (standBlip[slot]) {
+        standBlip[slot] = null;
+        const { left, top } = C.cellToPx(data.x, data.y);
+        el.style.transition = "none";
+        el.style.left = (left - (C.ACTOR_W - C.TILE_W) / 2) + "px"; el.style.top = (top - (C.ACTOR_H - C.TILE_H)) + "px";
+        void el.offsetHeight; el.style.transition = "";
+      }
+      return [el];
+    },
+
     // Jotaro pri útoku (melee/S1/S2): cúvne DOZADU na miesto, kde stál stand (o STAND_OFFSET opačne než smeruje)
     bodyShift: (slot, fc) => standSwapActive(slot) ? -fc * STAND_OFFSET : 0,
 

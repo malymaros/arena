@@ -28,6 +28,18 @@ function trackMove(key, x, y, snap) {
 export function liveActorPos(key, now = performance.now()) {
   const m = motion[key];
   if (!m) return { left: 0, top: 0 };
+  // Portal Realm: figúra práve ide cez trhlinu - poloha = cieľ + posun z dráhy (animatePortalWalk)
+  const pp = actors.portalPath[key];
+  if (pp) {
+    const f = (now - pp.t0) / pp.ms;
+    if (f >= 1 || f < 0) delete actors.portalPath[key];
+    else {
+      let i = 1;
+      while (i < pp.pts.length - 1 && pp.pts[i].o < f) i++;
+      const a = pp.pts[i - 1], b = pp.pts[i], k = b.o > a.o ? (f - a.o) / (b.o - a.o) : 1;
+      return { left: m.x1 + a.x + (b.x - a.x) * k, top: m.y1 + a.y + (b.y - a.y) * k };
+    }
+  }
   const k = MOVE_MS > 0 ? Math.min(1, Math.max(0, (now - m.t0) / MOVE_MS)) : 1;
   return { left: m.x0 + (m.x1 - m.x0) * k, top: m.y0 + (m.y1 - m.y0) * k };
 }

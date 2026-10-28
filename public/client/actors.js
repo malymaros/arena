@@ -33,6 +33,9 @@ export const actors = {
   // Portal Realm: figúra v tomto frame prechádza portálom - positionActors ju umiestni rovno na cieľ (bez CSS
   // sklzu naprieč doskou) a cestu cez trhlinu prehrá WAAPI (client/portals.js). Kľúč slot alebo "clone:" + slot.
   portalSnap: {},
+  // ... a jej dráha cez trhlinu ({ t0, ms, pts: [{ o, x, y }] } - posun voči cieľu), z ktorej liveActorPos počíta
+  // aktuálnu polohu (démon za postavou, aury nesmú skočiť na cieľ behu skôr než figúra)
+  portalPath: {},
 };
 
 // nová hra / reset: figúry v idle, bez castu, flinchu a otočenia po streľbe
