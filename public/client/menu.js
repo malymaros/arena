@@ -37,7 +37,7 @@ function render() {
   const fsLabel = document.fullscreenElement ? "EXIT FULL SCREEN" : "FULL SCREEN";
   panel.innerHTML = `
     <div class="um-head"><span>MENU</span><button type="button" class="um-close" aria-label="Close">✕</button></div>
-    <button type="button" class="menu-item" data-act="reload">⟳ RELOAD GAME<small>if the game is stuck - you keep your seat</small></button>
+    <button type="button" class="menu-item" data-act="reload">⟳ RELOAD GAME</button>
     ${canFullscreen ? `<button type="button" class="menu-item" data-act="fullscreen">⛶ ${fsLabel}</button>` : ""}
     <button type="button" class="menu-item" data-act="sound">♪ SOUND</button>
     <button type="button" class="menu-item" data-act="graphics">◐ GRAPHICS: ${perf.lite ? "LITE" : "FULL"}</button>

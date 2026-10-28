@@ -426,20 +426,26 @@ function startMusicEl() {
 export function musicKey() { return currentMusicKey; }
 // prepni hudbu na `key` (null = ticho); `fallback` sa použije, ak `key` nemá súbory (napr. music.final → music.battle)
 export function setMusic(key, fallback = null) {
+  wantedMusic = { key, fallback };
   if (key && !(entryFor(key)?.urls || []).length) key = fallback;
   if (key === currentMusicKey) return;
   stopMusicEl();
   currentMusicKey = key;
   if (key) startMusicEl();
 }
-// vrstvy sa zmenili (načítaný balík / koncept) - ak aktuálna hudba má teraz iný súbor, prelínaj na nový
+// požadovaná hudba pred náhradou za fallback - po dotiahnutí balíka sa vyhodnotí znova (restartMusicIfChanged)
+let wantedMusic = { key: null, fallback: null };
+// vrstvy sa zmenili (načítaný balík / koncept) - ak aktuálna hudba má teraz iný súbor, prelínaj na nový.
+// Rozhoduje POŽADOVANÝ kľúč: pri reloade sa balík dotiahne až po prvom setMusic, ktorý vtedy spadol na fallback
+// (portal realm → music.battle, lebo music.battle.portal ešte nemal súbor) - po načítaní hrá správna skladba
 function restartMusicIfChanged() {
-  if (!currentMusicKey) return;
+  const { key: wk, fallback: wf } = wantedMusic;
+  const want = wk && (entryFor(wk)?.urls || []).length ? wk : wf;
+  if (!currentMusicKey && !want) return;
   const urls = entryFor(currentMusicKey)?.urls || [];
-  if (currentMusicUrl && urls.includes(currentMusicUrl)) return;
-  const k = currentMusicKey;
+  if (want === currentMusicKey && currentMusicUrl && urls.includes(currentMusicUrl)) return;
   stopMusicEl();
   currentMusicKey = null;
-  setMusic(k);
+  setMusic(wk, wf);
 }
 function applyMusicVolume() { music?.setVolume(musicTargetVolume()); }

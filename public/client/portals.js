@@ -36,7 +36,7 @@ function portalEl(pair, i) {
   const len = Math.round((horiz ? TILE_W : TILE_H) * 0.62);
   const p = edgePoint(end.x, end.y, end.side);
   const el = document.createElement("div");
-  el.className = "portal";
+  el.className = "portal side-" + end.side; // side-down = pod doskou (stlmený - pás lišty kola)
   el.dataset.pair = pair.id;
   el.style.cssText = `left:${p.x}px;top:${p.y}px;width:${len}px;height:${PT}px;--rot:${horiz ? 0 : 90}deg;--pc:${T.pc};--pc2:${T.pc2};--pad:${RIFT_PAD}px`;
   const frames = [0, 1, 2].map(f => `<img class="rift-f" alt="" src="${riftDataUrl(len, PT, pair.type, f)}">`).join("");

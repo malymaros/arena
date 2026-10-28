@@ -156,8 +156,6 @@
    žiadny náhľad z prehliadača, žiadny popis, žiadne označenie */
 .touch .controls-row .locked-ui { pointer-events: none; }
 
-/* menu ☰: RELOAD GAME len s nápisom, bez vysvetľujúceho podnadpisu */
-.touch .menu-item[data-act="reload"] small { display: none; }
 
 /* lobby: −/+ pri percentách dlaždíc (lobby.js, len dotyk) */
 .weight .w-step {

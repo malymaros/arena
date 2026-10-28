@@ -212,6 +212,8 @@ body {
 .portal .p-tag.start { left: -20px; }
 .portal .p-tag.end { right: -20px; }
 .perf-lite .portal .rift-spark { display: none; }
+/* portály na spodnej hrane ležia v páse lišty kola pod doskou - stlmené, nech je UI výrazné a čitateľné */
+.portal.side-down { opacity: .38; }
 /* záblesk trhliny pri prechode (vstup/výstup) */
 .portal-flash { position: absolute; width: 140px; height: 140px; border-radius: 50%; pointer-events: none; z-index: 6;
   background: radial-gradient(circle, #fff 0 12%, var(--pc, #c04dff) 35%, transparent 68%); transform: translate(-50%, -50%); }
