@@ -39,6 +39,12 @@ export function createEngine(io = {}) {
   // zber buniek, ktorými figúry prešli počas PRÁVE vykonávanej akcie (napĺňajú trackSteps/trackCloneSteps);
   // null mimo vyhodnocovania akcie - pasca sa triggeruje až PO úplnom dokončení súperovej akcie
   let actionSteps = null;
+  // labyrint „peek": framy JEDNEJ akcie (ohlásenie → koniec vrátane pauzy) nesú NEenumerovateľný tag
+  // act = { slot, n } (do JSON/socketu sa nedostane) - redactTimelineFor podľa neho pozná hranice
+  // súperovej akcie a odhalí ju prekliatemu, ak začala na jeho políčku
+  let actTag = null, actSeq = 0;
+  const beginAct = (slot) => { actTag = { slot, n: ++actSeq }; };
+  const endAct = () => { actTag = null; };
 
   // vnútorný scope enginu pre moduly mechaník (engine/labyrinth|timestop|laststand|tiles.js) - getter/setter
   // pre stav, funkcie zostávajúce v tomto súbore; moduly sa doň zapíšu pri inštalácii nižšie
@@ -46,7 +52,7 @@ export function createEngine(io = {}) {
     get actionSteps() { return actionSteps; }, set actionSteps(v) { actionSteps = v; },
     get game() { return game; }, set game(v) { game = v; },
     get rand() { return rand; }, set rand(v) { rand = v; },
-    pushStateFrame, other, attackDirOk, special1ArgsOk, winnerNow, notePrideHit, doAction,
+    pushStateFrame, beginAct, endAct, other, attackDirOk, special1ArgsOk, winnerNow, notePrideHit, doAction,
     runRoundLoop, finishRound, pushInvalid, killClone, breakTrap, strikeZone,
     kitOf,
   };
@@ -272,7 +278,9 @@ function inBounds(x, y, board = game.board) {
 
 function pushStateFrame(timeline, effects = [], delayMs = SMALL_DELAY_MS) {
   const snap = snapshot();
-  timeline.push({ ...snap, effects, delayMs });
+  const frame = { ...snap, effects, delayMs };
+  if (actTag) Object.defineProperty(frame, "act", { value: actTag }); // neenumerovateľný - neserializuje sa
+  timeline.push(frame);
 }
 
 function pushInvalid(tl, who, ms = SMALL_DELAY_MS, reason = null) {
@@ -1198,10 +1206,12 @@ function resolveTurn() {
       if (p.lastStandBuff) continue; // buffnutý hráč Last Hope nemá (má démon útok)
       if (p.lastHope) {
         p.lastHope = false;
+        beginAct(slot);
         pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "last_hope", dir: null } }], 250);
         // skamenený hráč: zlaté akcie sa nevykonajú (bez ceny) a kameň NEuberajú
-        if (p.stone > 0) { pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS); continue; }
+        if (p.stone > 0) { pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS); endAct(); continue; }
         resolveLastHopeSummon(slot, tl);
+        endAct();
       } else {
         pushStateFrame(tl, [{ kind: "beat_empty", from: slot, beat: "lhope" }], ACTION_GAP_MS);
       }
@@ -1215,6 +1225,7 @@ function resolveTurn() {
     const isMirror = gp.goldenMirror;
     const cost = isMirror ? GOLDEN_MIRROR_COST : GOLDEN_COST;
     const type = isMirror ? "golden_mirror" : "golden_shield";
+    beginAct(second);
     pushStateFrame(tl, [{ kind: "action", from: second, action: { type, dir: null } }], 250);
     if (gp.stone > 0) {
       // skamenený hráč: zlatý predťah sa nevykoná (mana ostáva) a kameň NEuberá
@@ -1239,6 +1250,7 @@ function resolveTurn() {
     gp.golden = false;
     gp.goldenMirror = false;
     pushStateFrame(tl, [], ACTION_GAP_MS); // oddeľ predťah od prvej akcie startera
+    endAct();
   } else {
     // prázdny golden shield/mirror beat - zelená šípka cezeň prekrokuje (rovnako ako prázdny golden mana)
     pushStateFrame(tl, [{ kind: "beat_empty", from: second, beat: "gpre" }], ACTION_GAP_MS);
@@ -1276,9 +1288,11 @@ function runRoundLoop() {
         // vrátane vyhodnotenia jeho dlaždíc; odkamenenie sa tak prejaví až na začiatku NASLEDUJÚCEJ akcie
         // (predtým socha zmizla už pri „STONED" float 2. akcie, hoci dlaždica pod hráčom sa ešte netriggerovala).
         ctx.tookStoned[slot] = true;
+        beginAct(slot);
         pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "stoned", dir: null, to: null } }], 250);
         pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS);
         pushStateFrame(tl, [], ACTION_GAP_MS);
+        endAct();
         ctx.slotIdx++;
         continue;
       }
@@ -1288,7 +1302,10 @@ function runRoundLoop() {
       const foeMirrorArmed = game.players[foe].mirror;
       const act = meP.queue[ctx.i];
       // ohlás akciu klientovi (záznam kola pod HUD widgetom)
-      if (act) pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null, to: act.to || null } }], 250);
+      if (act) {
+        beginAct(slot);
+        pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null, to: act.to || null } }], 250);
+      }
       // pasca (Countess/Onre): zbieraj bunky prejdené počas akcie; trigger sa vyhodnotí AŽ PO jej dokončení
       actionSteps = { p1: [], p2: [], p1c: [], p2c: [] };
       const res = doAction(slot, act, tl);
@@ -1296,6 +1313,7 @@ function runRoundLoop() {
       // timestop_actions. Súperovu obranu NEspotrebuj (ostáva armed cez zamrazenie), pasce nevyhodnocuj (čas stojí).
       if (res === PAUSE) {
         actionSteps = null;
+        endAct();
         ctx.slotIdx++; // resume pokračuje NASLEDUJÚCOU akciou pôvodnej queue
         pushStateFrame(tl, [{ kind: "timestop_wait", from: slot }], SMALL_DELAY_MS);
         ctx.emittedUpTo = tl.length;
@@ -1312,6 +1330,7 @@ function runRoundLoop() {
       if (w) { ctx.ended = true; return finishRound(); }
       // krátka pokojová pauza medzi akciami, nech oko stihne zaregistrovať každý ťah
       pushStateFrame(tl, [], ACTION_GAP_MS);
+      endAct();
       ctx.slotIdx++;
     }
 
@@ -1338,6 +1357,7 @@ function finishRound() {
   const ctx = game.roundCtx;
   const { tl, order, doomSlot } = ctx;
   let ended = ctx.ended;
+  endAct(); // lethal uprostred akcie - jej tag nesmie presiaknuť do koncovej fázy
 
   // koniec hry: tieňové klony miznú (aj pri výhre majiteľa) - poof po dohraní smrteľného zásahu;
   // pasce zanikajú ticho (smrť castera / koniec hry - nová hra aj tak resetuje hráčov)
@@ -1368,9 +1388,11 @@ function finishRound() {
     // vyhodnotí sa len tomu, koho akcia príde na rad prvá (starter), druhému červený ✗.
     let demonUsed = false;
     for (const slot of order) {
+      endAct();
       const p = game.players[slot];
       if (p.lastStand) {
         p.lastStand = false;
+        beginAct(slot);
         pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "last_stand", dir: null } }], 250);
         // skamenený hráč: zlatá akcia sa nevykoná (bez ceny) a kameň NEuberá
         if (p.stone > 0) { pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS); continue; }
@@ -1387,6 +1409,7 @@ function finishRound() {
       }
       p.goldenMana = false;
       const cost = p.manaRefills + 1;
+      beginAct(slot);
       pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: "golden_mana", dir: null } }], 250);
       // skamenený hráč: zlatá akcia sa nevykoná (bez ceny) a kameň NEuberá
       if (p.stone > 0) { pushStateFrame(tl, [{ kind: "stoned", target: slot }], SMALL_DELAY_MS); continue; }
@@ -1402,6 +1425,7 @@ function finishRound() {
         pushInvalid(tl, slot, SMALL_DELAY_MS, p.mana >= MAX_MANA ? "mana_full" : "hp_low");
       }
     }
+    endAct();
 
     // DOOM: ak je toto buffnuté (posledné) kolo a obaja stále žijú → démon Last Stand hráča opustí a zabije ho.
     // Banish je istá smrť = koniec hry - ak beží labyrint, prehraj rovnakú sekvenciu ako pri istom zásahu:

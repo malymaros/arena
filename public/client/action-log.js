@@ -16,8 +16,12 @@ export function displayDir(action, ownerSlot) {
   const vertMirrored = action?.type === "move" || action?.type === "dash" || action?.type === "attack";
   // anonymizuj len keď Naruto SKUTOČNE má klona - bez klona sa vertikála nerozdvojuje a smer nič neprezrádza
   // (klona má len Naruto - nastavuje ho jedine jeho special, swap ho maže)
+  // labyrint: prekliatemu je lovcov klon skrytý (aj počas peeku môže byť v tme) → Naruto-lovec vždy „↕",
+  // inak by smer prezradil, či je odhalená figúra pravý Naruto (a ↕ len pri klonovi by prezradil klona)
+  const o = ownerSlot ? state?.[ownerSlot] : null;
+  const hiddenNaruto = o?.char === "naruto" && (o.x == null || o.labPeek);
   if (vertMirrored && (dir === "up" || dir === "down") &&
-      ownerSlot && ownerSlot !== me && state?.[ownerSlot]?.clone) {
+      ownerSlot && ownerSlot !== me && (o?.clone || hiddenNaruto)) {
     return "vert";
   }
   return dir;

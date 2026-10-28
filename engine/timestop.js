@@ -81,9 +81,11 @@ function runTimestopActions(queue) {
   E.actionSteps = null;
   for (const act of queue) {
     // frozen:true - klient túto akciu NEzaráta do round-scriptu (kurzor ostáva na THE WORLD), len ju animuje
+    E.beginAct(slot); // labyrint peek: aj zmrazená akcia z bunky prekliateho sa mu odhalí
     E.pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null }, frozen: true }], 250);
     E.doAction(slot, act, tl); // frozen: zásah na súpera sa cez guardy v apply* len ohlási (ts_hit/ts_mirror)
     E.pushStateFrame(tl, [], ACTION_GAP_MS);
+    E.endAct();
   }
   applyTimestopResume();
   // resume mohol niekoho zabiť (kumulatívny zásah / mirror odraz na Jotara) - prvá smrť končí hru

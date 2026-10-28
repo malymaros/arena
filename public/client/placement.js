@@ -138,7 +138,8 @@ export function positionActors(s, immediate = false) {
   [["p1", cloneEls.p1, p1, p2], ["p2", cloneEls.p2, p2, p1]].forEach(([slot, el, data, opp]) => {
     const c = data?.clone;
     // klon už puffol (clone_die) - drž ho skrytého, aj keď ho snapshot toho istého framu ešte nesie (žiadny problik)
-    if (actors.cloneDead[slot] || !data || !data.char || data.x == null || !c) {
+    // (majiteľ so skrytou pozíciou x null a viditeľným klonom = labyrint peek: odhalený je len klon)
+    if (actors.cloneDead[slot] || !data || !data.char || !c) {
       el.style.display = "none";
       el._logCell = null;
       return;

@@ -106,11 +106,73 @@ function maskTrapFrame(oppSlot, f) {
   return out;
 }
 
+// labyrint „peek": súperova akcia, ktorá ZAČALA na fakľovej bunke prekliateho (jeho vlastnej alebo bunke
+// jeho klona), sa mu odhalí celá - záznam kola, animácia, strela, aj pohyb/dash preč. Odhalí sa LEN figúra,
+// ktorá na fakľovej bunke pri ohlásení akcie stála (lovcova druhá figúra - klon/majiteľ inde - ostáva v tme
+// celý čas). Hranice akcie nesie neenumerovateľný tag frame.act (pushStateFrame počas beginAct/endAct).
+// Mana ostáva skrytá. Po akcii lovec zmizne (lab_peek_end → klient ho vyfaduje), ak už nestojí na fakli.
+function onTorch(me, x, y) {
+  if (!me || me.x == null || x == null) return false;
+  return (me.x === x && me.y === y) || !!(me.clone && me.clone.x === x && me.clone.y === y);
+}
+function peekStart(me, opp) {
+  return { owner: onTorch(me, opp?.x, opp?.y), clone: !!opp?.clone && onTorch(me, opp.clone.x, opp.clone.y), cloneGone: false };
+}
+// ktoré lovcove figúry sú v tomto frame odhalené akciou (owner/clone); null = nič (bežná redakcia)
+function peekShown(pk, opp) {
+  if (!pk || !opp) return null;
+  const owner = pk.owner;
+  // klon: ten, čo stál na fakli (kým nezanikne), alebo klon stojaci na bunke odhaleného majiteľa
+  // (zliatie / nový summon tam, kde majiteľ stojí - prekliaty to miesto aj tak vidí)
+  const clone = !!opp.clone && ((pk.clone && !pk.cloneGone) || (owner && opp.clone.x === opp.x && opp.clone.y === opp.y));
+  return (owner || clone) ? { owner, clone } : null;
+}
+function peekFrame(mySlot, oppSlot, f, shown) {
+  const opp = f[oppSlot];
+  // niektorá figúra ostáva v tme → efekty nesmú prezradiť jej bunku (Narutov klon/majiteľ)
+  const partial = !shown.owner || (!!opp.clone && !shown.clone);
+  const vis = [];
+  if (shown.owner) vis.push([opp.x, opp.y]);
+  if (shown.clone) vis.push([opp.clone.x, opp.clone.y]);
+  const okCell = (c) => vis.some(([vx, vy]) => vx === c[0] && vy === c[1]);
+  const effects = (f.effects || []).map(e => {
+    if (!e) return null;
+    if (e.from !== oppSlot && e.target !== oppSlot) return redactEffect(mySlot, oppSlot, e, f);
+    if (!partial) return e;
+    if (e.kind === "charge" || e.kind === "wall_bump") return (e.clone ? shown.clone : shown.owner) ? e : null;
+    if (Array.isArray(e.cells)) return { ...e, cells: e.cells.filter(okCell) };
+    if (Array.isArray(e.cell)) return okCell(e.cell) ? e : null;
+    return e;
+  }).filter(Boolean);
+  return redactRosterMana(oppSlot, redactTilesFor(mySlot, {
+    ...f,
+    [mySlot]: { ...f[mySlot], hunterHere: hunterLitCells(f[mySlot], opp) },
+    [oppSlot]: {
+      ...redactActor(opp),
+      x: shown.owner ? opp.x : null, y: shown.owner ? opp.y : null,
+      clone: shown.clone ? { ...opp.clone } : null,
+      shield: opp.shield, shieldGold: opp.shieldGold, mirror: opp.mirror, mirrorGold: opp.mirrorGold,
+      labPeek: true,
+    },
+    effects,
+  }));
+}
+
 function redactTimelineFor(mySlot, tl) {
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
-  return tl.map(f0 => {
+  let pk = null, pkN = null;
+  const meta = []; // per výstupný frame: odhalené figúry (peek) + či sú v ňom lovcove figúry na fakli
+  const out = tl.map(f0 => {
+    const tag = f0?.act; // tag čítaj z originálu - kópie (maskTrapFrame) neenumerovateľnú vlastnosť nenesú
     const f = maskTrapFrame(oppSlot, f0);
     if (f?.[mySlot]?.labyrinth && !f[mySlot].labReveal) {
+      const me = f[mySlot], opp = f[oppSlot];
+      if (!tag || tag.slot !== oppSlot) { pk = null; pkN = null; }
+      else if (pkN !== tag.n) { pk = peekStart(me, opp); pkN = tag.n; } // štart akcie = bunky pri ohlásení
+      const shown = peekShown(pk, opp);
+      meta.push({ shown, lit: { owner: onTorch(me, opp?.x, opp?.y), clone: !!opp?.clone && onTorch(me, opp.clone.x, opp.clone.y) } });
+      if (pk && (f.effects || []).some(e => e?.kind === "clone_die" && e.target === oppSlot)) pk.cloneGone = true;
+      if (shown) return peekFrame(mySlot, oppSlot, f, shown);
       // hunterHere sa musí počítať aj pre každý FRAME timeline (nielen root snapshot) - inak keď prekliaty
       // POČAS kola vstúpi na lovcovu bunku, frame ho nenesie a klient ukáže čierny tieň namiesto ožiareného lovca
       const hunterHere = hunterLitCells(f[mySlot], f[oppSlot]);
@@ -121,6 +183,8 @@ function redactTimelineFor(mySlot, tl) {
         effects: (f.effects || []).map(e => redactEffect(mySlot, oppSlot, e, f)).filter(Boolean),
       }));
     }
+    pk = null; pkN = null;
+    meta.push(null);
     if (f?.[oppSlot]?.labyrinth && !f[oppSlot].labReveal) {
       return redactRosterMana(oppSlot, {
         ...f,
@@ -130,6 +194,18 @@ function redactTimelineFor(mySlot, tl) {
     }
     return f;
   });
+  // koniec odhalenej akcie: figúra, ktorá v nasledujúcom (redigovanom) frame zmizne - nie je už odhalená ani
+  // na fakli - sa v poslednom odhalenom frame vyfaduje (lab_peek_end). Bez ďalšieho frame-u rozhoduje fakľa.
+  meta.forEach((m, i) => {
+    if (!m?.shown) return;
+    const nx = i + 1 < meta.length ? meta[i + 1] : undefined;
+    if (nx === null) return; // ďalší frame už nie je redigovaný (odhalenie/koniec labyrintu) → postava ostáva
+    const stays = (fig) => nx ? (nx.shown?.[fig] || nx.lit[fig]) : m.lit[fig];
+    const owner = m.shown.owner && !stays("owner");
+    const clone = m.shown.clone && !stays("clone");
+    if (owner || clone) out[i] = { ...out[i], effects: [...out[i].effects, { kind: "lab_peek_end", target: oppSlot, owner, clone }] };
+  });
+  return out;
 }
 
 // 2× VÝSTUPNÝ dmg pre hráča s maze buffom (ten, čo úspešne priamym castom zaklial súpera do labyrintu).

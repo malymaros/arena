@@ -3,7 +3,7 @@
 // prechod medzi kolami, koniec hry (game-over sekvencia / medzihra série) a upratanie figúr.
 import { playback } from "/client/playback.js";
 import { actors } from "/client/actors.js";
-import { setAnim, NEW_ROUND_MS, resetActorFade, MOVE_MS, INVALID_MSG, POSE_TAIL_MS, fadeActor, INVALID_MSG_DEFAULT } from "/client/anim.js";
+import { setAnim, NEW_ROUND_MS, resetActorFade, MOVE_MS, INVALID_MSG, POSE_TAIL_MS, fadeActor, INVALID_MSG_DEFAULT, peekFadeOut, clearPeekFade } from "/client/anim.js";
 import { me, state, computeWinnerFromState, otherSlot } from "/client/session.js";
 import { renderSeriesCrowns } from "/client/phase-ui.js";
 import { hudTurn, actorsEl, goOverlay, roundBannerEl, lockBtn, hudP1Mana, hudP2Mana, actorP1, actorP2, hudBoxP1, hudBoxP2 } from "/client/dom.js";
@@ -287,6 +287,11 @@ export function schedulePlayTimeline(timeline) {
     const beforeP1 = prev?.p1 || state.p1;
     const beforeP2 = prev?.p2 || state.p2;
     soundForFrame(timeline, i - 1, { p1: beforeP1, p2: beforeP2 });
+    // labyrint peek: začína odhalená lovcova akcia - zruš fade-out z predošlého odhalenia (fill forwards)
+    {
+      const oS = otherSlot();
+      if (oS && frame[oS]?.labPeek && !(oS === "p1" ? beforeP1 : beforeP2)?.labPeek) clearPeekFade(oS);
+    }
 
     state.p1 = frame.p1; state.p2 = frame.p2;
     state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending;
@@ -543,6 +548,10 @@ export function schedulePlayTimeline(timeline) {
       if (e.kind === "labyrinth_reveal" && (e.target === "p1" || e.target === "p2")) {
         if (me === e.target) fadeActor(otherSlot(), 0, 1, frameHold);
         spawnFloat(e.target, "🌀 REVEALED!", "maze-float");
+      }
+      // labyrint peek: odhalená lovcova akcia skončila → figúra, ktorá už nestojí na mojej fakli, zmizne v tme
+      if (e.kind === "lab_peek_end" && (e.target === "p1" || e.target === "p2") && me !== e.target) {
+        peekFadeOut(e.target, e.owner, e.clone, frameHold);
       }
       // súper vstúpil na Ariadninu niť - perzistentný obrys kreslí raf zo state.threadMark; navyše
       // preblik obrysu na KAŽDEJ prejdenej niťovej bunke - okrem mojej vlastnej (tam lovca vidím naživo/lit,

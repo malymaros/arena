@@ -5,6 +5,7 @@ import { CHARGE_STEP_MS, MOVE_MS } from "/shared/timing.js";
 import { actorP1, actorP2 } from "/client/dom.js";
 import { ANIM_DEF } from "/client/sprites.js";
 import { actors } from "/client/actors.js";
+import { cloneEls } from "/client/actor-layers.js";
 
 // === Timing ===
 export { MOVE_MS }; // pohyb na boarde (shared/timing.js); CSS číta --move-ms (nastavené nižšie)
@@ -45,10 +46,23 @@ export function fadeActor(slot, from, to, dur) {
   );
 }
 export function resetActorFade() {
-  for (const slot of ["p1", "p2"]) {
-    if (_teleAnim[slot]) { try { _teleAnim[slot].cancel(); } catch {} _teleAnim[slot] = null; }
-    (slot === "p1" ? actorP1 : actorP2).style.opacity = "";
+  for (const slot of ["p1", "p2"]) clearPeekFade(slot);
+}
+// labyrint „peek": lovcova akcia z mojej fakľovej bunky sa odohrala odhalená - po nej figúra (majiteľ a/alebo
+// klon) zmizne v tme fade-om. fill forwards → pred ďalším odhalením treba zrušiť (clearPeekFade).
+const _peekClone = { p1: null, p2: null };
+export function peekFadeOut(slot, owner, clone, dur) {
+  if (owner) fadeActor(slot, 1, 0, dur);
+  if (clone && cloneEls[slot]) {
+    if (_peekClone[slot]) { try { _peekClone[slot].cancel(); } catch {} }
+    _peekClone[slot] = cloneEls[slot].animate([{ opacity: 1 }, { opacity: 0 }],
+      { duration: Math.max(150, dur || 600), easing: "ease-in", fill: "forwards" });
   }
+}
+export function clearPeekFade(slot) {
+  if (_teleAnim[slot]) { try { _teleAnim[slot].cancel(); } catch {} _teleAnim[slot] = null; }
+  (slot === "p1" ? actorP1 : actorP2).style.opacity = "";
+  if (_peekClone[slot]) { try { _peekClone[slot].cancel(); } catch {} _peekClone[slot] = null; }
 }
 
 /* ---------- animation state ---------- */

@@ -229,7 +229,13 @@ export function raf() {
     const oppA = oppS ? state?.[oppS] : null;
     const oppChar = oppA?.char || null;
     const inLab = !!mine?.labyrinth;
-    const litCells = (inLab && oppChar && Array.isArray(mine.hunterHere)) ? mine.hunterHere : [];
+    const litCells = (inLab && oppChar && Array.isArray(mine.hunterHere)) ? [...mine.hunterHere] : [];
+    // labPeek: figúry odhalené akciou kreslí skutočný actor/klon canvas - ich ožiarené kópie vynechaj
+    if (oppA?.labPeek) {
+      const drop = (x, y) => { const k = litCells.findIndex(([cx, cy]) => cx === x && cy === y); if (k >= 0) litCells.splice(k, 1); };
+      if (oppA.x != null) drop(oppA.x, oppA.y);
+      if (oppA.clone) drop(oppA.clone.x, oppA.clone.y);
+    }
     // figúry na vykreslenie: ožiarení lovci (lit) majú prednosť; bez nich breadcrumb (čierny tieň) na threadMark
     const figs = litCells.length ? litCells.map(c => ({ cell: c, lit: true }))
       : (inLab && oppChar && mine.threadMark ? [{ cell: mine.threadMark, lit: false }] : []);
@@ -287,7 +293,8 @@ export function raf() {
     // labyrint: CELÝ súperov widget prekrýva bludisko (assets/minotaur/labyrint.png cez CSS .in-maze) -
     // blúdiaci (labyrinth) aj skrytý Minotaur (x null): obaja si navzájom vidia len bludisko.
     // labReveal (istý zásah v tomto ťahu) widget odkryje ešte pred animáciou akcie - HP/mana sú späť.
-    const inMaze = slot !== me && ((st.labyrinth && !st.labReveal) || st.x == null);
+    // labPeek: lovec odhalený akciou z mojej bunky - widget (HP/mana) ostáva zakrytý
+    const inMaze = slot !== me && ((st.labyrinth && !st.labReveal) || st.x == null || st.labPeek);
     box.classList.toggle("in-maze", inMaze);
     if (inMaze) {
       cvs.classList.remove("wounded", "critical", "dead", "stoned", "alt-color");
