@@ -17,6 +17,10 @@ const BODY_CROP = 0.5;      // armCrop tela pri naťahovaní (anims luffypunch*)
 const STD_BODY = 66 / 128, LUFFY_BODY_PX = 112;
 const centerMul = (frame) => STD_BODY / (LUFFY_BODY_PX / frame);
 const CENTER_SCALE = { "Attack_1.png": centerMul(144), "Special_1.png": centerMul(160) }; // melee, guľa
+// nohy vo frame (spodok figúry / výška framu): ostatní mágovia stoja na spodku framu, takže ich zmenšený stred
+// stojí na spodku štandardného canvasu. Luffyho sheety majú pod nohami voľné miesto → bez ukotvenia za nohy by
+// zmenšená figúra visela vysoko nad ostatnými (melee Attack_1: nohy y135/144, Special 2 Attack_2: y199/208).
+const CENTER_FEET = { "Attack_1.png": 135 / 144, "Attack_2.png": 199 / 208 };
 
 export default function luffyFx(C) {
   /* ---------- Special 1: naťahovacia ruka ---------- */
@@ -124,6 +128,16 @@ export default function luffyFx(C) {
     clearOverlays() { centerRemove(); armRemove(); },
     // generický stred (melee Attack_1, Special 2 Attack_2) v štandardnej veľkosti mága
     centerScale: (slot, sp) => CENTER_SCALE[sp?.file] ?? 1,
+    // ... ukotvený za nohy na nožnú líniu štandardného stredového mága (spodok canvasu bez korekcie)
+    centerPlace(cvs, flip) {
+      const feet = CENTER_FEET[cvs.dataset.file];
+      if (!feet) return false;
+      const basePx = Math.round(C.TILE_H * C.SPECIAL_SCALE);
+      cvs.style.left = "50%";
+      cvs.style.top = `calc(50% + ${Math.round(basePx / 2)}px)`;
+      cvs.style.transform = `translate(-50%, -${(feet * 100).toFixed(2)}%) scaleX(${flip})`;
+      return true;
+    },
     // dash: beh (setAnim "run" z prehrávača) nahradí kotúľ Special_7 od začiatku presunu
     boardAnim({ slot, st, aSt, anim }) {
       if (st?.char === "luffy" && aSt?.key === "run" && curAction[slot] === "dash") return C.ANIM_DEF.luffydash;

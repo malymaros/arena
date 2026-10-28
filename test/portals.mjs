@@ -16,7 +16,7 @@ const P = (id, type, a, b) => ({ id, type, ends: [{ x: a[0], y: a[1], side: a[2]
 
 const CFG = { format: "single", tilesPerRound: 1, timer: "off", tilePreview: false, colorPref: "white", arena: "portal",
   tileWeights: { dmg: 90, heal: 0, mana: 0, ik: 10, power: 0, block: 0 },
-  portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 } };
+  portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 }, portalsPerRound: 1 };
 const R = { type: "recharge" }, S = { type: "shield" }, PASS = { type: "pass" };
 const PASS3 = [PASS, PASS, PASS];
 const mv = (dir) => ({ type: "move", dir }), dash = (dir) => ({ type: "dash", dir }), atk = (dir) => ({ type: "attack", dir });
@@ -527,7 +527,7 @@ console.log("Generovanie / config / dlaždice");
   check(e.game.portals.length === 1 && Array.isArray(e.snapshot().portals) && e.game.arena === "portal-realm", "GN1: štart hry - 1 pár, snapshot nesie portály, aréna portal-realm");
   const e2 = createEngine({ seed: 7 });
   e2.startMatch(e2.sanitizeConfig({ ...CFG, arena: undefined, portalWeights: undefined, tileWeights: { dmg: 75, heal: 5, mana: 5, ik: 5, power: 5, block: 5 } }));
-  check(e2.game.portals.length === 0 && !("portals" in e2.snapshot()) && !("arena" in e2.game.config) && e2.game.arena === "bridge",
+  check(e2.game.portals.length === 0 && !("portals" in e2.snapshot()) && !("arena" in e2.game.config) && !("portalsPerRound" in e2.game.config) && e2.game.arena === "bridge",
     "GN1: stone bridge - žiadne portály, snapshot/config bez nových kľúčov");
 }
 {
@@ -546,6 +546,37 @@ console.log("Generovanie / config / dlaždice");
     g.players.p1.mana = 6; g.players.p2.mana = 6;
   }
   check(okAll && max === 7, "GN2: +1 pár za kolo, max 7, unikátne hrany a písmená", String(max));
+}
+{
+  // „Portals / round": default 2, na štarte hry aj na konci kola pribudne N párov; 7 = plná doska hneď od štartu
+  const e = createEngine({ seed: 5 });
+  const c = e.sanitizeConfig({ ...CFG, portalsPerRound: undefined });
+  check(c.portalsPerRound === 2, "GN8: default 2 páry za kolo", J(c.portalsPerRound));
+  check(e.sanitizeConfig({ ...CFG, portalsPerRound: 99 }).portalsPerRound === 7 && e.sanitizeConfig({ ...CFG, portalsPerRound: -3 }).portalsPerRound === 1,
+    "GN8: portalsPerRound orezané na 1–7");
+  e.startMatch(c);
+  e.chooseCharacter("A", "fire"); e.chooseCharacter("B", "fire");
+  check(e.game.portals.length === 2, "GN8: default - na štarte hry 2 páry", J(e.game.portals.length));
+  const sc = scenario("fire", "fire", (g) => { g.config.portalsPerRound = 3; g.portals = []; });
+  let counts = [], spawnFx = [];
+  for (let r = 0; r < 4; r++) {
+    const tl = sc.round([R, S, PASS], [R, S, PASS]);
+    counts.push(sc.game.portals.length); spawnFx.push(fx(tl, "portal_spawn").length);
+    const g = sc.game; g.players.p1.hp = 10; g.players.p2.hp = 10; g.tiles = []; g.iks = []; g.pending = null; g.players.p1.mana = 6; g.players.p2.mana = 6;
+  }
+  check(J(counts) === "[3,6,7,7]" && J(spawnFx) === "[3,3,1,0]", "GN8: 3 za kolo - pribúda po 3, strop 7, plná doska nič", J(counts) + " " + J(spawnFx));
+  const e7 = createEngine({ seed: 9 });
+  e7.startMatch(e7.sanitizeConfig({ ...CFG, portalsPerRound: 7 }));
+  e7.chooseCharacter("A", "fire"); e7.chooseCharacter("B", "fire");
+  const ends = e7.game.portals.flatMap(p => p.ends.map(x => `${x.x},${x.y},${x.side}`));
+  check(e7.game.portals.length === 7 && new Set(ends).size === 14, "GN8: 7 za kolo - plná doska (7 párov, 14 hrán) hneď na štarte", J(e7.game.portals.length));
+  // po zatvorení páru sa v ďalšom kole doplní
+  const s7 = scenario("fire", "fire", (g) => { g.config.portalsPerRound = 7; });
+  s7.game.portals = []; s7.round([R, S, PASS], [R, S, PASS]);
+  s7.game.portals.splice(2, 1);
+  s7.game.players.p1.hp = 10; s7.game.players.p2.hp = 10; s7.game.tiles = []; s7.game.iks = []; s7.game.pending = null;
+  const tl7 = s7.round([R, S, PASS], [R, S, PASS]);
+  check(s7.game.portals.length === 7 && fx(tl7, "portal_spawn").length === 1, "GN8: zmiznutý pár sa doplní v ďalšom kole", J(s7.game.portals.length));
 }
 {
   // rohový pár sa smie vygenerovať; váha 0 = typ nikdy

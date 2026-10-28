@@ -37,7 +37,8 @@ function playMatch(ch1, ch2, seed) {
     emit: (ev, payload) => { if (ev === "game_result") result = payload; },
     emitState: (timeline) => { if (timeline) frames += timeline.length; if (PORTAL && timeline) checkPortals(engine.game, `${ch1}/${ch2} seed ${seed}`); },
   });
-  engine.startMatch(engine.sanitizeConfig(CONFIG));
+  // Portal Realm: počet párov za kolo cyklí 1–7 podľa seedu (pokrytie plnej dosky)
+  engine.startMatch(engine.sanitizeConfig(PORTAL ? { ...CONFIG, portalsPerRound: (seed % 7) + 1 } : CONFIG));
   engine.chooseCharacter("A", ch1);
   engine.chooseCharacter("B", ch2);
   const g = () => engine.game;

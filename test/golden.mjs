@@ -61,7 +61,7 @@ const MATCH_CONFIG = {
 
 const PORTAL_CONFIG = { ...MATCH_CONFIG, arena: "portal", tilesPerRound: 1,
   tileWeights: { dmg: 90, heal: 0, mana: 0, ik: 10, power: 0, block: 0 },
-  portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 } };
+  portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 }, portalsPerRound: 1 };
 
 const BASIC_TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "mirror", "special1", "demon"];
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "special1"];

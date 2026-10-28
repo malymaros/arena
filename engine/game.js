@@ -11,7 +11,7 @@ import {
   ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS,
   MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS,
   MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, VAMP_TRAP_STRIKE_MS, QUICKDRAW_MS, PASS_MANA_COST,
-  charRollMs, COLOR_ROLL_MS, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
+  charRollMs, COLOR_ROLL_MS, PORTAL_MAX_PAIRS, PORTALS_PER_ROUND, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
@@ -61,7 +61,7 @@ export function createEngine(io = {}) {
   const { PAUSE, frozenActive, noteFrozenHit, noteFrozenClone, validTimestopQueue, doJotaroWorld, runTimestopActions } = Object.assign(E, timestopModule(E));
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
-  const { isPortalRealm, portalList, spawnPortalPair, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
+  const { isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -1557,11 +1557,12 @@ function finishRound() {
     // na ďalšie kolo. Oboje nesie až finálny mini-frame, takže klient ukáže nové tiles AJ čerstvý preview
     // spolu s „ROUND N / FINAL ROUND" animáciou na začiatku nasledujúceho kola, nie uprostred dohrávania akcií.
     endOfRoundTiles();
-    // Portal Realm: nový pár portálov ako ÚPLNE posledná vec kola - hráči ho vidia od začiatku ďalšieho kola
-    const spawned = spawnPortalPair();
+    // Portal Realm: nové páry portálov (lobby „Portals / round") ako ÚPLNE posledná vec kola - hráči ich vidia od
+    // začiatku ďalšieho kola
+    const spawned = spawnPortalRound();
     const nextTurn    = game.turn + 1;
     const nextStarter = game.starter === "p1" ? "p2" : "p1"; // preklop (hru mohol začínať aj p2)
-    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: spawned ? [{ kind: "portal_spawn", id: spawned.id }] : [], delayMs: 10 });
+    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: spawned.map(p => ({ kind: "portal_spawn", id: p.id })), delayMs: 10 });
     game.turn    = nextTurn;
     game.starter = nextStarter;
   }
@@ -1732,7 +1733,7 @@ function startGame(gameIndex) {
   game.pending = null;
   rollPendingTiles(); // preview spawnov na koniec 1. kola - hráči ho vidia už pri plánovaní prvých akcií
   game.portals = [];
-  spawnPortalPair(); // Portal Realm: jeden pár hneď pri štarte každej hry (mimo portal realm nič)
+  spawnPortalRound(); // Portal Realm: „Portals / round" párov hneď pri štarte každej hry (mimo portal realm nič)
   game.phase = "playing";
 
   emitYouAre();
@@ -1794,6 +1795,8 @@ function sanitizeConfig(raw) {
     for (const k of PORTAL_TYPES) { const v = Math.max(0, Math.round(Number(pw[k]) || 0)); portalWeights[k] = v; psum += v; }
     if (psum !== 100) return null;
   }
+  // Portal Realm: koľko párov pribudne na štarte hry a na konci každého kola (1–7)
+  const portalsPerRound = Math.max(1, Math.min(PORTAL_MAX_PAIRS, Math.round(Number(raw.portalsPerRound) || PORTALS_PER_ROUND)));
   // farba hosta (osoby A): white/black si host vyberie pevne, random = losuje sa (default)
   const colorPref = ["white", "black"].includes(raw.colorPref) ? raw.colorPref : "random";
   // náhodný výber postáv (lobby „RANDOM CHARACTERS“) - default vypnutý; kľúč len keď je zapnutý
@@ -1801,7 +1804,7 @@ function sanitizeConfig(raw) {
   return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref,
     ...(raw.randomChars === true ? { randomChars: true } : {}),
     // aréna: kľúč len pre portal realm (stone bridge config ostáva bez zmeny - goldeny)
-    ...(portal ? { arena: "portal", portalWeights } : {}) };
+    ...(portal ? { arena: "portal", portalWeights, portalsPerRound } : {}) };
 }
 
 // vypršal čas na ťah: kto nie je locknutý, zahrá rozpracovaný draft doplnený náhodne; potom vyhodnoť kolo

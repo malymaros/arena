@@ -6,7 +6,7 @@ import { socket } from "/client/net.js";
 import { isTouch } from "/client/viewport.js";
 import { pixSvg } from "/client/pix.js";
 import { PORTAL_TYPES, PORTAL_ORDER, FLAME2_SVG } from "/client/portal-art.js";
-import { PORTAL_WEIGHTS, PORTAL_TILE_WEIGHTS } from "/shared/balance.js";
+import { PORTAL_WEIGHTS, PORTAL_TILE_WEIGHTS, PORTALS_PER_ROUND, PORTAL_MAX_PAIRS } from "/shared/balance.js";
 
 const lobbyEl = document.getElementById("lobby");
 
@@ -29,7 +29,7 @@ const ARENA_THUMBS = {
 let lobbyBuilt = false;
 let arena = "bridge";
 let wtab = "tiles"; // telefón v portal realm: ktorý zoznam váh je vidieť
-const forms = {};   // per aréna: { fields: {…}, tileWeights: {…}, portalWeights?: {…} }
+const forms = {};   // per aréna: { fields: {…}, tileWeights: {…}, portalWeights?: {…}, perRound?: n }
 
 const $ = (id) => document.getElementById(id);
 const sum = (o) => Object.values(o || {}).reduce((a, b) => a + (b || 0), 0);
@@ -47,14 +47,23 @@ function drawThumb(cvs, layers) {
 }
 
 // jeden riadok váhy (na dotyku −/+ po 5 % namiesto písania - číselné pole by otvorilo klávesnicu cez pol obrazovky)
-function weightRow(kind, key, label, icoHtml, val, { portal = false, alone = false } = {}) {
+function weightRow(kind, key, label, icoHtml, val, { portal = false, perRound = false } = {}) {
   const T = PORTAL_TYPES[key];
   const ico = portal ? `<span class="w-ico w-portal" style="--pc:${T.pc};--pc2:${T.pc2}"></span>`
                      : `<span class="w-ico${key === "dmg" && arena === "portal" ? " w-dmg2" : ""}">${icoHtml}</span>`;
   const step = (d, t) => isTouch ? `<button type="button" class="w-step" data-kind="${kind}" data-key="${key}" data-d="${d}">${t}</button>` : "";
   return `<label class="weight">${ico}${label}
-    ${step(-5, "−")}<input type="number" min="0" max="100" step="5" data-kind="${kind}" data-key="${key}" value="${val}"${isTouch ? " readonly" : ""}>${step(5, "+")}<span class="pct">%</span></label>${alone ? '<span class="w-fill"></span>' : ""}`;
+    ${step(-5, "−")}<input type="number" min="0" max="100" step="5" data-kind="${kind}" data-key="${key}" value="${val}"${isTouch ? " readonly" : ""}>${step(5, "+")}<span class="pct">%</span></label>${perRound ? perRoundRow() : ""}`;
 }
+
+// portal realm: koľko párov pribudne na štarte hry a na konci každého kola (1–7) - napravo od Classic
+function perRoundRow() {
+  const v = forms.portal.perRound;
+  const step = (d, t) => isTouch ? `<button type="button" class="w-step" data-kind="perround" data-d="${d}">${t}</button>` : "";
+  return `<label class="weight w-perround"><span class="w-ico w-portal w-pair" style="--pc:${PORTAL_TYPES.classic.pc};--pc2:${PORTAL_TYPES.classic.pc2}"></span>Per round
+    ${step(-1, "−")}<input type="number" min="1" max="${PORTAL_MAX_PAIRS}" step="1" data-kind="perround" value="${v}"${isTouch ? " readonly" : ""}>${step(1, "+")}<span class="pct">×</span></label>`;
+}
+const clampPerRound = (n) => Math.max(1, Math.min(PORTAL_MAX_PAIRS, n || 1));
 
 function render() {
   const f = forms[arena];
@@ -67,7 +76,7 @@ function render() {
   const portal = arena === "portal";
   $("lobby-portal-section").style.display = portal ? "" : "none";
   $("lobby-portal-weights").innerHTML = portal
-    ? PORTAL_ORDER.map(k => weightRow("portal", k, PORTAL_TYPES[k].en, "", f.portalWeights[k] || 0, { portal: true, alone: k === "classic" })).join("")
+    ? PORTAL_ORDER.map(k => weightRow("portal", k, PORTAL_TYPES[k].en, "", f.portalWeights[k] || 0, { portal: true, perRound: k === "classic" })).join("")
     : "";
   const box = $("lobby-sec-weights");
   box.classList.toggle("is-portal", portal);
@@ -101,7 +110,7 @@ export function showLobby() {
   for (const [k, id] of Object.entries(FIELDS)) fields[k] = $(id)?.querySelector(".opt.active")?.dataset.val;
   forms.bridge = { fields: { ...fields }, tileWeights: { dmg: 75, heal: 5, mana: 5, ik: 5, power: 5, block: 5 } };
   forms.portal = { fields: { ...fields }, tileWeights: { dmg: 0, heal: 0, mana: 0, ik: 0, power: 0, block: 0, ...PORTAL_TILE_WEIGHTS },
-    portalWeights: { ...PORTAL_WEIGHTS } };
+    portalWeights: { ...PORTAL_WEIGHTS }, perRound: PORTALS_PER_ROUND };
 
   lobbyEl.querySelectorAll(".arena-card").forEach(c => {
     drawThumb(c.querySelector("canvas"), ARENA_THUMBS[c.dataset.arena] || []);
@@ -124,13 +133,19 @@ export function showLobby() {
   lobbyEl.addEventListener("input", (e) => {
     const i = e.target.closest("input[data-kind]");
     if (!i) return;
+    if (i.dataset.kind === "perround") { forms.portal.perRound = clampPerRound(parseInt(i.value, 10)); return; }
     target(i.dataset.kind)[i.dataset.key] = Math.max(0, Math.min(100, parseInt(i.value, 10) || 0));
     refreshSums();
+  });
+  lobbyEl.addEventListener("change", (e) => {
+    const i = e.target.closest('input[data-kind="perround"]');
+    if (i) i.value = forms.portal.perRound;
   });
   lobbyEl.addEventListener("click", (e) => {
     const b = e.target.closest(".w-step");
     if (!b) return;
     e.preventDefault();
+    if (b.dataset.kind === "perround") { forms.portal.perRound = clampPerRound(forms.portal.perRound + Number(b.dataset.d)); render(); return; }
     const t = target(b.dataset.kind);
     t[b.dataset.key] = Math.max(0, Math.min(100, (t[b.dataset.key] || 0) + Number(b.dataset.d)));
     render();
@@ -148,7 +163,7 @@ export function showLobby() {
       tilePreview: (f.fields.preview || "on") === "on",
       colorPref: f.fields.color || "random",
       randomChars: f.fields.random === "on",
-      ...(arena === "portal" ? { arena: "portal", portalWeights: { ...f.portalWeights } } : {}),
+      ...(arena === "portal" ? { arena: "portal", portalWeights: { ...f.portalWeights }, portalsPerRound: f.perRound } : {}),
     };
     socket.emit("configure_match", config);
   });

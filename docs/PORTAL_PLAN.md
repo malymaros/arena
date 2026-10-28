@@ -52,12 +52,14 @@ Zmenšenú verziu do `public/arenas/portal-realm/` vyrobí `node tools/arena-bg/
 - Portály sú v **pároch** (oba konce rovnakého typu), pár má písmeno **A–G**, naraz najviac
   **7 párov** (= všetkých 14 hrán). Písmeno = prvé voľné.
 - **Generovanie:**
-  - **1 pár hneď pri štarte každej hry** (aj v sérii),
-  - **1 pár ako úplne posledná vec na konci kola** (po políčkach, golden mane, Last Stand heale…) —
+  - počet párov naraz = lobby **„Per round"** (vedľa Classic v PORTAL CHANCE, **1–7, default 2**,
+    `config.portalsPerRound`; doplnené 2026-10-28 — pôvodne pevne 1),
+  - **N párov hneď pri štarte každej hry** (aj v sérii; pri 7 je doska plná od štartu),
+  - **N párov ako úplne posledná vec na konci kola** (po políčkach, golden mane, Last Stand heale…) —
     hráči ho vidia od začiatku ďalšieho kola,
   - na **ľubovoľné dve voľné hrany** — aj na tej istej strane dosky, **aj obe hrany toho istého
     rohového políčka** (pozri 2.6),
-  - keď nie sú 2 voľné hrany → nič sa nevygeneruje,
+  - keď nie sú 2 voľné hrany (alebo je 7 párov) → ďalšie sa nevygenerujú, kým nejaké nezmiznú,
   - typ podľa `portalWeights`, všetko cez `rand()` (determinizmus),
   - hra, ktorá skončí uprostred kola, už negeneruje.
 - Presný vzhľad a vizuálne párovanie (písmeno/farba) sa **schváli v etape 0**.
@@ -340,7 +342,7 @@ Oba v `npm test`.
 - [ ] self-hit prekliateho/lovca labyrint neukončí
 
 **Generovanie a lobby**
-- [ ] 1 pár pri štarte hry (aj každej hry v sérii), 1 pár na konci kola ako posledný krok
+- [x] N párov (lobby „Per round") pri štarte hry (aj každej hry v sérii), N párov na konci kola ako posledný krok
 - [ ] limit 7 párov, plná doska → nič; rohový pár sa smie vygenerovať
 - [ ] písmená = prvé voľné, typy podľa váh (váha 0 = nikdy)
 - [ ] hra skončená uprostred kola negeneruje

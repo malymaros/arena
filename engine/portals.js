@@ -163,5 +163,15 @@ function walkAction(slot, dir, maxSteps, tl) {
   closePortals(used, tl);
 }
 
-return { isPortalRealm, portalList, tileDmg, spawnPortalPair, closePortals, bodyEffect, resumeFrozenPortals, threadCut, trackPath, walkAction };
+// koľko párov pribudne naraz (lobby „Portals / round", 1–7) - na štarte hry aj na konci každého kola; pri plnej doske
+// (7 párov / málo voľných hrán) sa ďalšie negenerujú, kým nejaké nezmiznú. Vracia vygenerované páry.
+function spawnPortalRound() {
+  if (!isPortalRealm()) return [];
+  const n = Math.max(1, Math.min(PORTAL_MAX_PAIRS, E.game.config.portalsPerRound || 1));
+  const out = [];
+  for (let k = 0; k < n; k++) { const p = spawnPortalPair(); if (!p) break; out.push(p); }
+  return out;
+}
+
+return { isPortalRealm, portalList, tileDmg, spawnPortalPair, spawnPortalRound, closePortals, bodyEffect, resumeFrozenPortals, threadCut, trackPath, walkAction };
 }
