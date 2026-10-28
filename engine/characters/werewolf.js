@@ -2,7 +2,7 @@
 // (klon-návnada absorbuje úder skôr než súper) alebo na okraji plochy. Zásah = WOLF_MOON_DMG[moon] bez
 // falloffu, cez obrany ako každý dmg special - vlkolak na bunke terča OSTÁVA STÁŤ aj pri bloku/odraze.
 // Bez terča je akcia len presun; charge z okrajovej bunky von sa VYKONÁ podľa wall pravidla.
-import { SPECIAL_COST, SMALL_DELAY_MS, MOVE_DELAY_MS, WOLF_DIRS, WOLF_CAST_MS, WOLF_STRIKE_MS, WOLF_MOON_DMG, moonLevelFor } from "../constants.js";
+import { SPECIAL_COST, SMALL_DELAY_MS, WOLF_DIRS, WOLF_CAST_MS, WOLF_STRIKE_MS, WOLF_MOON_DMG, moonLevelFor } from "../constants.js";
 import { portalCharge } from "./portal-charge.js";
 import * as G from "../../shared/geometry.js";
 
@@ -48,7 +48,7 @@ export default {
       const fx = [{ kind: "wolf_charge", from: slot, dir }];
       ctx.trackPath(slot, path, passes, fx);
       if (passes.length) fx.push({ kind: "portal_walk", from: slot, clone: false, dir, path, passes, charge: "wolf" });
-      ctx.pushStateFrame(tl, fx, MOVE_DELAY_MS);
+      ctx.pushStateFrame(tl, fx, ctx.walkDelay(fx)); // cez portál so stropom rýchlosti (dlhý beh trvá dlhšie)
       // Portal Realm: telo dostane HP/manu, použité páry sa zatvoria (charge = telo AJ útok)
       for (const ps of passes) ctx.bodyEffect(slot, ps, tl);
       ctx.closePortals(passes.map(ps => ps.id), tl);

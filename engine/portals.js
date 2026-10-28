@@ -8,6 +8,7 @@ import {
   SMALL_DELAY_MS, MOVE_DELAY_MS,
 } from "./constants.js";
 import * as G from "../shared/geometry.js";
+import { portalWalkMs } from "../shared/timing.js";
 
 // smer Narutovho klona (vertikálne inverzný) - zrkadlí CLONE_DIR v engine/game.js
 const CLONE_DIR4 = { up: "down", down: "up", left: "left", right: "right" };
@@ -158,7 +159,7 @@ function walkAction(slot, dir, maxSteps, tl) {
       if (clone.passes.length) fx.push({ kind: "portal_walk", from: slot, clone: true, dir: CLONE_DIR4[dir], path: clone.path, passes: clone.passes });
     } else fx.push({ kind: "wall_bump", from: slot, dir: CLONE_DIR4[dir], clone: true });
   }
-  E.pushStateFrame(tl, fx, MOVE_DELAY_MS);
+  E.pushStateFrame(tl, fx, walkDelay(fx));
   for (const ps of owner.passes) bodyEffect(slot, ps, tl); // klon HP/manu nedostane, portál len spáli
   closePortals(used, tl);
 }
@@ -173,5 +174,12 @@ function spawnPortalRound() {
   return out;
 }
 
-return { isPortalRealm, portalList, tileDmg, spawnPortalPair, spawnPortalRound, closePortals, bodyEffect, resumeFrozenPortals, threadCut, trackPath, walkAction };
+// dĺžka pohybového framu: bez prechodu portálom MOVE_DELAY_MS (bridge), s prechodom podľa najdlhšej dráhy
+// (majiteľ / klon) so stropom rýchlosti - klient animuje cestu cez celý frame (animatePortalWalk)
+function walkDelay(fx) {
+  return fx.filter(e => e.kind === "portal_walk")
+    .reduce((ms, e) => Math.max(ms, portalWalkMs(e.path.length, e.passes.length)), MOVE_DELAY_MS);
+}
+
+return { walkDelay, isPortalRealm, portalList, tileDmg, spawnPortalPair, spawnPortalRound, closePortals, bodyEffect, resumeFrozenPortals, threadCut, trackPath, walkAction };
 }

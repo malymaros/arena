@@ -48,7 +48,7 @@
           {"p1":{"~":{"mana":9}},"effects":[{"kind":"recharge","from":"p1","cells":[[0,1]],"amount":4}],"delayMs":1080},
           {"p2":{"~":{"mirror":false}},"effects":[],"delayMs":630},
           {"effects":[{"kind":"action","from":"p2","action":{"type":"attack","dir":"right","to":null}}],"delayMs":250},
-          {"p2":{"~":{"mana":3}},"effects":[{"kind":"charge","from":"p2","dir":"right","cell":[0,0],"clone":false,"portal":{"id":"B","type":"power","enter":{"x":3,"y":1,"side":"right"},"exit":{"x":0,"y":0,"side":"left"}},"aura":{"power":2,"defBreak":false}}],"delayMs":432},
+          {"p2":{"~":{"mana":3}},"effects":[{"kind":"charge","from":"p2","dir":"right","cell":[0,0],"clone":false,"portal":{"id":"B","type":"power","enter":{"x":3,"y":1,"side":"right"},"exit":{"x":0,"y":0,"side":"left"}},"aura":{"power":2,"defBreak":false}}],"delayMs":734},
           {"portals":[{"id":"A","type":"hp","ends":[{"x":0,"y":2,"side":"left"},{"x":0,"y":1,"side":"left"}]}],"effects":[{"kind":"portal_close","ids":["B"]}],"delayMs":1080},
           {"effects":[{"kind":"charge","from":"p2","dir":"right","cell":[1,0],"clone":false,"aura":{"power":2,"defBreak":false}}],"delayMs":432},
           {"effects":[{"kind":"charge","from":"p2","dir":"right","cell":[2,0],"clone":false,"aura":{"power":2,"defBreak":false}}],"delayMs":432},

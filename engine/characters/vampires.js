@@ -1,7 +1,7 @@
 // Vampire (countess, p1) a Onryō (onre, p2): special = skrytá PASCA na zvolenej bunke - BEZ obmedzení
 // (aj súperova aktuálna bunka; trigger až pri opätovnom vstupe/prechode). Značku vidí len caster. Max 1
 // pasca - recast starú nahradí. Trigger rieši resolveTrapsAfterAction/triggerTrap v engine.
-import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, VAMP_CAST_MS, START_HP, MAX_MANA, MELEE_COST, MELEE_REPEAT, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS, DASH_COST, MOVE_DELAY_MS, WOLF_STRIKE_MS, VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS } from "../constants.js";
+import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, VAMP_CAST_MS, START_HP, MAX_MANA, MELEE_COST, MELEE_REPEAT, VAMP_MELEE_DMG, VAMP_CHARGE_DMG, VAMP_CHARGE_BONUS, DASH_COST, WOLF_STRIKE_MS, VAMP_TRAP_STRIKE_MS, VAMP_HEAL_BEAT_MS } from "../constants.js";
 import * as G from "../../shared/geometry.js";
 import { portalCharge } from "./portal-charge.js";
 
@@ -139,7 +139,7 @@ function doVampCharge(ctx, slot, dir, tl) {
   const fx = [{ kind: "vamp_charge", from: slot, dir }];
   ctx.trackPath(slot, path, passes, fx);
   if (passes.length) fx.push({ kind: "portal_walk", from: slot, clone: false, dir, path, passes, charge: "vamp" });
-  ctx.pushStateFrame(tl, fx, MOVE_DELAY_MS);
+  ctx.pushStateFrame(tl, fx, ctx.walkDelay(fx)); // cez portál so stropom rýchlosti (dlhý beh trvá dlhšie)
   for (const ps of passes) ctx.bodyEffect(slot, ps, tl);
   ctx.closePortals(passes.map(ps => ps.id), tl);
   if (!hit) return; // dobehla na okraj bez terča - len presun

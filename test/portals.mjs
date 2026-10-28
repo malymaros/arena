@@ -4,6 +4,7 @@
 // Spustenie: node test/portals.mjs  (súčasť npm test)
 import { createEngine } from "../engine/game.js";
 import * as G from "../shared/geometry.js";
+import { MOVE_DELAY_MS, CHARGE_STEP_MS, PORTAL_SHOT_STEP_MS, portalWalkMs } from "../shared/timing.js";
 
 let failures = 0, passes = 0;
 function check(cond, label, detail = "") {
@@ -364,6 +365,33 @@ console.log("Charge / Escanor / Luffy");
   const p = sc.game.players.p1;
   check(p.x === 1 && p.y === 2 && sc.game.players.p2.hp === 4, "C1: vlkolak cez 2 powerup portály - moon 2 + 4 = 6", J([p.x, p.y, sc.game.players.p2.hp]));
   check(J(closedIds(tl).sort()) === '["A","B"]', "C1: oba páry zatvorené");
+  // strop rýchlosti: 9 buniek + 2 prechody → frame dlhší než bridge charge (max 3 bunky za MOVE_DELAY_MS)
+  const run = tl.find(fr => (fr.effects || []).some(e => e.kind === "wolf_charge"));
+  const pw = run.effects.find(e => e.kind === "portal_walk");
+  check(pw.path.length >= 8 && run.delayMs === portalWalkMs(pw.path.length, 2) && run.delayMs >= pw.path.length * MOVE_DELAY_MS / 3,
+    "TM1: dlhý charge cez portály trvá dlhšie (max rýchlosť = bridge)", J([pw.path.length, run.delayMs]));
+}
+{
+  // krátky pohyb cez portál = rovnaká dĺžka ako na bridge; charge bez portálu = MOVE_DELAY_MS
+  const A = P("A", "classic", [0, 1, "left"], [3, 0, "right"]);
+  const sc = scenario("fire", "fire", (g) => { g.portals = [A]; });
+  const tl = sc.round([mv("left"), R, S], PASS3);
+  const fr = tl.find(f2 => (f2.effects || []).some(e => e.kind === "portal_walk"));
+  check(fr && fr.delayMs === MOVE_DELAY_MS, "TM2: move cez portál (1 bunka) trvá ako na bridge", J(fr?.delayMs));
+  const sc2 = scenario("countess", "fire", (g) => { g.players.p2.x = 3; g.players.p2.y = 1; });
+  const tl2 = sc2.round([dash("right"), R, S], PASS3);
+  const fr2 = tl2.find(f2 => (f2.effects || []).some(e => e.kind === "vamp_charge"));
+  check(fr2 && fr2.delayMs === MOVE_DELAY_MS, "TM2: charge bez portálu = MOVE_DELAY_MS", J(fr2?.delayMs));
+}
+{
+  // krok strely s prechodom portálom má dlhší frame, ostatné kroky normálne
+  const A = P("A", "classic", [0, 1, "left"], [3, 0, "right"]);
+  const sc = scenario("fire", "fire", (g) => { g.portals = [A]; g.players.p2.x = 2; g.players.p2.y = 0; });
+  const tl = sc.round([atk("left"), R, S], PASS3);
+  const steps = tl.filter(f2 => (f2.effects || []).some(e => e.kind === "charge"));
+  const withP = steps.filter(f2 => f2.effects.some(e => e.kind === "charge" && e.portal));
+  check(withP.length === 1 && withP[0].delayMs === PORTAL_SHOT_STEP_MS && steps.filter(f2 => !withP.includes(f2)).every(f2 => f2.delayMs === CHARGE_STEP_MS),
+    "TM3: krok strely cez portál = PORTAL_SHOT_STEP_MS, ostatné CHARGE_STEP_MS", J(steps.map(f2 => f2.delayMs)));
 }
 {
   const A = P("A", "classic", [1, 0, "up"], [3, 2, "down"]);

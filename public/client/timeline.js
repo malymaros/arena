@@ -306,8 +306,10 @@ export function schedulePlayTimeline(timeline) {
     const cloneMoved = (b, f) => !!(b?.clone && f?.clone && (b.clone.x !== f.clone.x || b.clone.y !== f.clone.y));
     // pohyb postavy pre register fx (Jotarov stand: dash = beh za Jotarom, MOVE = zmizne a zjaví sa na novej bunke)
     const noteStandLoco = (slot, before, frm) => CHAR_FX[frm?.char]?.moved?.(slot, before, frm);
-    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", "run", MOVE_MS); noteStandLoco("p1", beforeP1, frame.p1); }
-    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", "run", MOVE_MS); noteStandLoco("p2", beforeP2, frame.p2); }
+    // Portal Realm: beh cez portál trvá celý (dlhší) frame - run póza tiež
+    const runMs = (s) => (frame.effects || []).some(e => e.kind === "portal_walk" && e.from === s) ? Math.max(MOVE_MS, frameHold) : MOVE_MS;
+    if (beforeP1 && (beforeP1.x !== frame.p1.x || beforeP1.y !== frame.p1.y || cloneMoved(beforeP1, frame.p1))) { setAnim("p1", "run", runMs("p1")); noteStandLoco("p1", beforeP1, frame.p1); }
+    if (beforeP2 && (beforeP2.x !== frame.p2.x || beforeP2.y !== frame.p2.y || cloneMoved(beforeP2, frame.p2))) { setAnim("p2", "run", runMs("p2")); noteStandLoco("p2", beforeP2, frame.p2); }
 
     const portalWalks = [];     // Portal Realm: figúry, ktoré v tomto frame prechádzajú portálom (portal_walk)
     const shooters = new Set(); // basic strela - jednorazová póza

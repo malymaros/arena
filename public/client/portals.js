@@ -6,6 +6,7 @@
 import { gridEl, actorsEl, cellToPx, TILE_W, TILE_H } from "/client/dom.js";
 import { PORTAL_TYPES, riftDataUrl, glyphSvg, typeIconSvg, RIFT_PAD } from "/client/portal-art.js";
 import { board } from "/client/session.js";
+import { PORTAL_POP_MS } from "/shared/timing.js";
 
 const PT = 32;              // hrúbka trhliny (8 pixelov po 4 px)
 const POFF = PT / 2 + 4;    // stred trhliny je kúsok von od hrany políčka
@@ -114,6 +115,21 @@ export function portalFlash(end, type = "classic") {
   setTimeout(() => f.remove(), 800);
 }
 
+// pulzujúci „maják" na konci portálu (výstup strely) - ms = dokedy; len opacity/transform
+function portalBeacon(end, type, ms) {
+  if (!end) return;
+  const T = PORTAL_TYPES[type] || PORTAL_TYPES.classic;
+  const p = edgePoint(end.x, end.y, end.side);
+  const f = document.createElement("div");
+  f.className = "portal-flash portal-beacon";
+  f.style.cssText = `left:${p.x}px;top:${p.y}px;--pc:${T.pc}`;
+  actorsEl.appendChild(f);
+  const pulse = Math.max(120, ms / 2);
+  f.animate([{ opacity: 0.25, transform: "translate(-50%,-50%) scale(.45)" }, { opacity: 0.9, transform: "translate(-50%,-50%) scale(.85)" },
+    { opacity: 0.25, transform: "translate(-50%,-50%) scale(.45)" }], { duration: pulse, iterations: 2, easing: "ease-in-out", fill: "forwards" });
+  setTimeout(() => f.remove(), ms);
+}
+
 /* ---------- prechod figúry (portal_walk) ---------- */
 // Postavu positionActors umiestni rovno na cieľovú bunku (bez CSS sklzu); cestu prehrá WAAPI na vlastnostiach
 // translate/scale/opacity relatívne k cieľu: dráha k hrane → zmiznutie v trhline → vynorenie z druhého konca → zvyšok
@@ -138,7 +154,8 @@ export function animatePortalWalk(el, start, e, ms) {
     prev = [x, y];
   });
   // čas: sklzy podľa dĺžky, zmiznutie/vynorenie pevne
-  const POP = Math.min(220, ms * 0.14);
+  // ms = dĺžka framu = portalWalkMs (shared/timing.js) → sklzy nikdy nie rýchlejšie než najrýchlejší beh na bridge
+  const POP = Math.min(PORTAL_POP_MS, ms * 0.14);
   const walkLen = pts.reduce((acc, q, i) => acc + (q.kind === "walk" && i ? Math.hypot(q.p.x - pts[i - 1].p.x, q.p.y - pts[i - 1].p.y) : 0), 0) || 1;
   const pops = pts.filter(q => q.kind === "sink" || q.kind === "emerge").length;
   const walkMs = Math.max(ms * 0.3, ms - pops * POP);
@@ -174,12 +191,15 @@ export function animateProjectilePortal(el, from, to, portal, ms, yOff = 0) {
   el.style.transition = "none";
   el.style.left = to.left + "px"; el.style.top = (to.top + yOff) + "px";
   const k = (x, y, s, o, off) => ({ offset: off, left: x + "px", top: (y + yOff) + "px", scale: s, opacity: o });
+  // k vstupu (0–30 %) → zmiznutie (30–40 %) → skrytá (výstup pulzuje) → vynorenie (58–68 %) → výstupná bunka
   const anim = el.animate([
-    k(from.left, from.top, "1", 1, 0), k(a.x, a.y, "1", 1, 0.38), k(a.x, a.y, "0.1", 0, 0.5),
-    k(b.x, b.y, "0.1", 0, 0.5001), k(b.x, b.y, "1", 1, 0.62), k(to.left, to.top, "1", 1, 1),
+    k(from.left, from.top, "1", 1, 0), k(a.x, a.y, "1", 1, 0.30), k(a.x, a.y, "0.1", 0, 0.40),
+    k(b.x, b.y, "0.1", 0, 0.58), k(b.x, b.y, "1", 1, 0.68), k(to.left, to.top, "1", 1, 1),
   ], { duration: ms, easing: "linear" });
-  setTimeout(() => portalFlash(portal.enter, portal.type), ms * 0.38);
-  setTimeout(() => portalFlash(portal.exit, portal.type), ms * 0.5);
+  // výstup sa rozsvieti hneď na začiatku kroku (oko vie, kam sa pozrieť, ešte kým strela letí k vstupu)
+  portalBeacon(portal.exit, portal.type, ms * 0.66);
+  setTimeout(() => portalFlash(portal.enter, portal.type), ms * 0.30);
+  setTimeout(() => portalFlash(portal.exit, portal.type), ms * 0.58);
   anim.onfinish = () => { el.style.transition = ""; };
   setTimeout(() => { el.style.transition = ""; }, ms + 50);
 }

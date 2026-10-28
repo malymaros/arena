@@ -46,7 +46,7 @@
           {"portals":[{"id":"A","type":"hp","ends":[{"x":0,"y":2,"side":"left"},{"x":0,"y":1,"side":"left"}]}],"effects":[{"kind":"portal_close","ids":["B"]}],"delayMs":1080},
           {"effects":[],"delayMs":630},
           {"effects":[{"kind":"action","from":"p1","action":{"type":"attack","dir":"left","to":null}}],"delayMs":250},
-          {"p1":{"~":{"mana":3}},"effects":[{"kind":"charge","from":"p1","dir":"right","cell":[0,2],"clone":false,"portal":{"id":"A","type":"hp","enter":{"x":0,"y":1,"side":"left"},"exit":{"x":0,"y":2,"side":"left"}}}],"delayMs":432},
+          {"p1":{"~":{"mana":3}},"effects":[{"kind":"charge","from":"p1","dir":"right","cell":[0,2],"clone":false,"portal":{"id":"A","type":"hp","enter":{"x":0,"y":1,"side":"left"},"exit":{"x":0,"y":2,"side":"left"}}}],"delayMs":734},
           {"portals":[],"effects":[{"kind":"portal_close","ids":["A"]}],"delayMs":1080},
           {"effects":[{"kind":"charge","from":"p1","dir":"right","cell":[1,2],"clone":false}],"delayMs":432},
           {"effects":[{"kind":"charge","from":"p1","dir":"right","cell":[2,2],"clone":false}],"delayMs":432},

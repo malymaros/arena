@@ -11,7 +11,7 @@ import { cloneEls } from "/client/actor-layers.js";
 import { HEAD_CX, PROJECTILE, CHAR_META } from "/chars/index.js";
 import { CHAR_FX } from "/client/fx-registry.js";
 import { spawnExplosionAt } from "/client/explosion.js";
-import { CHARGE_STEP_MS } from "/shared/timing.js";
+import { CHARGE_STEP_MS, PORTAL_SHOT_STEP_MS } from "/shared/timing.js";
 import { animateProjectilePortal } from "/client/portals.js";
 import { perf } from "/client/perf.js";
 
@@ -408,9 +408,10 @@ function spawnOrMoveProjectile(c, s) {
   if (c.portal) {
     // prelet trhlinou: k hrane vstupu → zmiznutie → vynorenie na druhom konci → výstupná bunka; špic sa otočí
     // do nového smeru až v trhline (pred ňou letí pôvodným smerom)
-    animateProjectilePortal(entry.el, entry.pos || dst, dst, c.portal, CHARGE_STEP_MS, yOff);
+    // (krok s portálom má dlhší frame PORTAL_SHOT_STEP_MS)
+    animateProjectilePortal(entry.el, entry.pos || dst, dst, c.portal, PORTAL_SHOT_STEP_MS, yOff);
     const el = entry.el;
-    setTimeout(() => { el.style.transform = `translate(-50%, -50%) ${orient}`.trim(); }, CHARGE_STEP_MS * 0.5);
+    setTimeout(() => { el.style.transform = `translate(-50%, -50%) ${orient}`.trim(); }, PORTAL_SHOT_STEP_MS * 0.5);
   } else {
     entry.el.style.transform = `translate(-50%, -50%) ${orient}`.trim();
     entry.el.style.left = dst.left + "px"; // nová cieľová bunka → CSS ju plynule dokĺže za --charge-ms

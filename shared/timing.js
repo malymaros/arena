@@ -33,6 +33,15 @@ export const ESC_SPECIAL_MS   = 4625;
 export const WOLF_CAST_MS     = Math.round(1200 * ANIM_SLOW);
 export const WOLF_STRIKE_MS   = Math.round(500 * ANIM_SLOW);
 export const CHARGE_STEP_MS   = Math.round(240 * ANIM_SLOW); // krok strely za bunku - rýchla strela, aby ani 3-bunkový let nebol pomalší než iné akcie
+// Portal Realm: krok strely, ktorý prechádza portálom, je dlhší - strela pri vstupe chvíľu mizne, výstup sa medzitým
+// rozsvieti a až potom sa z neho strela vynorí (oko stihne preskočiť na druhý koniec)
+export const PORTAL_SHOT_STEP_MS = Math.round(CHARGE_STEP_MS * 1.7);
+// Portal Realm: beh cez portál (move/dash/charge) nikdy nie je rýchlejší než najrýchlejší beh na bridge
+// (charge 3 bunky za MOVE_DELAY_MS) - dlhá dráha trvá dlhšie. Každý prechod = zmiznutie + vynorenie (2× POP).
+export const PORTAL_POP_MS = 200;
+export function portalWalkMs(cells, passes) {
+  return Math.max(MOVE_DELAY_MS, Math.round(cells * MOVE_DELAY_MS / 3 + passes * 2 * PORTAL_POP_MS));
+}
 export const MIRROR_BEAM_MS   = 460; // kým beam mirroru doletí k útočníkovi (CSS .mirror-beam ≈ .16+.42s); nezávisí od ANIM_SLOW
 // Teleport (výmena maga v turnaji) - dvojfázová animácia: (1) starý mág zmizne, (2) nový sa objaví
 export const TELEPORT_OUT_MS  = Math.round(650 * ANIM_SLOW);

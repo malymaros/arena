@@ -9,7 +9,7 @@ import {
   VAMP_TRAP_BONUS, STONE_ACTIONS, CLONE_DMG, RECHARGE_GAIN,
   SHIELD_COST, MIRROR_COST, GOLDEN_COST, GOLDEN_MIRROR_COST, DASH_COST, GOLDEN_MANA_GAIN,
   ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS,
-  MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS,
+  MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS, PORTAL_SHOT_STEP_MS,
   MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, VAMP_TRAP_STRIKE_MS, QUICKDRAW_MS, PASS_MANA_COST,
   charRollMs, COLOR_ROLL_MS, PORTAL_MAX_PAIRS, PORTALS_PER_ROUND, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
 } from "./constants.js";
@@ -61,7 +61,7 @@ export function createEngine(io = {}) {
   const { PAUSE, frozenActive, noteFrozenHit, noteFrozenClone, validTimestopQueue, doJotaroWorld, runTimestopActions } = Object.assign(E, timestopModule(E));
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
-  const { isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
+  const { walkDelay, isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -74,7 +74,7 @@ export function createEngine(io = {}) {
     applyPetrify, applyLabyrinth, applyStatusOnClone,
     killClone, trackSteps, doJotaroWorld, vampShotRoute,
     // Portal Realm: portály pre geometriu (null mimo portal realm), efekty na telo, zatvorenie párov, niť cez prechod
-    portalList, bodyEffect, closePortals, trackPath,
+    portalList, bodyEffect, closePortals, trackPath, walkDelay,
   };
 
 function newPlayer(slot) {
@@ -712,7 +712,8 @@ function doBasic(slot, dir, tl) {
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
       else { const own = ownAt(s); if (own) { s.done = true; hits.push({ target: own, shot: s }); } }
     }
-    if (fx.length) { anyCharge = true; pushStateFrame(tl, fx, CHARGE_STEP_MS); }
+    // Portal Realm: krok s prechodom portálom je dlhší (PORTAL_SHOT_STEP_MS - strela sa dá sledovať)
+    if (fx.length) { anyCharge = true; pushStateFrame(tl, fx, stepUsed.length ? PORTAL_SHOT_STEP_MS : CHARGE_STEP_MS); }
     // portál použitý strelou sa zatvorí hneď po prelete (druhá strela ním v ďalšom kroku už neprejde)
     if (stepUsed.length) { stepUsed.forEach(id => closedShots.add(id)); closePortals(stepUsed, tl); }
     // Vojak: granát nezasiahne v momente doletu, ale až keď na cieľovej bunke VYBUCHNE a výbuch je vidieť.
