@@ -234,3 +234,12 @@ Environment=ADMIN_KEY=<admin heslo>
 ```
 potom `sudo systemctl daemon-reload && sudo systemctl restart arena`. Bez `ADMIN_KEY` nie je adminom nikto.
 Skriptom: `curl -s "https://arena.marosmaly.sk/admin/reset-all?key=<admin heslo>"`.
+
+**Zber herných dát** ([TELEMETRY.md](TELEMETRY.md)): zapína ho `TELEMETRY_DIR` - v `deploy/arena.service` je
+`Environment=TELEMETRY_DIR=/home/arena/arena-data`. Na existujúcom VM ho stačí pridať do drop-inu
+(`sudo systemctl edit arena` → `[Service]` + `Environment=TELEMETRY_DIR=/home/arena/arena-data`, alebo znova
+skopírovať unit z `deploy/`), potom `sudo systemctl daemon-reload && sudo systemctl restart arena`;
+`journalctl -u arena -n 5` ukáže riadok `telemetry: /home/arena/arena-data (commit …)`. Stiahnutie: menu ☰ → ADMIN →
+DOWNLOAD DATA, skriptom `curl -o data.jsonl.gz "https://arena.marosmaly.sk/admin/data?key=<admin heslo>"`
+(voliteľne `&from=2026-11-01`), alebo `scp -i ~/.ssh/google_compute_engine -r arena@<IP>:arena-data .`
+Dáta sú len na disku VM - občas si ich stiahni ako zálohu.

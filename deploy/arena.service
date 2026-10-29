@@ -11,6 +11,8 @@ User=arena
 WorkingDirectory=/home/arena/arena
 # Node počúva na porte 3000, verejne ho vystaví Caddy (HTTPS reverse proxy)
 Environment=PORT=3000
+# Zber herných dát (docs/TELEMETRY.md): denné JSONL súbory mimo repa; stiahnutie v menu ☰ → ADMIN → DOWNLOAD DATA
+Environment=TELEMETRY_DIR=/home/arena/arena-data
 # Admin heslo: hráč prihlásený ním je admin (reset roomiek v menu ☰; aj /admin/reset-all?key=…). Bez neho nie je admin nikto.
 # Tajné hodnoty nedávaj do repa - na VM ich daj do override: sudo systemctl edit arena
 #   [Service]

@@ -2,3 +2,4 @@ node_modules/
 *.stackdump
 .difftest_old/
 tmp/
+arena-data/

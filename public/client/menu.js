@@ -1,7 +1,7 @@
 // public/client/menu.js - menu ☰ v ľavom dolnom rohu, dostupné vždy (aj nad char-selectom, lobby, zoznamom
 // roomiek a zaseknutými overlaymi): RELOAD GAME (= obnovenie stránky; server hráča vráti na jeho miesto),
 // celá obrazovka (kde to prehliadač vie), zvuk (okno zo sound-ui.js) a pre admina (prihlásený admin heslom)
-// reset tejto roomky / všetkých roomiek. GRAPHICS prepína úspornú grafiku LITE ↔ FULL (perf.js; kým hráč neklikne, platí auto). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
+// reset tejto roomky / všetkých roomiek a stiahnutie zozbieraných herných dát (docs/TELEMETRY.md). GRAPHICS prepína úspornú grafiku LITE ↔ FULL (perf.js; kým hráč neklikne, platí auto). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
 import { socket } from "/client/net.js";
 import { isAdmin, onAdminChange } from "/client/admin-state.js";
 import { canFullscreen, toggleFullscreen } from "/client/viewport.js";
@@ -44,6 +44,7 @@ function render() {
     ${isAdmin() ? `
       <div class="menu-sep">ADMIN</div>
       ${inRoom() ? `<button type="button" class="menu-item danger" data-act="reset-room">✖ RESET THIS ROOM</button>` : ""}
+      <button type="button" class="menu-item" data-act="data">⬇ DOWNLOAD DATA</button>
       <button type="button" class="menu-item danger" data-act="reset-all">✖ RESET ALL ROOMS</button>` : ""}`;
 }
 export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
@@ -63,6 +64,19 @@ panel.addEventListener("click", (ev) => {
   if (act === "fullscreen") { toggleFullscreen(); closeMenu(); return; }
   if (act === "sound") { closeMenu(); openSoundWindow(); return; }
   if (act === "graphics") { setPerfMode(perf.lite ? "full" : "lite"); render(); return; }
+  if (act === "data") {
+    // server vydá jednorazový token (heslo nejde do URL), stiahnutie potom ide obyčajným odkazom
+    socket.timeout(5000).emit("admin_data_token", (err, res) => {
+      if (err || !res?.token) { alert(res?.error === "off" ? "Zber dát je na serveri vypnutý (TELEMETRY_DIR)." : "Stiahnutie sa nepodarilo."); return; }
+      const a = document.createElement("a");
+      a.href = `/admin/data?token=${res.token}`;
+      a.download = "";
+      document.body.append(a);
+      a.click();
+      a.remove();
+    });
+    closeMenu(); return;
+  }
   if (act === "reset-room") {
     if (!confirm("Zrušiť TÚTO roomku a odpojiť jej hráčov aj divákov?")) return;
     socket.emit("admin_reset_room"); closeMenu(); return;

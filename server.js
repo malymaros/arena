@@ -5,8 +5,11 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+import { execSync } from "child_process";
 import { fileURLToPath } from "url";
-import { createEngine } from "./engine/game.js";
+import { createRecordedEngine } from "./telemetry/recorder.js";
+import { createJsonlStore } from "./telemetry/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -69,6 +72,34 @@ const ADMIN_KEY = process.env.ADMIN_KEY || ""; // ← admin heslo: kto sa ním p
 // (default), prepísateľné cez env PLAYER_KEYS=heslo1,heslo2 (napr. systemd deploy/arena.service).
 // POZOR: repo je verejné → tento default je viditeľný; na reálne tajné heslo nastav env a zmaž default.
 const PLAYER_KEYS = new Set((process.env.PLAYER_KEYS || "hamara").split(",").map(s => s.trim()).filter(Boolean));
+
+/* -------------------- Telemetria (zber herných dát, docs/TELEMETRY.md) -------------------- */
+// TELEMETRY_DIR = adresár pre denné JSONL súbory (na VM /home/arena/arena-data); bez neho sa nič nezapisuje.
+const TELEMETRY_DIR = process.env.TELEMETRY_DIR || "";
+const telemetry = TELEMETRY_DIR ? createJsonlStore(path.resolve(TELEMETRY_DIR)) : null;
+// verzia servera do match_start: commit (+ či bol pracovný strom čistý) a odtlačok shared/balance.js
+const telemetryMeta = (() => {
+  const meta = { commit: null, dirty: null, balance: null };
+  try {
+    meta.commit = execSync("git rev-parse --short HEAD", { cwd: __dirname, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    meta.dirty = execSync("git status --porcelain --untracked-files=no", { cwd: __dirname, stdio: ["ignore", "pipe", "ignore"] }).toString().trim() !== "";
+  } catch { /* bez gitu ostane null */ }
+  try { meta.balance = crypto.createHash("sha1").update(fs.readFileSync(path.join(__dirname, "shared", "balance.js"))).digest("hex").slice(0, 12); } catch { /* */ }
+  return meta;
+})();
+if (telemetry) {
+  console.log(`telemetry: ${telemetry.dir} (commit ${telemetryMeta.commit}${telemetryMeta.dirty ? ", dirty" : ""})`);
+  // pri reštarte/deployi (systemd SIGTERM) dopíš rozpracovaný buffer
+  for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => { telemetry.flush(); process.exit(0); });
+}
+// jednorazové tokeny na stiahnutie dát z menu ☰ (admin socket si ho vypýta; heslo tak nejde do URL)
+const dataTokens = new Map(); // token → expirácia (ms)
+function takeDataToken(token) {
+  const exp = dataTokens.get(token);
+  if (!exp) return false;
+  dataTokens.delete(token);
+  return exp >= Date.now();
+}
 /* -------------------- Room registry (globálna vrstva) -------------------- */
 // Viac nezávislých roomiek naraz. Každá roomka je closure z createRoom(id) s vlastným herným stavom,
 // osobami A/B, časovačmi a emitmi (roomEmit). Globálne ostáva len register roomiek + room-browser.
@@ -107,7 +138,7 @@ function createRoom(id) {
   let pendingMatchConfig = null;              // host stlačil START, ale 2. hráč ešte nie je → čaká sa; po jeho príchode sa spustí
   const spectators = new Set();               // diváci tejto roomky (dostávajú nemaskovaný stav cez roomEmit)
 
-  const engine = createEngine({
+  const engine = createRecordedEngine({
     emit: (ev, payload) => roomEmit(ev, payload),
     emitState: (timeline) => emitStateMasked(timeline),
     emitYouAre: () => emitYouAre(),
@@ -117,7 +148,7 @@ function createRoom(id) {
     timerRemainingMs: () => timerRemainingMs(),
     names: () => personNames,
     awaitingOpponent: () => pendingMatchConfig != null,
-  });
+  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta });
   const { snapshot, snapshotFor, redactTimelineFor, slotForPerson, startMatch, newGame, sanitizeConfig } = engine;
 
   // per-room emit: nahrádza io.emit - pošle len hráčom A/B a divákom TEJTO roomky (nie cudzím)
@@ -154,6 +185,7 @@ function emitStateMasked(timeline = null) {
 /* ---- Admin: tvrdý reset TEJTO roomky (odpojí oboch hráčov, zruší časovače) ---- */
 // Globálny forceResetAll() (mimo factory) volá forceReset() na každej roomke a vyprázdni register.
 function forceReset() {
+  engine.abort("admin_reset");
   clearTurnTimer();
   // všetci v roomke (hráči aj diváci) si vynútene obnovia stránku (force_reload → location.reload) - načítajú
   // novú verziu klienta a po reloade skončia na room-browseri; odpojenie až chvíľu po správe, nech dorazí
@@ -240,6 +272,7 @@ function onTurnTimeout() {
   }
   // zruš túto roomku: vyčisti stav a časovače, odstráň z registra, diváci sa vrátia na room-browser
   function destroySelf() {
+    engine.abort("abandoned");
     clearTurnTimer();
     if (roomDestroyTimer) { clearTimeout(roomDestroyTimer); roomDestroyTimer = null; }
     personSockets.A = null; personSockets.B = null;
@@ -423,6 +456,18 @@ app.get("/admin/reset-all", (req, res) => {
   res.send("ok");
 });
 
+// stiahnutie zozbieraných dát: všetky denné JSONL súbory spojené a zbalené (gzip). Prístup admin heslom
+// (?key=, pre skripty) alebo jednorazovým tokenom z menu ☰ (?token=); voliteľne ?from=YYYY-MM-DD.
+app.get("/admin/data", (req, res) => {
+  if (!okAdmin(req.query.key) && !takeDataToken(String(req.query.token || ""))) return res.status(403).send("forbidden");
+  if (!telemetry) return res.status(404).send("telemetry off (TELEMETRY_DIR not set)");
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from || "") ? req.query.from : null;
+  res.setHeader("Content-Type", "application/gzip");
+  res.setHeader("Content-Disposition", `attachment; filename="arena-data-${new Date().toISOString().slice(0, 10)}.jsonl.gz"`);
+  res.setHeader("Cache-Control", "no-store");
+  telemetry.pipeGzip(res, from);
+});
+
 /* -------------------- IO -------------------- */
 // Brána: heslo (ak je nejaké nastavené) + platné meno. Odmietnuté spojenie klient dostane ako `connect_error`
 // s message "bad_pass" / "bad_name". Pozn.: pri connectionStateRecovery sa middleware preskočí (skipMiddlewares),
@@ -496,6 +541,16 @@ io.on("connection", (socket) => {
 
   // --- admin reset cez socket - len socket prihlásený admin heslom; globálny (všetky roomky)
   socket.on("admin_reset_all", () => { if (socket.data.isAdmin) forceResetAll(); });
+
+  // admin: jednorazový token na stiahnutie dát (/admin/data?token=…), platí 60 s
+  socket.on("admin_data_token", (ack) => {
+    if (typeof ack !== "function" || !socket.data.isAdmin) return;
+    if (!telemetry) { ack({ error: "off" }); return; }
+    for (const [t, exp] of dataTokens) if (exp < Date.now()) dataTokens.delete(t);
+    const token = crypto.randomBytes(16).toString("hex");
+    dataTokens.set(token, Date.now() + 60 * 1000);
+    ack({ token });
+  });
 
   // --- admin reset LEN tejto roomky (rohový button / menu): odpojí jej hráčov aj divákov a roomku zruší
   socket.on("admin_reset_room", () => {

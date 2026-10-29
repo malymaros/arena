@@ -14,7 +14,7 @@ export default [
     },
   },
   // engine, server, testy, nástroje bežia v Node
-  { files: ["*.js", "engine/**", "shared/**", "test/**", "tools/**"], languageOptions: { globals: globals.node } },
+  { files: ["*.js", "engine/**", "shared/**", "telemetry/**", "test/**", "tools/**"], languageOptions: { globals: globals.node } },
   { files: ["**/*.cjs"], languageOptions: { sourceType: "commonjs", globals: globals.node } },
   // klient beží v prehliadači (io = globál zo /socket.io/socket.io.js)
   { files: ["public/**"], languageOptions: { globals: { ...globals.browser, io: "readonly" } } },
