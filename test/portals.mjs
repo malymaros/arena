@@ -363,7 +363,7 @@ console.log("Charge / Escanor / Luffy");
   const sc = scenario("werewolf", "fire", (g) => { g.players.p2.x = 1; g.players.p2.y = 2; g.portals = [A, Bp]; });
   const tl = sc.round([sp("right"), R, S], PASS3);
   const p = sc.game.players.p1;
-  check(p.x === 1 && p.y === 2 && sc.game.players.p2.hp === 4, "C1: vlkolak cez 2 powerup portály - moon 2 + 4 = 6", J([p.x, p.y, sc.game.players.p2.hp]));
+  check(p.x === 1 && p.y === 2 && sc.game.players.p2.hp === 8, "C1: vlkolak cez 2 powerup portály - powerup sa na charge nevzťahuje, len moon 2", J([p.x, p.y, sc.game.players.p2.hp]));
   check(J(closedIds(tl).sort()) === '["A","B"]', "C1: oba páry zatvorené");
   // strop rýchlosti: 9 buniek + 2 prechody → frame dlhší než bridge charge (max 3 bunky za MOVE_DELAY_MS)
   const run = tl.find(fr => (fr.effects || []).some(e => e.kind === "wolf_charge"));

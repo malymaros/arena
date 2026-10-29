@@ -3,7 +3,6 @@
 // falloffu, cez obrany ako každý dmg special - vlkolak na bunke terča OSTÁVA STÁŤ aj pri bloku/odraze.
 // Bez terča je akcia len presun; charge z okrajovej bunky von sa VYKONÁ podľa wall pravidla.
 import { SPECIAL_COST, SMALL_DELAY_MS, WOLF_DIRS, WOLF_CAST_MS, WOLF_STRIKE_MS, WOLF_MOON_DMG, moonLevelFor } from "../constants.js";
-import { portalCharge } from "./portal-charge.js";
 import * as G from "../../shared/geometry.js";
 
 export default {
@@ -36,8 +35,8 @@ export default {
         ctx.pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
         return;
       }
-      const pc = portalCharge(passes); // Portal Realm: powerup na úder po dobehnutí (Def-breaker len na strely)
-      const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * ctx.dealMul(slot) * ctx.labyrinthMul(slot) + pBonus + pc.power;
+      // Portal Realm: beh cez portál dáva len efekty tela (HP/mana) - powerup ani Def-breaker sa na charge nevzťahujú
+      const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * ctx.dealMul(slot) * ctx.labyrinthMul(slot) + pBonus;
       // istý zásah REÁLNEHO hráča odhalí labyrint pred animáciou; zásah klona-návnady nie
       if (target === "player" || target === "stacked") ctx.revealLabyrinths(tl);
       // rozbehový cast: veľký Run+Attack v strede, malá postava tiež (casting), dráha bliká
@@ -49,13 +48,13 @@ export default {
       ctx.trackPath(slot, path, passes, fx);
       if (passes.length) fx.push({ kind: "portal_walk", from: slot, clone: false, dir, path, passes, charge: "wolf" });
       ctx.pushStateFrame(tl, fx, ctx.walkDelay(fx)); // cez portál so stropom rýchlosti (dlhý beh trvá dlhšie)
-      // Portal Realm: telo dostane HP/manu, použité páry sa zatvoria (charge = telo AJ útok)
+      // Portal Realm: telo dostane HP/manu, použité páry sa zatvoria
       for (const ps of passes) ctx.bodyEffect(slot, ps, tl);
       ctx.closePortals(passes.map(ps => ps.id), tl);
       if (!target) return; // dobehol na okraj bez terča - len presun
       // seknutie (Attack_2) na bunke terča; dmg/block/odraz dopadne až po ňom
       ctx.pushStateFrame(tl, [{ kind: "wolf_strike", from: slot, cell: [actor.x, actor.y] }], WOLF_STRIKE_MS);
-      ctx.strikeCell(foeS, target, raw, tl, { kind: "special", bonus: pBonus, ...pc.opts });
+      ctx.strikeCell(foeS, target, raw, tl, { kind: "special", bonus: pBonus });
     },
   },
 };
