@@ -81,5 +81,5 @@ export const PORTAL_HP_GAIN = 1;            // HP portál (telo): +HP (Lightning
 export const PORTAL_POWER_BONUS = 2;        // powerup portál (útok): flat +dmg (ako power tile), sčítava sa
 export const PORTAL_SHOT_RANGE = 3;         // rovná strela v portal realm: dolet 3 políčka spolu (3/2/1 cez portál)
 export const PORTAL_TYPES = ["classic", "hp", "mana", "power", "nodef"]; // nodef = Def-breaker
-export const PORTAL_WEIGHTS = { classic: 80, hp: 5, mana: 5, power: 5, nodef: 5 }; // default % v lobby
+export const PORTAL_WEIGHTS = { classic: 60, hp: 10, mana: 10, power: 10, nodef: 10 }; // default % v lobby
 export const PORTAL_TILE_WEIGHTS = { dmg: 90, ik: 10 }; // v portal realm sú len Damage a Insta-kill dlaždice

@@ -1261,7 +1261,7 @@ const base = () => ({ format: "bo3", tilesPerRound: "1", colorPref: "random", ti
 // dva samostatné formuláre so spoločným základom - každý si pamätá svoje hodnoty
 const forms = {
   bridge: { ...base(), tileWeights: { dmg: 75, heal: 5, mana: 5, ik: 5, power: 5, block: 5 } },
-  portal: { ...base(), tileWeights: { dmg: 90, ik: 10 }, portalWeights: { classic: 80, hp: 5, mana: 5, power: 5, nodef: 5 } },
+  portal: { ...base(), tileWeights: { dmg: 90, ik: 10 }, portalWeights: { classic: 60, hp: 10, mana: 10, power: 10, nodef: 10 } },
 };
 let arena = "bridge";
 
