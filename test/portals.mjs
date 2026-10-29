@@ -414,8 +414,8 @@ console.log("Charge / Escanor / Luffy");
   const A = P("A", "nodef", [0, 1, "left"], [3, 0, "right"]);
   const sc = scenario("countess", "fire", (g) => { const p = g.players.p1; p.hp = 5; g.players.p2.x = 1; g.players.p2.y = 0; g.players.p2.shield = true; g.portals = [A]; });
   const tl = sc.round([dash("left"), PASS, PASS], PASS3);
-  check(fx(tl, "dispel").length === 1 && sc.game.players.p2.hp === 6 && fx(tl, "heal").some(e => e.target === "p1" && !e.portal),
-    "C4: charge cez Def-breaker - štít sa minie, dmg aj heal bonus dopadnú");
+  check(!fx(tl, "dispel").length && fx(tl, "block").length === 1 && sc.game.players.p2.hp === 10 && !fx(tl, "heal").some(e => e.target === "p1" && !e.portal) && !hasEnds(sc.game, A),
+    "C4: charge cez Def-breaker - Def-breaker sa na beh nevzťahuje, štít blokuje, portál sa spáli");
 }
 {
   const A = P("A", "classic", [3, 1, "right"], [0, 0, "left"]);
@@ -469,6 +469,12 @@ console.log("Charge / Escanor / Luffy");
   check(sc.game.players.p2.hp === 0, "X6: slnko cez powerup portál - 8 + 2 = 10", String(sc.game.players.p2.hp));
 }
 {
+  const A = P("A", "nodef", [3, 1, "right"], [0, 1, "left"]);
+  const sc = scenario("escanor", "fire", (g) => { const p = g.players.p1; p.x = 3; p.y = 1; g.players.p2.x = 0; g.players.p2.y = 1; g.players.p2.shield = true; g.portals = [A]; });
+  const tl = sc.round([sp("right"), R, mv("down")], PASS3);
+  check(!fx(tl, "dispel").length && fx(tl, "block").length === 1 && sc.game.players.p2.hp === 10, "X7: slnko cez Def-breaker - bez efektu, štít blokuje");
+}
+{
   const A = P("A", "hp", [0, 1, "left"], [2, 0, "up"]);
   const sc = scenario("luffy", "fire", (g) => { g.players.p1.hp = 5; g.players.p2.x = 3; g.players.p2.y = 1; g.portals = [A]; });
   const tl = sc.round([sp("left"), R, S], PASS3);
@@ -487,6 +493,12 @@ console.log("Charge / Escanor / Luffy");
   const sc = scenario("luffy", "fire", (g) => { g.players.p2.x = 3; g.players.p2.y = 1; g.players.p2.mirror = true; g.portals = [A]; });
   const tl = sc.round([sp("left"), R, S], PASS3);
   check(!fx(tl, "reflect_void").length && sc.game.players.p1.hp === 2, "L3: zrkadlo vs guľa cez portál - odraz trafí Luffyho priamo", String(sc.game.players.p1.hp));
+}
+{
+  const A = P("A", "nodef", [0, 1, "left"], [2, 0, "up"]);
+  const sc = scenario("luffy", "fire", (g) => { g.players.p2.x = 3; g.players.p2.y = 1; g.players.p2.mirror = true; g.portals = [A]; });
+  const tl = sc.round([sp("left"), R, S], PASS3);
+  check(!fx(tl, "dispel").length && sc.game.players.p1.hp === 2 && sc.game.players.p2.hp === 10, "L4: guľa cez Def-breaker - bez efektu, zrkadlo odrazí", J([sc.game.players.p1.hp, sc.game.players.p2.hp]));
 }
 
 /* ==================== THE WORLD ==================== */

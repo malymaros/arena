@@ -45,7 +45,8 @@ export default {
       ctx.pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells, ...(portal ? { portal } : {}) }], ESC_SPECIAL_MS);
       if (portal) ctx.closePortals([portal.id], tl);
       const power = portal?.type === "power" ? PORTAL_POWER_BONUS : 0;
-      const pt = portal ? { defBreak: portal.type === "nodef", reflectVoid: portal.exit, portalBonus: power } : {};
+      // Def-breaker platí len na strely basic útoku - slnko ho nedostane (powerup áno)
+      const pt = portal ? { reflectVoid: portal.exit, portalBonus: power } : {};
       const dmg = SPECIAL_ZONE_DMG.escanor; // 8
       if (inZone || cloneStruck) ctx.strikeZone(foeS, inZone, cloneStruck, dmg * ctx.dealMul(slot) + pBonus + power, tl, { kind: "special", bonus: pBonus, ...pt });
       else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);

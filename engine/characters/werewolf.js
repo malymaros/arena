@@ -36,7 +36,7 @@ export default {
         ctx.pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
         return;
       }
-      const pc = portalCharge(passes); // Portal Realm: powerup / Def-breaker na úder po dobehnutí
+      const pc = portalCharge(passes); // Portal Realm: powerup na úder po dobehnutí (Def-breaker len na strely)
       const raw = WOLF_MOON_DMG[Math.max(0, Math.min(3, actor.moon || 0))] * ctx.dealMul(slot) * ctx.labyrinthMul(slot) + pBonus + pc.power;
       // istý zásah REÁLNEHO hráča odhalí labyrint pred animáciou; zásah klona-návnady nie
       if (target === "player" || target === "stacked") ctx.revealLabyrinths(tl);

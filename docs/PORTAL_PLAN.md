@@ -120,11 +120,11 @@ Zmenšenú verziu do `public/arenas/portal-realm/` vyrobí `node tools/arena-bg/
 | **HP** | telo | +1 HP (**Lightning: plné HP**); strela ním len prejde a spáli ho |
 | **mana** | telo | mana **na maximum**; strela ho len spáli |
 | **powerup** | útok | **+2 dmg**, zlatá aura na strele; telo ho len spáli |
-| **def-breaker** | útok | **zásah ignoruje štít aj zrkadlo** (aj golden), biela aura; telo ho len spáli |
+| **def-breaker** | útok | **zásah ignoruje štít aj zrkadlo** (aj golden), biela aura; **len strely basic útoku** — telo, charge, Escanorovo slnko a Luffyho balón ho len spália (zmena 2026-10-29) |
 
 - **Narutov klon** pri prechode HP/mana portálom bonus nedostane, ale portál spáli (žiadna animácia
   +HP/+mana). Strela klona **dostáva** powerup aj def-breaker.
-- **Charge (Vlkolak/Vampír/Onryō) a Luffyho balón** dostávajú efekty tela **aj** útoku.
+- **Charge (Vlkolak/Vampír/Onryō) a Luffyho balón** dostávajú efekty tela **aj** powerup (Def-breaker nie — 2026-10-29).
 - **Sčítanie:** viac portálov v jednej akcii → efekty sa sčítajú (2× powerup = +4, powerup + def-breaker =
   obe aury, telo cez mana aj HP = oboje).
 - Powerup bonus je **flat** ako dnešný power tile (nenásobí sa Last Stand/maze), zrkadlo ho odráža ako

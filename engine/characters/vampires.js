@@ -48,7 +48,7 @@ function vampBonus(ctx, slot, tl, amount, hpSource = amount) {
 // resolveTurn slučky (ktorá inak spotrebuje súperovu obranu za akciu castera), tak si ju spotrebuje sám.
 // Vracia true, ak úder na niečo dopadol (na rozlíšenie whiffu naprázdno).
 // powerBonus = POWER tile prídavok už obsiahnutý v raw - len na rozpis hit framu (samostatný „-2" float)
-// pt = Portal Realm voľby zásahu (Def-breaker / powerup rozpis) - len charge, ktorý prešiel portálom
+// pt = Portal Realm voľby zásahu (powerup rozpis) - len charge, ktorý prešiel portálom
 export function vampMeleeLand(ctx, ownerSlot, raw, bonusAmount, tl, consumeDefense = false, powerBonus = 0, pt = {}) {
   const me   = ctx.game.players[ownerSlot];
   const foeS = ctx.other(ownerSlot);
@@ -59,7 +59,7 @@ export function vampMeleeLand(ctx, ownerSlot, raw, bonusAmount, tl, consumeDefen
   const playerHere = foeAt && !cloneAt;  // len hráč (klon inde alebo žiadny)
   const decoyHere  = cloneAt && !foeAt;  // klon-návnada sám
   const shieldArmed = foe.shield, mirrorArmed = foe.mirror;
-  const defended = (shieldArmed || mirrorArmed) && !pt.defBreak; // Def-breaker: obrana sa minie, bonus dopadne
+  const defended = shieldArmed || mirrorArmed;
   if (stacked) {
     // s obranou kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok na majiteľa (bonus zo zvyšku)
     const hpBefore = foe.hp;
@@ -122,7 +122,7 @@ function doVampCharge(ctx, slot, dir, tl) {
   const raw = VAMP_CHARGE_DMG * ctx.dealMul(slot) * ctx.labyrinthMul(slot) + pBonus;
 
   // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár);
-  // Portal Realm: charge beží aj cez portály (telo dostane HP/manu, úder powerup / Def-breaker)
+  // Portal Realm: charge beží aj cez portály (telo dostane HP/manu, úder powerup; Def-breaker nie)
   const { path, target, passes } = ctx.portalList()
     ? G.runPathPortals(ctx.game.board, me.x, me.y, dir, op, ctx.portalList())
     : { ...G.runPath(ctx.game.board, me.x, me.y, delta, op), passes: [] };
