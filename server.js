@@ -361,6 +361,7 @@ function onTurnTimeout() {
   function onDraftQueue(socket, d) { engine.draftQueue(socket.data.person, d); }
 
   function onRetry(socket) {
+    if (!socket.data.person) return; // divák hru reštartovať nesmie
     clearTurnTimer();
     newGame();
     roomEmit("reset");

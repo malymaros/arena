@@ -1520,6 +1520,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 /* „Leave room" - tmavé sekundárne tlačidlo, odlíšené od zeleného Play again */
 .retry.leave { background: #2b2e35; color: #d9dbe0; font-size: 13px; padding: 16px 26px 18px; }
 .retry.leave:hover { background: #3a3e47; }
+.spectating #gameover { display: none; } /* divák: žiadne okno na konci hry - odchod má v pruhu diváka (LEAVE) */
 .retry:hover { background: #379e3d; }
 .retry:active {
   transform: translateY(3px);

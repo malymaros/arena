@@ -2270,6 +2270,11 @@ async function main() {
   cS.sock.emit("take_seat");
   await new Promise(r => setTimeout(r, 300));
   check(cS.slot == null, "SP: TAKE SEAT v plnej roomke divákovi miesto nedá");
+  // PLAY AGAIN (retry) od diváka hráčom zápas nereštartuje
+  let gotReset = false; c3.sock.once("reset", () => { gotReset = true; });
+  cS.sock.emit("retry");
+  await new Promise(r => setTimeout(r, 300));
+  check(!gotReset, "SP: retry od diváka nereštartuje hru");
   // LEAVE → divák späť na room-browser, hráči count 0
   cS.rooms = null;
   cS.sock.emit("leave_room");
