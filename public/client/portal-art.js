@@ -7,9 +7,9 @@ import { pixSvg } from "/client/pix.js";
 // farba = typ; klasický má farbu fialových plameňov arény. icon = pixel ikona v strede trhliny (pix.js)
 export const PORTAL_TYPES = {
   classic: { en: "Classic",     pc: "#c04dff", pc2: "#f2c9ff", icon: null },
-  hp:      { en: "HP",          pc: "#2e9e54", pc2: "#b4f0c6", icon: "heart" }, // zelená = rovnaká ako heal tile
+  hp:      { en: "Heal",        pc: "#2e9e54", pc2: "#b4f0c6", icon: "heart" }, // zelená = rovnaká ako heal tile
   mana:    { en: "Mana",        pc: "#2f8bff", pc2: "#b9dcff", icon: "drop" },
-  power:   { en: "Power-up",    pc: "#ffc400", pc2: "#fff3c0", icon: "sword" },
+  power:   { en: "Power",       pc: "#ffc400", pc2: "#fff3c0", icon: "sword" },
   nodef:   { en: "Def-breaker", pc: "#f4f4f4", pc2: "#ffffff", icon: "shieldx" },
 };
 export const PORTAL_ORDER = ["classic", "hp", "power", "mana", "nodef"]; // poradie v lobby (2 stĺpce po riadkoch)

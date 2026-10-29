@@ -35,8 +35,8 @@ Zmenšenú verziu do `public/arenas/portal-realm/` vyrobí `node tools/arena-bg/
   - políčka **len `dmg` a `ik`**, predvolene **90 / 10**, súčet 100; ostatné typy (heal/mana/power/
     block) neexistujú (vo formulári nie sú, server ich vynuluje),
   - `tilesPerRound` 1–3 ako dnes,
-  - **váhy typov portálov** — predvolene klasický **40**, HP **15**, mana **15**, powerup **15**,
-    def-breaker **15**; súčet presne 100; jednotlivý typ smie byť 0, nie všetky.
+  - **váhy typov portálov** — predvolene klasický **80**, HP **5**, mana **5**, powerup **5**,
+    def-breaker **5** (od 2026-10-29, predtým 40/15/15/15/15); súčet presne 100; jednotlivý typ smie byť 0, nie všetky.
   - `tilePreview` sa týka len políčok — **portály nemajú náhľad dopredu**.
 - Pri návrate z portal realm na bridge sa obnovia bridge defaulty (dva formuláre = dva stavy).
 
