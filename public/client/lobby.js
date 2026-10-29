@@ -22,7 +22,7 @@ const TILE_ORDER = ["dmg", "ik", "heal", "power", "mana", "block"];
 const FIELDS = { format: "lobby-format", tiles: "lobby-tiles-count", color: "lobby-color", preview: "lobby-preview", random: "lobby-random", timer: "lobby-timer" };
 // pozadie náhľadu arény v tlačidle (rovnaké vrstvy ako hra, socket-handlers ARENAS_CLIENT)
 const ARENA_THUMBS = {
-  bridge: ["sky-bridge.png", "clouds.png", "clouds-2.png", "tower.png", "bridge.png"].map(f => `/arenas/bridge/${f}`),
+  bridge: ["/arenas/bridge/thumb.png"], // hotové zložené vrstvy (tools/arena-bg/thumbs.mjs)
   portal: ["/arenas/portal-realm/portal-realm-hd.webp"],
 };
 

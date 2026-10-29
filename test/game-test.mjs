@@ -2253,6 +2253,39 @@ async function main() {
   check(c1.lastTimeline === null && c2.lastTimeline === null,
     "TR: kolo v 2. roomke NEpresiaklo do 1. roomky (izolácia)");
 
+  /* ---------- SP: diváci - počet (oko), LEAVE, TAKE SEAT ---------- */
+  // c3/c4 hrajú v 2. roomke; divák cS sa pripojí → hráči dostanú count 1, voľné miesto nie je
+  c3.specs = null; c3.sock.on("spectators", (x) => { c3.specs = x; });
+  const cS = await connect();
+  cS.specs = null; cS.sock.on("spectators", (x) => { cS.specs = x; });
+  cS.spectatorInfo = null; cS.sock.on("spectator", (x) => { cS.spectatorInfo = x; });
+  await waitFor(() => cS.rooms != null, 5000, "cS room-browser");
+  const r2 = (cS.rooms.rooms || []).reduce((a, b) => (b.id > a.id ? b : a)); // 2. roomka (c3/c4) = vyššie id
+  cS.sock.emit("spectate_room", { roomId: r2.id });
+  await waitFor(() => c3.specs?.count === 1, 3000, "c3 vidí 1 diváka");
+  check(c3.specs?.count === 1 && c3.specs?.seatFree === false, "SP: hráč dostal počet divákov 1 (bez voľného miesta)", JSON.stringify(c3.specs));
+  check(cS.spectatorInfo?.roomId === r2.id, "SP: divák dostal roomId (návrat po reloade)", JSON.stringify(cS.spectatorInfo));
+  // TAKE SEAT pri plnej roomke nič nespraví
+  cS.slot = null;
+  cS.sock.emit("take_seat");
+  await new Promise(r => setTimeout(r, 300));
+  check(cS.slot == null, "SP: TAKE SEAT v plnej roomke divákovi miesto nedá");
+  // LEAVE → divák späť na room-browser, hráči count 0
+  cS.rooms = null;
+  cS.sock.emit("leave_room");
+  await waitFor(() => c3.specs?.count === 0 && cS.rooms != null, 3000, "divák odišiel");
+  check(c3.specs?.count === 0 && cS.rooms != null, "SP: LEAVE - divák je na room-browseri, hráči vidia 0 divákov");
+  // znova sleduje, c4 odíde → voľné miesto → TAKE SEAT ho posadí
+  cS.sock.emit("spectate_room", { roomId: r2.id });
+  await waitFor(() => cS.specs?.count === 1, 3000, "cS znova divák");
+  c4.sock.emit("leave_room");
+  await waitFor(() => cS.specs?.seatFree === true, 3000, "voľné miesto po odchode c4");
+  check(cS.specs?.seatFree === true, "SP: po odchode hráča divák vidí voľné miesto");
+  cS.sock.emit("take_seat");
+  await waitFor(() => cS.slot != null, 3000, "cS si sadol");
+  await waitFor(() => c3.specs?.count === 0, 3000, "po TAKE SEAT 0 divákov");
+  check(cS.slot != null && c3.specs?.count === 0, "SP: TAKE SEAT - divák je hráč (you_are), divákov 0", `slot=${cS.slot}`);
+
   /* ---------- TR3: per-room admin reset zruší LEN svoju roomku (druhá beží ďalej) ---------- */
   // admin = socket prihlásený admin heslom (ADMIN_KEY); bežný hráč reset spustiť nevie - ani so správnym kľúčom v argumente
   check(c1.session?.admin === false, "ADMIN: hráč s heslom hráča nie je admin", JSON.stringify(c1.session));
@@ -2288,7 +2321,7 @@ async function main() {
   await waitFor(() => c5.rooms != null, 5000, "c5 dostal room-browser po admin resete");
   check((c5.rooms.rooms || []).length === 0, "TR2: globálny admin reset zrušil všetky roomky (0 v zozname)", `rooms=${JSON.stringify(c5.rooms?.rooms)}`);
   check(c5.rooms.canCreate === true, "TR2: po admin resete sa dá vytvoriť nová roomka");
-  c5.sock.close(); cAdm.sock.close(); cAdm2.sock.close();
+  c5.sock.close(); cAdm.sock.close(); cAdm2.sock.close(); cS.sock.close();
 
   c3.sock.close(); c4.sock.close();
 

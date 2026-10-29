@@ -116,13 +116,35 @@ function renderRooms(info) {
     roomsListEl.appendChild(rb);
   }
 }
+// divák: roomka, ktorú sledujem (sessionStorage) - po RELOAD GAME / výpadku spojenia sa do nej vrátim sledovať
+const SPECTATE_KEY = "arenaSpectate";
+let respectating = false; // čakám na „spectator" po automatickom návrate
+export function rememberSpectate(roomId) { respectating = false; try { sessionStorage.setItem(SPECTATE_KEY, String(roomId)); } catch {} }
+export function forgetSpectate() { try { sessionStorage.removeItem(SPECTATE_KEY); } catch {} }
+function respectateFrom(info) {
+  let id = null;
+  try { id = sessionStorage.getItem(SPECTATE_KEY); } catch {}
+  if (id == null) return false;
+  forgetSpectate(); // „spectator" ho uloží znova; roomka zanikla → zoznam roomiek ako obvykle
+  const room = (info?.rooms || []).find(r => String(r.id) === id);
+  if (!room) return false;
+  respectating = true;
+  socket.emit("spectate_room", { roomId: room.id });
+  return true;
+}
+function showRooms(info) { renderRooms(info); roomsEl?.classList.remove("hidden"); }
 socket.on("rooms", (info) => {
   document.getElementById("login")?.classList.add("hidden");
   // browsing socket nedostáva state → herné obrazovky (viditeľné by default) treba schovať, nech neprebliknú spod room-browsera
   ["char-select", "lobby", "lobby-wait", "host-wait", "team-wait", "spectator", "gameover", "intermission"].forEach(id =>
     document.getElementById(id)?.classList.add("hidden"));
-  renderRooms(info);
-  roomsEl?.classList.remove("hidden");
+  if (respectating) return; // iný „rooms" (zmena cudzej roomky), kým čakám na návrat do sledovania
+  if (respectateFrom(info)) {
+    // zoznam roomiek neukazuj (nebliká); keby server divákovi neodpovedal, po chvíli sa zoznam aj tak ukáže
+    setTimeout(() => { if (respectating) { respectating = false; showRooms(info); } }, 1500);
+    return;
+  }
+  showRooms(info);
 });
 // miesto sa medzičasom zaplnilo - server pošle aj čerstvý „rooms", ktorý prekreslí na Spectate
 socket.on("join_denied", () => { /* rooms event prekreslí kartu */ });

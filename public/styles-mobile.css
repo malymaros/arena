@@ -45,6 +45,11 @@
 .touch img { -webkit-user-drag: none; user-drag: none; }
 /* menu ☰: ~40 skutočných px bez ohľadu na zmenšenie hry */
 .touch #menu-btn { transform: scale(calc(var(--ui-k, 1) * .9)); }
+/* oko divákov rovnako veľké ako menu, hneď vpravo od neho; telefón: nad menu (vpravo začína lišta akcií) */
+.touch #spec-eye { transform: scale(calc(var(--ui-k, 1) * .9)); left: calc(14px + 44px * var(--ui-k, 1) * .9 + 10px); }
+.phone #spec-eye { left: 14px; bottom: calc(14px + 44px * var(--ui-k, 1) * .9 + 10px); }
+/* pruh diváka v skutočnej veľkosti displeja (prst) */
+.touch .spectator { transform: translateX(-50%) scale(calc(var(--ui-k, 1) * .8)); transform-origin: 50% 100%; }
 
 /* vrstva nad boardom (fixná v body, zarovnaná na board) - pickery smeru / políčka sa otvárajú na postave */
 #touch-layer { position: fixed; z-index: 60; pointer-events: none; }
@@ -237,7 +242,7 @@
 /* --- nastavenie zápasu (lobby hosta) na celú obrazovku: dva stĺpce bez rolovania - vľavo voľby, vpravo percentá
    dlaždíc, START cez celú šírku dole. Voľné miesto ide do riadku nadpisu (1fr) a nadpis je v ňom vycentrovaný.
    Menu ☰ sa počas nastavovania skryje (inak by lobby muselo uhýbať jeho rohu). --- */
-html.phone:has(#lobby:not(.hidden)) #menu-btn { display: none; }
+html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden)) #spec-eye { display: none; }
 .phone .lobby { padding: 0; align-items: stretch; }
 .phone .lobby-card {
   width: 100%; max-width: none; padding: 30px 48px 36px; border: none; border-radius: 0; box-shadow: none;

@@ -407,8 +407,12 @@
     <div class="cr-result hidden" id="cr-result"></div>
   </div>
 
-  <!-- Tretí a ďalší pripojený hráč - hra je plná, len informačná hláška -->
-  <div id="spectator" class="spectator hidden">Game in progress…</div>
+  <!-- Divák (tretí a ďalší) - hru sleduje bez ovládania; TAKE SEAT len keď je v roomke voľné miesto (spectators.js) -->
+  <div id="spectator" class="spectator hidden">
+    <span class="spec-label"><span class="spec-ico"></span>SPECTATING</span>
+    <button type="button" id="spec-take" class="spec-btn take hidden">TAKE SEAT</button>
+    <button type="button" id="spec-leave" class="spec-btn leave">LEAVE</button>
+  </div>
 
   <!-- Chyba spojenia pri odosielaní ťahu - server nepotvrdil prijatie, treba potvrdiť znova -->
   <div id="conn-error" class="conn-error hidden">

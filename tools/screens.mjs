@@ -231,8 +231,19 @@ try {
     }
     bot.sock.emit("choose_character", "escanor");
     await waitPage(`document.getElementById("char-select").classList.contains("hidden")`, 8000, "hra");
+    // divák v roomke → hráč vidí oko s počtom divákov vedľa menu ☰
+    const spec = await connect(url, "specc");
+    for (let i = 0; i < 50 && !spec.rooms?.rooms?.length; i++) await sleep(100);
+    spec.sock.emit("spectate_room", { roomId: spec.rooms.rooms[0].id });
+    await waitPage(visible("#spec-eye"), 5000, "oko divákov");
     await sleep(3500); // intro / premena Escanora
     await shot(dev, "09-game");
+    // pruh diváka (SPECTATING · TAKE SEAT · LEAVE) - prehliadač je hráč, tak sa len ukáže namiesto ovládania
+    await br.evaluate(`(() => { document.querySelector(".controls-row").style.display = "none"; document.getElementById("spectator").classList.remove("hidden"); document.getElementById("spec-take").classList.remove("hidden"); })()`);
+    await sleep(200);
+    await shot(dev, "09b-spectator");
+    await br.evaluate(`(() => { document.querySelector(".controls-row").style.display = ""; document.getElementById("spectator").classList.add("hidden"); document.getElementById("spec-take").classList.add("hidden"); })()`);
+    spec.sock.close();
     await br.evaluate(`document.querySelector('.btn.act.attack')?.click()`);
     await sleep(500);
     await shot(dev, "10-picker");

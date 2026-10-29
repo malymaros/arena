@@ -1,7 +1,7 @@
 // public/client/socket-handlers.js - herné udalosti zo servera: you_are, color_roll (animácia farebného kolesa), state
 // (snapshot / timeline / THE WORLD pauza), game_result, new_game, game_over, reset, spectator, turn_timer.
 // Každá udalosť má jediný handler; registrujú sa pri načítaní, pripojenie je asynchrónne.
-import { socket, hideRooms } from "/client/net.js";
+import { socket, hideRooms, rememberSpectate, forgetSpectate } from "/client/net.js";
 import { setIdentity, me, setSpectator, setState } from "/client/session.js";
 import { colorRollEl, crResultEl, crArrowEl, selEl, intermissionEl, goOverlay, dirPicker, aimPicker, lockBtn, hudTurn, arenaEl, meleeBtn, specialBtn } from "/client/dom.js";
 import { stopCharSelectPreview } from "/client/char-select.js";
@@ -38,6 +38,10 @@ socket.on("you_are", (info) => {
   if (info && typeof info === "object") setIdentity(info.slot, !!info.isHost);
   else setIdentity(info); // spätná kompat.
   hideRooms(); // posadený hráč (join/create alebo reclaim) → preč z room-browsera
+  // divák si sadol (TAKE SEAT) → koniec diváckeho režimu; ovládanie vráti applyPhaseUI z nasledujúceho state
+  setSpectator(false);
+  forgetSpectate();
+  document.getElementById("spectator")?.classList.add("hidden");
 });
 
 /* ---------- Losovanie farieb (po configure_match) ---------- */
@@ -82,8 +86,9 @@ socket.on("color_roll", (info) => {
 socket.on("char_roll", (info) => { startCharRoll(info); });
 
 // hra je plná - divák hru sleduje, ale nemá výber postavy ani ovládanie (box s hláškou dole)
-socket.on("spectator", () => {
+socket.on("spectator", (info) => {
   setSpectator();
+  if (info?.roomId != null) rememberSpectate(info.roomId);
   hideRooms();
   document.getElementById("spectator")?.classList.remove("hidden");
   selEl.classList.add("hidden");
@@ -131,10 +136,10 @@ function resetGameUi() {
 }
 socket.on("reset", resetGameUi);
 // admin reset roomky (alebo všetkých): server žiada obnovenie stránky - nová verzia klienta, potom room-browser
-socket.on("force_reload", () => location.reload());
+socket.on("force_reload", () => { forgetSpectate(); location.reload(); });
 // room-browser (opustil som roomku / skončila) - „rooms" dostáva len socket mimo roomky, takže reset
 // nikdy nezasiahne rozohranú hru; ďalšia roomka tak začne s prázdnou frontou (nie s ťahmi z poslednej hry)
-socket.on("rooms", resetGameUi);
+socket.on("rooms", () => { setSpectator(false); resetGameUi(); });
 
 socket.on("state", (s) => {
   tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing: playback.playing });

@@ -279,6 +279,12 @@ function onTurnTimeout() {
     socket.emit("you_are", { slot: slotForPerson(p), isHost: p === "A" });
     socket.emit("state", snapshotFor(p)); // počas char-selectu maskuje súperov pick
     if (p === "B") maybeStartPending(); // 2. hráč dorazil → ak host čakal, spusti zápas
+    broadcastSpectators();
+  }
+
+  // oko s počtom divákov (hráči aj diváci) + či je voľné miesto (divák vidí TAKE SEAT)
+  function broadcastSpectators() {
+    roomEmit("spectators", { count: spectators.size, seatFree: isFree("A") || isFree("B") });
   }
 
   // pripoj sa do tejto roomky ako 2. hráč (osoba B; ak host odišiel a B ostal, obsadí A)
@@ -297,8 +303,18 @@ function onTurnTimeout() {
     socket.data.roomId = id;
     socket.data.spectating = true;
     socket.join(String(id));
-    socket.emit("spectator");
+    socket.emit("spectator", { roomId: id }); // roomId → klient sa po reloade vráti sledovať tú istú roomku
     socket.emit("state", snapshot());
+    broadcastSpectators();
+  }
+
+  // divák si sadne na voľné miesto (hráč odišiel / host čaká na súpera) - rovnaké pravidlá ako join z room-browsera
+  function takeSeat(socket) {
+    if (!spectators.has(socket)) return;
+    const p = isFree("B") ? "B" : isFree("A") ? "A" : null;
+    if (!p) { socket.emit("join_denied", "full"); return; }
+    seat(socket, p); // vyradí ho z divákov a pošle you_are + state
+    broadcastRooms();
   }
 
   // opusti roomku (hráč aj divák) → miesto sa uvoľní hneď, socket ide späť na room-browser
@@ -316,7 +332,7 @@ function onTurnTimeout() {
     socket.leave(String(id));
     browsing.add(socket);
     socket.emit("rooms", roomsSnapshot());
-    if (roomEmpty()) destroySelf(); else broadcastRooms(); // ak ostal sám nikto → zruš; inak uprav počet
+    if (roomEmpty()) destroySelf(); else { broadcastRooms(); broadcastSpectators(); } // ak ostal sám nikto → zruš; inak uprav počet
   }
 
   /* -------------------- Herné handlery (per-room, dispatchnuté z io.on) -------------------- */
@@ -352,7 +368,7 @@ function onTurnTimeout() {
   }
 
   function onDisconnect(socket) {
-    if (spectators.delete(socket)) return; // divák odišiel - počet hráčov sa nezmenil
+    if (spectators.delete(socket)) { broadcastSpectators(); return; } // divák odišiel - počet hráčov sa nezmenil
     const wasPlayer = personSockets.A === socket || personSockets.B === socket;
     // uvoľni len živý socket; personIds zámerne NEmažeme → hráč si po reconnecte (do grace) vyžiada svoj slot späť
     if (personSockets.A === socket) { personSockets.A = null; personFreedAt.A = Date.now(); }
@@ -360,12 +376,14 @@ function onTurnTimeout() {
     if (wasPlayer) {
       clearTurnTimer();            // bez hráča nemá zmysel auto-resolve; odpojenie diváka časovač neruší
       scheduleRoomDestroyCheck();  // ak sa obaja odpojili → po grace roomku zruš
+      // po grace sa miesto uvoľní aj pre cudzích → diváci uvidia TAKE SEAT
+      setTimeout(() => { if (rooms.get(id)) broadcastSpectators(); }, RECLAIM_GRACE_MS + 100);
     }
     broadcastRooms();              // ostatní na room-browseri vidia aktuálny počet hráčov
   }
 
   return {
-    id, roomsRow, reclaimPersonFor, seat, join, spectate, leave, forceReset,
+    id, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset,
     isEmpty: roomEmpty, onConfigure, onChooseTeam, onChooseCharacter, onLockIn, onTimestopActions, onDraftQueue, onRetry, onDisconnect,
   };
 }
@@ -463,6 +481,7 @@ io.on("connection", (socket) => {
     if (!room) return;
     room.spectate(socket);
   });
+  socket.on("take_seat", () => { if (socket.data.spectating) roomForSocket(socket)?.takeSeat(socket); });
   socket.on("leave_room", () => { roomForSocket(socket)?.leave(socket); });
 
   // --- Herné eventy (dispatch do roomky socketu) ---

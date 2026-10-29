@@ -10,7 +10,7 @@ export let state = { p1: null, p2: null, arena: null, turn: 1, starter: "p1", ph
 
 // you_are: slot (a host); starý formát posielal len slot
 export function setIdentity(slot, host) { me = slot; if (host !== undefined) isHost = host; }
-export function setSpectator() { isSpectator = true; }
+export function setSpectator(on = true) { isSpectator = on; }
 // nový snapshot zo servera (board sa mení len ak ho snapshot nesie)
 export function setState(s) { state = s; board = s.board || board; }
 // druhý slot voči mne (null pre diváka)

@@ -12,7 +12,7 @@ import "/client/controls.js";         // akčné tlačidlá a pickery
 import "/client/preview-hovers.js";   // hover náhľady zón pri plánovaní
 import "/client/retry.js";
 import "/client/raf.js";              // hlavná slučka kreslenia
-import "/client/admin.js";            // admin (prihlásený admin heslom) → tlačidlo reset roomky
+import "/client/spectators.js";       // oko s počtom divákov + pruh diváka (TAKE SEAT / LEAVE)
 import "/client/debug-hope.js";       // ?hopedebug=1 → náhľad hope sprite
 import "/client/sound-ui.js";         // zvukové okno (z menu) + UI zvuky klikov
 import "/client/menu.js";             // menu ☰: reload, celá obrazovka, zvuk, admin
