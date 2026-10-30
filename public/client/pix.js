@@ -201,10 +201,25 @@ export function pixelizeEmoji(el, res) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(el.dataset.emoji, res / 2, res / 2 + 1);
+  if (el.dataset.tone === "noir") noirTone(ctx, res);
   el.appendChild(cvs);
 }
-// Shield/Mirror Breaker: ikona obrany čiernobielo (CSS filter v .brk-ico) - spolu s útočnou farbou tlačidla
-export const breakerIco = (emoji, cls = "") => `<span class="brk-ico ${cls}"><span class="pix-ico" data-emoji="${emoji}"></span></span>`;
+// tón „noir" (ikona breakera): zlaté/teplé pixely (rám zrkadla) → ebenovo čierna s jemným leskom,
+// ostatné → čiernobielo so zvýšeným kontrastom (starý film). Po pixeloch - CSS filter by nevedel zmeniť len rám.
+function noirTone(ctx, res) {
+  const img = ctx.getImageData(0, 0, res, res), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const L = 0.299 * r + 0.587 * g + 0.114 * b;
+    const warm = r > b + 40 && g > b + 10 && r - b > (Math.max(r, g, b) - Math.min(r, g, b)) * 0.6;
+    if (warm) { d[i] = 16 + L * 0.16; d[i + 1] = 11 + L * 0.12; d[i + 2] = 9 + L * 0.1; }
+    else { const v = Math.max(0, Math.min(255, (L - 128) * 1.35 + 110)); d[i] = d[i + 1] = d[i + 2] = v; }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+// Shield/Mirror Breaker: ikona obrany v tóne „noir" (čiernobielo, rám zrkadla ebenový) - spolu s farbou tlačidla
+export const breakerIco = (emoji, cls = "") => `<span class="brk-ico ${cls}"><span class="pix-ico" data-emoji="${emoji}" data-tone="noir"></span></span>`;
 export function hydratePix(root = document) {
   root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => pixelizeEmoji(el));
 }
