@@ -11,6 +11,8 @@ export const planning = {
   goldenArmed: false,
   // objednaný golden mirror - ten istý predťah, len odraz (vzájomne výlučný s golden shieldom)
   goldenMirrorArmed: false,
+  // golden predťah je breaker (Golden Shield/Mirror Breaker - návrh), nie obrana
+  goldenBreaker: false,
   // objednaný golden mana refill (extra akcia po konci kola)
   goldenManaArmed: false,
   // objednaný Last Stand (duálny s golden mana, výlučný)
@@ -27,6 +29,7 @@ export function resetPlanning() {
   planning.myQueue = [];
   planning.goldenArmed = false;
   planning.goldenMirrorArmed = false;
+  planning.goldenBreaker = false;
   planning.goldenManaArmed = false;
   planning.lastStandArmed = false;
   planning.lastHopeArmed = false;

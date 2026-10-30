@@ -1,7 +1,7 @@
 // public/client/queue.js - lišta kola (round-script): naplánované akcie oboch strán po beatoch, kurzor počas
 // prehrávania, varovania plánu, LOCK IN tlačidlo a odomykanie UI.
 import { ARROW_DIR, displayDir } from "/client/action-log.js";
-import { LS_BADGE_IMG, LH_BADGE_IMG } from "/client/pix.js";
+import { LS_BADGE_IMG, LH_BADGE_IMG, crackIco, hydratePix } from "/client/pix.js";
 import { mageHeadHtml } from "/client/mage-head.js";
 import { usesAltColor } from "/client/sprites.js";
 import { ghostPos, showPreviewCells, cellsForAimPreview, ghostCharAt, clearPreviewCells, planWarnings, foeMirrorImmune, MIRROR_IMMUNE_WARN } from "/client/ghost.js";
@@ -34,6 +34,11 @@ function actionBadgeView(a, ownerSlot) {
     case "special1":      return { cls: "mirror",  text: "🪞" }; // Special 1 (Jotaro, Luffy) v mirror slote sa tvári ako mirror (analógia k charge=dash u Vampire/Onryō)
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
+    // Shield/Mirror Breaker (návrh): ikona obrany preškrtnutá čiernou trhlinou, farba svojej obrany
+    case "shield_breaker":        return { cls: "shield", html: crackIco("🛡️") };
+    case "mirror_breaker":        return { cls: "mirror", html: crackIco("🪞") };
+    case "golden_shield_breaker": return { cls: "golden",     html: crackIco("🛡️", "g-ico") };
+    case "golden_mirror_breaker": return { cls: "golden",     html: crackIco("🪞", "g-ico") };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
     case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
@@ -210,7 +215,8 @@ export function renderQueue() {
 
     let filled = null;
     if (mine) {
-      if (b.kind === "gshield")    filled = planning.goldenArmed ? { type: "golden_shield" } : planning.goldenMirrorArmed ? { type: "golden_mirror" } : null;
+      if (b.kind === "gshield")    filled = planning.goldenArmed ? { type: planning.goldenBreaker ? "golden_shield_breaker" : "golden_shield" }
+                                        : planning.goldenMirrorArmed ? { type: planning.goldenBreaker ? "golden_mirror_breaker" : "golden_mirror" } : null;
       else if (b.kind === "gmana") filled = planning.goldenManaArmed ? { type: "golden_mana" } : planning.lastStandArmed ? { type: "last_stand" } : null;
       else                         filled = planning.myQueue[b.idx] || null;
     }
@@ -218,7 +224,7 @@ export function renderQueue() {
     if (filled) {
       const v = actionBadgeView(filled, me);
       if (v.cls) el.classList.add(v.cls);
-      if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
+      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text;
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
       // akcia podľa plánu nebude mať efekt → žltý ⚠ v rohu + dôvod v tooltipe
       const warn = b.kind === "act" ? warnings[b.idx]

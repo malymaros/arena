@@ -203,6 +203,11 @@ export function pixelizeEmoji(el, res) {
   ctx.fillText(el.dataset.emoji, res / 2, res / 2 + 1);
   el.appendChild(cvs);
 }
+// Shield/Mirror Breaker: ikona obrany preškrtnutá čiernou trhlinou (svetlý lem pod ňou, nech je čitateľná na každej farbe)
+const CRACK_SVG = '<svg class="crack" viewBox="0 0 20 20" aria-hidden="true">' +
+  '<path class="edge" d="M16 0 L11 6 L14 9 L8 13 L10 15 L4 20 M11 6 L6 5"/>' +
+  '<path class="line" d="M16 0 L11 6 L14 9 L8 13 L10 15 L4 20 M11 6 L6 5"/></svg>';
+export const crackIco = (emoji, cls = "") => `<span class="brk-ico ${cls}"><span class="pix-ico" data-emoji="${emoji}"></span>${CRACK_SVG}</span>`;
 export function hydratePix(root = document) {
   root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => pixelizeEmoji(el));
 }

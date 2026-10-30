@@ -40,12 +40,13 @@ const CRACKS = [
   ["M44 88 L18 100", "M52 120 L76 108 L88 124", "M80 56 L88 30", "M12 70 L20 92"],
 ];
 
-// opts: { kind: "shield"|"mirror", gold, whiff, slow (násobok dĺžky, náhľad) }. Vráti Promise - resolve
-// v momente roztrieštenia (volajúci hneď pustí hit/float), resp. po zasyčaní pri whiffe.
-export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold = false, whiff = false, slow = 1 } = {}) {
+// opts: { kind: "shield"|"mirror", gold, whiff (súper bez obrany), react (zlá obrana - odraz/blok prehrá volajúci),
+// slow (násobok dĺžky, náhľad) }. Vráti Promise - resolve
+// v momente roztrieštenia (volajúci hneď pustí hit/float), resp. keď sa lúč pri whiffe rozplynie.
+export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold = false, whiff = false, react = false, slow = 1 } = {}) {
   const a = handPt(fromSlot), d = bodyPt(toSlot);
   if (!a || !d) return;
-  const RAMP = 140 * slow, HEAT = (whiff ? 420 : 1150) * slow;
+  const RAMP = 140 * slow, HEAT = (react ? 420 : 1150) * slow;
   const dx = d.x - a.x, dy = d.y - a.y, len = Math.hypot(dx, dy);
 
   // lúč: kontajner otočený z ruky do cieľa; vrstvy = široká červená žiara + horúce jadro, blikajú (opacity/scaleY)
@@ -53,11 +54,26 @@ export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold
   beam.style.setProperty("--ramp", RAMP + "ms");
   beam.innerHTML = '<i class="glow"></i><i class="core"></i>';
   const muzzle = add("brk-muzzle", a.x, a.y);
+
+  // súper bez obrany: lúč dorazí k postave a len sa rozplynie - žiadny záblesk dopadu ani iskry (nič neprerazil)
+  if (whiff) {
+    await sleep(RAMP + 160 * slow);
+    beam.style.setProperty("--fade", 420 * slow + "ms");
+    beam.classList.add("dissolve"); muzzle.remove();
+    for (let i = 0; i < 7; i++) {
+      const s = add("brk-smoke", d.x + (Math.random() - .5) * 40, d.y + (Math.random() - .5) * 50, { animationDuration: 700 * slow + "ms" });
+      s.style.setProperty("--dx", Math.round((Math.random() - .5) * 30) + "px");
+      s.style.setProperty("--dy", -Math.round(25 + Math.random() * 30) + "px");
+      setTimeout(() => s.remove(), 750 * slow);
+    }
+    setTimeout(() => beam.remove(), 450 * slow);
+    return;
+  }
   const impact = add("brk-impact", d.x, d.y);
 
   // bariéra (len pri nabitej obrane): zohrievanie = prelínanie vrstiev, praskliny pribúdajú
   let bar = null;
-  if (!whiff) {
+  if (!whiff && !react) {
     const w = Math.round(TILE_W * 0.7), h = Math.round(TILE_H * 0.95);
     bar = add(`brk-barrier ${kind}${gold ? " gold" : ""}`, d.x, d.y, { width: w + "px", height: h + "px" });
     bar.style.setProperty("--heat", HEAT + "ms");
@@ -87,11 +103,11 @@ export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold
   await sleep(HEAT);
   alive = false;
 
-  if (whiff) {
-    add("brk-fizzle", d.x, d.y);
+  if (react) {
+    // zlá obrana (Shield Breaker do mirroru / Mirror Breaker do štítu): lúč len zhasne, reakciu obrany
+    // (odraz / blok) prehrá volajúci skutočnými efektmi obrany z defense-fx.js
     beam.classList.add("off"); muzzle.remove(); impact.remove();
     setTimeout(() => beam.remove(), 200);
-    document.querySelectorAll(".brk-fizzle").forEach(e => setTimeout(() => e.remove(), 500));
     return;
   }
 
