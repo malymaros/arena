@@ -208,13 +208,21 @@ export function pixelizeEmoji(el, res) {
 // ostatné → čiernobielo so zvýšeným kontrastom (starý film). Po pixeloch - CSS filter by nevedel zmeniť len rám.
 function noirTone(ctx, res) {
   const img = ctx.getImageData(0, 0, res, res), d = img.data;
+  const warm = new Uint8Array(res * res);
   for (let i = 0; i < d.length; i += 4) {
     if (!d[i + 3]) continue;
     const r = d[i], g = d[i + 1], b = d[i + 2];
     const L = 0.299 * r + 0.587 * g + 0.114 * b;
-    const warm = r > b + 40 && g > b + 10 && r - b > (Math.max(r, g, b) - Math.min(r, g, b)) * 0.6;
-    if (warm) { d[i] = 16 + L * 0.16; d[i + 1] = 11 + L * 0.12; d[i + 2] = 9 + L * 0.1; }
-    else { const v = Math.max(0, Math.min(255, (L - 128) * 1.35 + 110)); d[i] = d[i + 1] = d[i + 2] = v; }
+    if (r > b + 40 && g > b + 10 && r - b > (Math.max(r, g, b) - Math.min(r, g, b)) * 0.6) {
+      warm[i / 4] = 1; d[i] = 16 + L * 0.16; d[i + 1] = 11 + L * 0.12; d[i + 2] = 9 + L * 0.1;
+    } else { const v = Math.max(0, Math.min(255, (L - 128) * 1.35 + 110)); d[i] = d[i + 1] = d[i + 2] = v; }
+  }
+  // hrubší rám: pixel vnútri susediaci s ebenovým rámom → „svetločierna" vnútorná vrstva rámu (čierna + svetločierna)
+  for (let y = 0; y < res; y++) for (let x = 0; x < res; x++) {
+    const k = y * res + x;
+    if (warm[k] || !d[k * 4 + 3]) continue;
+    const near = (x > 0 && warm[k - 1]) || (x < res - 1 && warm[k + 1]) || (y > 0 && warm[k - res]) || (y < res - 1 && warm[k + res]);
+    if (near) { d[k * 4] = 62; d[k * 4 + 1] = 58; d[k * 4 + 2] = 56; }
   }
   ctx.putImageData(img, 0, 0);
 }
