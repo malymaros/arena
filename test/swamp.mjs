@@ -54,8 +54,19 @@ console.log("Config a štart hry");
   check(g.shrek && g.shrek.hp === SHREK_HP && !g.shrek.dead, "C3: Shrek má na štarte plné HP");
   check(!["0,1", "3,1"].includes(`${g.shrek.x},${g.shrek.y}`), "C4: Shrek nestojí na štartovom políčku hráča", J(g.shrek));
   const m = g.shrek.marks;
-  check(m.length === 3 && !(m[0][0] === g.shrek.x && m[0][1] === g.shrek.y) && J(m[1]) !== J(m[0]) && J(m[2]) !== J(m[1]),
-    "C5: 3 ohlásené skoky, každý na iné políčko než predošlé", J(m));
+  check(m.length === 3 && new Set([...m, [g.shrek.x, g.shrek.y]].map(String)).size === 4,
+    "C5: 3 ohlásené skoky na tri rôzne políčka, žiadne nie je Shrekovo aktuálne", J(m));
+  // tri rôzne skoky platia pre každé kolo (300 žrebov)
+  {
+    let ok = true;
+    for (let seed = 1; seed <= 300 && ok; seed++) {
+      const t = createEngine({ seed, emitState: () => {} });
+      t.startMatch(t.sanitizeConfig(CFG)); t.chooseCharacter("A", "fire"); t.chooseCharacter("B", "lightning");
+      const s = t.game.shrek;
+      ok = new Set([...s.marks, [s.x, s.y]].map(String)).size === 4;
+    }
+    check(ok, "C5b: v 300 hrách vždy tri rôzne skoky mimo Shrekovho políčka");
+  }
   const tl = s.round(PASS3, PASS3);
   check(!g.tiles.length && !g.iks.length && !(g.pending?.spawns || []).length, "C6: po kole žiadne dlaždice ani ohlásené spawny");
   check(tl.every(f => f.shrek), "C7: každý frame nesie verejný stav Shreka");
@@ -76,11 +87,12 @@ console.log("Skoky a rev (veža)");
   const jumps = fx(tl, "shrek_jump");
   check(J(jumps.map(j => [j.n, j.to])) === J([[1, [0, 0]], [2, [3, 2]], [3, [2, 1]]]), "R1: tri skoky v poradí 1-2-3 na ohlásené políčka", J(jumps));
   const roars = fx(tl, "shrek_roar");
-  check(roars.length === 3 && roars[0].cells.length === 6 && roars.every(r => r.dmg === 1), "R2: rev = riadok + stĺpec (6 políčok), 1 dmg pri plných HP", J(roars[0]));
-  // krok 1 (0,0): stĺpec 0 → p1 (0,1); krok 2 (3,2): stĺpec 3 → p2 (3,1); krok 3 (2,1): riadok 1 → obaja
-  check(s.game.players.p1.hp === 8 && s.game.players.p2.hp === 8, "R3: rev zasiahne hráčov v riadku/stĺpci (p1 2×, p2 2×)", J([s.game.players.p1.hp, s.game.players.p2.hp]));
+  check(roars.length === 3 && J(roars[0].cells) === J([[0, 0], [1, 0], [0, 1]]) && roars[2].cells.length === 5 && roars.every(r => r.dmg === 1),
+    "R2: rev = políčko dopadu + ortogonálni susedia (roh 3, stred 5), 1 dmg pri plných HP", J(roars.map(r => r.cells)));
+  // krok 1 (0,0): sused (0,1) → p1; krok 2 (3,2): sused (3,1) → p2; krok 3 (2,1): sused (3,1) → p2, (0,1) je ďaleko
+  check(s.game.players.p1.hp === 9 && s.game.players.p2.hp === 8, "R3: rev zasiahne len hráčov na kríži (p1 1×, p2 2×)", J([s.game.players.p1.hp, s.game.players.p2.hp]));
   const hits = fx(tl, "hit").filter(h => h.shrek);
-  check(hits.length === 4, "R4: zásahy revu sú hit efekty so značkou shrek", J(hits));
+  check(hits.length === 3, "R4: zásahy revu sú hit efekty so značkou shrek", J(hits));
   check(s.game.shrek.x === 2 && s.game.shrek.y === 1 && s.game.shrek.done === 0 && s.game.shrek.marks.length === 3, "R5: koniec kola - Shrek na 3. políčku, nové skoky ohlásené");
   // prvý skok ide až po prvom kroku (po akciách oboch hráčov)
   const firstJump = idx(tl, e => e.kind === "shrek_jump");

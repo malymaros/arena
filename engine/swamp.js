@@ -1,6 +1,7 @@
 // engine/swamp.js - Shrek Swamp (tretia aréna, docs/SWAMP_PLAN.md): neutrálne NPC Shrek namiesto špeciálnych dlaždíc.
-// Fáza 1: pred kolom ohlási 3 očíslované políčka (game.shrek.marks), po k-tom kroku skočí na k-te a zareve ako
-// šachová veža (celý riadok + stĺpec). Sila revu rastie s klesajúcimi HP (SHREK_ROAR_DMG / SHREK_RAGE_HP).
+// Fáza 1: pred kolom ohlási 3 očíslované políčka (game.shrek.marks - tri rôzne, žiadne nie je jeho aktuálne), po k-tom
+// kroku skočí na k-te a zareve: zasiahne políčko dopadu + jeho ortogonálnych susedov. Sila revu rastie s klesajúcimi HP
+// (SHREK_ROAR_DMG / SHREK_RAGE_HP).
 // Kto ho zasiahne, dostane reakciu: strela → sud späť (−mana, chýbajúca do HP), melee → punch (−2 many, prelieva
 // sa do HP), special zboku → PowerUp + tackle po riadku k útočníkovi (prvá figúra v ceste, Shrek sa vráti),
 // special od útočníka v tom istom stĺpci → okamžitý rev. Fáza 2: pri 0 HP padne (leží, nič neblokuje) a z tela
@@ -41,15 +42,12 @@ function randomCell(filter) {
   return cells[Math.floor(E.rand() * cells.length)];
 }
 
-// 3 očíslované skoky kola: každý na iné políčko než to, z ktorého skáče (hráči na cieli nevadia)
+// 3 očíslované skoky kola: tri RÔZNE políčka a žiadne nie je to, na ktorom Shrek práve stojí (hráči na cieli nevadia)
 function rollMarks(from) {
   const marks = [];
-  let prev = from;
   for (let k = 0; k < 3; k++) {
-    const p = prev;
-    const c = randomCell((x, y) => !(x === p[0] && y === p[1]));
-    marks.push(c);
-    prev = c;
+    const used = [from, ...marks];
+    marks.push(randomCell((x, y) => !used.some(c => c[0] === x && c[1] === y)));
   }
   return marks;
 }
@@ -137,10 +135,10 @@ function cloneCosmetic(slot, raw, tl) {
 
 const stonedNow = (slot, stoned) => !!(stoned?.[slot]) || E.game.players[slot].stone > 0;
 
-// rev ako šachová veža: celý riadok + stĺpec Shrekovho políčka (vrátane neho)
+// rev: Shrekovo políčko + jeho ortogonálni susedia (kríž, na okraji/rohu menší)
 function roar(tl, stoned = null) {
   const s = E.game.shrek, dmg = roarDmg();
-  const inLine = (x, y) => x === s.x || y === s.y;
+  const inLine = (x, y) => Math.abs(x - s.x) + Math.abs(y - s.y) <= 1;
   const cells = [];
   for (let y = 0; y < E.game.board.h; y++) for (let x = 0; x < E.game.board.w; x++) if (inLine(x, y)) cells.push([x, y]);
   E.pushStateFrame(tl, [{ kind: "shrek_roar", cell: [s.x, s.y], cells, dmg }], SHREK_ROAR_MS);

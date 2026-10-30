@@ -122,7 +122,7 @@ export function showLobby() {
     portalWeights: { ...PORTAL_WEIGHTS }, perRound: PORTALS_PER_ROUND };
   forms.swamp = { fields: { ...fields }, tileWeights: { dmg: 0, heal: 0, mana: 0, ik: 0, power: 0, block: 0, ...ITEM_WEIGHTS } };
   // pravidlá Shreka v lobby (čísla z shared/balance.js)
-  $("lobby-swamp-info").innerHTML = `<p>Shrek (${SHREK_HP} HP) marks 3 cells each round, jumps there after each step and roars along the row and column (${SHREK_ROAR_DMG.join(" / ")} dmg as his HP drops below ${SHREK_RAGE_HP.join(" / ")}).</p>
+  $("lobby-swamp-info").innerHTML = `<p>Shrek (${SHREK_HP} HP) marks 3 cells each round, jumps there after each step and roars at the landing cell and its 4 neighbours (${SHREK_ROAR_DMG.join(" / ")} dmg as his HP drops below ${SHREK_RAGE_HP.join(" / ")}).</p>
     <p>Hit him and he hits back. At 0 HP he falls and his stench spreads one cell per round (${STENCH_DMG} dmg per step).</p>
     <p>Hearts and mana drops fall on the board - step on one or run through it to pick it up.</p>`;
 

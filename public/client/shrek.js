@@ -1,6 +1,6 @@
 // public/client/shrek.js - Shrek Swamp (docs/SWAMP_PLAN.md): Shrek na doske (sprite canvas medzi figúrami, HP lišta
 // nad hlavou), ohlásené skoky 1/2/3 a smrad v bunkách (renderShrek z renderGrid) a choreografia jeho efektov
-// z timeline (shrekEffect): skok, rev (riadok + stĺpec), zásah, sud, punch, PowerUp + tackle + návrat, pád, smrad.
+// z timeline (shrekEffect): skok, rev (kríž okolo dopadu), zásah, sud, punch, PowerUp + tackle + návrat, pád, smrad.
 // Stav nesie server v state.shrek (verejný - aj prekliatemu v labyrinte); klient len prehráva. Sprity sú pásy
 // z tools/sprites-shrek (public/assets/shrek/*.png + anims.json).
 import { state } from "/client/session.js";
@@ -22,7 +22,7 @@ fetch(DIR + "anims.json").then(r => r.json()).then(list => Promise.all(list.filt
 
 let fig = null, hpEl = null;
 const view = { anim: "Idle", start: 0, ms: 0, flip: false, px: null, py: null, motion: null, hurtUntil: 0, lastKey: "" };
-let roar = null;                     // { cells, until } - rozsvietený riadok + stĺpec revu
+let roar = null;                     // { cells, until } - rozsvietené políčka revu (kríž)
 let freshStench = new Map();         // "x,y" → do kedy sa bunka smradu „rozlieva" (animácia nástupu)
 const flashCells = new Map();        // "x,y" → do kedy bliká (stench_proc)
 const freshItems = new Map();        // "x,y" → do kedy item „padá" (item_drop)
@@ -239,10 +239,14 @@ function throwBarrel(from, to, ms) {
 
 /* ---------- kreslenie (vlastná slučka; kreslí len pri zmene framu/polohy) ---------- */
 // jednorazová animácia sa zrýchli, aby sa zmestila do framu timeline (view.ms); PowerUp sa točí dookola
+// mŕtvy Shrek: po páde donekonečna točí posledné framy s hviezdičkami okolo hlavy (STAR_FRAMES)
+const STAR_FRAMES = 3;
 function frameIndex(m, now) {
-  if (view.anim === "HurtDead" && view.start === 0) return m.frames - 1; // reload po smrti - rovno ležiaci
+  const stars = () => m.frames - STAR_FRAMES + Math.floor(now / 1000 * m.fps) % STAR_FRAMES;
+  if (view.anim === "HurtDead" && view.start === 0) return stars(); // reload po smrti - rovno ležiaci
   const fps = view.ms ? Math.max(m.fps, m.frames / (view.ms / 1000)) : m.fps;
   const n = Math.floor((now - view.start) / 1000 * fps);
+  if (view.anim === "HurtDead") return n < m.frames ? n : stars();
   return (m.loop || view.anim === "PowerUp") ? n % m.frames : Math.min(m.frames - 1, n);
 }
 

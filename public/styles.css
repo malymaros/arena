@@ -1731,7 +1731,7 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   animation: shrek-roar .25s ease-in-out infinite alternate; }
 @keyframes shrek-roar { from { opacity: .55; } to { opacity: 1; } }
 /* smrad po Shrekovej smrti: špeciálna dlaždica (plochá výplň + tvrdý rámik) v zelenej skokov, ikona zelené hovno */
-.cell.tile-stench { background: rgba(182,232,70,.16); box-shadow: inset 0 0 0 2px #b6e846; }
+.cell.tile-stench { background: rgba(182,232,70,.26); box-shadow: inset 0 0 0 3px #b6e846; animation: ik-pulse 1s ease-in-out infinite; } /* pulzuje ako IK */
 .cell.stench-fresh .stench-marker { animation: stench-in .9s ease-out; }
 @keyframes stench-in { from { opacity: 0; transform: scale(.3); } }
 .cell.stench-flash { background: rgba(182,232,70,.45); }
@@ -3133,7 +3133,7 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .perf-lite .hud-box.death-golden .bar { animation: none; box-shadow: 0 0 0 2px #000, 0 0 10px 1px rgba(255,210,74,.8); }
 .perf-lite .hud-box.hope-red .bar     { animation: none; box-shadow: 0 0 0 2px #000, 0 0 10px 1px rgba(255,70,70,.8); }
 /* IK dlaždice (sú na ploche skoro stále) - bez pulzu jasu */
-.perf-lite .cell.tile-ik { animation: none; }
+.perf-lite .cell.tile-ik, .perf-lite .cell.tile-stench { animation: none; }
 /* portrét pri kritickom HP a max level ikony - statické */
 .perf-lite .hud-char.critical { animation: none;
   filter: saturate(.35) brightness(.62) sepia(.85) hue-rotate(-35deg) drop-shadow(0 0 12px rgba(255,20,20,.8)); }

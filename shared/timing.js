@@ -142,7 +142,7 @@ export const COLOR_ROLL_MS = COLOR_ROLL_SPIN_MS + COLOR_ROLL_RESULT_MS + COLOR_R
 
 // Shrek Swamp (docs/SWAMP_PLAN.md): Shrekove framy - skok na očíslované políčko, rev, reakcie na zásah, smrť, smrad
 export const SHREK_JUMP_MS    = 550;  // skok (oblúk) na ďalšie políčko
-export const SHREK_ROAR_MS    = 750;  // rev - riadok + stĺpec sa rozsvieti, zásahy padnú v ďalšom frame
+export const SHREK_ROAR_MS    = 750;  // rev - kríž okolo dopadu sa rozsvieti, zásahy padnú v ďalšom frame
 export const SHREK_HIT_MS     = 450;  // Shreka niekto zasiahol (float nad ním)
 export const SHREK_BARREL_MS  = 1150; // zdvihne sud a hodí ho na útočníka (dopad v ďalšom frame)
 export const SHREK_PUNCH_MS   = 550;  // punch útočníka na spoločnom políčku

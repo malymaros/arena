@@ -15,8 +15,10 @@ Náhľady:
   mimo štartových políčok hráčov.
 - Pred kolom ohlási **3 políčka s číslami 1 / 2 / 3** (`game.shrek.marks`). Vidia ich obaja hráči už pri
   plánovaní, rovnako ako ohlásené dlaždice. Každé políčko je iné ako to, z ktorého na neho skáče.
-- Po **k-tom kroku** (keď obaja odohrajú k-tu akciu) skočí na políčko k a **zareve ako šachová veža**:
-  zasiahne celý riadok aj stĺpec vrátane vlastného políčka.
+- Tri ohlásené políčka sú vždy **tri rôzne** a žiadne nie je to, na ktorom Shrek práve stojí.
+- Po **k-tom kroku** (keď obaja odohrajú k-tu akciu) skočí na políčko k a **zareve**: zasiahne políčko dopadu
+  a jeho **ortogonálnych susedov** (kríž; na okraji 4 políčka, v rohu 3). Pôvodne (do 2026-10-31) to bol celý
+  riadok a stĺpec.
 - Dmg revu závisí od Shrekových HP (`SHREK_ROAR_DMG` / `SHREK_RAGE_HP`):
 
   | Shrekove HP | Dmg revu |
@@ -42,11 +44,13 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 ### Fáza 2: smrad
 
 - Pri 0 HP Shrek padne (animácia HurtDead). Už nič nerobí, strely ním prechádzajú a leží za figúrkami.
+  Okolo hlavy mu stále krúžia hviezdičky (posledné 3 framy HurtDead v slučke).
 - Z tela sa šíri **smrad**:
   - v kole smrti je smrad len na jeho políčku,
   - na konci každého ďalšieho kola pribudnú ortogonálni susedia smradových políčok,
   - nakoniec je smrad v celej aréne.
 - Smrad dáva **1 dmg na konci každého kroku** (`STENCH_DMG`), ako dmg dlaždica. Hra tak určite skončí.
+  Smradové políčko vyzerá ako špeciálna dlaždica v zelenej skokov s pixel ikonou zeleného hovna a pulzuje ako IK.
 - Smrad pokryje celú plochu za 4 kolá, ak Shrek padne v strede, a za 6 kôl, ak padne v rohu. Miesto aj čas
   zabitia sú preto taktické rozhodnutie.
 
@@ -66,7 +70,8 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 
 ### Hudba
 
-`music.battle.swamp` hrá *All Star* počas hry v bažine. Vo FINAL ROUND hrá finálna hudba ako v iných arénach.
+`music.battle.swamp` hrá *All Star* počas hry v bažine. Nahrávka je tichá (−17,9 LUFS, vrchol −7 dBFS), preto má
+`vol` 1,0: vychádza na −17,9 LUFS rovnako ako `music.battle` (−9,9 LUFS × 0,40). Vo FINAL ROUND hrá finálna hudba ako v iných arénach.
 Súbor `public/sounds/custom/music/shrek-all-star.mp3` je orezaný úsek 40,4–107,6 s originálu (rez po MP3 rámcoch,
 prepočítaná Xing hlavička). Slučka `trim [514, 66737]` má 28 taktov pri 103,5 BPM a prechod 1,5 s na takt.
 
