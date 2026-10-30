@@ -7,10 +7,10 @@ import { state } from "/client/session.js";
 import { cellToPx, TILE_W, TILE_H, gridEl, actorsEl, figuresEl, rowZ } from "/client/dom.js";
 import { spawnFloat, spawnCellFloat } from "/client/board-fx.js";
 import { perf } from "/client/perf.js";
-import { SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP } from "/shared/balance.js";
+import { SHREK_RAGE_HP } from "/shared/balance.js";
 
 const DIR = "/assets/shrek/";
-const K = 4.3;                       // mierka sprite-u (~45 px Shrek → ~190 px, o niečo väčší než mágovia)
+const K = 2.15;                      // mierka sprite-u (~45 px Shrek → ~95 px)
 const CW = Math.round(96 * K), CH = CW; // canvas: najväčší pás (88 px) + rezerva
 const SIDE = 62;                     // odsun Shreka nabok, keď s ním na políčku stojí hráč (hráča odsúva pairShift)
 const META = {};
@@ -38,7 +38,6 @@ function ensureEls() {
 }
 
 const cellCenter = (x, y) => { const { left, top } = cellToPx(x, y); return { x: left + TILE_W / 2, y: top + TILE_H }; };
-const roarDmg = (hp) => hp <= SHREK_RAGE_HP[1] ? SHREK_ROAR_DMG[2] : hp <= SHREK_RAGE_HP[0] ? SHREK_ROAR_DMG[1] : SHREK_ROAR_DMG[0];
 
 // pokojová pozícia: stred bunky, nabok ak tam stojí živý hráč (oba hráči → Shrek ostane v strede za nimi)
 function restPos(s) {
@@ -65,17 +64,20 @@ export function renderShrek(s) {
   if (!sh) { if (fig) { fig.style.display = "none"; hpEl.style.display = "none"; } return; }
   ensureEls();
   fig.style.display = "block";
-  // bunky: ohlásené skoky (číslo, už odskákané vyblednú), smrad, rev, blik smradu
+  // bunky: ohlásené skoky - políčko podfarbené ako špeciálna dlaždica + piktogram Shrekovej hlavy s číslom
+  // (už odskákané vyblednú), smrad, rev, blik smradu
   const cells = gridEl.children, w = state?.board?.w || 4, now = performance.now();
   sh.marks.forEach(([x, y], i) => {
     const cell = cells[y * w + x];
     if (!cell) return;
+    const phase = i < sh.done ? "done" : i === sh.done ? "next" : "";
+    if (phase !== "done") cell.classList.add("shrek-cell");
     const m = document.createElement("div");
-    m.className = "shrek-mark" + (i < sh.done ? " done" : i === sh.done ? " next" : "");
-    m.textContent = String(i + 1);
-    // viac čísel na jednej bunke (napr. 1 a 3) - posun, nech sa neprekryjú
+    m.className = "shrek-mark" + (phase ? " " + phase : "");
+    m.innerHTML = `<img src="${DIR}Head.png" alt=""><b>${i + 1}</b>`;
+    // viac čísel na jednej bunke (napr. 1 a 3) - ďalšia hlava vedľa, nech sa neprekryjú
     const prior = cell.querySelectorAll(".shrek-mark").length;
-    if (prior) m.style.transform = `translateX(${-prior * 46}px)`;
+    if (prior) m.style.left = (8 + prior * 52) + "px";
     cell.appendChild(m);
   });
   for (const [x, y] of sh.stench) {
@@ -104,12 +106,10 @@ export function renderShrek(s) {
     play("Idle");
   }
   fig.style.zIndex = sh.dead ? 1 : rowZ(sh.y) - 1; // mŕtvy leží za všetkými figúrami, živý za hráčmi na svojom riadku
+  // nad hlavou len číslo HP: 20–11 zelené, 10–6 oranžové, 5–0 červené (prahy revu SHREK_RAGE_HP)
   hpEl.style.display = sh.dead ? "none" : "";
-  const dmg = roarDmg(sh.hp);
-  const tier = dmg >= 3 ? "t3" : dmg >= 2 ? "t2" : "";
-  const segs = Array.from({ length: SHREK_HP }, (_, i) => `<i${i < sh.hp ? ' class="on"' : ""}></i>`).join("");
-  hpEl.className = "shrek-hp " + tier;
-  hpEl.innerHTML = `<b class="shp-name">SHREK</b><span class="shp-num">${sh.hp}</span><div class="shp-bar">${segs}</div><span class="shp-roar">ROAR ${dmg}</span>`;
+  hpEl.className = "shrek-hp " + (sh.hp <= SHREK_RAGE_HP[1] ? "t3" : sh.hp <= SHREK_RAGE_HP[0] ? "t2" : "");
+  hpEl.textContent = String(sh.hp);
   if (!view.motion && !sh.dead) view.flip = sh.x >= (state?.board?.w || 4) / 2; // tvárou do stredu dosky
 }
 
@@ -126,7 +126,7 @@ export function shrekEffect(e, hold) {
       if (view.px == null) { view.px = fromC.x; view.py = fromC.y; }
       view.flip = to.x < view.px;
       play("JumpKick", hold);
-      moveTo(to, hold * 0.85, 150);
+      moveTo(to, hold * 0.85, 90);
       break;
     }
     case "shrek_roar":
@@ -191,7 +191,7 @@ function floatOverShrek(text, cls) {
   el.className = cls;
   el.textContent = text;
   el.style.left = view.px + "px";
-  el.style.top = (view.py - 250) + "px";
+  el.style.top = (view.py - 150) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
 }
@@ -200,15 +200,15 @@ function floatOverShrek(text, cls) {
 function throwBarrel(from, to, ms) {
   const m = META.PickUp;
   if (!m) return;
-  const S = m.size, k = 3;
+  const S = m.size, k = 1.6;
   const c = document.createElement("canvas");
   c.width = S; c.height = S;
   c.className = "shrek-barrel";
   c.getContext("2d").drawImage(m.img, 0, 0, S, S, 0, 0, S, S);
   c.style.width = S * k + "px"; c.style.height = S * k + "px";
-  c.style.left = (from.x - S * k / 2) + "px"; c.style.top = (from.y - 230) + "px";
+  c.style.left = (from.x - S * k / 2) + "px"; c.style.top = (from.y - 120) + "px";
   actorsEl.appendChild(c);
-  const dx = to.x - from.x, dy = (to.y - 120) - (from.y - 230);
+  const dx = to.x - from.x, dy = (to.y - 110) - (from.y - 120);
   const kf = [0, 0.25, 0.5, 0.75, 1].map(p => ({ transform: `translate(${dx * p}px, ${dy * p - Math.sin(p * Math.PI) * 160}px) rotate(${p * 540}deg)` }));
   c.animate(kf, { duration: Math.max(200, ms), easing: "linear", fill: "forwards" });
   setTimeout(() => c.remove(), Math.max(200, ms) + 60);
@@ -248,7 +248,7 @@ function tick(now) {
   const hurt = now < view.hurtUntil;
   const key = `${view.anim}|${f}|${view.flip}|${hurt}`;
   fig.style.transform = `translate(${Math.round(view.px - CW / 2)}px, ${Math.round(view.py - CH - lift)}px)`;
-  hpEl.style.transform = `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 232)}px)`;
+  hpEl.style.transform = `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 128)}px)`;
   if (key === view.lastKey) return;
   view.lastKey = key;
   const g = fig.getContext("2d");

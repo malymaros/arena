@@ -91,7 +91,7 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 
 ### Klient
 
-- `public/client/shrek.js` kreslí Shreka do canvasu medzi figúrami (mŕtvy leží za nimi), HP lištu nad hlavou,
+- `public/client/shrek.js` kreslí Shreka do canvasu medzi figúrami (mŕtvy leží za nimi), číslo HP nad hlavou,
   čísla skokov a smrad v bunkách (`renderShrek` z `renderGrid`) a prehráva efekty (`shrekEffect` z `timeline.js`).
   Hráč sám so Shrekom na políčku odstúpi nabok (`pairShift` v `placement.js`).
 - Lobby: karta SHREK SWAMP. Sekcie dlaždíc sú skryté a nahrádza ich popis Shreka (`public/client/lobby.js`).

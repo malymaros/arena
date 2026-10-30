@@ -77,4 +77,12 @@ for (const a of ANIMS) {
   meta.push({ name: a.name, frames: anchors.length, size: S, fps: a.fps, loop: !!a.loop, hassle: !!a.hassle });
 }
 fs.writeFileSync(path.join(OUT, "anims.json"), JSON.stringify(meta, null, 1));
+
+// piktogram Shrekovej hlavy (HUD ikona z Reekin' Havoc, 24×24) - značka ohlásených políčok 1/2/3
+{
+  const [x0, y0, w, h] = rows[0].cells[5];
+  const head = new PNG({ width: w, height: h });
+  for (let y = 0; y < h; y++) src.data.copy(head.data, y * w * 4, ((y0 + y) * W + x0) * 4, ((y0 + y) * W + x0 + w) * 4);
+  fs.writeFileSync(path.join(OUT, "Head.png"), PNG.sync.write(head));
+}
 console.log(meta.map((m) => `${m.name} ${m.frames}f ${m.size}px`).join("\n"));
