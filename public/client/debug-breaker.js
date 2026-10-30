@@ -50,9 +50,10 @@ import { ACTION_ANIMS } from "/chars/index.js";
     { t: "Golden Shield Breaker vs golden štít",   def: { shield: true, shieldGold: true }, cost: 3, dmg: 2, kind: "shield", gold: true, label: "SHIELD BROKEN!" },
     { t: "Golden Mirror Breaker vs golden mirror", def: { mirror: true, mirrorGold: true }, cost: 5, dmg: 4, kind: "mirror", gold: true, label: "MIRROR SHATTERED!" },
     { t: "Mirror Breaker s Last Stand (×2)",       def: { mirror: true }, atk: { lastStandBuff: true }, cost: 4, dmg: 8, kind: "mirror", label: "MIRROR SHATTERED!" },
-    { t: "Shield Breaker vs mirror → odraz",       def: { mirror: true },                   cost: 2, dmg: 2, react: "reflect" },
-    { t: "Mirror Breaker vs štít → blok",          def: { shield: true },                   cost: 4, dmg: 4, react: "block" },
-    { t: "Breaker naprázdno (súper bez obrany)",   def: {},                                 cost: 2, dmg: 0, whiff: true },
+    { t: "Shield Breaker vs mirror → odraz",       def: { mirror: true },                   cost: 2, dmg: 2, kind: "shield", react: "reflect" },
+    { t: "Mirror Breaker vs štít → blok",          def: { shield: true },                   cost: 4, dmg: 4, kind: "mirror", react: "block" },
+    { t: "Shield Breaker naprázdno (bez obrany)",  def: {},                                 cost: 2, dmg: 0, kind: "shield", whiff: true },
+    { t: "Mirror Breaker naprázdno (bez obrany)",  def: {},                                 cost: 4, dmg: 0, kind: "mirror", whiff: true },
   ];
   let slow = 1, busy = false;
 
@@ -67,7 +68,7 @@ import { ACTION_ANIMS } from "/chars/index.js";
     setAnim("p1", ACTION_ANIMS[chars.p1]?.shot || "attack", beamMs + 150);
     await spawnBreakerBeam("p1", "p2", { kind: sc.kind, gold: !!sc.gold, whiff: !!sc.whiff, react: !!sc.react, slow });
     if (sc.whiff) {
-      spawnFloat("p2", "NO GUARD", "breaker-float whiff");
+      // súper bez obrany: lúč sa len rozplynul - žiadny text, žiadny dmg
     } else if (sc.react === "block") {
       // Mirror Breaker do štítu: štít ho zablokuje ako bežný útok (spotrebuje sa, 0 dmg)
       spawnShieldBlock("p2", false);

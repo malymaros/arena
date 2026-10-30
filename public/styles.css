@@ -2778,24 +2778,29 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   }
   .board.fx-shake{ animation: fx-shake .45s ease-in-out; }
 
-  /* Shield/Mirror Breaker (NÁVRH - public/client/breaker-fx.js): súvislý červený lúč, obrana sa zohrieva až praskne.
+  /* Shield/Mirror Breaker (NÁVRH - public/client/breaker-fx.js): súvislý lúč vo farbe breakera (Shield Breaker =
+     farba štítu, Mirror Breaker = farba mirroru, golden varianty zlatý), obrana sa zohrieva až praskne.
      Animujú sa len opacity/transform (pravidlá výkonu z docs/PERF_PLAN.md). */
-  .brk-fx{ position: absolute; pointer-events: none; z-index: 7; }
+  .brk-fx{ position: absolute; pointer-events: none; z-index: 7;
+    --bc: #4dd0e1; --bc-glow: rgba(77,208,225,.8); --bc-deep: rgba(0,151,167,.85); --bc-tint: #c8f6ff; }
+  .brk-fx.c-mirror{ --bc: #ce93d8; --bc-glow: rgba(206,147,216,.8); --bc-deep: rgba(142,36,170,.85); --bc-tint: #f3d9ff; }
+  .brk-fx.c-gold{ --bc: #ffd54f; --bc-glow: rgba(255,202,40,.85); --bc-deep: rgba(255,160,0,.85); --bc-tint: #fff4c2; }
   .brk-beam{ height: 26px; transform-origin: 0 50%; }
   .brk-beam i{ position: absolute; left: 0; right: 0; top: 50%; transform-origin: 0 50%; border-radius: 12px;
     animation: brk-beam-in var(--ramp) ease-out both, brk-beam-flick .09s steps(2) infinite; }
-  .brk-beam .glow{ height: 26px; margin-top: -13px; background: linear-gradient(90deg, rgba(255,40,30,.15), rgba(255,30,20,.75) 25%, rgba(255,60,30,.85));
-    box-shadow: 0 0 18px #ff1a1a, 0 0 36px rgba(255,0,0,.6); }
-  .brk-beam .core{ height: 7px; margin-top: -3.5px; background: linear-gradient(90deg, #ffb0a0, #fff 20%, #fff6d0); box-shadow: 0 0 6px #fff; }
+  .brk-beam .glow{ height: 26px; margin-top: -13px; opacity: .85;
+    background: linear-gradient(90deg, transparent, var(--bc-deep) 25%, var(--bc));
+    box-shadow: 0 0 18px var(--bc-glow), 0 0 36px var(--bc-glow); }
+  .brk-beam .core{ height: 7px; margin-top: -3.5px; background: linear-gradient(90deg, var(--bc-tint), #fff 20%, #fff); box-shadow: 0 0 6px #fff; }
   .brk-beam.off i{ animation: brk-beam-out .18s ease-in forwards; }
   @keyframes brk-beam-in{ from{ transform: scaleX(0); } to{ transform: scaleX(1); } }
   @keyframes brk-beam-flick{ 0%{ opacity: 1; } 100%{ opacity: .8; } }
   @keyframes brk-beam-out{ from{ opacity: 1; } to{ opacity: 0; transform: scaleY(.1); } }
   .brk-muzzle, .brk-impact{ width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
-    background: radial-gradient(circle, #fff 0 22%, rgba(255,90,60,.9) 40%, rgba(255,0,0,0) 70%); animation: brk-pulse .12s steps(2) infinite alternate; }
+    background: radial-gradient(circle, #fff 0 22%, var(--bc) 40%, transparent 70%); animation: brk-pulse .12s steps(2) infinite alternate; }
   .brk-impact{ width: 70px; height: 70px; margin: -35px 0 0 -35px; }
   @keyframes brk-pulse{ from{ transform: scale(.85); } to{ transform: scale(1.15); } }
-  .brk-spark{ width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #ffe7a0; box-shadow: 0 0 6px #ff5a1a; animation: brk-spark .42s ease-out forwards; }
+  .brk-spark{ width: 6px; height: 6px; margin: -3px 0 0 -3px; background: var(--bc-tint); box-shadow: 0 0 6px var(--bc); animation: brk-spark .42s ease-out forwards; }
   @keyframes brk-spark{ to{ transform: translate(var(--dx), var(--dy)) scale(.3); opacity: 0; } }
 
   /* bariéra: vrstvy base (farba obrany) → hot (oranžovo-červená) → white (biely žiar); praskliny w0/w1/w2 v 3 vlnách */
@@ -2835,12 +2840,12 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
     clip-path: polygon(50% 0, 100% 62%, 62% 100%, 0 72%); animation: brk-shard .8s cubic-bezier(.15,.7,.3,1) forwards; }
   .brk-shard.white{ background: linear-gradient(135deg, #fff, #ffd0a0); }
   @keyframes brk-shard{ to{ transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)); opacity: 0; } }
-  /* súper bez obrany: lúč sa rozplynie (zoslabne a rozptýli sa), pri postave len slabý červený dym - žiadny dopad */
+  /* súper bez obrany: lúč sa rozplynie (zoslabne a rozptýli sa), pri postave len slabý dym vo farbe lúča - žiadny dopad */
   .brk-beam.dissolve i{ animation: brk-dissolve var(--fade) ease-out forwards; }
   @keyframes brk-dissolve{ from{ opacity: 1; transform: scaleY(1); } to{ opacity: 0; transform: scaleY(2.2); } }
   .brk-smoke{ width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,120,110,.45), rgba(200,40,40,.15) 60%, transparent 72%); animation: brk-smoke .7s ease-out forwards; }
-  @keyframes brk-smoke{ from{ transform: scale(.6); opacity: .9; } to{ transform: translate(var(--dx), var(--dy)) scale(2.2); opacity: 0; } }
+    background: radial-gradient(circle, var(--bc-glow), transparent 72%); opacity: .5; animation: brk-smoke .7s ease-out forwards; }
+  @keyframes brk-smoke{ from{ transform: scale(.6); opacity: .5; } to{ transform: translate(var(--dx), var(--dy)) scale(2.2); opacity: 0; } }
   .breaker-float{ position: absolute; z-index: 9; font-weight: 900; font-size: 20px; pointer-events: none; white-space: nowrap;
     transform: translateX(-50%); animation: floatUp 1.2s ease-out forwards; color: #ff5a2a; text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 10px rgba(255,40,0,.9); }
   /* ikona obrany preškrtnutá čiernou trhlinou (pix.js crackIco) - tlačidlá, výber aj lišta kola */
@@ -2855,7 +2860,6 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   .def-picker.hidden{ display: none; }
   .def-picker .btn.act .cost.word{ font-size: 10px; letter-spacing: .5px; }
   .def-picker .btn.act.golden-opt{ background: linear-gradient(#ffd54f, #c99700); color: #2a1c00; }
-  .breaker-float.whiff{ color: #c8c8c8; text-shadow: 0 2px 0 rgba(0,0,0,.6); font-size: 16px; }
 
   /* štít/mirror sa už nekreslia na bunku - pulzujúci glow je per-postavu (JS actorFilter) */
 
