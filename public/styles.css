@@ -2778,6 +2778,69 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   }
   .board.fx-shake{ animation: fx-shake .45s ease-in-out; }
 
+  /* Shield/Mirror Breaker (NÁVRH - public/client/breaker-fx.js): súvislý červený lúč, obrana sa zohrieva až praskne.
+     Animujú sa len opacity/transform (pravidlá výkonu z docs/PERF_PLAN.md). */
+  .brk-fx{ position: absolute; pointer-events: none; z-index: 7; }
+  .brk-beam{ height: 26px; transform-origin: 0 50%; }
+  .brk-beam i{ position: absolute; left: 0; right: 0; top: 50%; transform-origin: 0 50%; border-radius: 12px;
+    animation: brk-beam-in var(--ramp) ease-out both, brk-beam-flick .09s steps(2) infinite; }
+  .brk-beam .glow{ height: 26px; margin-top: -13px; background: linear-gradient(90deg, rgba(255,40,30,.15), rgba(255,30,20,.75) 25%, rgba(255,60,30,.85));
+    box-shadow: 0 0 18px #ff1a1a, 0 0 36px rgba(255,0,0,.6); }
+  .brk-beam .core{ height: 7px; margin-top: -3.5px; background: linear-gradient(90deg, #ffb0a0, #fff 20%, #fff6d0); box-shadow: 0 0 6px #fff; }
+  .brk-beam.off i{ animation: brk-beam-out .18s ease-in forwards; }
+  @keyframes brk-beam-in{ from{ transform: scaleX(0); } to{ transform: scaleX(1); } }
+  @keyframes brk-beam-flick{ 0%{ opacity: 1; } 100%{ opacity: .8; } }
+  @keyframes brk-beam-out{ from{ opacity: 1; } to{ opacity: 0; transform: scaleY(.1); } }
+  .brk-muzzle, .brk-impact{ width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 22%, rgba(255,90,60,.9) 40%, rgba(255,0,0,0) 70%); animation: brk-pulse .12s steps(2) infinite alternate; }
+  .brk-impact{ width: 70px; height: 70px; margin: -35px 0 0 -35px; }
+  @keyframes brk-pulse{ from{ transform: scale(.85); } to{ transform: scale(1.15); } }
+  .brk-spark{ width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #ffe7a0; box-shadow: 0 0 6px #ff5a1a; animation: brk-spark .42s ease-out forwards; }
+  @keyframes brk-spark{ to{ transform: translate(var(--dx), var(--dy)) scale(.3); opacity: 0; } }
+
+  /* bariéra: vrstvy base (farba obrany) → hot (oranžovo-červená) → white (biely žiar); praskliny w0/w1/w2 v 3 vlnách */
+  .brk-barrier{ transform: translate(-50%, -50%); }
+  .brk-barrier i, .brk-barrier svg{ position: absolute; inset: 0; }
+  .brk-barrier.shield i, .brk-barrier.shield svg{ clip-path: polygon(50% 0, 100% 22%, 100% 78%, 50% 100%, 0 78%, 0 22%); }
+  .brk-barrier.mirror i, .brk-barrier.mirror svg{ clip-path: polygon(14% 0, 86% 0, 86% 100%, 14% 100%); }
+  .brk-barrier .base{ background: linear-gradient(135deg, rgba(234,251,255,.75), rgba(77,208,225,.45)); }
+  .brk-barrier.mirror .base{ background: linear-gradient(135deg, rgba(255,255,255,.7), rgba(206,147,216,.5)); }
+  .brk-barrier.gold .base{ background: linear-gradient(135deg, rgba(255,240,180,.85), rgba(255,200,60,.45)); }
+  .brk-barrier .hot{ opacity: 0; background: radial-gradient(ellipse at 50% 50%, rgba(255,230,120,.95), rgba(255,90,20,.85) 45%, rgba(200,0,0,.75)); }
+  .brk-barrier .white{ opacity: 0; background: radial-gradient(ellipse at 50% 50%, #fff, rgba(255,240,200,.9) 50%, rgba(255,120,60,.6)); }
+  .brk-barrier.heating{ animation: brk-tremble .07s steps(2) infinite; }
+  .brk-barrier.heating .base{ animation: brk-fade-out var(--heat) linear forwards; }
+  .brk-barrier.heating .hot{ animation: brk-hot var(--heat) ease-in forwards; }
+  .brk-barrier.heating .white{ animation: brk-white var(--heat) ease-in forwards; }
+  @keyframes brk-fade-out{ 0%{ opacity: 1; } 60%{ opacity: 0; } 100%{ opacity: 0; } }
+  @keyframes brk-hot{ 0%{ opacity: 0; } 45%{ opacity: 1; } 100%{ opacity: 1; } }
+  @keyframes brk-white{ 0%,65%{ opacity: 0; } 100%{ opacity: .9; } }
+  @keyframes brk-tremble{ from{ transform: translate(-50%, -50%) translate(-1px, 1px); } to{ transform: translate(-50%, -50%) translate(2px, -1px); } }
+  .brk-barrier svg path{ fill: none; stroke: #fff8d8; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0;
+    filter: drop-shadow(0 0 2px #ff2a00); vector-effect: non-scaling-stroke; }
+  .brk-barrier.heating svg .w0{ animation: brk-crack var(--heat) steps(1) forwards; animation-delay: calc(var(--heat) * -0.55); }
+  .brk-barrier.heating svg .w1{ animation: brk-crack var(--heat) steps(1) forwards; animation-delay: calc(var(--heat) * -0.30); }
+  .brk-barrier.heating svg .w2{ animation: brk-crack var(--heat) steps(1) forwards; animation-delay: calc(var(--heat) * -0.12); }
+  @keyframes brk-crack{ 0%{ opacity: 0; } 100%{ opacity: 1; } }
+
+  /* roztrieštenie */
+  .brk-flash{ width: 300px; height: 300px; margin: -150px 0 0 -150px; border-radius: 50%; z-index: 8;
+    background: radial-gradient(circle, #fff 0 12%, rgba(255,200,120,.8) 25%, rgba(255,40,20,.35) 45%, transparent 68%); animation: brk-flash .35s ease-out forwards; }
+  @keyframes brk-flash{ from{ transform: scale(.4); opacity: 1; } to{ transform: scale(1.1); opacity: 0; } }
+  .brk-ring{ width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; border: 5px solid #ff5a2a;
+    box-shadow: 0 0 18px #ff1a1a, inset 0 0 12px #ffb070; animation: brk-ring .55s ease-out forwards; }
+  @keyframes brk-ring{ from{ transform: scale(.12); opacity: 1; } to{ transform: scale(1); opacity: 0; } }
+  .brk-shard{ transform: translate(-50%, -50%); border: 1px solid rgba(255,255,255,.7);
+    background: linear-gradient(135deg, #ffe7a0, #ff5a1a 55%, #8a0a00); box-shadow: 0 0 12px #ff3a10;
+    clip-path: polygon(50% 0, 100% 62%, 62% 100%, 0 72%); animation: brk-shard .8s cubic-bezier(.15,.7,.3,1) forwards; }
+  .brk-shard.white{ background: linear-gradient(135deg, #fff, #ffd0a0); }
+  @keyframes brk-shard{ to{ transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)); opacity: 0; } }
+  .brk-fizzle{ width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,140,120,.8), rgba(255,30,30,.3) 50%, transparent 70%); animation: brk-flash .45s ease-out forwards; }
+  .breaker-float{ position: absolute; z-index: 9; font-weight: 900; font-size: 20px; pointer-events: none; white-space: nowrap;
+    transform: translateX(-50%); animation: floatUp 1.2s ease-out forwards; color: #ff5a2a; text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 10px rgba(255,40,0,.9); }
+  .breaker-float.whiff{ color: #c8c8c8; text-shadow: 0 2px 0 rgba(0,0,0,.6); font-size: 16px; }
+
   /* štít/mirror sa už nekreslia na bunku - pulzujúci glow je per-postavu (JS actorFilter) */
 
 /* ---------- Prihlásenie (meno + heslo) ---------- */
