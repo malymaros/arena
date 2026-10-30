@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Breaker — návrh</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<style>
+  /* DOČASNÁ návrhová stránka Shield/Mirror Breaker - nie je linkovaná z hry. Nič odtiaľto nejde do hry,
+     kým vlastník vizuál a ovládanie neschváli. Sprity sú skutočné assety hry (public/assets/...). */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  .top { position: sticky; top: 0; z-index: 50; display: flex; gap: 10px; align-items: center; padding: 10px 16px;
+    background: #0b0c10ee; border-bottom: 1px solid #23262e; flex-wrap: wrap; }
+  .top h1 { font: 14px "Press Start 2P", monospace; color: #ff5a5a; margin: 0 14px 0 0; letter-spacing: 1px; }
+  .wrap { display: flex; gap: 14px; padding: 14px 16px; align-items: flex-start; flex-wrap: wrap; }
+  .main { flex: 1 1 760px; min-width: 0; }
+  .panel { flex: 0 0 330px; background: #15171d; border: 1px solid #262a33; border-radius: 8px; padding: 12px; }
+  .panel h3, .main h3 { margin: 14px 0 6px; font-size: 12px; color: #ffb300; letter-spacing: .5px; text-transform: uppercase; }
+  .panel h3:first-child { margin-top: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .b { background: #262a33; color: #e8eaf0; border: 1px solid #3a4150; border-radius: 4px; padding: 6px 9px; cursor: pointer; font: 12px system-ui, sans-serif; }
+  .b:hover { background: #313745; }
+  .b.on { background: #ffb300; color: #2a1c00; border-color: #ffcf55; }
+  .b.anim { width: 100%; text-align: left; }
+  .b.anim small { color: #8b93a3; display: block; font-size: 11px; }
+  .b:disabled { opacity: .45; cursor: wait; }
+  #caption { min-height: 40px; margin: 8px 0 0; padding: 8px 12px; background: #15171d; border: 1px solid #262a33; border-radius: 6px; color: #ffe1e1; }
+  ul.notes { margin: 6px 0; padding-left: 18px; color: #c7ccd6; }
+  ul.notes li { margin: 3px 0; }
+  ul.notes b { color: #fff; }
+  .open { color: #ffcf55; }
+
+  /* ---------- javisko ---------- */
+  .stage { position: relative; width: 860px; height: 420px; max-width: 100%; overflow: hidden; border-radius: 8px;
+    background: radial-gradient(ellipse at 50% 30%, #4b4438 0%, #2c2822 60%, #1d1a16 100%); box-shadow: 0 0 0 1px #262a33; }
+  .stage.shake { animation: shake .32s linear; }
+  @keyframes shake { 0%,100%{transform:translate(0,0)} 15%{transform:translate(-7px,3px)} 30%{transform:translate(6px,-4px)}
+    45%{transform:translate(-5px,-2px)} 60%{transform:translate(4px,3px)} 80%{transform:translate(-2px,1px)} }
+  .grid { position: absolute; left: 30px; top: 40px; display: grid; grid-template-columns: repeat(4, 200px); grid-template-rows: repeat(3, 110px); gap: 0; }
+  .cell { border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.025); }
+  canvas.actor { position: absolute; width: 230px; height: 230px; image-rendering: pixelated; pointer-events: none; z-index: 5; }
+  canvas.actor.flip { transform: scaleX(-1); }
+  .fx { position: absolute; pointer-events: none; z-index: 8; }
+  .flash { position: absolute; inset: 0; pointer-events: none; z-index: 20; background: radial-gradient(circle at var(--x) var(--y), rgba(255,255,255,.75), rgba(255,40,40,.35) 18%, transparent 45%);
+    animation: flashOut .35s ease-out forwards; }
+  @keyframes flashOut { from { opacity: 1 } to { opacity: 0 } }
+
+  /* breaker strela: projektil postavy prefarbený na červenú energiu + červená žiara a stopa */
+  canvas.bolt { position: absolute; width: 96px; height: 96px; image-rendering: pixelated; z-index: 9; pointer-events: none;
+    filter: grayscale(1) sepia(1) saturate(9) hue-rotate(-48deg) brightness(1.15) drop-shadow(0 0 6px #ff2a2a) drop-shadow(0 0 14px #ff0000); }
+  .trail { position: absolute; height: 10px; border-radius: 6px; z-index: 8; pointer-events: none; transform-origin: 0 50%;
+    background: linear-gradient(90deg, transparent, rgba(255,40,40,.0) 10%, rgba(255,60,60,.65) 70%, #fff 100%);
+    box-shadow: 0 0 12px #ff2020; animation: trailFade .45s ease-out forwards; }
+  @keyframes trailFade { 0% { opacity: .95 } 100% { opacity: 0 } }
+
+  /* bariéra obrancu: pri dopade sa ukáže, sčervenie, praskne a rozletí sa */
+  svg.barrier { position: absolute; width: 170px; height: 210px; z-index: 7; overflow: visible; pointer-events: none; }
+  svg.barrier .shell { fill: var(--fill); stroke: var(--col); stroke-width: 3; transition: fill .12s, stroke .12s; }
+  svg.barrier.red .shell { fill: rgba(255,40,40,.32); stroke: #ff3b3b; filter: drop-shadow(0 0 8px #ff1a1a); }
+  svg.barrier .crack { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+    filter: drop-shadow(0 0 3px #ff2020) drop-shadow(0 0 6px #ff0000); stroke-dasharray: 260; stroke-dashoffset: 260; }
+  svg.barrier.cracking .crack { animation: crackDraw var(--crackMs) steps(5) forwards; }
+  @keyframes crackDraw { to { stroke-dashoffset: 0 } }
+  svg.barrier.gone { animation: barrierPop .14s ease-out forwards; }
+  @keyframes barrierPop { 0% { opacity: 1; transform: scale(1) } 100% { opacity: 0; transform: scale(1.12) } }
+  .shard { position: absolute; z-index: 10; pointer-events: none; border: 1px solid rgba(255,255,255,.75);
+    clip-path: polygon(50% 0, 100% 38%, 72% 100%, 18% 82%, 0 30%);
+    animation: shardFly var(--ms) cubic-bezier(.15,.7,.3,1) forwards; }
+  @keyframes shardFly { 0% { transform: translate(-50%,-50%) rotate(0); opacity: 1 }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)); opacity: 0 } }
+  .ring { position: absolute; z-index: 9; width: 40px; height: 40px; border-radius: 50%; border: 4px solid #ff3b3b; pointer-events: none;
+    transform: translate(-50%,-50%); box-shadow: 0 0 18px #ff1a1a, inset 0 0 10px #ff6a6a; animation: ring .5s ease-out forwards; }
+  @keyframes ring { to { width: 260px; height: 260px; opacity: 0; border-width: 1px } }
+  .puff { position: absolute; z-index: 9; width: 30px; height: 30px; border-radius: 50%; transform: translate(-50%,-50%); pointer-events: none;
+    background: radial-gradient(circle, rgba(255,120,120,.9), rgba(255,30,30,.4) 50%, transparent 70%); animation: puff .45s ease-out forwards; }
+  @keyframes puff { to { width: 120px; height: 120px; opacity: 0 } }
+  .float { position: absolute; z-index: 30; transform: translate(-50%, 0); white-space: nowrap; pointer-events: none;
+    font: 15px "Press Start 2P", monospace; text-shadow: -2px 0 #000, 2px 0 #000, 0 -2px #000, 0 2px #000, 0 3px 6px #000;
+    animation: floatUp 1.3s ease-out forwards; }
+  .float.brk { color: #ff4040; font-size: 16px; }
+  .float.dmg { color: #ff2b2b; font-size: 18px; }
+  .float.whiff { color: #b9b9b9; font-size: 12px; }
+  @keyframes floatUp { 0% { transform: translate(-50%, 10px) scale(.6); opacity: 0 } 15% { transform: translate(-50%, 0) scale(1.15); opacity: 1 }
+    30% { transform: translate(-50%, -4px) scale(1) } 100% { transform: translate(-50%, -60px); opacity: 0 } }
+  .hud { position: absolute; top: 8px; display: flex; gap: 10px; font: 11px "Press Start 2P", monospace; z-index: 40; }
+  .hud.l { left: 12px; } .hud.r { right: 12px; }
+  .hud span { padding: 4px 6px; background: rgba(0,0,0,.45); border-radius: 3px; }
+  .hp { color: #ff6b6b } .mn { color: #6fb7ff }
+
+  /* ---------- maketa ovládania ---------- */
+  .controls { display: flex; gap: 18px; align-items: flex-end; padding: 26px 14px 14px; background: #1b1814; border-radius: 8px; box-shadow: 0 0 0 1px #262a33; margin-top: 10px; flex-wrap: wrap; }
+  .grp { position: relative; display: flex; gap: 8px; padding-top: 16px; }
+  .grp::before { content: attr(data-label); position: absolute; top: 0; left: 0; right: 0; text-align: center; font: 9px "Press Start 2P", monospace; color: #cfc6b6; }
+  .wrapbtn { position: relative; }
+  .gbtn { width: 78px; height: 66px; border: 2px solid #000; border-radius: 6px; cursor: pointer; color: #fff; font-size: 26px; position: relative;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+  .gbtn .cost { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font: 9px "Press Start 2P", monospace; text-shadow: 0 1px 0 #000; }
+  .gbtn.shield { background: #0097a7; } .gbtn.mirror { background: #8e44ad; }
+  .gbtn.gold { background: linear-gradient(#ffd54f, #c99700); height: 44px; width: 78px; font-size: 18px; }
+  .gbtn.used { filter: grayscale(.9) brightness(.55); cursor: default; }
+  .gbtn.breaker-pick { box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), 0 0 0 3px #ff3b3b, 0 0 14px #ff1a1a; }
+  .gbtn .brk-badge { position: absolute; top: -8px; right: -8px; font-size: 16px; filter: drop-shadow(0 0 3px #ff0000); }
+  .picker { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px;
+    background: #111; border: 2px solid #000; border-radius: 6px; z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.6); }
+  .picker.hidden { display: none; }
+  .pk { width: 92px; padding: 6px 4px 5px; border: 2px solid #000; border-radius: 5px; cursor: pointer; color: #fff; text-align: center; font-size: 22px; line-height: 1.1; }
+  .pk small { display: block; font: 8px "Press Start 2P", monospace; margin-top: 4px; }
+  .pk.def.shield { background: #0097a7; } .pk.def.mirror { background: #8e44ad; } .pk.def.gold { background: linear-gradient(#ffd54f, #c99700); color: #2a1c00; }
+  .pk.brk { background: linear-gradient(#5a0f0f, #2a0606); box-shadow: inset 0 0 0 1px #ff3b3b, 0 0 10px rgba(255,30,30,.55); }
+  .pk:hover { filter: brightness(1.15); }
+  .queue { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+  .qb { min-width: 48px; height: 40px; border: 2px solid #000; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; position: relative; }
+  .qb.empty { background: transparent; border: 2px dashed #555; color: #666; font: 10px "Press Start 2P", monospace; }
+  .qb.shield { background: #00606b } .qb.mirror { background: #5b2a70 } .qb.gold { background: #b58900 }
+  .qb.brk { background: #3a0909; box-shadow: inset 0 0 0 1px #ff3b3b, 0 0 8px rgba(255,30,30,.6); }
+  .qb .x { position: absolute; top: -7px; right: -6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>SHIELD / MIRROR BREAKER — návrh</h1>
+  <span style="color:#8b93a3">dočasná stránka na schválenie animácie a ovládania · nič odtiaľto ešte nie je v hre</span>
+</div>
+
+<div class="wrap">
+  <div class="main">
+    <div class="stage" id="stage">
+      <div class="grid" id="grid"></div>
+      <div class="hud l"><span id="nm1">FIRE</span><span class="hp" id="hp1">♥10</span><span class="mn" id="mn1">💧6</span></div>
+      <div class="hud r"><span id="nm2">LIGHTNING</span><span class="hp" id="hp2">♥10</span><span class="mn" id="mn2">💧6</span></div>
+    </div>
+    <div id="caption">Vyber scenár vpravo.</div>
+
+    <h3>Ovládanie (maketa) — klikni na štít, mirror alebo golden polovicu</h3>
+    <div class="controls">
+      <div class="grp" data-label="GOLDEN PRE-ACTION">
+        <div class="wrapbtn">
+          <button class="gbtn gold" data-slot="gshield">🛡️<span class="cost">-3</span></button>
+          <div class="picker hidden" data-for="gshield">
+            <div class="pk def gold" data-pick="golden_shield">🛡️<small>G.SHIELD -3</small></div>
+            <div class="pk brk" data-pick="golden_shield_breaker">💥<small>G.BREAKER -3</small></div>
+          </div>
+        </div>
+        <div class="wrapbtn">
+          <button class="gbtn gold" data-slot="gmirror">🪞<span class="cost">-5</span></button>
+          <div class="picker hidden" data-for="gmirror">
+            <div class="pk def gold" data-pick="golden_mirror">🪞<small>G.MIRROR -5</small></div>
+            <div class="pk brk" data-pick="golden_mirror_breaker">💥<small>G.BREAKER -5</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="grp" data-label="DEFEND">
+        <div class="wrapbtn">
+          <button class="gbtn shield" data-slot="shield">🛡️<span class="cost">-2</span></button>
+          <div class="picker hidden" data-for="shield">
+            <div class="pk def shield" data-pick="shield">🛡️<small>SHIELD -2</small></div>
+            <div class="pk brk" data-pick="shield_breaker">💥<small>BREAKER -2</small></div>
+          </div>
+        </div>
+        <div class="wrapbtn">
+          <button class="gbtn mirror" data-slot="mirror">🪞<span class="cost">-4</span></button>
+          <div class="picker hidden" data-for="mirror">
+            <div class="pk def mirror" data-pick="mirror">🪞<small>MIRROR -4</small></div>
+            <div class="pk brk" data-pick="mirror_breaker">💥<small>BREAKER -4</small></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="font:9px 'Press Start 2P',monospace;color:#cfc6b6">ZÁPIS KOLA</div>
+        <div class="queue" id="queue"></div>
+        <button class="b" id="qreset" style="margin-top:8px">vyčistiť</button>
+      </div>
+    </div>
+    <ul class="notes">
+      <li>Klik na štít/mirror otvorí výber ako pri smerových útokoch: <b>obrana</b> alebo <b>breaker</b> (červený). Rovnako golden polovice.</li>
+      <li>Breaker zaberá slot svojej obrany: po <b>Shield Breaker</b> už v tom kole nedáš štít (tlačidlo zošedne) a naopak.</li>
+      <li>Badge v zázname kola a na tlačidle: ikona obrany s červeným 💥 (v hre pixelový). Golden voľba ide do políčka G pred kolom (golden štít / mirror / ich breakery sú jeden predťah).</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h3>Scenáre</h3>
+    <button class="b anim" data-sc="sb"><b>Shield Breaker vs štít</b><small>-2 many · rozbije štít, 2 dmg</small></button>
+    <button class="b anim" data-sc="mb"><b>Mirror Breaker vs mirror</b><small>-4 many · rozbije mirror, 4 dmg</small></button>
+    <button class="b anim" data-sc="gsb"><b>Golden Shield Breaker vs golden štít</b><small>-3 many · predťah nestartéra, 2 dmg</small></button>
+    <button class="b anim" data-sc="gmb"><b>Golden Mirror Breaker vs golden mirror</b><small>-5 many · predťah nestartéra, 4 dmg</small></button>
+    <button class="b anim" data-sc="whiff"><b>Breaker naprázdno</b><small>súper nemá obranu · mana minutá, 0 dmg</small></button>
+    <button class="b anim" data-sc="wrong"><b>Shield Breaker vs mirror</b><small>zlá obrana = naprázdno, mirror sa spotrebuje? (otázka)</small></button>
+    <button class="b anim" data-sc="ls"><b>Mirror Breaker s Last Stand</b><small>buff ×2 → 8 dmg</small></button>
+
+    <h3>Útočník (p1)</h3>
+    <div class="row" id="casters"></div>
+    <h3>Rýchlosť</h3>
+    <div class="row" id="speeds"></div>
+
+    <h3>Dohodnuté</h3>
+    <ul class="notes">
+      <li>Cena = cena obrany: 2 / 4 / golden 3 / 5.</li>
+      <li>Dmg 2 (shield) / 4 (mirror); Last Stand / Last Hope / maze buffy platia.</li>
+      <li>Rozbije súperovu nabitú obranu (o tom je akcia).</li>
+      <li>Power dlaždica sa nespotrebuje (ako pri štíte).</li>
+      <li>Zabije Narutovho klona, ukončí labyrint (je to zásah).</li>
+      <li>THE WORLD: Jotaro smie Shield Breaker aj v zmrazených akciách (súperova obrana trvá).</li>
+      <li>Jotaro/Luffy nemajú mirror → nemajú Mirror Breaker.</li>
+    </ul>
+    <h3>Otvorené</h3>
+    <ul class="notes open">
+      <li>Golden breakery: rovnaký dmg 2 / 4 ako bežné?</li>
+      <li>Jotaro/Luffy: majú golden mirror → majú aj Golden Mirror Breaker?</li>
+      <li>Shield Breaker trafí mirror (zlá obrana): naprázdno a súperov mirror ostane, alebo sa spotrebuje ako pri každej akcii?</li>
+      <li>Breaker do mirroru Vampire/Onryō útočníka: imunita na mirror sa ho netýka (nie je to odraz).</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const CELL_W = 200, CELL_H = 110, GX = 30, GY = 40;
+const CHAR = {
+  fire:      { name: "FIRE", dir: "fire", dir2: "fire_2", atkFps: 9, rel: .6 },
+  lightning: { name: "LIGHTNING", dir: "lightning", dir2: "lightning_2", atkFps: 18, rel: .6 },
+  wanderer:  { name: "WANDERER", dir: "wanderer", dir2: "wanderer_2", atkFps: 12, rel: .6 },
+};
+const stage = document.getElementById("stage");
+const grid = document.getElementById("grid");
+for (let i = 0; i < 12; i++) { const c = document.createElement("div"); c.className = "cell"; grid.appendChild(c); }
+
+let speed = 1;
+const wait = (ms) => new Promise(r => setTimeout(r, ms / speed));
+const imgCache = {};
+function img(src) {
+  if (!imgCache[src]) imgCache[src] = new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+  return imgCache[src];
+}
+
+// postava = canvas so sprite sheetom (horizontálny pás, štvorcové framy)
+class Actor {
+  constructor(slot, cell) {
+    this.slot = slot; this.cell = cell; this.cv = document.createElement("canvas");
+    this.cv.className = "actor" + (slot === "p2" ? " flip" : ""); this.cv.width = 128; this.cv.height = 128;
+    stage.appendChild(this.cv); this.anim = null; this.glow = null; this.place();
+  }
+  place() {
+    const [x, y] = this.cell;
+    this.cx = GX + x * CELL_W + CELL_W / 2; this.cy = GY + y * CELL_H + CELL_H / 2;
+    this.cv.style.left = (this.cx - 115) + "px"; this.cv.style.top = (this.cy - 165) + "px";
+  }
+  async setChar(key) {
+    this.key = key; const d = this.slot === "p2" ? CHAR[key].dir2 : CHAR[key].dir;
+    this.sheets = {};
+    for (const n of ["Idle", "Attack_1", "Hurt", "Charge"]) this.sheets[n] = await img(`/assets/${d}/${n}.png`);
+    this.play("Idle", 8, true);
+  }
+  play(name, fps, loop) { this.anim = { name, fps, loop, t0: performance.now() }; }
+  draw(now) {
+    const a = this.anim; const sh = a && this.sheets?.[a.name]; const ctx = this.cv.getContext("2d");
+    ctx.clearRect(0, 0, 128, 128);
+    if (!sh) return;
+    const n = Math.max(1, Math.round(sh.width / sh.height));
+    let f = Math.floor((now - a.t0) * speed / 1000 * a.fps);
+    if (a.loop) f %= n; else if (f >= n) { this.play("Idle", 8, true); f = 0; return this.draw(now); }
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sh, f * sh.height, 0, sh.height, sh.height, 0, 0, 128, 128);
+    // nabitá obrana = pulzujúca žiara okolo postavy (ako v hre); pri zásahu breakerom bliká červeno
+    let filt = "";
+    if (this.glow) {
+      const t = .5 + .5 * Math.sin(now / 240);
+      const c = this.glow;
+      filt = `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c}) drop-shadow(0 0 ${(3 + 2 * t).toFixed(1)}px ${c}) drop-shadow(0 0 ${(9 + 5 * t).toFixed(1)}px ${c})`;
+    }
+    if (this.hit && now < this.hit) filt += " brightness(1.8) sepia(1) saturate(6) hue-rotate(-40deg)";
+    this.cv.style.filter = filt;
+  }
+}
+const A = new Actor("p1", [0, 1]), B = new Actor("p2", [3, 1]);
+(function loop(now) { A.draw(now); B.draw(now); requestAnimationFrame(loop); })(performance.now());
+
+function el(cls, x, y, parent = stage) { const e = document.createElement("div"); e.className = cls; e.style.left = x + "px"; e.style.top = y + "px"; parent.appendChild(e); return e; }
+function float(txt, cls, x, y, delay = 0) { setTimeout(() => { const f = el("float " + cls, x, y); f.textContent = txt; f.style.animationDuration = (1300 / speed) + "ms"; setTimeout(() => f.remove(), 1400 / speed); }, delay / speed); }
+const caption = (t) => { document.getElementById("caption").innerHTML = t; };
+
+// červená energia letí od útočníka k obrancovi (projektil postavy prefarbený na červeno + stopa)
+async function bolt(from, to, ms) {
+  const sh = from.sheets.Charge; const n = sh ? Math.round(sh.width / sh.height) : 1;
+  const cv = document.createElement("canvas"); cv.className = "bolt"; cv.width = 64; cv.height = 64; stage.appendChild(cv);
+  const sx = from.cx + 40, sy = from.cy - 40, ex = to.cx - 30, ey = to.cy - 40;
+  const t0 = performance.now(); const dur = ms / speed;
+  await new Promise(res => {
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur);
+      const x = sx + (ex - sx) * k, y = sy + (ey - sy) * k;
+      cv.style.left = (x - 48) + "px"; cv.style.top = (y - 48) + "px";
+      const ctx = cv.getContext("2d"); ctx.clearRect(0, 0, 64, 64); ctx.imageSmoothingEnabled = false;
+      if (sh) ctx.drawImage(sh, (Math.floor((now - t0) / 70) % n) * sh.height, 0, sh.height, sh.height, 0, 0, 64, 64);
+      if (k < 1) requestAnimationFrame(step); else res();
+    };
+    requestAnimationFrame(step);
+  });
+  const tr = el("trail", sx, sy - 5); tr.style.width = Math.hypot(ex - sx, ey - sy) + "px";
+  tr.style.transform = `rotate(${Math.atan2(ey - sy, ex - sx)}rad)`; tr.style.animationDuration = (450 / speed) + "ms";
+  setTimeout(() => tr.remove(), 500 / speed);
+  cv.remove();
+  return { x: ex, y: ey };
+}
+
+// bariéra: objaví sa vo farbe obrany → sčervenie → prasknutia sa nakreslia → roztriešti sa
+const CRACKS = [
+  "M85 20 L78 60 L92 92 L70 130 L84 175",
+  "M78 60 L40 72 L22 104",
+  "M92 92 L132 84 L150 118",
+  "M70 130 L36 150",
+  "M84 175 L120 160 L140 186",
+  "M40 72 L30 40",
+];
+function barrier(def, gold) {
+  const col = gold ? "#ffca28" : def === "mirror" ? "#ce93d8" : "#4dd0e1";
+  const fill = gold ? "rgba(255,210,80,.28)" : def === "mirror" ? "rgba(206,147,216,.28)" : "rgba(77,208,225,.25)";
+  const NS = "http://www.w3.org/2000/svg";
+  const s = document.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 170 210"); s.classList.add("barrier");
+  s.style.setProperty("--col", col); s.style.setProperty("--fill", fill); s.style.setProperty("--crackMs", (220 / speed) + "ms");
+  s.style.left = (B.cx - 85 + 14) + "px"; s.style.top = (B.cy - 150) + "px";
+  const shell = document.createElementNS(NS, "path"); shell.setAttribute("class", "shell");
+  shell.setAttribute("d", def === "mirror" ? "M30 8 H140 V202 H30 Z" : "M85 6 L160 46 L160 160 L85 204 L10 160 L10 46 Z");
+  s.appendChild(shell);
+  for (const d of CRACKS) { const p = document.createElementNS(NS, "path"); p.setAttribute("class", "crack"); p.setAttribute("d", d); s.appendChild(p); }
+  stage.appendChild(s);
+  return { s, col };
+}
+function shatter(x, y, col) {
+  const N = 26;
+  for (let i = 0; i < N; i++) {
+    const ang = Math.PI * 2 * i / N + i * .21, dist = 90 + (i % 4) * 45 + Math.random() * 30;
+    const sh = el("shard", x, y); const w = 14 + Math.random() * 20;
+    sh.style.width = w + "px"; sh.style.height = (w * (1 + Math.random() * .6)) + "px";
+    sh.style.background = i % 3 === 0 ? `linear-gradient(135deg, #fff, ${col})` : "linear-gradient(135deg, #ffd0d0, #ff2020 60%, #7a0000)";
+    sh.style.boxShadow = "0 0 10px #ff1a1a";
+    sh.style.setProperty("--dx", Math.round(Math.cos(ang) * dist) + "px"); sh.style.setProperty("--dy", Math.round(Math.sin(ang) * dist) + "px");
+    sh.style.setProperty("--rot", Math.round(ang * 300) + "deg"); sh.style.setProperty("--ms", (700 / speed) + "ms");
+    setTimeout(() => sh.remove(), 800 / speed);
+  }
+  const r = el("ring", x, y); r.style.animationDuration = (500 / speed) + "ms"; setTimeout(() => r.remove(), 550 / speed);
+  const f = document.createElement("div"); f.className = "flash"; f.style.setProperty("--x", x + "px"); f.style.setProperty("--y", y + "px");
+  f.style.animationDuration = (350 / speed) + "ms"; stage.appendChild(f); setTimeout(() => f.remove(), 400 / speed);
+  stage.classList.remove("shake"); void stage.offsetWidth; stage.style.animationDuration = (320 / speed) + "ms"; stage.classList.add("shake");
+}
+
+const SC = {
+  sb:   { def: "shield", gold: false, cost: 2, dmg: 2, label: "SHIELD BROKEN!" },
+  mb:   { def: "mirror", gold: false, cost: 4, dmg: 4, label: "MIRROR SHATTERED!" },
+  gsb:  { def: "shield", gold: true,  cost: 3, dmg: 2, label: "SHIELD BROKEN!" },
+  gmb:  { def: "mirror", gold: true,  cost: 5, dmg: 4, label: "MIRROR SHATTERED!" },
+  whiff:{ def: null,     gold: false, cost: 2, dmg: 0 },
+  wrong:{ def: "mirror", gold: false, cost: 2, dmg: 0, wrong: true },
+  ls:   { def: "mirror", gold: false, cost: 4, dmg: 8, label: "MIRROR SHATTERED!", ls: true },
+};
+let busy = false;
+async function run(key) {
+  if (busy) return; busy = true;
+  document.querySelectorAll("[data-sc]").forEach(b => b.disabled = true);
+  const sc = SC[key];
+  const hp = { a: 10, b: 10 }, mn = { a: 6, b: 6 };
+  const setHud = () => { hp1.textContent = "♥" + hp.a; hp2.textContent = "♥" + hp.b; mn1.textContent = "💧" + mn.a; mn2.textContent = "💧" + mn.b; };
+  setHud();
+  A.glow = sc.ls ? "#ffd24a" : null;
+  B.glow = sc.def ? (sc.gold ? "#ffca28" : sc.def === "mirror" ? "#ce93d8" : "#4dd0e1") : null;
+  caption(sc.def ? `Súper má nabitý <b>${sc.gold ? "golden " : ""}${sc.def === "mirror" ? "mirror" : "štít"}</b> (žiara okolo postavy).` : "Súper <b>nemá</b> obranu.");
+  await wait(900);
+  // 1) útočník: jeho range attack animácia, v momente výstrelu letí červená energia
+  mn.a -= sc.cost; setHud(); float(`-${sc.cost} MANA`, "whiff", A.cx, A.cy - 140);
+  const cfg = CHAR[A.key];
+  A.play("Attack_1", cfg.atkFps, false);
+  const n = A.sheets.Attack_1 ? Math.round(A.sheets.Attack_1.width / A.sheets.Attack_1.height) : 4;
+  caption(`<b>${{ sb: "Shield Breaker", mb: "Mirror Breaker", gsb: "Golden Shield Breaker", gmb: "Golden Mirror Breaker", whiff: "Shield Breaker", wrong: "Shield Breaker", ls: "Mirror Breaker (Last Stand ×2)" }[key]}</b> - útočník vypáli červenú energiu na súpera.`);
+  await wait(n / cfg.atkFps * 1000 * cfg.rel);
+  const hit = await bolt(A, B, 380);
+  if (!sc.def || sc.wrong) {
+    // naprázdno: energia sa rozplynie o súpera, žiadny dmg
+    const p = el("puff", hit.x + 10, hit.y + 10); p.style.animationDuration = (450 / speed) + "ms"; setTimeout(() => p.remove(), 500 / speed);
+    float(sc.wrong ? "WRONG GUARD" : "NO GUARD", "whiff", B.cx + 14, B.cy - 140);
+    caption(sc.wrong ? "Súper mal <b>mirror</b>, nie štít → Shield Breaker naprázdno (0 dmg). <span class='open'>Otázka: spotrebuje sa jeho mirror?</span>" : "Súper nemal obranu → energia sa rozplynie, <b>0 dmg</b>, mana je minutá.");
+    await wait(1500); finish(); return;
+  }
+  // 2) dopad: bariéra sa zjaví vo farbe obrany, hneď sčervenie a praskne
+  const { s: bar, col } = barrier(sc.def, sc.gold);
+  B.hit = performance.now() + 900 / speed;
+  await wait(90);
+  bar.classList.add("red"); B.glow = "#ff2a2a";
+  caption("Dopad - obrana <b>sčervenie a praskne</b>.");
+  await wait(60);
+  bar.classList.add("cracking");
+  await wait(340);
+  // 3) roztrieštenie + dmg
+  bar.classList.add("gone"); setTimeout(() => bar.remove(), 200 / speed);
+  B.glow = null;
+  shatter(B.cx + 14, B.cy - 45, col);
+  float(sc.label, "brk", B.cx - 40, B.cy - 128);
+  await wait(180);
+  B.play("Hurt", 10, false);
+  hp.b -= sc.dmg; setHud();
+  float(`-${sc.dmg} HP`, "dmg", B.cx + 14, B.cy - 92, 120);
+  caption(`Obrana <b>rozbitá a spotrebovaná</b>, súper dostane <b>${sc.dmg} dmg</b>${sc.ls ? " (4 × 2 za Last Stand)" : ""}.`);
+  await wait(1600); finish();
+}
+function finish() { busy = false; A.glow = null; B.glow = null; document.querySelectorAll("[data-sc]").forEach(b => b.disabled = false); }
+document.querySelectorAll("[data-sc]").forEach(b => b.addEventListener("click", () => run(b.dataset.sc)));
+
+const casters = document.getElementById("casters");
+for (const k of Object.keys(CHAR)) {
+  const b = document.createElement("button"); b.className = "b" + (k === "fire" ? " on" : ""); b.textContent = CHAR[k].name;
+  b.onclick = async () => { if (busy) return; casters.querySelectorAll(".b").forEach(x => x.classList.remove("on")); b.classList.add("on"); await A.setChar(k); nm1.textContent = CHAR[k].name; };
+  casters.appendChild(b);
+}
+const speeds = document.getElementById("speeds");
+for (const s of [1, .5, .25]) {
+  const b = document.createElement("button"); b.className = "b" + (s === 1 ? " on" : ""); b.textContent = s === 1 ? "1×" : s + "×";
+  b.onclick = () => { speed = s; speeds.querySelectorAll(".b").forEach(x => x.classList.remove("on")); b.classList.add("on"); };
+  speeds.appendChild(b);
+}
+const hp1 = document.getElementById("hp1"), hp2 = document.getElementById("hp2"), mn1 = document.getElementById("mn1"), mn2 = document.getElementById("mn2"), nm1 = document.getElementById("nm1");
+A.setChar("fire"); B.setChar("lightning");
+
+// ---------- maketa ovládania: výber obrana / breaker, breaker blokuje svoju obranu v kole ----------
+const queue = [];
+const ICON = { shield: "🛡️", mirror: "🪞", golden_shield: "🛡️", golden_mirror: "🪞", shield_breaker: "🛡️", mirror_breaker: "🪞", golden_shield_breaker: "🛡️", golden_mirror_breaker: "🪞" };
+const SLOT_OF = { shield: "shield", shield_breaker: "shield", mirror: "mirror", mirror_breaker: "mirror",
+  golden_shield: "gshield", golden_shield_breaker: "gshield", golden_mirror: "gmirror", golden_mirror_breaker: "gmirror" };
+function renderControls() {
+  document.querySelectorAll(".gbtn").forEach(btn => {
+    const pick = queue.find(a => SLOT_OF[a] === btn.dataset.slot);
+    const goldTaken = btn.dataset.slot.startsWith("g") && queue.some(a => a.startsWith("golden"));
+    btn.classList.toggle("used", !!pick || goldTaken);
+    btn.classList.toggle("breaker-pick", !!pick && pick.endsWith("breaker"));
+    btn.querySelector(".brk-badge")?.remove();
+    if (pick?.endsWith("breaker")) { const s = document.createElement("span"); s.className = "brk-badge"; s.textContent = "💥"; btn.appendChild(s); }
+  });
+  const q = document.getElementById("queue"); q.innerHTML = "";
+  const gold = queue.find(a => a.startsWith("golden")); const main = queue.filter(a => !a.startsWith("golden"));
+  for (let i = -1; i < 3; i++) {
+    const a = i < 0 ? gold : main[i]; const d = document.createElement("div");
+    if (i < 0 && !a) { d.className = "qb empty"; d.textContent = "G"; q.appendChild(d); continue; }
+    if (!a) { d.className = "qb empty"; d.textContent = i + 1; }
+    else {
+      d.className = "qb " + (a.endsWith("breaker") ? "brk" : a.startsWith("golden") ? "gold" : a.includes("mirror") ? "mirror" : "shield");
+      d.textContent = ICON[a];
+      if (a.endsWith("breaker")) { const x = document.createElement("span"); x.className = "x"; x.textContent = "💥"; d.appendChild(x); }
+    }
+    q.appendChild(d);
+  }
+}
+document.querySelectorAll(".gbtn").forEach(btn => btn.addEventListener("click", () => {
+  if (btn.classList.contains("used")) return;
+  const pk = document.querySelector(`.picker[data-for="${btn.dataset.slot}"]`);
+  const open = pk.classList.contains("hidden");
+  document.querySelectorAll(".picker").forEach(p => p.classList.add("hidden"));
+  if (open) pk.classList.remove("hidden");
+}));
+document.querySelectorAll(".pk").forEach(p => p.addEventListener("click", () => {
+  const isGold = p.dataset.pick.startsWith("golden");
+  if (isGold ? queue.some(a => a.startsWith("golden")) : queue.filter(a => !a.startsWith("golden")).length >= 3) return;
+  queue.push(p.dataset.pick); p.parentElement.classList.add("hidden"); renderControls();
+}));
+document.getElementById("qreset").onclick = () => { queue.length = 0; renderControls(); };
+renderControls();
+</script>
+</body>
+</html>
