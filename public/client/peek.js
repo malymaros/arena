@@ -83,7 +83,7 @@ function open(what) {
     const { name, cost, text } = what.info;
     box.className = "peek-btn";
     box.innerHTML = `<div class="pk-head"><span class="pk-name">${name}</span>${cost ? `<span class="pk-cost">${costMarkup(cost)}</span>` : ""}</div>`
-      + `<div class="pk-text">${text}</div>`;
+      + `<div class="pk-text">${text.replace(/\n/g, "<br>")}</div>`; // \n\n = odsek (štít / breaker)
     hydratePix(box);
   } else {
     if (selEl && !selEl.classList.contains("hidden")) return false; // náhľad práve používa výber postáv

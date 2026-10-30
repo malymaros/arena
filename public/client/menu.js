@@ -44,7 +44,7 @@ function render() {
     ${isAdmin() ? `
       <div class="menu-sep">ADMIN</div>
       ${inRoom() ? `<button type="button" class="menu-item danger" data-act="reset-room">✖ RESET THIS ROOM</button>` : ""}
-      <button type="button" class="menu-item" data-act="data">⬇ DOWNLOAD DATA</button>
+      <button type="button" class="menu-item menu-data" data-act="data">⬇ DOWNLOAD DATA</button>
       <button type="button" class="menu-item danger" data-act="reset-all">✖ RESET ALL ROOMS</button>` : ""}`;
 }
 export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }

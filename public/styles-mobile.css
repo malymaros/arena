@@ -45,6 +45,8 @@
 .touch img { -webkit-user-drag: none; user-drag: none; }
 /* menu ☰: ~40 skutočných px bez ohľadu na zmenšenie hry */
 .touch #menu-btn { transform: scale(calc(var(--ui-k, 1) * .9)); }
+/* telefón: admin DOWNLOAD DATA skrytý (dáta sa sťahujú na PC a do menu sa nevojde) */
+.phone #menu-panel .menu-data { display: none; }
 /* oko divákov rovnako veľké ako menu, hneď vpravo od neho; telefón: nad menu (vpravo začína lišta akcií) */
 .touch #spec-eye { transform: scale(calc(var(--ui-k, 1) * .9)); left: calc(14px + 44px * var(--ui-k, 1) * .9 + 10px); }
 .phone #spec-eye { left: 14px; bottom: calc(14px + 44px * var(--ui-k, 1) * .9 + 10px); }
