@@ -203,7 +203,7 @@ export function pixelizeEmoji(el, res) {
   ctx.fillText(el.dataset.emoji, res / 2, res / 2 + 1);
   el.appendChild(cvs);
 }
-// Shield/Mirror Breaker: ikona obrany ako čierna silueta (CSS filter v .brk-ico) - spolu s útočnou farbou tlačidla
+// Shield/Mirror Breaker: ikona obrany čiernobielo (CSS filter v .brk-ico) - spolu s útočnou farbou tlačidla
 export const breakerIco = (emoji, cls = "") => `<span class="brk-ico ${cls}"><span class="pix-ico" data-emoji="${emoji}"></span></span>`;
 export function hydratePix(root = document) {
   root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => pixelizeEmoji(el));

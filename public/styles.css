@@ -2848,9 +2848,10 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   @keyframes brk-smoke{ from{ transform: scale(.6); opacity: .5; } to{ transform: translate(var(--dx), var(--dy)) scale(2.2); opacity: 0; } }
   .breaker-float{ position: absolute; z-index: 9; font-weight: 900; font-size: 20px; pointer-events: none; white-space: nowrap;
     transform: translateX(-50%); animation: floatUp 1.2s ease-out forwards; color: #ff5a2a; text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 10px rgba(255,40,0,.9); }
-  /* breaker: ikona obrany ako čierna silueta (pix.js breakerIco) - tlačidlá, výber aj lišta kola */
+  /* breaker: ikona obrany čiernobielo ako starý film (pix.js breakerIco) - tlačidlá, výber aj lišta kola */
   .brk-ico{ display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
-  .brk-ico .pix-ico{ filter: brightness(0) drop-shadow(0 0 1px rgba(255,255,255,.45)); }
+  .brk-ico .pix-ico{ filter: grayscale(1) contrast(1.35) brightness(.8) drop-shadow(0 1px 0 rgba(0,0,0,.55)); }
+  .brk-ico.g-ico{ filter: none; } /* golden breaker: zlatý filter .g-ico by čiernobielu ikonu znova zafarbil */
   /* výber obrana / breaker nad tlačidlom štítu / mirroru / golden polovice - rovnaký panel ako smerové pickery */
   .def-picker{ position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); z-index: 5;
     display: flex; gap: 6px; padding: 8px; background: rgba(12,14,18,.9); border-radius: 2px; box-shadow: 0 0 0 2px #000; }
