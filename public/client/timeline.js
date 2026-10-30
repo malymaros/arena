@@ -25,6 +25,7 @@ import { ANIM_DEF } from "/client/sprites.js";
 import { cloneEls, spawnSilhouetteFlash, qCursor, cloneGhost, youMarker } from "/client/actor-layers.js";
 import { WOLF_DIRS_CLIENT } from "/client/zones.js";
 import { spawnMirrorReflect, spawnShieldBlock } from "/client/defense-fx.js";
+import { spawnBreakerBeam } from "/client/breaker-fx.js";
 import { playTeleportExplosion } from "/client/teleport.js";
 import { lastStand } from "/client/last-stand-state.js";
 import { deathBehind } from "/client/overlays.js";
@@ -328,6 +329,14 @@ export function schedulePlayTimeline(timeline) {
         if (st && st.x != null) portalWalks.push({ e, start: [st.x, st.y] });
       }
       // Portal Realm: Def-breaker rozbil nabitú obranu - úlomky + SHIELD/MIRROR DISPELLED, zásah dopadne v ďalšom frame
+      // Shield / Mirror Breaker: útočník drží range attack pózu, lúč do súpera; zhodná obrana sa zohreje a roztriešti
+      // (zásah príde v ďalšom frame), nezhodná - lúč zhasne a blok/odraz prehrá ďalší frame, bez obrany sa rozplynie
+      if (e.kind === "breaker" && (e.from === "p1" || e.from === "p2")) {
+        shooters.add(e.from);
+        const brk = e.result === "break";
+        spawnBreakerBeam(e.from, e.target, { kind: e.what, gold: !!e.gold, whiff: e.result === "none", react: !brk && e.result !== "none" })
+          .then(() => { if (brk) spawnFloat(e.target, e.what === "mirror" ? "MIRROR SHATTERED!" : "SHIELD BROKEN!", "breaker-float"); });
+      }
       if (e.kind === "dispel" && (e.target === "p1" || e.target === "p2")) {
         spawnShieldBlock(e.target, !!e.gold, null);
         if (Array.isArray(e.cloneCell)) spawnShieldBlock(e.target, !!e.gold, e.cloneCell);

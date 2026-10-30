@@ -32,6 +32,8 @@ export const DIRECT = {
   // Portal Realm: nový pár na konci kola, zatvorenie páru po prechode (prechod tela/strely = portal.use - zvlášť nižšie,
   // s posunom v rámci framu na moment vletu)
   portal_spawn: "portal.open", portal_close: "portal.close",
+  // Shield / Mirror Breaker - lúč (okno = frame lúča: zohrievanie až po roztrieštenie, resp. krátky lúč)
+  breaker: "breaker",
 };
 // efekty opakované v po sebe idúcich frame-och (let strely po bunkách, beaty castu) → zaznejú raz za beh;
 // okno = celý beh. Melee sem nepatrí - zvuk úderu znie pri každom z 3 švihov.

@@ -59,6 +59,10 @@ export const aimPickerDiag = document.getElementById("aim-picker-diag"); // Coun
 export const mirrorBtn = document.getElementById("mirror-btn"); // pre Jotara sa mení na Special 1
 export const s1Picker  = document.getElementById("s1-picker");  // Jotarov Special 1 - smer left/right
 export const s1CellPicker = document.getElementById("s1-cell-picker"); // Luffyho Special 1 - cieľová bunka
+// Shield / Mirror Breaker: výber obrana | breaker nad štítom a mirrorom (docs/BREAKER_PLAN.md)
+export const shieldBtn = document.querySelector('.controls .btn.act.shield[data-act="shield"]');
+export const shieldPicker = document.getElementById("shield-picker");
+export const mirrorDefPicker = document.getElementById("mirror-def-picker");
 export const meleeBtn = document.getElementById("melee-btn"); // melee má picker (Countess/Onre) → vlastné id a handler
 export const rechargeBtn = document.querySelector('.btn.act.mana[data-act="recharge"]');
 export const goldenBtn = document.getElementById("golden-btn");

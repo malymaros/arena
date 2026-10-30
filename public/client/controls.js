@@ -1,6 +1,6 @@
 // public/client/controls.js - akčné tlačidlá a pickery (move/dash/attack/melee/special/mirror/recharge, golden,
 // Last Stand/Hope, démon), skiny z registra postáv, odoslanie lock_in.
-import { dirPicker, aimPicker, aimPickerDiag, dashPicker, specialPicker, cellPicker, wolfPicker, s1Picker, s1CellPicker, moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, meleeBtn, undoBtn, goldenBtn, goldDualBtn, demonBtn, lastHopeBtn, gmCostEl, connErrorEl, lockBtn } from "/client/dom.js";
+import { dirPicker, aimPicker, aimPickerDiag, dashPicker, specialPicker, cellPicker, wolfPicker, s1Picker, s1CellPicker, shieldPicker, mirrorDefPicker, shieldBtn, moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, meleeBtn, undoBtn, goldenBtn, goldDualBtn, demonBtn, lastHopeBtn, gmCostEl, connErrorEl, lockBtn } from "/client/dom.js";
 import { BUTTON_TEXT } from "/client/balance-ui.js";
 import { CHAR_BUTTONS, CHARS_BY_KEY, SIDE_CHARS } from "/chars/index.js";
 import { pixelizeEmoji, hydratePix, miniPix } from "/client/pix.js";
@@ -22,8 +22,11 @@ function shakeBtn(btn) {
 
 // otvorený smerový picker blokuje všetky ostatné akčné tlačidlá;
 // odblokuje sa opätovným klikom na to isté tlačidlo (picker sa zavrie)
-const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker, special1: s1Picker, special1_cell: s1CellPicker };
-const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn, special1: mirrorBtn, special1_cell: mirrorBtn };
+const PICKERS = { move: dirPicker, attack: aimPicker, attack_diag: aimPickerDiag, dash: dashPicker, special: specialPicker, special_cell: cellPicker, special_wolf: wolfPicker, special1: s1Picker, special1_cell: s1CellPicker, def_shield: shieldPicker, def_mirror: mirrorDefPicker };
+const PICKER_BTNS = { move: moveBtn, attack: attackBtn, attack_diag: attackBtn, dash: dashBtn, special: specialBtn, special_cell: specialBtn, special_wolf: specialBtn, special1: mirrorBtn, special1_cell: mirrorBtn, def_shield: shieldBtn, def_mirror: mirrorBtn };
+// Shield / Mirror Breaker zaberá slot svojej obrany: v kole buď obrana, alebo jej breaker (engine DEFENSE_SLOT)
+export const DEFENSE_SLOT = { shield: "shield", shield_breaker: "shield", mirror: "mirror", mirror_breaker: "mirror" };
+const slotTaken = (slot) => planning.myQueue.some(a => DEFENSE_SLOT[a.type] === slot);
 
 // Vampire/Onryō: dash slot = CHARGE - tlačidlo dostane fialový „Hidden" skin s preblikávaním a ???
 // namiesto bežca (tajomná akcia v štýle skrytej stránky); pre ostatných mágov sa vráti bežný dash.
@@ -119,11 +122,13 @@ export function closePickers() {
   clearPreviewCells();
   updateUiLocks();
 }
+// usedType: typ akcie, ktorú picker zaradí (alebo funkcia typ → „slot je obsadený")
 function togglePicker(kind, btn, usedType) {
   if (uiLocked()) return;
   if (planning.openPicker === kind) { closePickers(); return; } // opätovný klik = zavrieť
   if (planning.openPicker) { shakeBtn(btn); return; }           // iný picker je otvorený -> blokované
-  if (planning.myQueue.length >= 3 || planning.myQueue.some(a => a.type === usedType)) {
+  const used = typeof usedType === "function" ? usedType : (t) => t === usedType;
+  if (planning.myQueue.length >= 3 || planning.myQueue.some(a => used(a.type))) {
     shakeBtn(btn);
     return;
   }
@@ -216,8 +221,8 @@ export function syncGoldenHalves() {
   goldenShieldHalf?.classList.toggle("armed", planning.goldenArmed);
   goldenMirrorHalf?.classList.toggle("armed", planning.goldenMirrorArmed);
   // bežný štít/mirror vo fronte zamkne príslušnú zlatú polovicu (vzájomné vylúčenie)
-  goldenShieldHalf?.classList.toggle("locked", !planning.goldenArmed && planning.myQueue.some(a => a.type === "shield"));
-  goldenMirrorHalf?.classList.toggle("locked", !planning.goldenMirrorArmed && planning.myQueue.some(a => a.type === "mirror"));
+  goldenShieldHalf?.classList.toggle("locked", !planning.goldenArmed && slotTaken("shield"));   // aj Shield Breaker
+  goldenMirrorHalf?.classList.toggle("locked", !planning.goldenMirrorArmed && slotTaken("mirror")); // aj Mirror Breaker
 }
 
 function toggleGoldenHalf(mode) {
@@ -226,10 +231,10 @@ function toggleGoldenHalf(mode) {
   if (!me || state?.starter === me || isStonedNow()) { shakeBtn(goldenBtn); return; }
   // golden shield/mirror sa vzájomne vylučuje s bežnou akciou rovnakého druhu vo fronte (zamknuté, kým ju nezrušíš)
   if (mode === "shield") {
-    if (!planning.goldenArmed && planning.myQueue.some(a => a.type === "shield")) { shakeBtn(goldenBtn); return; }
+    if (!planning.goldenArmed && slotTaken("shield")) { shakeBtn(goldenBtn); return; }
     planning.goldenArmed = !planning.goldenArmed; planning.goldenMirrorArmed = false;
   } else {
-    if (!planning.goldenMirrorArmed && planning.myQueue.some(a => a.type === "mirror")) { shakeBtn(goldenBtn); return; }
+    if (!planning.goldenMirrorArmed && slotTaken("mirror")) { shakeBtn(goldenBtn); return; }
     planning.goldenMirrorArmed = !planning.goldenMirrorArmed; planning.goldenArmed = false;
   }
   syncGoldenHalves();
@@ -371,20 +376,27 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
       return;
     }
 
+    // štít / mirror: klik otvorí výber obrana | breaker (ako smerový picker útoku); golden obrana ho zamyká
+    const isPickerArrow = !!btn.closest(".dir-picker");
+    if (!isPickerArrow && (type === "shield" || type === "mirror")) {
+      if ((type === "shield" && planning.goldenArmed) || (type === "mirror" && planning.goldenMirrorArmed)) { if (!uiLocked()) shakeBtn(btn); return; }
+      togglePicker(type === "shield" ? "def_shield" : "def_mirror", btn, (t) => DEFENSE_SLOT[t] === type);
+      return;
+    }
+
     if (uiLocked()) return;
     if (planning.myQueue.length >= 3) return;
 
     // pri otvorenom pickeri sú klikateľné len jeho šípky - ostatné tlačidlá sú blokované
-    const isPickerArrow = !!btn.closest(".dir-picker");
     if (planning.openPicker && !isPickerArrow) { shakeBtn(btn); return; }
 
-    // každá akcia max 1× za kolo
-    if (planning.myQueue.some(a => a.type === type)) {
+    // každá akcia max 1× za kolo; obrana a jej breaker zdieľajú slot
+    if (planning.myQueue.some(a => a.type === type) || (DEFENSE_SLOT[type] && slotTaken(DEFENSE_SLOT[type]))) {
       shakeBtn(btn);
       return;
     }
-    // vzájomné vylúčenie s golden predťahom: golden shield zamyká štít, golden mirror zamyká mirror
-    if ((type === "shield" && planning.goldenArmed) || (type === "mirror" && planning.goldenMirrorArmed)) {
+    // vzájomné vylúčenie s golden predťahom: golden shield zamyká štít aj Shield Breaker, golden mirror mirror aj Mirror Breaker
+    if ((DEFENSE_SLOT[type] === "shield" && planning.goldenArmed) || (DEFENSE_SLOT[type] === "mirror" && planning.goldenMirrorArmed)) {
       shakeBtn(btn);
       return;
     }
@@ -398,6 +410,7 @@ document.querySelectorAll(".controls button[data-act]").forEach(btn => {
     if (type === "special1")  planning.myQueue.push({ type: "special1", dir: arg }); // Jotarov útok v mirror slote
     if (type === "shield")    planning.myQueue.push({ type: "shield" });
     if (type === "mirror")    planning.myQueue.push({ type: "mirror" });
+    if (type === "shield_breaker" || type === "mirror_breaker") planning.myQueue.push({ type });
 
     if (isPickerArrow) closePickers();
     renderQueue();

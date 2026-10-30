@@ -14,7 +14,6 @@ import "/client/retry.js";
 import "/client/raf.js";              // hlavná slučka kreslenia
 import "/client/spectators.js";       // oko s počtom divákov + pruh diváka (TAKE SEAT / LEAVE)
 import "/client/debug-hope.js";       // ?hopedebug=1 → náhľad hope sprite
-import "/client/debug-breaker.js";    // ?breakerdebug=1 → náhľad Shield/Mirror Breaker v hre (návrh)
 import "/client/sound-ui.js";         // zvukové okno (z menu) + UI zvuky klikov
 import "/client/menu.js";             // menu ☰: reload, celá obrazovka, zvuk, admin
 import "/client/mobile-ui.js";        // dotyk: výzva otočiť na šírku

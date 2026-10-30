@@ -2857,7 +2857,13 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   .def-picker .btn.act .cost.word{ font-size: 10px; letter-spacing: .5px; }
   /* breaker = útočná akcia: tmavá krvavočervená medzi červenou a čiernou (tmavšie než melee #7f0000) */
   .btn.act.breaker{ background: #4a0b0e; }
-  .q-badge.breaker{ background: #3a0809; }
+  .q-badge.breaker, .a-badge.shield_breaker, .a-badge.mirror_breaker{ background: #3a0809; }
+  .a-badge .brk-ico .pix-ico{ width: 18px; height: 18px; }
+  /* zvolený breaker: tlačidlo štítu / mirroru ukáže čiernobielu ikonu breakera v jeho farbe (queue.js .brk-chosen) */
+  .btn.act .brk-alt{ display: none; }
+  .btn.act.brk-chosen .brk-alt{ display: inline-flex; }
+  .btn.act.brk-chosen > .pix-ico{ display: none; }
+  .btn.act.brk-chosen{ background: #4a0b0e; }
 
   /* štít/mirror sa už nekreslia na bunku - pulzujúci glow je per-postavu (JS actorFilter) */
 

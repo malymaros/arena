@@ -11,7 +11,7 @@ import { BUTTON_TEXT } from "/client/balance-ui.js";
 import { CHAR_BUTTONS, CHARS_BY_KEY } from "/chars/index.js";
 import { GOLDEN_COST, GOLDEN_MIRROR_COST, MAX_MANA } from "/shared/balance.js";
 
-const shieldBtn = document.querySelector('.btn.act.shield[data-act="shield"]');
+const shieldBtn = document.querySelector('.controls .btn.act.shield[data-act="shield"]');
 // sloty, ktoré môže postava prebiť (buttons.<slot> v registri)
 const CHAR_SLOTS = new Set(["attack", "dash", "melee", "special", "mirror", "recharge"]);
 
@@ -25,6 +25,8 @@ export function slotOf(el) {
   if (el === mirrorBtn) return "mirror";
   if (el === shieldBtn) return "shield";
   if (el === rechargeBtn) return "recharge";
+  // výber obrana | breaker (docs/BREAKER_PLAN.md)
+  if (el.classList.contains("def-opt")) return { shield: "shield", mirror: "mirror", shield_breaker: "shieldBreaker", mirror_breaker: "mirrorBreaker" }[el.dataset.act] ?? null;
   if (el === demonBtn) return "demon";
   if (el === lastHopeBtn) return "lastHope";
   if (el.classList.contains("shield-half")) return "goldenShield";
@@ -52,6 +54,8 @@ export function labelText(slot) {
 function candidateFor(slot, el) {
   const act = el?.dataset?.act;
   if (act && el.classList.contains("arrow")) { const [type, dir] = act.split(":"); return { type, dir }; }
+  if (act && el.classList.contains("def-opt")) return { type: act }; // voľba obrana | breaker
+  if (el === shieldBtn || (el === mirrorBtn && CHARS_BY_KEY[ghostCharAt()]?.mirrorSlot !== "special1")) return null; // len otvára výber
   if (el?.classList.contains("mini-target")) return { type: "special" };
   switch (slot) {
     case "attack": case "dash": case "melee": case "special": case "shield": case "recharge": return { type: slot };
@@ -90,7 +94,8 @@ export function openerOf(pickerEl) {
   if (id === "dir-picker") return moveBtn;
   if (id === "dash-picker") return dashBtn;
   if (id === "aim-picker" || id === "aim-picker-diag") return attackBtn;
-  if (id === "s1-picker" || id === "s1-cell-picker") return mirrorBtn;
+  if (id === "s1-picker" || id === "s1-cell-picker" || id === "mirror-def-picker") return mirrorBtn;
+  if (id === "shield-picker") return shieldBtn;
   if (id === "special-picker" || id === "wolf-picker" || id === "cell-picker") return specialBtn;
   return null;
 }

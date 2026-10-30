@@ -10,8 +10,8 @@ import { cellsForVampChargePreview, cellsForSpecialPreview, cellsForJotaroS1, ce
 import { state, otherSlot, me, isSpectator } from "/client/session.js";
 import { playback } from "/client/playback.js";
 import { planning } from "/client/planning.js";
-import { queueEl, moveBtn, dirPicker, attackBtn, aimPicker, dashBtn, dashPicker, aimPickerDiag, meleeBtn, specialBtn, specialPicker, cellPicker, wolfPicker, s1Picker, s1CellPicker, lockBtn } from "/client/dom.js";
-import { syncGoldenHalves, updateGoldenButton, updateUiLocks } from "/client/controls.js";
+import { shieldBtn as shieldBtnEl, mirrorBtn, queueEl, moveBtn, dirPicker, attackBtn, aimPicker, dashBtn, dashPicker, aimPickerDiag, meleeBtn, specialBtn, specialPicker, cellPicker, wolfPicker, s1Picker, s1CellPicker, lockBtn } from "/client/dom.js";
+import { syncGoldenHalves, updateGoldenButton, updateUiLocks, DEFENSE_SLOT } from "/client/controls.js";
 import { qCursor } from "/client/actor-layers.js";
 import { renderMageHeads } from "/client/hud.js";
 import { socket } from "/client/net.js";
@@ -134,7 +134,7 @@ function renderTsQueue() {
     if (a) {
       const v = actionBadgeView(a, me);
       el.classList.add(v.cls);
-      if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
+      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text;
     } else { el.classList.add("empty"); el.textContent = String(i + 1); }
     slots.appendChild(el);
   }
@@ -282,7 +282,7 @@ export function highlightRoundBeat(from, action, counts, starterSlot) {
     el.classList.remove("q-slot");
     el.classList.add("revealed");
     if (v.cls) el.classList.add(v.cls);
-    if (v.html) el.innerHTML = v.html; else el.textContent = v.text;
+    if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text; // pixelové ikony (breaker)
     el.title = "Opponent"; // swap badge hlavu animuje raf (canvas.mage-head)
   }
   el.classList.add("q-now");
@@ -307,12 +307,18 @@ function updateActionButtons() {
     // mirror slot = Special 1 (register mirrorSlot - Jotaro, Luffy) → „used" podľa special1 a golden mirror ho NEZAMYKÁ
     const isJotaroMirror = type === "mirror" && CHARS_BY_KEY[ghostCharAt()]?.mirrorSlot === "special1";
     const effType = isJotaroMirror ? "special1" : type;
-    const used = planning.myQueue.some(a => a.type === effType);
+    // obrana a jej breaker zdieľajú slot: zvolená jedna = tlačidlo aj obe voľby výberu sú „použité"
+    const used = DEFENSE_SLOT[effType]
+      ? planning.myQueue.some(a => DEFENSE_SLOT[a.type] === DEFENSE_SLOT[effType])
+      : planning.myQueue.some(a => a.type === effType);
     btn.disabled = used; // skutočne navolené v kole = sivé „použité"
     // golden predťah blokuje bežnú akciu rovnakého druhu ZÁMKOM (nie ako „použité") - klik shake-ne cez poistku v handleri
     const goldenLock = ((type === "shield" && planning.goldenArmed) || (type === "mirror" && planning.goldenMirrorArmed)) && !isJotaroMirror;
     btn.classList.toggle("locked-golden", goldenLock && !used);
   });
+  // zvolený breaker: tlačidlo obrany ukáže čiernobielu ikonu breakera (.brk-alt) v jeho farbe
+  shieldBtnEl?.classList.toggle("brk-chosen", planning.myQueue.some(a => a.type === "shield_breaker"));
+  mirrorBtn?.classList.toggle("brk-chosen", planning.myQueue.some(a => a.type === "mirror_breaker"));
   const moveUsed = planning.myQueue.some(a => a.type === "move");
   moveBtn.disabled = moveUsed;
   if (moveUsed) dirPicker.classList.add("hidden");

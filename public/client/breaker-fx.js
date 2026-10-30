@@ -1,12 +1,13 @@
-// public/client/breaker-fx.js - Shield/Mirror Breaker (NÁVRH, docs: pamäť breaker-design): súvislý červený lúč
-// z útočníka do súperovej nabitej obrany - bariéra sa zohrieva (farba obrany → oranžová → červená → biely žiar),
-// postupne praská a nakoniec sa roztriešti; bez obrany lúč len zasyčí o postavu (NO GUARD).
-// Zatiaľ ho používa len náhľad ?breakerdebug=1 (debug-breaker.js) - do timeline sa zapojí po schválení.
+// public/client/breaker-fx.js - Shield/Mirror Breaker (docs/BREAKER_PLAN.md): súvislý lúč vo farbe breakera z útočníka
+// do súperovej nabitej obrany - bariéra sa zohrieva (farba obrany → oranžová → červená → biely žiar), postupne praská
+// a nakoniec sa roztriešti; nezhodná obrana = lúč zhasne (blok/odraz prehrá defense-fx); bez obrany sa lúč rozplynie.
+// Volá ho timeline.js pri efekte `breaker`; dĺžky sú zo shared/timing.js (musia sedieť s delayMs servera).
 import { state } from "/client/session.js";
 import { pairShift, computeFacing } from "/client/placement.js";
 import { ACTOR_W } from "/client/sprites.js";
 import { HEAD_CX } from "/chars/index.js";
 import { cellToPx, TILE_W, TILE_H, actorsEl, gridEl } from "/client/dom.js";
+import { BREAKER_RAMP_MS, BREAKER_BREAK_MS, BREAKER_SHORT_MS } from "/shared/timing.js";
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -48,7 +49,7 @@ const CRACKS = [
 export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold = false, whiff = false, react = false, slow = 1 } = {}) {
   const a = handPt(fromSlot), d = bodyPt(toSlot);
   if (!a || !d) return;
-  const RAMP = 140 * slow, HEAT = (react ? 420 : 1150) * slow;
+  const RAMP = BREAKER_RAMP_MS * slow, HEAT = ((react ? BREAKER_SHORT_MS : BREAKER_BREAK_MS) - BREAKER_RAMP_MS) * slow;
   const dx = d.x - a.x, dy = d.y - a.y, len = Math.hypot(dx, dy);
   colorCls = kind === "mirror" ? "c-mirror" : "c-shield";
 

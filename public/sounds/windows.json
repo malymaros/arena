@@ -16,7 +16,7 @@
   ]
  },
  "attack.escanor": {
-  "med": 432,
+  "med": 864,
   "values": [
    432,
    864,
@@ -24,7 +24,7 @@
   ]
  },
  "attack.fire": {
-  "med": 432,
+  "med": 864,
   "values": [
    432,
    864,
@@ -32,7 +32,7 @@
   ]
  },
  "attack.jotaro": {
-  "med": 864,
+  "med": 432,
   "values": [
    432,
    864,
@@ -56,7 +56,7 @@
   ]
  },
  "attack.medusa": {
-  "med": 864,
+  "med": 432,
   "values": [
    432,
    864,
@@ -64,7 +64,7 @@
   ]
  },
  "attack.minotaur": {
-  "med": 432,
+  "med": 864,
   "values": [
    432,
    864,
@@ -72,7 +72,7 @@
   ]
  },
  "attack.naruto": {
-  "med": 432,
+  "med": 864,
   "values": [
    432,
    864,
@@ -88,7 +88,7 @@
   ]
  },
  "attack.soldier": {
-  "med": 864,
+  "med": 432,
   "values": [
    432,
    864,
@@ -104,7 +104,7 @@
   ]
  },
  "attack.werewolf": {
-  "med": 864,
+  "med": 432,
   "values": [
    432,
    864,
@@ -171,12 +171,6 @@
    1080
   ]
  },
- "attack_whiff.onre": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
  "attack_whiff.soldier": {
   "med": 1080,
   "values": [
@@ -201,6 +195,12 @@
    1080
   ]
  },
+ "block.countess": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "block.escanor": {
   "med": 1080,
   "values": [
@@ -213,13 +213,13 @@
    1080
   ]
  },
- "block.jotaro": {
+ "block.luffy": {
   "med": 1080,
   "values": [
    1080
   ]
  },
- "block.lightning": {
+ "block.medusa": {
   "med": 1080,
   "values": [
    1080
@@ -237,6 +237,12 @@
    1080
   ]
  },
+ "block.onre": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "block.soldier": {
   "med": 1080,
   "values": [
@@ -249,10 +255,100 @@
    1080
   ]
  },
- "block.werewolf": {
-  "med": 1080,
+ "breaker": {
+  "med": 560,
   "values": [
-   1080
+   560,
+   1290
+  ]
+ },
+ "breaker.countess": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.escanor": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.fire": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.jotaro": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.lightning": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.luffy": {
+  "med": 560,
+  "values": [
+   560
+  ]
+ },
+ "breaker.medusa": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.minotaur": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.naruto": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.onre": {
+  "med": 560,
+  "values": [
+   560
+  ]
+ },
+ "breaker.soldier": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.wanderer": {
+  "med": 560,
+  "values": [
+   560,
+   1290
+  ]
+ },
+ "breaker.werewolf": {
+  "med": 560,
+  "values": [
+   560,
+   1290
   ]
  },
  "clone_born": {
@@ -381,31 +477,19 @@
    1620
   ]
  },
- "demon_attack.escanor": {
+ "demon_attack.countess": {
   "med": 1620,
   "values": [
    1620
   ]
  },
- "demon_attack.fire": {
+ "demon_attack.jotaro": {
   "med": 1620,
   "values": [
    1620
   ]
  },
- "demon_attack.lightning": {
-  "med": 1620,
-  "values": [
-   1620
-  ]
- },
- "demon_attack.luffy": {
-  "med": 1620,
-  "values": [
-   1620
-  ]
- },
- "demon_attack.minotaur": {
+ "demon_attack.medusa": {
   "med": 1620,
   "values": [
    1620
@@ -423,6 +507,18 @@
    1620
   ]
  },
+ "demon_attack.soldier": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
+ "demon_attack.wanderer": {
+  "med": 1620,
+  "values": [
+   1620
+  ]
+ },
  "demon_attack.werewolf": {
   "med": 1620,
   "values": [
@@ -432,41 +528,26 @@
  "demon_summon": {
   "med": 8020,
   "values": [
-   6940,
    8020,
    9100
   ]
  },
- "demon_summon.escanor": {
-  "med": 8020,
-  "values": [
-   8020
-  ]
- },
- "demon_summon.fire": {
-  "med": 6940,
-  "values": [
-   6940
-  ]
- },
- "demon_summon.lightning": {
-  "med": 8020,
-  "values": [
-   8020
-  ]
- },
- "demon_summon.luffy": {
-  "med": 8020,
-  "values": [
-   6940,
-   8020
-  ]
- },
- "demon_summon.minotaur": {
+ "demon_summon.countess": {
   "med": 9100,
   "values": [
-   8020,
    9100
+  ]
+ },
+ "demon_summon.jotaro": {
+  "med": 8020,
+  "values": [
+   8020
+  ]
+ },
+ "demon_summon.medusa": {
+  "med": 8020,
+  "values": [
+   8020
   ]
  },
  "demon_summon.naruto": {
@@ -481,10 +562,22 @@
    8020
   ]
  },
- "demon_summon.werewolf": {
-  "med": 6940,
+ "demon_summon.soldier": {
+  "med": 8020,
   "values": [
-   6940
+   8020
+  ]
+ },
+ "demon_summon.wanderer": {
+  "med": 8020,
+  "values": [
+   8020
+  ]
+ },
+ "demon_summon.werewolf": {
+  "med": 8020,
+  "values": [
+   8020
   ]
  },
  "golden_mana": {
@@ -577,12 +670,6 @@
    1080
   ]
  },
- "golden_mirror.countess": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
  "golden_mirror.escanor": {
   "med": 1080,
   "values": [
@@ -631,12 +718,6 @@
    1080
   ]
  },
- "golden_mirror.onre": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
  "golden_mirror.soldier": {
   "med": 1080,
   "values": [
@@ -668,18 +749,6 @@
   ]
  },
  "golden_shield.escanor": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
- "golden_shield.fire": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
- "golden_shield.jotaro": {
   "med": 1080,
   "values": [
    1080
@@ -1087,6 +1156,12 @@
    1080
   ]
  },
+ "labyrinth.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "labyrinth.fire": {
   "med": 1080,
   "values": [
@@ -1100,6 +1175,12 @@
   ]
  },
  "labyrinth.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth.luffy": {
   "med": 1080,
   "values": [
    1080
@@ -1153,6 +1234,12 @@
    1080
   ]
  },
+ "labyrinth_end.escanor": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "labyrinth_end.fire": {
   "med": 1080,
   "values": [
@@ -1166,6 +1253,12 @@
   ]
  },
  "labyrinth_end.lightning": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "labyrinth_end.luffy": {
   "med": 1080,
   "values": [
    1080
@@ -1219,6 +1312,12 @@
    1260
   ]
  },
+ "labyrinth_reveal.escanor": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
  "labyrinth_reveal.fire": {
   "med": 1260,
   "values": [
@@ -1232,6 +1331,12 @@
   ]
  },
  "labyrinth_reveal.lightning": {
+  "med": 1260,
+  "values": [
+   1260
+  ]
+ },
+ "labyrinth_reveal.luffy": {
   "med": 1260,
   "values": [
    1260
@@ -1279,7 +1384,7 @@
    3300
   ]
  },
- "last_hope.jotaro": {
+ "last_hope.countess": {
   "med": 3300,
   "values": [
    3300
@@ -1291,7 +1396,13 @@
    3300
   ]
  },
- "last_hope.werewolf": {
+ "last_hope.medusa": {
+  "med": 3300,
+  "values": [
+   3300
+  ]
+ },
+ "last_hope.naruto": {
   "med": 3300,
   "values": [
    3300
@@ -1388,12 +1499,6 @@
    5680
   ]
  },
- "last_stand_banish.countess": {
-  "med": 4600,
-  "values": [
-   4600
-  ]
- },
  "last_stand_banish.escanor": {
   "med": 4600,
   "values": [
@@ -1437,7 +1542,7 @@
   ]
  },
  "last_stand_banish.naruto": {
-  "med": 4600,
+  "med": 5680,
   "values": [
    4600,
    5680
@@ -1468,12 +1573,6 @@
   ]
  },
  "last_stand_banish_kill": {
-  "med": 700,
-  "values": [
-   700
-  ]
- },
- "last_stand_banish_kill.countess": {
   "med": 700,
   "values": [
    700
@@ -1561,8 +1660,7 @@
  "last_stand_kill.countess": {
   "med": 3900,
   "values": [
-   3900,
-   4980
+   3900
   ]
  },
  "last_stand_kill.escanor": {
@@ -1608,7 +1706,7 @@
   ]
  },
  "last_stand_kill.naruto": {
-  "med": 4980,
+  "med": 3900,
   "values": [
    3900,
    4980
@@ -1871,6 +1969,18 @@
    460
   ]
  },
+ "mirror.countess": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.escanor": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
  "mirror.fire": {
   "med": 460,
   "values": [
@@ -1883,7 +1993,19 @@
    460
   ]
  },
- "mirror.medusa": {
+ "mirror.minotaur": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.naruto": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
+ "mirror.onre": {
   "med": 460,
   "values": [
    460
@@ -2069,7 +2191,7 @@
    1080
   ]
  },
- "petrify.werewolf": {
+ "petrify.medusa": {
   "med": 1080,
   "values": [
    1080
@@ -2258,6 +2380,7 @@
  "special": {
   "med": 4860,
   "values": [
+   1620,
    2160,
    2600,
    2833,
@@ -2281,6 +2404,12 @@
   "med": 4860,
   "values": [
    4860
+  ]
+ },
+ "special.jotaro": {
+  "med": 1620,
+  "values": [
+   1620
   ]
  },
  "special.lightning": {
@@ -2355,22 +2484,10 @@
    1080
   ]
  },
- "stoned.werewolf": {
+ "stoned.medusa": {
   "med": 1080,
   "values": [
    1080
-  ]
- },
- "thread_mark": {
-  "med": 1440,
-  "values": [
-   1440
-  ]
- },
- "thread_mark.minotaur": {
-  "med": 1440,
-  "values": [
-   1440
   ]
  },
  "tile.dmg": {
@@ -2428,12 +2545,6 @@
   ]
  },
  "tile_consume.lightning": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
- "tile_consume.luffy": {
   "med": 1080,
   "values": [
    1080
@@ -2511,12 +2622,6 @@
    1080
   ]
  },
- "trap_break.countess": {
-  "med": 1080,
-  "values": [
-   1080
-  ]
- },
  "trap_break.onre": {
   "med": 1080,
   "values": [
@@ -2547,7 +2652,7 @@
    1080
   ]
  },
- "unpetrify.werewolf": {
+ "unpetrify.medusa": {
   "med": 1080,
   "values": [
    1080
@@ -2602,7 +2707,7 @@
   ]
  },
  "voice.attack": {
-  "med": 864,
+  "med": 1080,
   "values": [
    432,
    864,
@@ -2620,7 +2725,7 @@
   ]
  },
  "voice.attack.escanor": {
-  "med": 864,
+  "med": 1080,
   "values": [
    432,
    864,
@@ -2629,7 +2734,7 @@
   ]
  },
  "voice.attack.fire": {
-  "med": 864,
+  "med": 1080,
   "values": [
    432,
    864,
@@ -2665,7 +2770,7 @@
   ]
  },
  "voice.attack.medusa": {
-  "med": 864,
+  "med": 1080,
   "values": [
    432,
    864,
@@ -2683,7 +2788,7 @@
   ]
  },
  "voice.attack.naruto": {
-  "med": 864,
+  "med": 1080,
   "values": [
    432,
    864,
@@ -2696,12 +2801,11 @@
   "values": [
    432,
    864,
-   1080,
    1296
   ]
  },
  "voice.attack.soldier": {
-  "med": 864,
+  "med": 1080,
   "values": [
    432,
    864,
@@ -2719,7 +2823,7 @@
   ]
  },
  "voice.attack.werewolf": {
-  "med": 864,
+  "med": 1080,
   "values": [
    432,
    864,

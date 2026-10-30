@@ -19,7 +19,7 @@
 //     smeru nad tlačidlom, ktoré ho otvorilo; žltá linka = varovanie; málo many = červený štítok, blikajúci obrys
 //     mana baru a sivé tlačidlo - zaradiť sa dá aj tak (server ju preškrtne). Zablokované = zámok v strede.
 import { isTouch, appScale } from "/client/viewport.js";
-import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, lockBtn, undoBtn, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
+import { moveBtn, attackBtn, dashBtn, specialBtn, mirrorBtn, shieldBtn, lockBtn, undoBtn, TILE_W, TILE_H, GAP, selEl } from "/client/dom.js";
 import { specialTargetOf, uiLocked } from "/client/controls.js";
 import { ghostCharAt } from "/client/ghost.js";
 import { CHARS_BY_KEY, VAMP_CHARS } from "/chars/index.js";
@@ -52,7 +52,7 @@ function stripHoverRules() {
 }
 
 /* ---------- 2+3. pickery na boarde ---------- */
-const PICKER_IDS = ["dir-picker", "dash-picker", "aim-picker", "aim-picker-diag", "special-picker", "wolf-picker", "s1-picker", "cell-picker", "s1-cell-picker"];
+const PICKER_IDS = ["dir-picker", "dash-picker", "aim-picker", "aim-picker-diag", "special-picker", "wolf-picker", "s1-picker", "cell-picker", "s1-cell-picker", "shield-picker", "mirror-def-picker"];
 let layer = null;
 function initPickerLayer() {
   const boardEl = document.querySelector(".board");
@@ -94,17 +94,17 @@ function placePicker(el) {
 // ťukateľné prvky s výberom/náhľadom; LOCK IN, undo, menu a pod. reagujú normálne
 const SELECTABLE = [
   ".controls-row .btn.act", ".controls-row .golden-half", ".controls-row .gm-half", ".controls-row .ls-half",
-  "#touch-layer .arrow", "#touch-layer .mini-target", ".q-badge.mine", ".mhead.clickable", "#char-select .char-card",
+  "#touch-layer .arrow", "#touch-layer .def-opt", "#touch-layer .mini-target", ".q-badge.mine", ".mhead.clickable", "#char-select .char-card",
 ].join(",");
 let armed = null;
 let infoEl = null;
 
 // tlačidlá, ktoré len otvárajú výber (cieľ sa volí až potom) a šípky pohybu (ležia na cieli) → jedno ťuknutie
 function oneTap(el) {
-  if (el === moveBtn || el === attackBtn || el === dashBtn) return true;
+  if (el === moveBtn || el === attackBtn || el === dashBtn || el === shieldBtn) return true; // štít len otvára výber obrana | breaker
   const c = ghostCharAt();
   if (el === specialBtn) return specialTargetOf(c) !== "none";
-  if (el === mirrorBtn) return CHARS_BY_KEY[c]?.mirrorSlot === "special1";
+  if (el === mirrorBtn) return true; // Special 1 aj mirror (výber mirror | Mirror Breaker) len otvárajú výber
   if (el.closest("#dir-picker")) return true;            // pohyb - šípka leží na cieľovom políčku
   if (el.closest("#dash-picker")) return !VAMP_CHARS[c];  // Vampire/Onryō: dash = charge so zónou → náhľad + TAP AGAIN
   return false;
@@ -114,7 +114,8 @@ const previewOnly = (el) => el.classList.contains("q-badge");
 
 // šípka / políčko pickera: vlastný popis („Shoot Left") + popis akcie z jej tlačidla (cena, dmg)
 const PICKER_OPENER = { "dir-picker": moveBtn, "dash-picker": dashBtn, "aim-picker": attackBtn, "aim-picker-diag": attackBtn,
-  "special-picker": specialBtn, "wolf-picker": specialBtn, "cell-picker": specialBtn, "s1-picker": mirrorBtn, "s1-cell-picker": mirrorBtn };
+  "special-picker": specialBtn, "wolf-picker": specialBtn, "cell-picker": specialBtn, "s1-picker": mirrorBtn, "s1-cell-picker": mirrorBtn,
+  "shield-picker": shieldBtn, "mirror-def-picker": mirrorBtn };
 function describe(el) {
   const clean = (t) => (t || "").replace(/\s+/g, " ").trim();
   const own = clean(el.title || el.closest("[title]")?.title);
@@ -176,7 +177,9 @@ function refreshLabel() {
   }
   // štítok visí nad tlačidlom, ktoré otvorilo výber, inak nad označeným tlačidlom akcie
   const opener = openerOf(openPickerEl());
-  const host = slotOf(opener) ? opener : (armed && slotOf(armed) ? armed : null);
+  // voľba obrana | breaker má vlastnú cenu aj účinok → štítok visí nad ňou (nie nad štítom / mirrorom, ktorý výber otvoril)
+  const defOpt = armed?.classList?.contains("def-opt") ? armed : null;
+  const host = defOpt || (slotOf(opener) ? opener : (armed && slotOf(armed) ? armed : null));
   const info = host ? labelInfo(slotOf(host), host) : null;
   const inPicker = !!armed?.closest?.("#touch-layer");
   const pick = inPicker && host ? labelInfo(slotOf(host), armed) : null;

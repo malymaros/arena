@@ -15,8 +15,8 @@ export function seededRng(seed) {
   };
 }
 
-const TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "mirror", "special1", "demon"];
-const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "special1"];
+const TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "mirror", "special1", "demon", "shield_breaker", "mirror_breaker"];
+const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "special1", "shield_breaker"];
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
 
 function candidate(rng, board, stone, isStarter) {

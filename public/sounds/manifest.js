@@ -92,6 +92,7 @@ export const SOUNDS = {
   "mirror":      { files: [IMP + "impactBell_heavy_001.ogg"], vol: 0.55, status: "default", note: "zrkadlo odrazilo" },
   "shield":      { files: [SCI + "forceField_000.ogg"], vol: 0.5, status: "default", note: "aktivácia štítu" },
   "mirror_on":   { files: [UI + "glass_003.ogg"], vol: 0.6, status: "default", note: "aktivácia zrkadla" },
+  "breaker":     { files: [SCI + "laserLarge_002.ogg"], vol: 0.55, fit: "keep", status: "default", note: "Shield/Mirror Breaker - lúč do súperovej obrany" },
   "golden_shield": { files: [SCI + "forceField_002.ogg"], vol: 0.6, status: "default" },
   "golden_mirror": { files: [UI + "glass_005.ogg"], vol: 0.7, status: "default" },
 

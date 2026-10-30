@@ -294,10 +294,20 @@ try {
     // varovanie: obrana ako posledná akcia kola (bot hostbot = p1 začína → tapper je nestartér)
     await tap(".controls-row .btn.act.mana"); await tap(".controls-row .btn.act.mana");
     await tap("#melee-btn"); await tap("#melee-btn");
+    // štít otvorí výber obrana | Shield Breaker (docs/BREAKER_PLAN.md) - jedným ťuknutím, voľby ležia na boarde
     await tap(".controls-row .btn.act.shield");
+    check(await ev(`!document.getElementById("shield-picker").classList.contains("hidden") && !!document.querySelector("#touch-layer #shield-picker")`),
+      "ťuk na štít otvorí výber obrana | breaker na boarde");
+    await tap('#touch-layer .def-opt[data-act="shield"]');
     const sl = await label();
     check(sl.includes("BLOCK") && (sl.includes("EXPIRES UNUSED") || sl.includes("TAP AGAIN")), "štítok štítu: BLOCK (+ varovanie na poslednom mieste kola)", sl);
     await shot("shield-label");
+    await tap('#touch-layer .def-opt[data-act="shield_breaker"]');
+    check(/2/.test(await label()), "štítok Shield Breakera: cena + dmg", await label());
+    await tap('#touch-layer .def-opt[data-act="shield_breaker"]');
+    check((await queue())[2] === "breaker" && await ev(`document.querySelector(".controls-row .btn.act.shield").classList.contains("brk-chosen")`),
+      "druhý ťuk zaradí Shield Breaker, tlačidlo štítu ukáže ikonu breakera", JSON.stringify(await queue()));
+    await shot("shield-breaker");
     await tap("#undo"); await tap("#undo"); await tap("#undo");
   }
 

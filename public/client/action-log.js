@@ -1,7 +1,7 @@
 // public/client/action-log.js - záznam akcií kola pod HUD widgetom oboch hráčov.
 import { me, state } from "/client/session.js";
 import { logP1, logP2 } from "/client/dom.js";
-import { LS_BADGE_IMG } from "/client/pix.js";
+import { LS_BADGE_IMG, breakerIco, hydratePix } from "/client/pix.js";
 import { isPhone } from "/client/viewport.js";
 
 /* ---------- záznam akcií kola pod widgetom ---------- */
@@ -100,7 +100,11 @@ export function appendActionLog(slot, action) {
   const el = log.querySelector(".a-slot.slot-act");
   if (el) {
     el.className = `a-badge ${action?.type || ""}`;
-    el.textContent = actionIcon(action, slot);
+    // Shield / Mirror Breaker: čiernobiela ikona obrany (pix.js breakerIco), farbu dáva .a-badge.<typ> v CSS
+    if (action?.type === "shield_breaker" || action?.type === "mirror_breaker") {
+      el.innerHTML = breakerIco(action.type === "shield_breaker" ? "🛡️" : "🪞");
+      hydratePix(el);
+    } else el.textContent = actionIcon(action, slot);
   }
   return el;
 }

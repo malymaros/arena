@@ -1,7 +1,7 @@
 # Shield Breaker / Mirror Breaker — plán
 
-Stav: **dizajn schválený vlastníkom 2026-10-30, engine neimplementovaný.** Vizuál (animácia + tlačidlá) sa ladí
-v náhľade `/?breakerdebug=1` (`public/client/debug-breaker.js`), budúci efekt je `public/client/breaker-fx.js`.
+Stav: **implementované 2026-10-30** (engine `doBreaker` v `engine/game.js`, klient `breaker-fx.js` + výber v `controls.js`,
+testy `test/breaker.mjs`). Vizuál sa ladil v dočasnom náhľade `/?breakerdebug=1`, ktorý bol po implementácii odstránený.
 
 Cieľ: dotiahnuť yomi trojuholník. Dnes je obrana bezpečná voľba — najhoršie, čo sa jej stane, je, že ju spotrebuje
 súperova akcia bez dmg. Breaker ju trestá, ak súper obranu prečíta.
