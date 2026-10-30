@@ -52,6 +52,10 @@ export default function jotaroFx(C) {
   // stand - druhý canvas vedľa Jotara (vzor cloneEls); kreslí `_P` pás zodpovedajúci aktuálnej animácii Jotara.
   // Stály (viditeľný pri Jotarovi), summon intro pri nasadení, Dead_P pri smrti. Vzniká v init (rozmery actora).
   const standEls = { p1: null, p2: null };
+  // posun standu ZA Jotara (o STAND_OFFSET od jeho odsunu na spoločnom políčku), ale nikdy cez hranu Jotarovho
+  // políčka: na spoločnom políčku je Jotaro už odsunutý o pairShift a plný STAND_OFFSET by stand (aj Jotara pri
+  // útoku, ktorý cúvne na jeho miesto) opticky postavil na SUSEDNÉ políčko
+  const behind = (base, fc) => { const max = C.TILE_W * 0.42; return Math.max(-max, Math.min(max, base - fc * STAND_OFFSET)); };
   function init() {
     SCALE = Math.min(C.ACTOR_W, C.ACTOR_H) / FRAME_REF_H * BOARD_FILL;
     for (const slot of ["p1", "p2"]) {
@@ -208,7 +212,11 @@ export default function jotaroFx(C) {
     },
 
     // Jotaro pri útoku (melee/S1/S2): cúvne DOZADU na miesto, kde stál stand (o STAND_OFFSET opačne než smeruje)
-    bodyShift: (slot, fc) => standSwapActive(slot) ? -fc * STAND_OFFSET : 0,
+    bodyShift: (slot, fc) => {
+      if (!standSwapActive(slot)) return 0;
+      const base = C.pairShift(slot, C.state);
+      return behind(base, fc) - base;
+    },
 
     // stand - vždy vedľa Jotara (na jeho chrbtovej strane, o STAND_OFFSET), zrkadlený podľa facingu;
     // pozíciu drží so slideom ako actor. Kreslenie (aktuálny `_P` pás / summon / dead) rieši drawBoard.
@@ -234,7 +242,8 @@ export default function jotaroFx(C) {
         // Inak: za Jotarom (o STAND_OFFSET) a vznáša sa hore (STAND_FLOAT_Y). Float aj swap sú v transforme,
         // aby prechod plynulo animovala CSS transition (transform 150ms).
         const swap = standSwapActive(slot);
-        const shift  = C.pairShift(slot, s) - (swap ? 0 : fc * STAND_OFFSET);
+        const base = C.pairShift(slot, s);
+        const shift  = swap ? base : behind(base, fc);
         const floatY = swap ? 0 : STAND_FLOAT_Y;
         el.style.transform = `translateX(${shift}px) translateY(${floatY}px) scaleX(${fc})`;
       }
@@ -289,7 +298,7 @@ export default function jotaroFx(C) {
             const cx = phase2 ? st.x : blip.ox, cy = phase2 ? st.y : blip.oy;
             const { left, top } = C.cellToPx(cx, cy);
             const fc = C.computeFacing(state.p1, state.p2)[slot] || 1;
-            const sh = C.pairShift(slot, state) - fc * STAND_OFFSET; // pri pohybe je stand ZA Jotarom, vznáša sa
+            const sh = behind(C.pairShift(slot, state), fc); // pri pohybe je stand ZA Jotarom, vznáša sa
             el.style.transition = "none";
             el.style.left = (left - (C.ACTOR_W - C.TILE_W) / 2) + "px";
             el.style.top  = (top - (C.ACTOR_H - C.TILE_H)) + "px";
