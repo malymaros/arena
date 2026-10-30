@@ -35,10 +35,10 @@ function actionBadgeView(a, ownerSlot) {
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     // Shield/Mirror Breaker (návrh): ikona obrany preškrtnutá čiernou trhlinou, farba svojej obrany
-    case "shield_breaker":        return { cls: "shield", html: crackIco("🛡️") };
-    case "mirror_breaker":        return { cls: "mirror", html: crackIco("🪞") };
-    case "golden_shield_breaker": return { cls: "golden",     html: crackIco("🛡️", "g-ico") };
-    case "golden_mirror_breaker": return { cls: "golden",     html: crackIco("🪞", "g-ico") };
+    case "shield_breaker":        return { cls: "breaker", html: crackIco("🛡️") };
+    case "mirror_breaker":        return { cls: "breaker", html: crackIco("🪞") };
+    case "golden_shield_breaker": return { cls: "breaker-gold", html: crackIco("🛡️", "g-ico") };
+    case "golden_mirror_breaker": return { cls: "breaker-gold", html: crackIco("🪞", "g-ico") };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
     case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };

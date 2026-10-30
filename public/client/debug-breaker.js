@@ -109,13 +109,13 @@ import { ACTION_ANIMS } from "/chars/index.js";
   const dmg = (n) => ({ html: costHtml(`${n}{☠️}`) });
   const PICKERS = {
     shield:  { anchor: shieldBtn, html: opt("shield", "shield", '<span class="pix-ico" data-emoji="🛡️"></span>', word("BLOCK"))
-                                       + opt("shield", "shield_breaker", crackIco("🛡️"), dmg(BRK_DMG.shield)) },
+                                       + opt("breaker", "shield_breaker", crackIco("🛡️"), dmg(BRK_DMG.shield)) },
     mirror:  { anchor: mirrorBtn, html: opt("mirror", "mirror", '<span class="pix-ico" data-emoji="🪞"></span>', word("REFLECT"))
-                                       + opt("mirror", "mirror_breaker", crackIco("🪞"), dmg(BRK_DMG.mirror)) },
+                                       + opt("breaker", "mirror_breaker", crackIco("🪞"), dmg(BRK_DMG.mirror)) },
     gshield: { anchor: goldenBtn, html: opt("golden-opt", "golden_shield", '<span class="pix-ico" data-emoji="🛡️"></span>', word("BLOCK"))
-                                       + opt("golden-opt", "golden_shield_breaker", crackIco("🛡️"), dmg(BRK_DMG.shield)) },
+                                       + opt("breaker gold-ring", "golden_shield_breaker", crackIco("🛡️"), dmg(BRK_DMG.shield)) },
     gmirror: { anchor: goldenBtn, html: opt("golden-opt", "golden_mirror", '<span class="pix-ico" data-emoji="🪞"></span>', word("REFLECT"))
-                                       + opt("golden-opt", "golden_mirror_breaker", crackIco("🪞"), dmg(BRK_DMG.mirror)) },
+                                       + opt("breaker gold-ring", "golden_mirror_breaker", crackIco("🪞"), dmg(BRK_DMG.mirror)) },
   };
   for (const [key, p] of Object.entries(PICKERS)) {
     if (!p.anchor) continue;
@@ -137,22 +137,23 @@ import { ACTION_ANIMS } from "/chars/index.js";
       planning.goldenArmed = !mirror; planning.goldenMirrorArmed = mirror; planning.goldenBreaker = brk;
       syncGoldenHalves();
       const half = document.querySelector(`.golden-half.${mirror ? "mirror" : "shield"}-half`);
-      if (brk && half) setIcon(half, crackIco(mirror ? "🪞" : "🛡️", "g-ico"));
+      if (brk && half) { setIcon(half, crackIco(mirror ? "🪞" : "🛡️", "g-ico")); half.classList.add("breaker"); }
     } else {
       if (planning.myQueue.length >= 3) return;
       planning.myQueue.push({ type: pick });
       const btn = pick.startsWith("shield") ? shieldBtn : mirrorBtn;
-      if (brk) setIcon(btn, crackIco(pick.startsWith("shield") ? "🛡️" : "🪞"));
+      if (brk) { setIcon(btn, crackIco(pick.startsWith("shield") ? "🛡️" : "🪞")); btn.classList.add("breaker"); }
     }
     renderQueue();
     // breaker zaberá slot svojej obrany - tlačidlo je „použité" rovnako ako po zvolení obrany
-    if (pick === "shield_breaker") shieldBtn.disabled = true;
-    if (pick === "mirror_breaker") mirrorBtn.disabled = true;
+    // (renderQueue ho podľa typu „shield"/„mirror" pri každom prekreslení odomkne - preto vždy znova)
+    if (planning.myQueue.some(q => q.type === "shield_breaker")) shieldBtn.disabled = true;
+    if (planning.myQueue.some(q => q.type === "mirror_breaker")) mirrorBtn.disabled = true;
   }
   function resetPicks() {
     closeAll();
     planning.myQueue = []; planning.goldenArmed = false; planning.goldenMirrorArmed = false; planning.goldenBreaker = false;
-    for (const [b, html] of orig) { b.innerHTML = html; delete b.dataset.done; hydratePix(b); b.disabled = false; }
+    for (const [b, html] of orig) { b.innerHTML = html; delete b.dataset.done; hydratePix(b); b.disabled = false; b.classList.remove("breaker"); }
     syncGoldenHalves(); renderQueue();
   }
   // capture: klik na štít / mirror / golden polovicu otvorí návrh výberu namiesto pôvodnej akcie hry

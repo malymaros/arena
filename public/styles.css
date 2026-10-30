@@ -2860,6 +2860,12 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   .def-picker.hidden{ display: none; }
   .def-picker .btn.act .cost.word{ font-size: 10px; letter-spacing: .5px; }
   .def-picker .btn.act.golden-opt{ background: linear-gradient(#ffd54f, #c99700); color: #2a1c00; }
+  /* breaker = útočná akcia: červeno-fialová (rodina útoku #b71c1c / melee #7f0000 / special #7b1fa2), golden variant so zlatým rámom */
+  .btn.act.breaker, .golden-half.breaker{ background: #9a1b5e; }
+  .btn.act.breaker.gold-ring{ box-shadow: inset 0 0 0 3px #ffca28, 0 0 0 1px #000; }
+  .golden-half.breaker{ box-shadow: inset 0 0 0 3px #ffca28; }
+  .q-badge.breaker{ background: #6e1244; }
+  .q-badge.breaker-gold{ background: #6e1244; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,213,79,.8); }
 
   /* štít/mirror sa už nekreslia na bunku - pulzujúci glow je per-postavu (JS actorFilter) */
 
