@@ -141,7 +141,7 @@ for (const [label, p2setup] of [
 }
 
 /* ---- Portal Realm: dmg dlaždica (2) = dva zásahy po 1 - Last Hope (1 HP, ½) ju prežije, bez buffu „-1 -1" ---- */
-for (const [buff, hp, wantHp, wantParts] of [["lastHopeBuff", 1, 1, "[0,0]"], ["lastStandBuff", 10, 10, "[0,0]"], [null, 10, 4, "[1,1]"]]) {
+for (const [buff, hp, wantHp] of [["lastHopeBuff", 1, 1], ["lastStandBuff", 10, 10], [null, 10, 4]]) {
   const e = createEngine({ seed: 1 });
   e.startMatch(e.sanitizeConfig({ ...CFG, arena: "portal", tileWeights: { dmg: 90, ik: 10 } }));
   e.chooseCharacter("A", "fire");

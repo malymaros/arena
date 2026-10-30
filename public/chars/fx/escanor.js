@@ -2,6 +2,7 @@
 // kole po nasadení, special = slnko (WinSun → CruelSunHold → let na cieľ → SunBurst/SunFade), stredové overlaye
 // a FX škálované s Pride, HUD pride odznak + minimapka rozsahu, náhľad vo výbere (cyklenie pride) a karta
 // (WeakIdle / IntroStand). Továreň dostane C = klientský scope (client.js), háčiky: public/chars/fx/index.js.
+import escanorData from "/chars/escanor.js"; // abilityPreview = tá istá mini-doska ako vo výbere postáv
 
 // Escanor special - vlastná riadená choreografia (NECYKLÍ). Musí časovo sedieť s ESC_SPECIAL_MS na serveri
 // (server podrží zásah presne o dĺžku choreografie, aby dmg dopadol AŽ po dokončení výbuchu):
@@ -183,21 +184,32 @@ export default function escanorFx(C) {
     if (imgEl && !imgEl.getAttribute("src").endsWith("_" + pride + ".png")) imgEl.src = "/assets/pride_lion_" + pride + ".png";
     badge.classList.toggle("pride-max", pride >= 3);
     badge.classList.remove("hidden");
-    // rozsah zóny na minimapke (aktuálna pozícia + pride + smer k súperovi)
-    if (p.x == null) { range.classList.add("hidden"); return; } // labyrint: skrytá pozícia
-    const facing = C.computeFacing(C.state?.p1, C.state?.p2)[slot] || 1;
-    const dir = facing < 0 ? "left" : "right";
-    const hit = zoneSet(p.x, p.y, pride, dir);
-    const board = C.board;
-    range.style.gridTemplateColumns = `repeat(${board.w}, auto)`;
-    range.innerHTML = "";
-    for (let y = 0; y < board.h; y++) for (let x = 0; x < board.w; x++) {
-      const c = document.createElement("div"); c.className = "pr-cell";
-      if (hit.has(`${x},${y}`)) c.classList.add("hit");          // range (aj na políčku hráča)
-      if (x === p.x && y === p.y) c.classList.add("caster");     // pozícia hráča = červená bodka (navrch range)
-      range.appendChild(c);
-    }
+    // rozsah zóny: 4 STATICKÉ minimapky (pride 0-3) - tá istá abstraktná mapka ako náhľad vo výbere postáv
+    // (Escanor na pevnom políčku, smer k súperovi; p2 zrkadlovo). Nesleduje pozíciu, viditeľná je len aktuálna.
+    const maps = range.querySelectorAll(".pr-map").length === 4 ? range.querySelectorAll(".pr-map") : buildRangeMaps(slot, range);
+    maps.forEach((m, i) => m.classList.toggle("hidden", i !== pride));
     range.classList.remove("hidden");
+  }
+  function buildRangeMaps(slot, range) {
+    const { w, h } = C.board;
+    const def = escanorData.abilityPreview;
+    const mirror = slot === "p2";
+    const caster = mirror ? { x: w - 1 - def.caster.x, y: def.caster.y } : def.caster;
+    const dir = mirror ? (def.dir === "right" ? "left" : "right") : def.dir;
+    range.innerHTML = "";
+    for (let pride = 0; pride < 4; pride++) {
+      const hit = zoneSet(caster.x, caster.y, pride, dir, true);
+      const m = document.createElement("div"); m.className = "pr-map hidden";
+      m.style.gridTemplateColumns = `repeat(${w}, auto)`;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const c = document.createElement("div"); c.className = "pr-cell";
+        if (hit.has(`${x},${y}`)) c.classList.add("hit");                 // range (aj na políčku Escanora)
+        if (x === caster.x && y === caster.y) c.classList.add("caster");  // Escanor = červená bodka (navrch range)
+        m.appendChild(c);
+      }
+      range.appendChild(m);
+    }
+    return range.querySelectorAll(".pr-map");
   }
 
   // výber postáv: pride lev + číslo pod mini-doskou (rovnaký indikátor ako HUD widget - swap framu
