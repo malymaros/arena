@@ -55,7 +55,8 @@ function candidateFor(slot, el) {
   const act = el?.dataset?.act;
   if (act && el.classList.contains("arrow")) { const [type, dir] = act.split(":"); return { type, dir }; }
   if (act && el.classList.contains("def-opt")) return { type: act }; // voľba obrana | breaker
-  if (el === shieldBtn || (el === mirrorBtn && CHARS_BY_KEY[ghostCharAt()]?.mirrorSlot !== "special1")) return null; // len otvára výber
+  // štít / mirror len otvára výber obrana | breaker - obe stoja rovnako → mana sa kontroluje ako za obranu
+  if (opensDefPicker(el)) return { type: el === shieldBtn ? "shield" : "mirror" };
   if (el?.classList.contains("mini-target")) return { type: "special" };
   switch (slot) {
     case "attack": case "dash": case "melee": case "special": case "shield": case "recharge": return { type: slot };
@@ -65,6 +66,7 @@ function candidateFor(slot, el) {
   }
 }
 
+const opensDefPicker = (el) => el === shieldBtn || (el === mirrorBtn && CHARS_BY_KEY[ghostCharAt()]?.mirrorSlot !== "special1");
 // { text, warn, noMana } pre tlačidlo / šípku / políčko; `dir` = prvok nesie smer (varovania závislé od smeru)
 export function labelInfo(slot, el = null) {
   const out = { text: labelText(slot), warn: null, noMana: false };
@@ -83,7 +85,7 @@ export function labelInfo(slot, el = null) {
   if (!cand) return out;
   const w = candidateWarning(cand);
   out.noMana = !!w && NO_MANA_RE.test(w);
-  out.warn = shortWarning(w);
+  out.warn = opensDefPicker(el) ? null : shortWarning(w); // varovanie (EXPIRES UNUSED…) patrí až zvolenej voľbe
   // bez smeru (tlačidlo, ktoré len otvára výber) sa „mimo plochy" ešte nedá posúdiť
   if (!cand.dir && out.warn === "OFF BOARD") out.warn = null;
   return out;

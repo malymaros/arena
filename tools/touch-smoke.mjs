@@ -279,6 +279,8 @@ try {
     // mana 6: special (5) → ostane 1; melee (4) aj ďalší special sa nedajú zaplatiť
     await sleep(500);
     check(await ev(`document.getElementById("melee-btn").classList.contains("no-mana") && !document.querySelector(".controls-row .btn.act.mana").classList.contains("no-mana")`), "tlačidlo bez many je sivé, recharge nie");
+    // štít / mirror len otvárajú výber obrana | breaker - aj tak musia zošednúť (obe voľby stoja rovnako)
+    check(await ev(`document.querySelector(".controls-row .btn.act.shield").classList.contains("no-mana") && document.getElementById("mirror-btn").classList.contains("no-mana")`), "štít aj mirror bez many sú sivé");
     await tap("#melee-btn");
     check(await labelRed(), "ťuk na melee bez many: červený štítok", await label());
     check((await label()).includes("TAP AGAIN"), "červený štítok aj tak ponúka TAP AGAIN (akcia sa dá zaradiť)", await label());

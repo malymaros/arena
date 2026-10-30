@@ -51,7 +51,8 @@ export function ghostCharAt(idx = planning.myQueue.length) {
 // Ceny a wall pravidlo MUSIA sedieť so serverovými do* funkciami. Vracia pole dôvodov (null = ok) podľa planning.myQueue.
 const PLAN_MAX_MANA = MAX_MANA;
 const PLAN_RECHARGE = RECHARGE_GAIN;
-const PLAN_COST = { attack: BASIC_COST, melee: MELEE_COST, dash: DASH_COST, special: SPECIAL_COST, shield: SHIELD_COST, mirror: MIRROR_COST, demon: DEMON_COST };
+const PLAN_COST = { attack: BASIC_COST, melee: MELEE_COST, dash: DASH_COST, special: SPECIAL_COST, shield: SHIELD_COST, mirror: MIRROR_COST,
+  shield_breaker: SHIELD_COST, mirror_breaker: MIRROR_COST, demon: DEMON_COST }; // breaker stojí ako jeho obrana
 // súper Vampire/Onryō je mirror-imúnny: mirror (aj golden) sa voči jeho dmg správa len ako štít
 // (súper v turnaji nemôže z/do side-postavy swapnúť, takže jeho postava platí celé kolo)
 export function foeMirrorImmune() {
