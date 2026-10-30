@@ -20,6 +20,10 @@ export const DASH_COST   = 4; // presun až o 2 políčka jedným smerom
 export const RECHARGE_GAIN = 4;
 export const SHIELD_COST = 2; // zablokuje celý dmg najbližšej súperovej akcie
 export const MIRROR_COST = 4; // odrazí celý dmg najbližšej súperovej akcie späť do útočníka
+// Shield / Mirror Breaker (docs/BREAKER_PLAN.md): alternatíva obrany v jej slote, cena = cena obrany.
+// Zhodnú súperovu obranu rozbije + dmg; nezhodnú obrana odrazí / zablokuje; bez obrany nič.
+export const SHIELD_BREAKER_DMG = 2;
+export const MIRROR_BREAKER_DMG = 4;
 export const SPECIAL_COST = 5;
 // vypršaný čas na ťah: každý NEVYPLNENÝ slot je PASS („THINKING") - stojí toľkoto many (max. čo hráč má)
 export const PASS_MANA_COST = 2;

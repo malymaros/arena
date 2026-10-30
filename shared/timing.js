@@ -19,6 +19,12 @@ export const SOLDIER_AIM_MS   = 2600;
 // jeden frame drží let lúča aj nábeh výbuchu, zásah (hit/block/mirror) padne až po ňom.
 // MUSÍ sedieť s klientskou choreografiou spawnSoldierBeam v client.js.
 export const SOLDIER_BEAM_MS  = 900;
+// Shield / Mirror Breaker (public/client/breaker-fx.js): frame lúča. BREAK = nábeh + zohrievanie súperovej
+// obrany až po roztrieštenie (zásah padne v ďalšom frame); SHORT = lúč do nezhodnej obrany (blok/odraz
+// prehrá defense-fx) alebo do súpera bez obrany (lúč sa rozplynie). Klient z nich počíta dĺžky animácie.
+export const BREAKER_RAMP_MS  = 140;
+export const BREAKER_BREAK_MS = BREAKER_RAMP_MS + 1150;
+export const BREAKER_SHORT_MS = BREAKER_RAMP_MS + 420;
 // Vojakov basic granát: zásah (červené políčko + „-HP" float) NEMÁ padnúť pri dolete granátu, ale až keď
 // na cieľovej bunke VYBUCHNE a výbuch je vidieť. Klient kreslí výbuch CHARGE_STEP_MS po stiahnutí granátu;
 // tento konštantný odklad navyše posunie hit frame tak, aby padol AŽ po nábehu výbuchu (Explosion.png má

@@ -8,6 +8,7 @@ import {
   MELEE_REPEAT, SPECIAL_COST, WOLF_DIRS, SIDE_CHARS, DIAG_DIRS, VAMP_TRAP_DMG,
   VAMP_TRAP_BONUS, STONE_ACTIONS, CLONE_DMG, RECHARGE_GAIN,
   SHIELD_COST, MIRROR_COST, GOLDEN_COST, GOLDEN_MIRROR_COST, DASH_COST, GOLDEN_MANA_GAIN,
+  SHIELD_BREAKER_DMG, MIRROR_BREAKER_DMG, BREAKER_BREAK_MS, BREAKER_SHORT_MS, DEFENSE_SLOT,
   ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS,
   MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS, PORTAL_SHOT_STEP_MS,
   MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, VAMP_TRAP_STRIKE_MS, QUICKDRAW_MS, PASS_MANA_COST,
@@ -427,6 +428,9 @@ function validQueue(queue, slot) {
   // každý NE-swap typ najviac 1×; swapov najviac 2 (ciele sa overia nižšie); stoned a pass sa môžu opakovať
   const nonSwap = types.filter(t => t !== "swap" && t !== "stoned" && t !== "pass");
   if (new Set(nonSwap).size !== nonSwap.length) return false;
+  // slot obrany: v kole buď obrana, alebo jej breaker (Shield Breaker vylučuje štít, Mirror Breaker mirror)
+  const defSlots = nonSwap.map(t => DEFENSE_SLOT[t]).filter(Boolean);
+  if (new Set(defSlots).size !== defSlots.length) return false;
   const swaps = q.filter(a => a.type === "swap");
   if (swaps.length > 2) return false;
   if (swaps.length) {
@@ -453,15 +457,15 @@ function validQueue(queue, slot) {
     }
   }
   // golden shield/mirror sa vzájomne vylučuje s príslušnou bežnou akciou - nemôžeš ju zahrať 2× za kolo
-  if (goldenPre === "golden_shield" && types.includes("shield")) return false;
-  if (goldenPre === "golden_mirror" && types.includes("mirror")) return false;
+  if (goldenPre === "golden_shield" && (types.includes("shield") || types.includes("shield_breaker"))) return false;
+  if (goldenPre === "golden_mirror" && (types.includes("mirror") || types.includes("mirror_breaker"))) return false;
   {
     // tvar basicu a mirror slot podľa kitu postavy (Vampire/Onryō/Jotaro/Luffy diagonálne, Jotaro a Luffy
     // majú special1 namiesto mirroru)
     const meChar = game.players[slot]?.char;
     const special1Slot = kitOf(meChar).mirrorSlot === "special1";
     for (const a of q) {
-      if (a.type === "mirror" && special1Slot) return false;   // postava nemá mirror akciu (Jotaro, Luffy)
+      if ((a.type === "mirror" || a.type === "mirror_breaker") && special1Slot) return false; // postava nemá mirror (Jotaro, Luffy) - ani jeho breaker
       if (a.type === "special1" && !special1ArgsOk(meChar, a)) return false; // special1 len ak ho má v mirror slote
       if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
       if (a.type === "attack" && !attackDirOk(meChar, a.dir)) return false;
@@ -996,7 +1000,7 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
     if (pair && stacked) soakAmt = CLONE_DMG; // pár bez obrany: klon pohltí CLONE_DMG, zvyšok na majiteľa (ako nekrytý stacknutý pár)
   }
   // --- obrana: štít (alebo mirror voči imúnnej Countess/Onre = obyčajný štít) - blok na každej figúre v JEDNOM beate
-  if (o.shield || (o.mirror && mirrorImmune(atkSlot))) {
+  if (o.shield || (o.mirror && mirrorImmune(atkSlot) && kind !== "breaker")) { // breaker: imunita na mirror neplatí
     const gold = o.shield ? !!o.shieldGold : !!o.mirrorGold;
     const fx = [];
     if (pair) fx.push({ kind: "block", target: defSlot, gold });
@@ -1171,6 +1175,39 @@ function doMirror(slot, tl) {
   pushStateFrame(tl, [{ kind: "mirror_on", from: slot }], SMALL_DELAY_MS);
 }
 
+// Shield / Mirror Breaker (docs/BREAKER_PLAN.md): alternatíva obrany v jej slote, cena = cena obrany. Cieľ = súperova
+// obrana nabitá TERAZ (kryje práve túto akciu): zhodnú rozbije (spotrebuje) a zásah dopadne bez nej; nezhodnú
+// vyhodnotí bežne damage pipeline (štít zablokuje, mirror odrazí - imunita Vampire/Onryō tu neplatí); bez obrany
+// nič (lúč sa rozplynie). Nie je pozičný (dosah celá doska), power dlaždica sa nespotrebuje, Def-blocker ho nezakazuje.
+function doBreaker(slot, kind, tl) {
+  const me = game.players[slot], defSlot = other(slot), o = game.players[defSlot];
+  const cost = kind === "shield" ? SHIELD_COST : MIRROR_COST;
+  if (me.mana < cost) { pushInvalid(tl, slot, SMALL_DELAY_MS, "mana"); return; }
+  me.mana -= cost;
+  const raw = (kind === "shield" ? SHIELD_BREAKER_DMG : MIRROR_BREAKER_DMG) * dealMul(slot) * labyrinthMul(slot);
+  // THE WORLD: súperova obrana je zachytená v game.timestop a vyhodnotí sa kumulatívne pri obnovení času
+  const ts = frozenActive() && defSlot === game.timestop.foeSlot ? game.timestop : null;
+  const hasShield = ts ? ts.foeShield : !!o.shield, hasMirror = ts ? ts.foeMirror : !!o.mirror;
+  const gold = hasShield ? !!(ts ? ts.foeShieldGold : o.shieldGold) : hasMirror ? !!(ts ? ts.foeMirrorGold : o.mirrorGold) : false;
+  const result = (kind === "shield" ? hasShield : hasMirror) ? "break" : hasShield ? "block" : hasMirror ? "reflect" : "none";
+  // istý zásah (rozbitie aj blok / odraz) → labyrint sa odhalí PRED lúčom (v zamrazení až pri obnovení času)
+  if (result !== "none") revealLabyrinths(tl);
+  const cloneCell = result === "break" && o.clone ? { cloneCell: [o.clone.x, o.clone.y] } : {};
+  pushStateFrame(tl, [{ kind: "breaker", from: slot, target: defSlot, what: kind, result, gold, ...cloneCell }],
+    result === "break" ? BREAKER_BREAK_MS : BREAKER_SHORT_MS);
+  if (result === "none") return;
+  // rozbitá obrana už nekryje nikoho → zásah zasiahne majiteľa aj klona (klon zásahom zaniká); nezhodná obrana
+  // kryje obe figúry, reaguje len majiteľ (inak by mirror odrazil dmg dvakrát)
+  const figs = result === "break" && o.clone ? [{ fig: "owner", raw }, { fig: "clone", raw }] : [{ fig: "owner", raw }];
+  if (result === "break") {
+    if (kind === "shield") { o.shield = false; o.shieldGold = false; } else { o.mirror = false; o.mirrorGold = false; }
+    // zmrazený Shield Breaker rozbije zachytený štít HNEĎ: zmrazené zásahy PRED ním štít zablokoval (zahodia sa),
+    // tie PO ňom dopadnú pri obnovení času plne (vyhodnotenie po poradí)
+    if (ts) { ts.foeShield = false; ts.foeShieldGold = false; ts.hits = []; }
+  }
+  resolveStrike(defSlot, figs, tl, { kind: "breaker" }); // v zamrazení ho intercept len ohlási a zaráta
+}
+
 // Special 1 (mirror slot - Jotaro, Luffy): vyhodnotenie deklaruje postava (engine/characters/<postava>.js,
 // special1.resolve) vrátane mana gate-u, lebo cena aj tvar akcie sa líšia.
 function doSpecial1(slot, action, tl) {
@@ -1240,6 +1277,8 @@ function doAction(slot, action, tl) {
     case "special1": return doSpecial1(slot, action, tl); // útok v mirror slote (Jotaro smer, Luffy bunka)
     case "shield":   return doShield(slot, tl);
     case "mirror":   return doMirror(slot, tl);
+    case "shield_breaker": return doBreaker(slot, "shield", tl);
+    case "mirror_breaker": return doBreaker(slot, "mirror", tl);
     case "demon":    return doDemon(slot, tl);
     case "pass":     return doPass(slot, tl);
     default: break;
@@ -1263,8 +1302,10 @@ function validBasicAction(a, used, allowDemon = false, char = null) {
   if (!a) return false;
   const known = ACTION_TYPES.has(a.type) || (allowDemon && a.type === "demon");
   if (!known || used.has(a.type)) return false;
+  // slot obrany obsadený (obrana / breaker / golden obrana v exclude) → jej druhá varianta nie
+  if (DEFENSE_SLOT[a.type] && [...used].some(t => DEFENSE_SLOT[t] === DEFENSE_SLOT[a.type])) return false;
   const special1Slot = kitOf(char).mirrorSlot === "special1";
-  if (a.type === "mirror" && special1Slot) return false;   // postava nemá mirror (Jotaro, Luffy - v tom slote special1)
+  if ((a.type === "mirror" || a.type === "mirror_breaker") && special1Slot) return false; // postava nemá mirror (Jotaro, Luffy - v tom slote special1)
   if (a.type === "special1" && !special1ArgsOk(char, a)) return false;
   if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;
   if (a.type === "attack" && !attackDirOk(char, a.dir)) return false;

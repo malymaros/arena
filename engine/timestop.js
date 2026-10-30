@@ -29,14 +29,15 @@ function noteFrozenClone(ownerSlot) {
 }
 
 // Jotaro THE WORLD: 3 nové zmrazené akcie (kvázi nové kolo, všetky typy nanovo). Povolené:
-// move|dash|recharge|attack|melee|shield|special1. Zakázané: special (THE WORLD beží / Special 2 ešte
+// move|dash|recharge|attack|melee|shield|shield_breaker|special1 (štít a jeho breaker sa vylučujú). Zakázané: special (THE WORLD beží / Special 2 ešte
 // nie je), golden akcie, swap, stoned. Mana sa NEvaliduje tvrdo (nedostatok = invalid pri vykonaní).
 function validTimestopQueue(queue, slot) {
   if (!Array.isArray(queue) || queue.length !== 3) return false;
-  const allowed = new Set(["move", "dash", "recharge", "attack", "melee", "shield", "special1"]);
+  const allowed = new Set(["move", "dash", "recharge", "attack", "melee", "shield", "shield_breaker", "special1"]);
   const types = queue.map(a => a && a.type);
   if (types.some(t => !allowed.has(t))) return false;
   if (new Set(types).size !== types.length) return false; // každý typ max 1×
+  if (types.includes("shield") && types.includes("shield_breaker")) return false; // slot štítu: obrana XOR breaker
   const char = E.game.players[slot]?.char; // tvar basicu podľa kitu (Jotaro strieľa diagonálne)
   for (const a of queue) {
     if ((a.type === "move" || a.type === "dash") && !MOVE_DIRS.has(a.dir)) return false;

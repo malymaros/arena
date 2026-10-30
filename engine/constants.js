@@ -75,7 +75,9 @@ export const DIAG_DIR_KEYS = Object.keys(DIAG_DIRS);
 // Démon útok - dostupný LEN buffnutému hráčovi v poslednom (Last Stand) kole; zaberá jeden z 3 akčných slotov
 
 // special1 = útok v mirror slote (Jotaro, Luffy - register special1; ostatné postavy ho vo validQueue/fillFromDraft odmietnu)
-export const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash", "special1"]);
+export const ACTION_TYPES = new Set(["move", "recharge", "attack", "melee", "special", "shield", "mirror", "dash", "special1", "shield_breaker", "mirror_breaker"]);
+// breaker zaberá slot svojej obrany: v kole buď obrana, alebo jej breaker (golden obrana vylučuje svoj breaker tiež)
+export const DEFENSE_SLOT = { shield: "shield", shield_breaker: "shield", mirror: "mirror", mirror_breaker: "mirror" };
 export const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 
 /* -------------------- Match / lobby config -------------------- */
