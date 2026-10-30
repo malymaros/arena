@@ -11,7 +11,7 @@ import { breakerIco, hydratePix } from "/client/pix.js";
 import { costHtml } from "/client/hud.js";
 import { planning } from "/client/planning.js";
 import { renderQueue } from "/client/queue.js";
-import { syncGoldenHalves } from "/client/controls.js";
+import { syncGoldenHalves, updateUiLocks } from "/client/controls.js";
 import { ACTION_ANIMS } from "/chars/index.js";
 
 (function breakerDebug() {
@@ -124,7 +124,20 @@ import { ACTION_ANIMS } from "/chars/index.js";
     (key === "shield" ? p.anchor.parentElement : key === "mirror" ? p.anchor.parentElement : p.anchor).appendChild(p.el);
     hydratePix(p.el);
   }
-  const closeAll = () => Object.values(PICKERS).forEach(p => p.el?.classList.add("hidden"));
+  // otvorený výber zamkne ostatné tlačidlá ako smerový picker útoku (planning.openPicker → updateUiLocks),
+  // odomknuté ostane len tlačidlo, ku ktorému výber patrí; opätovný klik naň výber zavrie
+  let openKey = null;
+  const anchorBtn = (key) => key === "shield" ? shieldBtn : key === "mirror" ? mirrorBtn : goldenBtn;
+  const closeAll = () => {
+    Object.values(PICKERS).forEach(p => p.el?.classList.add("hidden"));
+    if (openKey) { openKey = null; planning.openPicker = null; updateUiLocks(); }
+  };
+  const openPicker = (key) => {
+    PICKERS[key].el.classList.remove("hidden");
+    openKey = key; planning.openPicker = "def_" + key; // kľúč mimo PICKER_BTNS → updateUiLocks zamkne všetko…
+    updateUiLocks();
+    anchorBtn(key)?.classList.remove("locked-ui");      // …okrem tlačidla, ku ktorému výber patrí
+  };
   // pôvodný obsah tlačidiel (ikona) - zvolený breaker ju na tlačidle nahradí preškrtnutou
   const orig = new Map([shieldBtn, mirrorBtn, ...document.querySelectorAll(".golden-half")].filter(Boolean).map(b => [b, b.innerHTML]));
   const setIcon = (btn, html) => { const ico = btn.querySelector(".pix-ico, .brk-ico"); if (ico) { ico.outerHTML = html; hydratePix(btn); } };
@@ -164,13 +177,12 @@ import { ACTION_ANIMS } from "/chars/index.js";
     const key = e.target.closest('.btn.act.shield[data-act="shield"]') ? "shield"
       : e.target.closest("#mirror-btn") ? "mirror"
       : half ? (half.dataset.gold === "mirror" ? "gmirror" : "gshield") : null;
-    if (!key) { if (!e.target.closest(".def-picker")) closeAll(); return; }
+    if (!key) return; // ako pri útoku: výber sa zatvorí len výberom možnosti alebo opätovným klikom na tlačidlo
     e.stopImmediatePropagation(); e.preventDefault();
+    if (openKey) { if (openKey === key) closeAll(); return; } // iný výber je otvorený → ostatné sú zamknuté
     const btn = key === "shield" ? shieldBtn : key === "mirror" ? mirrorBtn : half;
     if (btn.disabled || (key.startsWith("g") && (planning.goldenArmed || planning.goldenMirrorArmed))) return;
-    const el = PICKERS[key].el, wasOpen = !el.classList.contains("hidden");
-    closeAll();
-    if (!wasOpen) el.classList.remove("hidden");
+    openPicker(key);
   }, true);
 
   /* ---------------- panel (mimo zmenšovanej obrazovky hry, aby neprekrýval HUD) ---------------- */
