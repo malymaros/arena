@@ -2779,12 +2779,11 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   .board.fx-shake{ animation: fx-shake .45s ease-in-out; }
 
   /* Shield/Mirror Breaker (NÁVRH - public/client/breaker-fx.js): súvislý lúč vo farbe breakera (Shield Breaker =
-     farba štítu, Mirror Breaker = farba mirroru, golden varianty zlatý), obrana sa zohrieva až praskne.
+     farba štítu, Mirror Breaker = farba mirroru), obrana sa zohrieva až praskne.
      Animujú sa len opacity/transform (pravidlá výkonu z docs/PERF_PLAN.md). */
   .brk-fx{ position: absolute; pointer-events: none; z-index: 7;
     --bc: #4dd0e1; --bc-glow: rgba(77,208,225,.8); --bc-deep: rgba(0,151,167,.85); --bc-tint: #c8f6ff; }
   .brk-fx.c-mirror{ --bc: #ce93d8; --bc-glow: rgba(206,147,216,.8); --bc-deep: rgba(142,36,170,.85); --bc-tint: #f3d9ff; }
-  .brk-fx.c-gold{ --bc: #ffd54f; --bc-glow: rgba(255,202,40,.85); --bc-deep: rgba(255,160,0,.85); --bc-tint: #fff4c2; }
   .brk-beam{ height: 26px; transform-origin: 0 50%; }
   .brk-beam i{ position: absolute; left: 0; right: 0; top: 50%; transform-origin: 0 50%; border-radius: 12px;
     animation: brk-beam-in var(--ramp) ease-out both, brk-beam-flick .09s steps(2) infinite; }
@@ -2851,20 +2850,14 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   /* breaker: ikona obrany čiernobielo ako starý film (pix.js breakerIco) - tlačidlá, výber aj lišta kola */
   .brk-ico{ display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
   .brk-ico .pix-ico{ filter: drop-shadow(0 0 1px rgba(255,255,255,.35)); } /* tón noir kreslí pix.js (canvas) */
-  .brk-ico.g-ico{ filter: none; } /* golden breaker: zlatý filter .g-ico by čiernobielu ikonu znova zafarbil */
   /* výber obrana / breaker nad tlačidlom štítu / mirroru / golden polovice - rovnaký panel ako smerové pickery */
   .def-picker{ position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); z-index: 5;
     display: flex; gap: 6px; padding: 8px; background: rgba(12,14,18,.9); border-radius: 2px; box-shadow: 0 0 0 2px #000; }
   .def-picker.hidden{ display: none; }
-  #golden-btn > .def-picker{ left: 0; transform: none; } /* golden tlačidlo je pri ľavom okraji - výber nesmie pretiecť von */
   .def-picker .btn.act .cost.word{ font-size: 10px; letter-spacing: .5px; }
-  .def-picker .btn.act.golden-opt{ background: linear-gradient(#ffd54f, #c99700); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.6), 0 0 3px rgba(0,0,0,.45); }
   /* breaker = útočná akcia: tmavá krvavočervená medzi červenou a čiernou (tmavšie než melee #7f0000) */
   .btn.act.breaker{ background: #4a0b0e; }
   .q-badge.breaker{ background: #3a0809; }
-  /* golden breaker ostáva zlatý ako golden obrana - odlišuje ho len čiernobiela ikona */
-  .btn.act.breaker.gold-ring{ background: linear-gradient(#ffd54f, #c99700); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.6), 0 0 3px rgba(0,0,0,.45); }
-  .q-badge.breaker-gold{ background: #8a6d00; box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,213,79,.55); }
 
   /* štít/mirror sa už nekreslia na bunku - pulzujúci glow je per-postavu (JS actorFilter) */
 

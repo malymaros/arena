@@ -24,7 +24,7 @@ function handPt(slot) {
   return b && { x: b.x + b.facing * TILE_W * 0.24, y: b.y - TILE_H * 0.06 };
 }
 
-// farba lúča = farba breakera (nie súperovej obrany): golden variant zlatý, inak štít / mirror
+// farba lúča = farba breakera (nie súperovej obrany): štít / mirror
 let colorCls = "";
 function add(cls, x, y, style) {
   const el = document.createElement("div");
@@ -42,7 +42,7 @@ const CRACKS = [
   ["M44 88 L18 100", "M52 120 L76 108 L88 124", "M80 56 L88 30", "M12 70 L20 92"],
 ];
 
-// opts: { kind: "shield"|"mirror" (typ breakera - určuje farbu lúča), gold (golden breaker = zlatý lúč), whiff (súper bez obrany), react (zlá obrana - odraz/blok prehrá volajúci),
+// opts: { kind: "shield"|"mirror" (typ breakera - určuje farbu lúča), gold (súperova obrana je golden - farba bariéry), whiff (súper bez obrany), react (zlá obrana - odraz/blok prehrá volajúci),
 // slow (násobok dĺžky, náhľad) }. Vráti Promise - resolve
 // v momente roztrieštenia (volajúci hneď pustí hit/float), resp. keď sa lúč pri whiffe rozplynie.
 export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold = false, whiff = false, react = false, slow = 1 } = {}) {
@@ -50,7 +50,7 @@ export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold
   if (!a || !d) return;
   const RAMP = 140 * slow, HEAT = (react ? 420 : 1150) * slow;
   const dx = d.x - a.x, dy = d.y - a.y, len = Math.hypot(dx, dy);
-  colorCls = gold ? "c-gold" : kind === "mirror" ? "c-mirror" : "c-shield";
+  colorCls = kind === "mirror" ? "c-mirror" : "c-shield";
 
   // lúč: kontajner otočený z ruky do cieľa; vrstvy = široká červená žiara + horúce jadro, blikajú (opacity/scaleY)
   const beam = add("brk-beam", a.x, a.y, { width: len + "px", transform: `translateY(-50%) rotate(${Math.atan2(dy, dx)}rad)` });

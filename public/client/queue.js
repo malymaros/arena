@@ -37,8 +37,6 @@ function actionBadgeView(a, ownerSlot) {
     // Shield/Mirror Breaker (návrh): ikona obrany preškrtnutá čiernou trhlinou, farba svojej obrany
     case "shield_breaker":        return { cls: "breaker", html: breakerIco("🛡️") };
     case "mirror_breaker":        return { cls: "breaker", html: breakerIco("🪞") };
-    case "golden_shield_breaker": return { cls: "breaker-gold", html: breakerIco("🛡️", "g-ico") };
-    case "golden_mirror_breaker": return { cls: "breaker-gold", html: breakerIco("🪞", "g-ico") };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
     case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
@@ -215,8 +213,7 @@ export function renderQueue() {
 
     let filled = null;
     if (mine) {
-      if (b.kind === "gshield")    filled = planning.goldenArmed ? { type: planning.goldenBreaker ? "golden_shield_breaker" : "golden_shield" }
-                                        : planning.goldenMirrorArmed ? { type: planning.goldenBreaker ? "golden_mirror_breaker" : "golden_mirror" } : null;
+      if (b.kind === "gshield")    filled = planning.goldenArmed ? { type: "golden_shield" } : planning.goldenMirrorArmed ? { type: "golden_mirror" } : null;
       else if (b.kind === "gmana") filled = planning.goldenManaArmed ? { type: "golden_mana" } : planning.lastStandArmed ? { type: "last_stand" } : null;
       else                         filled = planning.myQueue[b.idx] || null;
     }

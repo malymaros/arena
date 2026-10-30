@@ -1,7 +1,7 @@
 // public/client/debug-breaker.js - DEBUG náhľad (?breakerdebug=1): Shield/Mirror Breaker v SKUTOČNEJ hre bez
 // servera. Stránka hry dostane vymyslený stav cez vlastné socket handlery (HUD, doska, postavy, žiara obrany sú
-// teda presne ako v hre), panel scenárov prehrá efekt z breaker-fx.js a tlačidlá štítu / mirroru / golden polovíc
-// otvoria návrh výberu obrana / breaker. Bez vplyvu na hru - len query parametrom.
+// teda presne ako v hre), panel scenárov prehrá efekt z breaker-fx.js a tlačidlá štítu / mirroru otvoria
+// návrh výberu obrana / breaker. Golden breaker neexistuje (golden predťah beží pred akoukoľvek súperovou obranou). Bez vplyvu na hru - len query parametrom.
 import { socket } from "/client/net.js";
 import { setAnim } from "/client/anim.js";
 import { spawnDamageFloat, spawnFloat } from "/client/board-fx.js";
@@ -11,7 +11,7 @@ import { breakerIco, hydratePix } from "/client/pix.js";
 import { costHtml } from "/client/hud.js";
 import { planning } from "/client/planning.js";
 import { renderQueue } from "/client/queue.js";
-import { syncGoldenHalves, updateUiLocks } from "/client/controls.js";
+import { updateUiLocks } from "/client/controls.js";
 import { ACTION_ANIMS } from "/chars/index.js";
 
 (function breakerDebug() {
@@ -31,7 +31,7 @@ import { ACTION_ANIMS } from "/chars/index.js";
     shield: false, shieldGold: false, mirror: false, mirrorGold: false, manaRefills: 0,
     lastStandBuff: false, lastHopeBuff: false, down: false, locked: false, ...extra,
   });
-  // starter p2 → ja (p1) som nestartér, takže vidím aj golden predťah (golden štít / mirror a ich breakery)
+  // starter p2 → ja (p1) som nestartér, takže vidím aj golden predťah (jeho golden štít / mirror breaker rozbije)
   const snap = (p1, p2) => ({
     phase: "playing", config: { format: "single", tilesPerRound: 1, tileWeights: { dmg: 50, heal: 10, mana: 10, ik: 10, power: 10, block: 10 },
       timer: "off", tilePreview: true, colorPref: "white" },
@@ -47,8 +47,8 @@ import { ACTION_ANIMS } from "/chars/index.js";
   const SC = [
     { t: "Shield Breaker vs štít",                 def: { shield: true },                   cost: 2, dmg: 2, kind: "shield", label: "SHIELD BROKEN!" },
     { t: "Mirror Breaker vs mirror",               def: { mirror: true },                   cost: 4, dmg: 4, kind: "mirror", label: "MIRROR SHATTERED!" },
-    { t: "Golden Shield Breaker vs golden štít",   def: { shield: true, shieldGold: true }, cost: 3, dmg: 2, kind: "shield", gold: true, label: "SHIELD BROKEN!" },
-    { t: "Golden Mirror Breaker vs golden mirror", def: { mirror: true, mirrorGold: true }, cost: 5, dmg: 4, kind: "mirror", gold: true, label: "MIRROR SHATTERED!" },
+    { t: "Shield Breaker vs golden štít",          def: { shield: true, shieldGold: true }, cost: 2, dmg: 2, kind: "shield", label: "SHIELD BROKEN!" },
+    { t: "Mirror Breaker vs golden mirror",        def: { mirror: true, mirrorGold: true }, cost: 4, dmg: 4, kind: "mirror", label: "MIRROR SHATTERED!" },
     { t: "Mirror Breaker s Last Stand (×2)",       def: { mirror: true }, atk: { lastStandBuff: true }, cost: 4, dmg: 8, kind: "mirror", label: "MIRROR SHATTERED!" },
     { t: "Shield Breaker vs mirror → odraz",       def: { mirror: true },                   cost: 2, dmg: 2, kind: "shield", react: "reflect" },
     { t: "Mirror Breaker vs štít → blok",          def: { shield: true },                   cost: 4, dmg: 4, kind: "mirror", react: "block" },
@@ -66,7 +66,7 @@ import { ACTION_ANIMS } from "/chars/index.js";
     // útočník drží svoju range attack pózu celý čas lúča
     const beamMs = (sc.whiff ? 720 : (sc.react ? 420 : 1150) + 140) * slow;
     setAnim("p1", ACTION_ANIMS[chars.p1]?.shot || "attack", beamMs + 150);
-    await spawnBreakerBeam("p1", "p2", { kind: sc.kind, gold: !!sc.gold, whiff: !!sc.whiff, react: !!sc.react, slow });
+    await spawnBreakerBeam("p1", "p2", { kind: sc.kind, gold: !!(sc.def.shieldGold || sc.def.mirrorGold), whiff: !!sc.whiff, react: !!sc.react, slow });
     if (sc.whiff) {
       // súper bez obrany: lúč sa len rozplynul - žiadny text, žiadny dmg
     } else if (sc.react === "block") {
@@ -96,13 +96,11 @@ import { ACTION_ANIMS } from "/chars/index.js";
   /* ---------------- návrh tlačidiel: klik na obranu → výber obrana / breaker ---------------- */
   const shieldBtn = document.querySelector('.controls .btn.act.shield[data-act="shield"]');
   const mirrorBtn = document.getElementById("mirror-btn");
-  const goldenBtn = document.getElementById("golden-btn");
   // štít nemá vlastný .move-wrap (nemal picker) - obal ho, nech sa výber ukotví nad ním
   if (shieldBtn && !shieldBtn.parentElement.classList.contains("move-wrap")) {
     const w = document.createElement("div"); w.className = "move-wrap";
     shieldBtn.replaceWith(w); w.appendChild(shieldBtn);
   }
-  if (goldenBtn) goldenBtn.style.position = "relative";
   const opt = (cls, pick, icon, label) =>
     `<button type="button" class="btn act ${cls}" data-pick="${pick}">${icon}<span class="cost${label.word ? " word" : ""}">${label.html}</span></button>`;
   const word = (w) => ({ word: true, html: w });
@@ -112,22 +110,18 @@ import { ACTION_ANIMS } from "/chars/index.js";
                                        + opt("breaker", "shield_breaker", breakerIco("🛡️"), dmg(BRK_DMG.shield)) },
     mirror:  { anchor: mirrorBtn, html: opt("mirror", "mirror", '<span class="pix-ico" data-emoji="🪞"></span>', word("REFLECT"))
                                        + opt("breaker", "mirror_breaker", breakerIco("🪞"), dmg(BRK_DMG.mirror)) },
-    gshield: { anchor: goldenBtn, html: opt("golden-opt", "golden_shield", '<span class="pix-ico" data-emoji="🛡️"></span>', word("BLOCK"))
-                                       + opt("breaker gold-ring", "golden_shield_breaker", breakerIco("🛡️"), dmg(BRK_DMG.shield)) },
-    gmirror: { anchor: goldenBtn, html: opt("golden-opt", "golden_mirror", '<span class="pix-ico" data-emoji="🪞"></span>', word("REFLECT"))
-                                       + opt("breaker gold-ring", "golden_mirror_breaker", breakerIco("🪞"), dmg(BRK_DMG.mirror)) },
   };
   for (const [key, p] of Object.entries(PICKERS)) {
     if (!p.anchor) continue;
     p.el = document.createElement("div");
     p.el.className = "def-picker hidden"; p.el.dataset.for = key; p.el.innerHTML = p.html;
-    (key === "shield" ? p.anchor.parentElement : key === "mirror" ? p.anchor.parentElement : p.anchor).appendChild(p.el);
+    p.anchor.parentElement.appendChild(p.el);
     hydratePix(p.el);
   }
   // otvorený výber zamkne ostatné tlačidlá ako smerový picker útoku (planning.openPicker → updateUiLocks),
   // odomknuté ostane len tlačidlo, ku ktorému výber patrí; opätovný klik naň výber zavrie
   let openKey = null;
-  const anchorBtn = (key) => key === "shield" ? shieldBtn : key === "mirror" ? mirrorBtn : goldenBtn;
+  const anchorBtn = (key) => key === "shield" ? shieldBtn : mirrorBtn;
   const closeAll = () => {
     Object.values(PICKERS).forEach(p => p.el?.classList.add("hidden"));
     if (openKey) { openKey = null; planning.openPicker = null; updateUiLocks(); }
@@ -139,24 +133,16 @@ import { ACTION_ANIMS } from "/chars/index.js";
     anchorBtn(key)?.classList.remove("locked-ui");      // …okrem tlačidla, ku ktorému výber patrí
   };
   // pôvodný obsah tlačidiel (ikona) - zvolený breaker ju na tlačidle nahradí preškrtnutou
-  const orig = new Map([shieldBtn, mirrorBtn, ...document.querySelectorAll(".golden-half")].filter(Boolean).map(b => [b, b.innerHTML]));
+  const orig = new Map([shieldBtn, mirrorBtn].filter(Boolean).map(b => [b, b.innerHTML]));
   const setIcon = (btn, html) => { const ico = btn.querySelector(".pix-ico, .brk-ico"); if (ico) { ico.outerHTML = html; hydratePix(btn); } };
 
   function choose(pick) {
     closeAll();
     const brk = pick.endsWith("_breaker");
-    if (pick.startsWith("golden")) {
-      const mirror = pick.includes("mirror");
-      planning.goldenArmed = !mirror; planning.goldenMirrorArmed = mirror; planning.goldenBreaker = brk;
-      syncGoldenHalves();
-      const half = document.querySelector(`.golden-half.${mirror ? "mirror" : "shield"}-half`);
-      if (brk && half) { setIcon(half, breakerIco(mirror ? "🪞" : "🛡️", "g-ico")); half.classList.add("breaker"); }
-    } else {
-      if (planning.myQueue.length >= 3) return;
-      planning.myQueue.push({ type: pick });
-      const btn = pick.startsWith("shield") ? shieldBtn : mirrorBtn;
-      if (brk) { setIcon(btn, breakerIco(pick.startsWith("shield") ? "🛡️" : "🪞")); btn.classList.add("breaker"); }
-    }
+    if (planning.myQueue.length >= 3) return;
+    planning.myQueue.push({ type: pick });
+    const btn = pick.startsWith("shield") ? shieldBtn : mirrorBtn;
+    if (brk) { setIcon(btn, breakerIco(pick.startsWith("shield") ? "🛡️" : "🪞")); btn.classList.add("breaker"); }
     renderQueue();
     // breaker zaberá slot svojej obrany - tlačidlo je „použité" rovnako ako po zvolení obrany
     // (renderQueue ho podľa typu „shield"/„mirror" pri každom prekreslení odomkne - preto vždy znova)
@@ -165,23 +151,20 @@ import { ACTION_ANIMS } from "/chars/index.js";
   }
   function resetPicks() {
     closeAll();
-    planning.myQueue = []; planning.goldenArmed = false; planning.goldenMirrorArmed = false; planning.goldenBreaker = false;
+    planning.myQueue = [];
     for (const [b, html] of orig) { b.innerHTML = html; delete b.dataset.done; hydratePix(b); b.disabled = false; b.classList.remove("breaker"); }
-    syncGoldenHalves(); renderQueue();
+    renderQueue();
   }
-  // capture: klik na štít / mirror / golden polovicu otvorí návrh výberu namiesto pôvodnej akcie hry
+  // capture: klik na štít / mirror otvorí návrh výberu namiesto pôvodnej akcie hry
   document.addEventListener("click", (e) => {
     const o = e.target.closest(".def-picker [data-pick]");
     if (o) { e.stopImmediatePropagation(); e.preventDefault(); choose(o.dataset.pick); return; }
-    const half = e.target.closest(".golden-half");
     const key = e.target.closest('.btn.act.shield[data-act="shield"]') ? "shield"
-      : e.target.closest("#mirror-btn") ? "mirror"
-      : half ? (half.dataset.gold === "mirror" ? "gmirror" : "gshield") : null;
+      : e.target.closest("#mirror-btn") ? "mirror" : null;
     if (!key) return; // ako pri útoku: výber sa zatvorí len výberom možnosti alebo opätovným klikom na tlačidlo
     e.stopImmediatePropagation(); e.preventDefault();
     if (openKey) { if (openKey === key) closeAll(); return; } // iný výber je otvorený → ostatné sú zamknuté
-    const btn = key === "shield" ? shieldBtn : key === "mirror" ? mirrorBtn : half;
-    if (btn.disabled || (key.startsWith("g") && (planning.goldenArmed || planning.goldenMirrorArmed))) return;
+    if (anchorBtn(key).disabled) return;
     openPicker(key);
   }, true);
 
@@ -199,7 +182,7 @@ import { ACTION_ANIMS } from "/chars/index.js";
   const sp = btn("rýchlosť 1×", () => { slow = slow === 1 ? 2 : slow === 2 ? 4 : 1; sp.textContent = `rýchlosť ${slow === 1 ? "1" : "1/" + slow}×`; });
   btn("vyčistiť výber tlačidiel", resetPicks);
   const hint = document.createElement("div");
-  hint.textContent = "Tlačidlá: klik na štít / mirror / golden polovicu dole = výber obrana alebo breaker";
+  hint.textContent = "Tlačidlá: klik na štít / mirror dole = výber obrana alebo breaker";
   Object.assign(hint.style, { width: "100%", textAlign: "center", color: "#aaa", fontSize: "11px" });
   panel.appendChild(hint);
   document.body.appendChild(panel);
