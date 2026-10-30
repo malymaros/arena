@@ -95,3 +95,8 @@ export const SHREK_RAGE_HP = [10, 5];    // prahy HP pre 2. a 3. stupeň revu
 export const SHREK_BARREL_MANA = 1;      // reakcia na strelu: sud späť - −1 mana (chýbajúca prejde do HP)
 export const SHREK_PUNCH_MANA = 2;       // reakcia na melee: punch - −2 many (chýbajúca prejde do HP)
 export const STENCH_DMG = 1;             // smrad po Shrekovej smrti: dmg na konci každého kroku (ako dmg dlaždica)
+// Shrek Swamp - itemy namiesto dlaždíc: srdiečko (+HP) a kvapka (plná mana), zoberie ich hráč pri vstupe/prechode
+export const ITEMS_PER_ROUND = 1;                 // default lobby: koľko itemov padne na štarte hry a na konci každého kola (1–3)
+export const ITEM_WEIGHTS = { heal: 60, mana: 40 }; // default % v lobby
+export const ITEM_HEAL_GAIN = 1;                  // srdiečko: +1 HP (Lightning: na plné HP - kit healTile "full")
+export const ITEM_MAX = 4;                        // naraz najviac 4 itemy na ploche

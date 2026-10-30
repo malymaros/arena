@@ -50,6 +50,26 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 - Smrad pokryje celú plochu za 4 kolá, ak Shrek padne v strede, a za 6 kôl, ak padne v rohu. Miesto aj čas
   zabitia sú preto taktické rozhodnutie.
 
+### Itemy (namiesto dlaždíc)
+
+- **Srdiečko** dá +1 HP (Lightning sa vylieči do plna, ako pri heal dlaždici). **Kvapka** doplní manu na plno.
+  Itemy vyzerajú ako pixel ikony dlaždíc bez krúžku (variant C4, polovičná veľkosť) a vznášajú sa nad tieňom.
+- V lobby bažiny: *Items per round* 1 / 2 / 3 (`config.itemsPerRound`, default 1) a šanca srdiečko / mana
+  (`config.itemWeights`, default 60 / 40, spolu 100).
+- Itemy padnú na štarte hry a na konci každého kola na voľné políčko (bez itemu, hráča, klona a živého Shreka).
+  Na ploche je naraz najviac 4 (`ITEM_MAX`).
+- Hráč item zoberie hneď pri vstupe na políčko alebo prebehnutí cezeň: pohyb, dash, charge, Luffyho kotúľ.
+  Zber číta prejdené bunky akcie (`actionSteps`) pred vyhodnotením pasce. Pri plnom HP alebo mane sa item aj tak
+  spotrebuje.
+- Narutov klon itemy neberie. Prekliaty v labyrinte vidí item len na fakľovej bunke, ako heal/mana dlaždice.
+  Počas THE WORLD sa itemy nezbierajú (čas stojí).
+
+### Hudba
+
+`music.battle.swamp` hrá *All Star* počas hry v bažine. Vo FINAL ROUND hrá finálna hudba ako v iných arénach.
+Súbor `public/sounds/custom/music/shrek-all-star.mp3` je orezaný úsek 40,4–107,6 s originálu (rez po MP3 rámcoch,
+prepočítaná Xing hlavička). Slučka `trim [514, 66737]` má 28 taktov pri 103,5 BPM a prechod 1,5 s na takt.
+
 ## 2. Rozhodnutia k okrajovým prípadom (zvolené pri implementácii, vlastník ich môže zmeniť)
 
 | Situácia | Rozhodnutie |

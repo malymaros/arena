@@ -27,6 +27,7 @@ function scenario(c1, c2, setup, cfg = CFG, seed = 1) {
   e.startMatch(e.sanitizeConfig(cfg));
   e.chooseCharacter("A", c1);
   e.chooseCharacter("B", c2);
+  e.game.items = []; // náhodne padnuté itemy by menili HP/manu scenárov - testy itemov si ich kladú samé
   setup?.(e.game);
   return {
     e,
@@ -183,6 +184,58 @@ console.log("Smrť a smrad");
   const s4 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 0, y: 1, dead: true, hp: 0, marks: [], stench: [[0, 1]] }); g.players.p1.hp = 2; });
   const tl4 = s4.round(PASS3, PASS3);
   check(s4.game.players.p1.hp === 0 && s4.game.phase === "match_over" && fx(tl4, "stench_proc").length === 2, "D9: smrad zabije - hra končí po 2. kroku", J([s4.game.players.p1.hp, s4.game.phase]));
+}
+
+/* ==================== Itemy ==================== */
+console.log("Itemy (srdiečko / mana)");
+{
+  const e0 = createEngine({ seed: 1 });
+  const cfg = e0.sanitizeConfig(CFG);
+  check(cfg.itemsPerRound === 1 && J(cfg.itemWeights) === J({ heal: 60, mana: 40 }), "I1: default 1 item za kolo, srdiečko 60 / mana 40", J(cfg));
+  check(e0.sanitizeConfig({ ...CFG, itemWeights: { heal: 70, mana: 40 } }) === null, "I2: váhy itemov musia dať 100");
+  check(e0.sanitizeConfig({ ...CFG, itemsPerRound: 9 }).itemsPerRound === 3, "I3: počet itemov za kolo 1–3");
+  // štart hry: 1 item na voľnom políčku (nie pod hráčom ani Shrekom)
+  const t0 = createEngine({ seed: 5 });
+  t0.startMatch(t0.sanitizeConfig(CFG)); t0.chooseCharacter("A", "fire"); t0.chooseCharacter("B", "lightning");
+  const g0 = t0.game, it0 = g0.items[0];
+  check(g0.items.length === 1 && !["p1", "p2"].some(s => g0.players[s].x === it0.x && g0.players[s].y === it0.y) && !(g0.shrek.x === it0.x && g0.shrek.y === it0.y),
+    "I4: na štarte padne 1 item na voľné políčko", J(g0.items));
+  check(Array.isArray(t0.snapshot().items), "I5: itemy sú v snapshote");
+
+  // vstup na srdiečko: +1 HP, item zmizne
+  const a = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.players.p1.hp = 7; g.items = [{ x: 1, y: 1, type: "heal" }]; });
+  const tla = a.round([{ type: "move", dir: "right" }, PASS, PASS], PASS3);
+  check(a.game.players.p1.hp === 8 && !a.game.items.some(i => i.x === 1 && i.y === 1) && fx(tla, "item_pick").some(e => e.target === "p1" && e.amount === 1),
+    "I6: vstup na srdiečko = +1 HP, item zmizne", J([a.game.players.p1.hp, a.game.items]));
+  // dash cez kvapku: zoberie ju aj na prebehnutom políčku (mana na plno po zaplatení dashu)
+  const b = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.items = [{ x: 1, y: 1, type: "mana" }]; });
+  const tlb = b.round([{ type: "dash", dir: "right" }, PASS, PASS], PASS3);
+  check(b.game.players.p1.x === 2 && b.game.players.p1.mana === 10 - 4 && fx(tlb, "item_pick").some(e => e.type === "mana" && J(e.cell) === "[1,1]" && e.amount === 8), "I7: dash cez kvapku → plná mana (zaplatený dash 6−4=2 → +8; potom 2× pass)", J([b.game.players.p1.mana, b.game.players.p1.x]));
+  // Lightning sa zo srdiečka vylieči do plna
+  const c = scenario("lightning", "fire", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.players.p1.hp = 3; g.items = [{ x: 1, y: 1, type: "heal" }]; });
+  c.round([{ type: "move", dir: "right" }, PASS, PASS], PASS3);
+  check(c.game.players.p1.hp === 10, "I8: Lightning zo srdiečka na plné HP", String(c.game.players.p1.hp));
+  // Narutov klon itemy neberie
+  const d = scenario("naruto", "lightning", (g) => {
+    shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] });
+    g.players.p1.x = 0; g.players.p1.y = 0; g.players.p1.clone = { x: 0, y: 2 }; g.items = [{ x: 1, y: 2, type: "heal" }];
+  });
+  d.round([{ type: "move", dir: "right" }, PASS, PASS], PASS3);
+  check(d.game.players.p1.clone?.x === 1 && d.game.items.some(i => i.x === 1 && i.y === 2), "I9: klon prejde cez item a nechá ho", J(d.game.items));
+  // koniec kola: nové itemy (3 za kolo), najviac ITEM_MAX naraz, nikdy dva na jednom políčku
+  const f = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.items = [{ x: 1, y: 0, type: "heal" }, { x: 2, y: 0, type: "mana" }]; },
+    { ...CFG, itemsPerRound: 3 });
+  const tlf = f.round(PASS3, PASS3);
+  const cells = f.game.items.map(i => `${i.x},${i.y}`);
+  check(f.game.items.length === 4 && new Set(cells).size === 4 && fx(tlf, "item_drop")[0]?.items.length === 2, "I10: koniec kola - doplní sa po limit 4 (2 nové)", J(f.game.items));
+  // labyrint: prekliaty vidí item len na fakľovej bunke
+  const l = scenario("fire", "minotaur", (g) => {
+    shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] });
+    Object.assign(g.players.p1, { labyrinth: true, thread: [[0, 1]] });
+    g.items = [{ x: 0, y: 1, type: "mana" }, { x: 2, y: 2, type: "heal" }];
+  });
+  const snap = l.e.snapshotFor("A");
+  check(snap.items.length === 1 && snap.items[0].x === 0, "I11: prekliaty vidí len item pod sebou", J(snap.items));
 }
 
 /* ==================== Labyrint ==================== */

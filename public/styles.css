@@ -1730,17 +1730,25 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   background: radial-gradient(ellipse at center, rgba(255,240,140,.5), rgba(190,230,60,.2) 70%); box-shadow: inset 0 0 0 3px rgba(255,236,120,.9);
   animation: shrek-roar .25s ease-in-out infinite alternate; }
 @keyframes shrek-roar { from { opacity: .55; } to { opacity: 1; } }
-.cell .stench { position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: .85;
-  background: radial-gradient(circle at 30% 60%, rgba(140,200,40,.65), transparent 45%), radial-gradient(circle at 70% 40%, rgba(110,170,30,.6), transparent 50%),
-    radial-gradient(circle at 50% 85%, rgba(170,220,60,.55), transparent 55%), rgba(80,130,20,.3);
-  animation: stench-breathe 3.2s ease-in-out infinite; }
-@keyframes stench-breathe { 50% { opacity: .6; } }
-.cell .stench.fresh { animation: stench-in 1.4s ease-out, stench-breathe 3.2s ease-in-out 1.4s infinite; }
-@keyframes stench-in { from { opacity: 0; transform: scale(.4); } }
-.cell.stench-flash .stench { opacity: 1; background-color: rgba(160,230,40,.65); }
+/* smrad po Shrekovej smrti: špeciálna dlaždica (plochá výplň + tvrdý rámik) v zelenej skokov, ikona zelené hovno */
+.cell.tile-stench { background: rgba(182,232,70,.16); box-shadow: inset 0 0 0 2px #b6e846; }
+.cell.stench-fresh .stench-marker { animation: stench-in .9s ease-out; }
+@keyframes stench-in { from { opacity: 0; transform: scale(.3); } }
+.cell.stench-flash { background: rgba(182,232,70,.45); }
 .shrek-roar-float { position: absolute; transform: translateX(-50%); color: #e9ff7a; font-weight: 900; font-size: 22px; letter-spacing: 2px;
   text-shadow: 2px 2px 0 #000, 0 0 12px rgba(160,230,40,.9); animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9; }
 .shrek-barrel { position: absolute; image-rendering: pixelated; pointer-events: none; z-index: 8; }
+/* itemy (srdiečko / mana): ikona bez krúžku v strede bunky, vznáša sa nad tieňom; čerstvý padne zhora */
+.swamp-item { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; z-index: 2; pointer-events: none; }
+.swamp-item i { display: block; width: 100%; height: 100%; animation: item-bob 1.6s ease-in-out infinite; filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
+.swamp-item svg { display: block; width: 100%; height: 100%; }
+.swamp-item::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: -6px; height: 5px; border-radius: 50%; background: rgba(0,0,0,.35); }
+@keyframes item-bob { 50% { transform: translateY(-4px); } }
+.swamp-item.fresh i { animation: item-drop .7s cubic-bezier(.5,0,.9,.5), item-bob 1.6s ease-in-out .7s infinite; }
+@keyframes item-drop { from { transform: translateY(-140px); opacity: 0; } 30% { opacity: 1; } }
+.perf-lite .swamp-item i { animation: none; }
+.item-pop { position: absolute; transform: translateX(-50%); font-size: 26px; animation: item-pop .5s ease-out forwards; pointer-events: none; z-index: 9; }
+@keyframes item-pop { from { opacity: 1; transform: translateX(-50%) translateY(60px) scale(1); } to { opacity: 0; transform: translateX(-50%) translateY(30px) scale(1.8); } }
 /* Shrek Swamp v lobby: popis Shreka namiesto váh dlaždíc */
 #lobby-swamp-section{ display: none; }
 .swamp-info p{ margin: 0 0 8px; font-size: 10px; line-height: 1.6; color: #cfe6a0; }

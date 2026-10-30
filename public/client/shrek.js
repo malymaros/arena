@@ -5,7 +5,8 @@
 // z tools/sprites-shrek (public/assets/shrek/*.png + anims.json).
 import { state } from "/client/session.js";
 import { cellToPx, TILE_W, TILE_H, gridEl, actorsEl, figuresEl, rowZ } from "/client/dom.js";
-import { spawnFloat, spawnCellFloat } from "/client/board-fx.js";
+import { spawnFloat, spawnCellFloat, spawnManaFloat } from "/client/board-fx.js";
+import { pixSvg } from "/client/pix.js";
 import { perf } from "/client/perf.js";
 import { SHREK_RAGE_HP } from "/shared/balance.js";
 
@@ -24,6 +25,7 @@ const view = { anim: "Idle", start: 0, ms: 0, flip: false, px: null, py: null, m
 let roar = null;                     // { cells, until } - rozsvietený riadok + stĺpec revu
 let freshStench = new Map();         // "x,y" → do kedy sa bunka smradu „rozlieva" (animácia nástupu)
 const flashCells = new Map();        // "x,y" → do kedy bliká (stench_proc)
+const freshItems = new Map();        // "x,y" → do kedy item „padá" (item_drop)
 
 function ensureEls() {
   if (fig) return;
@@ -83,10 +85,22 @@ export function renderShrek(s) {
   for (const [x, y] of sh.stench) {
     const cell = cells[y * w + x];
     if (!cell) continue;
-    const st = document.createElement("div");
-    st.className = "stench" + ((freshStench.get(`${x},${y}`) || 0) > now ? " fresh" : "");
-    cell.appendChild(st);
-    cell.classList.add("stinky");
+    // smrad = špeciálna dlaždica (výplň + rámik v zelenej skokov) s pixel ikonou zeleného hovna v rohu
+    cell.classList.add("tile-stench");
+    if ((freshStench.get(`${x},${y}`) || 0) > now) cell.classList.add("stench-fresh");
+    const m = document.createElement("span");
+    m.className = "tile-marker stench-marker";
+    m.innerHTML = pixSvg("poo");
+    cell.appendChild(m);
+  }
+  // itemy: srdiečko / kvapka (pixel ikony dlaždíc) bez krúžku, vznášajú sa nad tieňom; čerstvé padajú zhora
+  for (const it of s.items || []) {
+    const cell = cells[it.y * w + it.x];
+    if (!cell) continue;
+    const el = document.createElement("div");
+    el.className = `swamp-item ${it.type}` + ((freshItems.get(`${it.x},${it.y}`) || 0) > now ? " fresh" : "");
+    el.innerHTML = `<i>${pixSvg(it.type === "heal" ? "heart" : "drop")}</i>`;
+    cell.appendChild(el);
   }
   if (roar && roar.until > now) for (const [x, y] of roar.cells) cells[y * w + x]?.classList.add("shrek-roar");
   for (const [k, until] of flashCells) {
@@ -116,7 +130,7 @@ export function renderShrek(s) {
 /* ---------- efekty timeline ---------- */
 export function shrekEffect(e, hold) {
   const sh = state?.shrek;
-  if (!sh && !e.kind.startsWith("shrek_") && !e.kind.startsWith("stench_")) return;
+  if (!sh && !e.kind.startsWith("shrek_") && !e.kind.startsWith("stench_") && !e.kind.startsWith("item_")) return;
   const now = performance.now();
   switch (e.kind) {
     case "shrek_jump": {
@@ -178,6 +192,15 @@ export function shrekEffect(e, hold) {
       break;
     case "stench_proc":
       flashCells.set(`${e.cell[0]},${e.cell[1]}`, now + hold);
+      break;
+    case "item_drop":
+      for (const it of e.items || []) freshItems.set(`${it.x},${it.y}`, now + 900);
+      break;
+    case "item_pick":
+      // item zmizne (stav ho už nemá) - krátky záblesk na bunke + float hráčovi
+      spawnCellFloat(e.cell, e.type === "heal" ? "❤" : "💧", "item-pop");
+      if (e.type === "heal") spawnFloat(e.target, `+${e.amount} HP`, "heal-float");
+      else spawnManaFloat(e.target, e.amount);
       break;
     case "stench_spread":
       for (const [x, y] of e.cells || []) freshStench.set(`${x},${y}`, now + 1600);

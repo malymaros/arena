@@ -32,6 +32,8 @@ function redactTilesFor(mySlot, snap) {
     || (me.clone && t.x === me.clone.x && t.y === me.clone.y));
   const alwaysVisible = (type) => type === "dmg" || type === "block";
   const out = { ...snap, tiles: snap.tiles.filter(t => alwaysVisible(t.type) || onTorchCell(t)) };
+  // Shrek Swamp: itemy (srdiečko/mana) ako heal/mana dlaždice - len na fakľovej bunke
+  if (Array.isArray(snap.items)) out.items = snap.items.filter(onTorchCell);
   // preview (config.tilePreview) sa rediguje ROVNAKO ako existujúce tiles: dmg/block/IK spawny a ciele presunu IK
   // prekliaty vidí vždy, heal/mana/power spawn len keď na tej bunke priamo stojí on alebo jeho tieňový klon
   if (out.pending) {

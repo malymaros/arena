@@ -12,7 +12,7 @@ import {
   ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS,
   MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS, PORTAL_SHOT_STEP_MS,
   MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, VAMP_TRAP_STRIKE_MS, QUICKDRAW_MS, PASS_MANA_COST,
-  charRollMs, COLOR_ROLL_MS, PORTAL_MAX_PAIRS, PORTALS_PER_ROUND, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
+  charRollMs, COLOR_ROLL_MS, ITEMS_PER_ROUND, ITEM_WEIGHTS, PORTAL_MAX_PAIRS, PORTALS_PER_ROUND, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
@@ -64,7 +64,7 @@ export function createEngine(io = {}) {
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
   const { walkDelay, isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
-  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone } = Object.assign(E, swampModule(E));
+  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone } = Object.assign(E, swampModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -155,6 +155,7 @@ function newGame() {
     portals: [],
     // Shrek Swamp: { x, y, hp, dead, marks: [[x,y]×3], done, stench: [[x,y]…] } - mimo bažiny null
     shrek: null,
+    items: [], // Shrek Swamp: [{ x, y, type: "heal" | "mana" }] - srdiečka a kvapky namiesto dlaždíc
     iks: [],      // [{ x, y }] - insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
     pending: null, // { ikMoves: [{x,y}…], spawns: [{x,y,type}…] } - VOPRED vyžrebované zmeny tiles na koniec AKTUÁLNEHO kola (preview pre hráčov)
     // séria zápasov
@@ -237,6 +238,7 @@ function snapshot() {
   return {
     phase: game.phase,
     config: game.config ? { ...game.config, tileWeights: { ...game.config.tileWeights },
+      ...(game.config.itemWeights ? { itemWeights: { ...game.config.itemWeights } } : {}),
       ...(game.config.portalWeights ? { portalWeights: { ...game.config.portalWeights } } : {}) } : null,
     series: seriesSnapshot(),
     // zobrazované mená hráčov per slot (verejné - netreba redigovať; labyrint mená nemaskuje)
@@ -259,7 +261,7 @@ function snapshot() {
     // Portal Realm: portály sú verejný terén (vidí ich aj prekliaty v labyrinte); kľúč len v portal realm (bridge goldeny)
     ...(isPortalRealm() ? { portals: game.portals.map(p => ({ id: p.id, type: p.type, ends: p.ends.map(e => ({ ...e })) })) } : {}),
     // Shrek Swamp: Shrek (pozícia, HP, ohlásené skoky, smrad) je verejný terén; kľúč len v bažine (bridge goldeny)
-    ...(isSwamp() ? { shrek: shrekSnapshot() } : {}),
+    ...(isSwamp() ? { shrek: shrekSnapshot(), items: itemsSnapshot() } : {}),
     // preview zmien tiles na konci kola (len ak je zapnutý config.tilePreview) - verejná, symetrická informácia;
     // heal/mana spawny počas labyrintu rediguje redactTilesFor rovnako ako existujúce tiles
     pending: (game.config?.tilePreview && game.pending) ? {
@@ -1488,6 +1490,7 @@ function runRoundLoop() {
       }
       if (foeShieldArmed) { game.players[foe].shield = false; game.players[foe].shieldGold = false; }
       if (foeMirrorArmed) { game.players[foe].mirror = false; game.players[foe].mirrorGold = false; }
+      pickupItems(actionSteps, tl); // Shrek Swamp: item na prejdenom políčku sa zoberie hneď po pohybe (pred pascou)
       resolveTrapsAfterAction(tl);
       actionSteps = null;
 
@@ -1848,8 +1851,16 @@ function sanitizeConfig(raw) {
   const w = raw.tileWeights || {};
   // Portal Realm: len Damage + Insta-kill dlaždice (ostatné typy sa vynulujú), váhy typov portálov tiež spolu 100
   const portal = raw.arena === "portal";
-  // Shrek Swamp: špeciálne dlaždice nahrádza Shrek - všetky váhy 0 (rollPendingTiles potom nič nespawne)
+  // Shrek Swamp: špeciálne dlaždice nahrádza Shrek + itemy - všetky váhy dlaždíc 0 (rollPendingTiles nič nespawne);
+  // itemy: počet za kolo (1–3) a váhy srdiečko/mana (spolu 100)
   const swamp = raw.arena === "swamp";
+  let itemWeights = null;
+  if (swamp) {
+    const iw = raw.itemWeights || ITEM_WEIGHTS;
+    itemWeights = { heal: Math.max(0, Math.round(Number(iw.heal) || 0)), mana: Math.max(0, Math.round(Number(iw.mana) || 0)) };
+    if (itemWeights.heal + itemWeights.mana !== 100) return null;
+  }
+  const itemsPerRound = Math.max(1, Math.min(3, Math.round(Number(raw.itemsPerRound) || ITEMS_PER_ROUND)));
   const weights = {};
   let sum = 0;
   for (const k of ["dmg", "heal", "mana", "ik", "power", "block"]) {
@@ -1875,7 +1886,7 @@ function sanitizeConfig(raw) {
     ...(raw.randomChars === true ? { randomChars: true } : {}),
     // aréna: kľúč len pre portal realm (stone bridge config ostáva bez zmeny - goldeny)
     ...(portal ? { arena: "portal", portalWeights, portalsPerRound } : {}),
-    ...(swamp ? { arena: "swamp" } : {}) };
+    ...(swamp ? { arena: "swamp", itemsPerRound, itemWeights } : {}) };
 }
 
 // vypršal čas na ťah: kto nie je locknutý, zahrá rozpracovaný draft doplnený náhodne; potom vyhodnoť kolo

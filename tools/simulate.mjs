@@ -34,12 +34,13 @@ function checkPortals(g, where) {
 }
 
 // Shrek Swamp invarianty po každom kole: HP Shreka 0–20, živý = 3 rôzne ohlásené skoky na doske, mŕtvy = smrad bez
-// duplicít a bez dlaždíc; HP/mana hráčov v rozsahu
+// duplicít a bez dlaždíc; najviac 4 itemy, každý na inom políčku; HP/mana hráčov v rozsahu
 function checkSwamp(g, where) {
   const s = g.shrek, on = ([x, y]) => x >= 0 && y >= 0 && x < 4 && y < 3;
   const bad = !s || s.hp < 0 || s.hp > 20 || !on([s.x, s.y]) || g.tiles.length || g.iks.length
     || (!s.dead && (s.marks.length !== 3 || !s.marks.every(on)))
     || (s.dead && (s.marks.length || !s.stench.length || new Set(s.stench.map(String)).size !== s.stench.length || !s.stench.every(on)))
+    || g.items.length > 4 || new Set(g.items.map(i => i.x + "," + i.y)).size !== g.items.length || !g.items.every(i => on([i.x, i.y]))
     || ["p1", "p2"].some(sl => { const p = g.players[sl]; return p.hp < 0 || p.hp > 10 || p.mana < 0 || p.mana > 10; });
   if (bad) throw new Error(`porušený invariant (${where}): ${JSON.stringify({ shrek: s, tiles: g.tiles, p1: [g.players.p1.hp, g.players.p1.mana], p2: [g.players.p2.hp, g.players.p2.mana] })}`);
 }

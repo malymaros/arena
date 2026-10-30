@@ -8,10 +8,13 @@
 // Shrekove útoky sú ako dlaždice: obchádzajú štít/mirror, ½ pri Last Stand/Hope platí, skamenenú postavu
 // nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá); klon, ktorý
 // Shreka zasiahol, reakciu dostane a rozplynie sa. Počas THE WORLD je Shrek inertný (strely ním prejdú).
+// Itemy (namiesto dlaždíc): srdiečko (+1 HP, Lightning na plno) a kvapka (plná mana) padnú na voľné políčka na štarte
+// hry a na konci každého kola (config.itemsPerRound, itemWeights, max ITEM_MAX); hráč ich zoberie hneď pri vstupe
+// na políčko alebo prechode cezeň (prejdené bunky akcie z actionSteps - rovnaký zber ako pri pasci). Klon ich neberie.
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js), ako ostatné moduly mechaník.
 import {
   START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP, SHREK_BARREL_MANA, SHREK_PUNCH_MANA,
-  STENCH_DMG, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_BARREL_MS, SHREK_PUNCH_MS, SHREK_POWERUP_MS,
+  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_BARREL_MS, SHREK_PUNCH_MS, SHREK_POWERUP_MS,
   SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS,
 } from "./constants.js";
 
@@ -56,6 +59,54 @@ function swampStartGame() {
   if (!isSwamp()) { E.game.shrek = null; return; }
   const start = randomCell((x, y) => !Object.values(START_POS).some(p => p.x === x && p.y === y));
   E.game.shrek = { x: start[0], y: start[1], hp: SHREK_HP, dead: false, marks: rollMarks(start), done: 0, stench: [] };
+  E.game.items = [];
+  spawnItems();
+}
+
+/* ---------- itemy ---------- */
+// nové itemy na voľné políčka (bez itemu, hráča, klona a živého Shreka); vráti efekty pre finálny frame kola
+function spawnItems() {
+  const g = E.game, s = g.shrek;
+  const n = Math.max(1, Math.min(3, g.config.itemsPerRound || ITEMS_PER_ROUND));
+  const w = g.config.itemWeights || ITEM_WEIGHTS;
+  const taken = (x, y) => g.items.some(i => i.x === x && i.y === y)
+    || ["p1", "p2"].some(sl => { const p = g.players[sl]; return (p.x === x && p.y === y) || (p.clone && p.clone.x === x && p.clone.y === y); })
+    || (s && !s.dead && s.x === x && s.y === y);
+  const added = [];
+  for (let k = 0; k < n && g.items.length < ITEM_MAX; k++) {
+    const c = randomCell((x, y) => !taken(x, y));
+    if (!c) break;
+    const type = E.rand() * ((w.heal || 0) + (w.mana || 0)) < (w.heal || 0) ? "heal" : "mana";
+    g.items.push({ x: c[0], y: c[1], type });
+    added.push({ x: c[0], y: c[1], type });
+  }
+  return added.length ? [{ kind: "item_drop", items: added }] : [];
+}
+
+const itemsSnapshot = () => E.game.items.map(i => ({ ...i }));
+
+// po akcii: hráč, ktorý vstúpil na políčko s itemom alebo ním prebehol (moved = actionSteps akcie), ho zoberie
+// v poradí prejdených buniek. Klon itemy neberie (neodobraný item pod „postavou" prezrádza, ktorá je pravá).
+function pickupItems(moved, tl) {
+  if (!isSwamp() || !moved) return;
+  for (const slot of order()) {
+    const p = E.game.players[slot];
+    for (const [x, y] of moved[slot] || []) {
+      if (p.hp <= 0) break;
+      const idx = E.game.items.findIndex(i => i.x === x && i.y === y);
+      if (idx < 0) continue;
+      const it = E.game.items[idx];
+      E.game.items.splice(idx, 1);
+      let amount;
+      if (it.type === "heal") {
+        const to = E.kitOf(p.char).healTile === "full" ? START_HP : Math.min(START_HP, p.hp + ITEM_HEAL_GAIN);
+        amount = Math.max(0, to - p.hp); p.hp += amount;
+      } else {
+        amount = MAX_MANA - p.mana; p.mana = MAX_MANA;
+      }
+      E.pushStateFrame(tl, [{ kind: "item_pick", target: slot, cell: [x, y], type: it.type, amount }], SMALL_DELAY_MS);
+    }
+  }
 }
 
 // verejný stav pre snapshot (marks sú ohlásené vopred - vidia ich obaja aj prekliaty v labyrinte)
@@ -139,7 +190,8 @@ function shrekRoundEnd() {
   const s = shrek();
   if (!s) return [];
   s.done = 0;
-  if (!s.dead) { s.marks = rollMarks([s.x, s.y]); return []; }
+  const drops = spawnItems();
+  if (!s.dead) { s.marks = rollMarks([s.x, s.y]); return drops; }
   const added = [];
   for (const [x, y] of s.stench) {
     for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
@@ -150,7 +202,7 @@ function shrekRoundEnd() {
     }
   }
   s.stench.push(...added);
-  return added.length ? [{ kind: "stench_spread", cells: added.map(c => [...c]) }] : [];
+  return [...drops, ...(added.length ? [{ kind: "stench_spread", cells: added.map(c => [...c]) }] : [])];
 }
 
 // zásah Shreka hráčom; vráti true, ak Shrek padol (reakcia sa potom nekoná)
@@ -235,5 +287,5 @@ function tackle(dx, tl) {
   E.pushStateFrame(tl, [{ kind: "shrek_return", from: [stop, y], to: [s.x, y], dir, ...(victims.length ? { target: victims[0].slot } : {}) }], SHREK_RETURN_MS);
 }
 
-return { isSwamp, shrekAt, swampStartGame, shrekSnapshot, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone };
+return { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone };
 }

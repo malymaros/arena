@@ -200,7 +200,7 @@ export function schedulePlayTimeline(timeline) {
   // posledná zaznamenaná akcia per slot (badge v logu + beat v lište) - keď príde "invalid", prečiarkneme ju
   const lastActed = { p1: null, p2: null };
   state.p1 = first.p1; state.p2 = first.p2; state.turn = first.turn; state.starter = (first.starter ?? state.starter);
-  state.tiles = first.tiles; state.iks = first.iks; state.pending = first.pending; state.portals = first.portals; state.shrek = first.shrek;
+  state.tiles = first.tiles; state.iks = first.iks; state.pending = first.pending; state.portals = first.portals; state.shrek = first.shrek; state.items = first.items;
   applyRosterFrame(first);
   renderHUD();
   const NEXT_TURN = (first.turn ?? state.turn) + 1;
@@ -297,7 +297,7 @@ export function schedulePlayTimeline(timeline) {
     }
 
     state.p1 = frame.p1; state.p2 = frame.p2;
-    state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending; state.portals = frame.portals; state.shrek = frame.shrek;
+    state.tiles = frame.tiles; state.iks = frame.iks; state.pending = frame.pending; state.portals = frame.portals; state.shrek = frame.shrek; state.items = frame.items;
     applyRosterFrame(frame);
     if (frame.starter !== undefined) {
       state.starter = frame.starter;
@@ -454,7 +454,7 @@ export function schedulePlayTimeline(timeline) {
         if (e.from && (e.gained ?? 0) > 0) setTimeout(() => spawnManaFloat(e.from, e.gained), 400);
       }
       // Shrek Swamp: skok, rev, reakcie, pád a smrad (public/client/shrek.js)
-      if (e.kind.startsWith("shrek_") || e.kind.startsWith("stench_")) shrekEffect(e, frameHold);
+      if (e.kind.startsWith("shrek_") || e.kind.startsWith("stench_") || e.kind.startsWith("item_")) shrekEffect(e, frameHold);
       // choreografia autora efektu (register fx: public/chars/fx/<key>.js - Vojak, Vlkolak, Luffy, …)
       CHAR_FX[state?.[e.from]?.char]?.effect?.(e, frameHold);
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {

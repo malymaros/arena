@@ -169,6 +169,17 @@ const PIX = {
     "..o..o..",
     "..o..o..",
   ]},
+  // Shrek Swamp: smradové políčko po Shrekovej smrti - zelené hovno (rovnaká zelená ako ohlásené skoky)
+  poo: { pal: { a: "#b6e846", b: "#5f7f12", c: "#1c2a06", d: "#f4ffd0" }, rows: [
+    "....a...",
+    "...aab..",
+    "..aaaab.",
+    ".dcaadc.",
+    ".aaaaab.",
+    "aabaaaab",
+    "aaaaaaab",
+    ".bbbbbb.",
+  ]},
 };
 export function pixSvg(name) {
   const def = PIX[name];

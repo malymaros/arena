@@ -49,6 +49,8 @@ export const SOUNDS = {
   "music.menu":   { files: [MUS + "cynic-town-theme.mp3"],     vol: 0.45, status: "default", note: "lobby, výber postavy, draft" },
   "music.battle": { files: [MUS + "cynic-battle-theme-a.mp3"], vol: 0.40, status: "default", note: "hra (obe postavy zvolené)" },
   "music.battle.portal": { files: [],                          vol: 0.40, status: "default", note: "hra v Portal Realm - prázdne = hrá music.battle" },
+  "music.battle.swamp": { files: ["custom/music/shrek-all-star.mp3"], vol: 0.40, trim: { "custom/music/shrek-all-star.mp3": [514, 66737] }, status: "picked",
+    note: "hra v Shrek Swamp (mimo FINAL ROUND) - All Star, úsek 40,4–107,6 s originálu; slučka 28 taktov (103,5 BPM), prechod 1,5 s na takt" },
   "music.final":  { files: [],                                 vol: 0.40, status: "default", note: "FINAL ROUND (Last Stand) - prázdne = hrá ďalej music.battle" },
 
   /* ---------- Portal Realm ---------- */
