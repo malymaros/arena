@@ -61,6 +61,11 @@
 }
 #touch-layer .dir-picker .arrow { width: 40px; height: 40px; padding: 0; font-size: 20px; opacity: .92;
   box-shadow: 0 0 0 2px #000, 0 3px 8px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.18), inset 0 -2px 0 rgba(0,0,0,.35); }
+/* výber obrana | breaker: pevná veľkosť (inak zdedí tlačidlo lišty a vrstva ho ešte zväčší ×1.1·ui-k) - o niečo väčšie
+   než šípky (ikona), obe voľby rovnako veľké */
+#touch-layer .def-picker .def-opt { width: 60px; height: 60px; min-width: 0; padding: 0; opacity: .95;
+  box-shadow: 0 0 0 2px #000, 0 3px 8px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.18), inset 0 -2px 0 rgba(0,0,0,.35); }
+#touch-layer .def-picker .def-opt > .pix-ico, #touch-layer .def-picker .def-opt > .brk-ico > .pix-ico { width: 38px; height: 38px; }
 /* stredná bunka 3×3 krížov je prázdna - postava pod ňou ostáva vidieť */
 #touch-layer .dir-picker.wolf-picker .wolf-center { width: 40px; height: 40px; }
 /* výber políčka = priamo políčka boardu (rozmery nastaví touch.js) */
@@ -94,8 +99,10 @@
 @keyframes touch-confirm-pulse { 50% { filter: brightness(1.25); } }
 /* varovanie nad TAP AGAIN pri šípke (závislé od smeru - napr. mimo plochy) */
 #touch-confirm .tc-warn { display: block; margin-bottom: calc(3px * var(--ui-k, 1)); color: #7a3b00; }
-/* účinok voľby obrana | breaker (BLOCK / ☠️2) nad TAP AGAIN */
-#touch-confirm .tc-head { display: block; margin-bottom: calc(4px * var(--ui-k, 1)); text-align: center; font-size: calc(12px * var(--ui-k, 1)); }
+/* účinok voľby obrana | breaker (BLOCK / ☠️2) nad TAP AGAIN - biele na čiernom (ako štítok ceny), TAP AGAIN ostáva žlté */
+#touch-confirm .tc-head { display: block; margin: calc(-4px * var(--ui-k, 1)) calc(-8px * var(--ui-k, 1)) calc(4px * var(--ui-k, 1));
+  padding: calc(5px * var(--ui-k, 1)) calc(8px * var(--ui-k, 1)); background: rgba(12, 14, 18, .95); color: #fff;
+  text-align: center; font-size: calc(12px * var(--ui-k, 1)); }
 #touch-confirm .tc-head .pix-ico.mini { width: calc(14px * var(--ui-k, 1)); height: calc(14px * var(--ui-k, 1)); vertical-align: -.15em; margin: 0 1px; }
 
 /* telefón: štítok akcie - cena a účinok namiesto popisu (touch.js + touch-label.js) */
