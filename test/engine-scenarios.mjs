@@ -140,5 +140,20 @@ for (const [label, p2setup] of [
     `shield po passe = ${tl[p2first + 1]?.p1?.shield}`);
 }
 
+/* ---- Reload počas čakania na súpera: snapshot vráti LEN mne moju locknutú voľbu (myLock) ---- */
+{
+  const e = createEngine({ seed: 1 });
+  e.startMatch(e.sanitizeConfig(CFG));
+  e.chooseCharacter("A", "fire");
+  e.chooseCharacter("B", "lightning");
+  const q = [{ type: "move", dir: "right" }, R, S, { type: "golden_mana" }];
+  e.lockIn("A", q, e.game.turn, () => {});
+  const mine = e.snapshotFor("A").myLock, theirs = e.snapshotFor("B").myLock;
+  check(JSON.stringify(mine?.queue) === JSON.stringify([{ type: "move", dir: "right" }, R, S]) && mine.goldenMana === true && mine.golden === false,
+    "RELOAD: locknutý hráč dostane svoju voľbu kola (myLock)", JSON.stringify(mine));
+  check(theirs === undefined, "RELOAD: súper (ešte nelocknutý) myLock nedostane - žiadny únik voľby", JSON.stringify(theirs));
+  check(e.snapshot().myLock === undefined, "RELOAD: verejný snapshot (divák) bez myLock");
+}
+
 console.log(failures ? `\n${failures} ENGINE SCENÁROV ZLYHALO` : "\nENGINE SCENÁRE PREŠLI");
 process.exit(failures ? 1 : 0);

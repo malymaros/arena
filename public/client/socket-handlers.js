@@ -13,7 +13,7 @@ import { clearProjectiles } from "/client/board-fx.js";
 import { actors, resetPoses } from "/client/actors.js";
 import { stopTurnTimer, tlog, setServerTimer } from "/client/turn-timer.js";
 import { clearActionLogs } from "/client/action-log.js";
-import { resetPlanning } from "/client/planning.js";
+import { planning, resetPlanning } from "/client/planning.js";
 import { renderQueue } from "/client/queue.js";
 import { clearActors, schedulePlayTimeline } from "/client/timeline.js";
 import { renderGrid } from "/client/grid.js";
@@ -171,6 +171,17 @@ socket.on("state", (s) => {
     // finálny stav (vrátane nových tiles) nevykresľuj hneď - ukáže ho až posledný frame timeline
     schedulePlayTimeline(s.timeline);
   } else if (!playback.playing) {
+    // reload počas čakania na súpera: server mi pošle moju locknutú voľbu → vráť ju do lišty kola
+    if (s.myLock && !planning.myQueue.length) {
+      planning.myQueue = s.myLock.queue.map(a => ({ ...a }));
+      planning.goldenArmed = s.myLock.golden;
+      planning.goldenMirrorArmed = s.myLock.goldenMirror;
+      planning.goldenManaArmed = s.myLock.goldenMana;
+      planning.lastStandArmed = s.myLock.lastStand;
+      planning.lastHopeArmed = s.myLock.lastHope;
+      syncGoldenHalves();
+      syncGoldDualHalves();
+    }
     // čerstvý stav mimo prehrávania → stredový démon nemá čo visieť (objaví sa len počas timeline);
     // toto ho po reconnecte/refreshi spoľahlivo schová bez nutnosti F5
     hideDeathCenter();

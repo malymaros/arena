@@ -194,6 +194,12 @@ function snapshotFor(person) {
   base.mageMana = game.mageMana ? { ...game.mageMana[person] } : null;
   const mySlot = slotForPerson(person);
   const oppSlot = mySlot === "p1" ? "p2" : "p1";
+  // moja už locknutá voľba kola (LEN mne) - po reloade počas čakania na súpera ju klient vráti do lišty kola
+  const mine = game.players[mySlot];
+  if (person && game.phase === "playing" && mine?.locked) {
+    base.myLock = { queue: mine.queue.map(a => ({ ...a })), golden: !!mine.golden, goldenMirror: !!mine.goldenMirror,
+      goldenMana: !!mine.goldenMana, lastStand: !!mine.lastStand, lastHope: !!mine.lastHope };
+  }
   // slepý draft: súperov tím vidím, až keď potvrdia obaja (fáza sa vtedy prepne na playing);
   // rosterReady ostáva verejné - klient z neho ukazuje „opponent is picking / ready"
   if (game.phase === "team_select" && base.roster) {
