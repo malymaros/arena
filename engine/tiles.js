@@ -2,7 +2,7 @@
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js): stav hry (E.game) a funkcie
 // ostatných sekcií. Vracia svoje funkcie; engine ich zverejní cez E a destrukturuje pre vlastný kód.
 import {
-  START_HP, MAX_MANA, POWER_TILE_BONUS, SMALL_DELAY_MS, HEAL_TILE_GAIN, IK_DMG,
+  START_HP, TILE_DMG, MAX_MANA, POWER_TILE_BONUS, SMALL_DELAY_MS, HEAL_TILE_GAIN, IK_DMG,
 } from "./constants.js";
 
 export function tilesModule(E) {
@@ -56,6 +56,11 @@ function pickCell(filterFn) {
 // koniec ťahu: pickupy (heal/mana) a damage políčka (dmg/IK); štít tile damage neblokuje.
 // stonedStep = kto bol skamenený na začiatku kroku - skamenená postava sa berie, akoby na políčku nikto nestál
 // (žiadny pickup, žiadny dmg/IK), a to aj v kroku, v ktorom jej kameň práve skončil
+// dmg dlaždica silnejšia než TILE_DMG (Portal Realm: 2) = séria zásahov po TILE_DMG; null = jeden zásah (bridge, IK)
+function tileDmgParts(tileType, dmg) {
+  return tileType === "dmg" && dmg > TILE_DMG ? Array.from({ length: Math.ceil(dmg / TILE_DMG) }, () => TILE_DMG) : null;
+}
+
 function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
   const order = E.game.starter === "p1" ? ["p1", "p2"] : ["p2", "p1"];
   const stoned = (slot) => stonedStep[slot] || E.game.players[slot].stone > 0;
@@ -109,7 +114,10 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       dmg = E.tileDmg(); tileType = "dmg"; // Portal Realm: 2 (2 ohníky), inak TILE_DMG
     }
     if (dmg > 0) {
-      const d = E.recvDmg(slot, dmg);
+      // Portal Realm: dmg dlaždica (2) = dva zásahy po TILE_DMG - ½ (Last Stand/Hope) sa ráta z každého zvlášť
+      // (⌊1/2⌋ + ⌊1/2⌋ = 0, ako na bridge), klient vypíše „-1 -1 HP" v jednom bliku
+      const parts = tileDmgParts(tileType, dmg)?.map(r => E.recvDmg(slot, r));
+      const d = parts ? parts.reduce((a, b) => a + b, 0) : E.recvDmg(slot, dmg);
       // tile dmg labyrint bežne NEkončí - výnimka je smrteľný zásah: pred finálnym dmg sa prehrá
       // rovnaká postupnosť ako pri akciovom zásahu (reveal PRED animáciou, koniec labyrintu po hite),
       // aby smrť nepadla v hmle a hra neskončila s aktívnou redakciou
@@ -118,7 +126,7 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       // najprv zvýrazni vyhodnocované políčko, potom zásah (½ ak má hráč last stand buff - platí aj na tile/IK)
       E.pushStateFrame(tl, [{ kind: "tile_proc", tile: tileType, cell: [p.x, p.y] }], 600);
       p.hp = Math.max(0, p.hp - d);
-      E.pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d }], SMALL_DELAY_MS);
+      E.pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d, ...(parts ? { parts } : {}) }], SMALL_DELAY_MS);
       if (lethalInLab) E.endLabyrinths(tl);
       // prvý mŕtvy okamžite ukončuje hru - druhý tile zásah sa už nevyhodnotí (remíza nemôže nastať)
       if (E.winnerNow()) return;
@@ -138,7 +146,9 @@ function endOfStepTileEffects(tl, stonedStep = { p1: false, p2: false }) {
       // rovnaká dramaturgia ako pri hráčovom tile zásahu: NAJPRV rozsvieť políčko (vlastný frame),
       // až POTOM kozmetický zásah na klonovi - inak sa blik políčka „stratí" v spoločnom frame
       E.pushStateFrame(tl, [{ kind: "tile_proc", tile: "dmg", cell: [x, y] }], 600);
-      E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [x, y], dmg: E.tileDmg() }], SMALL_DELAY_MS);
+      // rozpis ako pri majiteľovi (vrátane jeho ½) - iný float na klone by prezradil, ktorý je pravý
+      const parts = tileDmgParts("dmg", E.tileDmg())?.map(r => E.recvDmg(slot, r));
+      E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [x, y], dmg: parts ? parts.reduce((a, b) => a + b, 0) : E.tileDmg(), ...(parts ? { parts } : {}) }], SMALL_DELAY_MS);
     }
   }
 }

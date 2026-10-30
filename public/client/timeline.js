@@ -617,7 +617,9 @@ export function schedulePlayTimeline(timeline) {
       // vlastnému hráčovi „-N" (pravda - je to len kozmetika, HP mu neklesá).
       if (e.kind === "clone_hit" && Array.isArray(e.cell) && (e.target === "p1" || e.target === "p2")) {
         const ownerView = me === e.target;
-        spawnCellFloat(e.cell, ownerView ? `-${e.dmg ?? 1}` : `-${e.dmg ?? 1} HP`, "dmg-float");
+        // Portal Realm: rozpis „-1 -1" ako pri majiteľovi; ½ v Last Stand/Hope = 0 → bez floatu (ako pravý)
+        const amt = Array.isArray(e.parts) ? (e.parts.some(n => n > 0) ? e.parts.join(" -") : null) : (e.dmg ?? 1);
+        if (amt !== null) spawnCellFloat(e.cell, ownerView ? `-${amt}` : `-${amt} HP`, "dmg-float");
         actors.cloneFlinch[e.target] = performance.now();
       }
       if (e.kind === "mirror" && (e.target === "p1" || e.target === "p2")) {

@@ -140,6 +140,41 @@ for (const [label, p2setup] of [
     `shield po passe = ${tl[p2first + 1]?.p1?.shield}`);
 }
 
+/* ---- Portal Realm: dmg dlaždica (2) = dva zásahy po 1 - Last Hope (1 HP, ½) ju prežije, bez buffu „-1 -1" ---- */
+for (const [buff, hp, wantHp, wantParts] of [["lastHopeBuff", 1, 1, "[0,0]"], ["lastStandBuff", 10, 10, "[0,0]"], [null, 10, 4, "[1,1]"]]) {
+  const e = createEngine({ seed: 1 });
+  e.startMatch(e.sanitizeConfig({ ...CFG, arena: "portal", tileWeights: { dmg: 90, ik: 10 } }));
+  e.chooseCharacter("A", "fire");
+  e.chooseCharacter("B", "lightning");
+  const g = e.game;
+  g.tiles = [{ type: "dmg", x: 0, y: 1 }]; g.iks = []; g.portals = []; if (g.pending) g.pending.spawns = [];
+  g.players.p1.hp = hp; if (buff) g.players.p1[buff] = true;
+  const tls = [];
+  e.lockIn("A", [R, S, ML], g.turn, () => {});
+  const tl0 = []; // timeline zachytíme z posledného hitu na p1
+  void tl0; void tls;
+  e.lockIn("B", [R, S, ML], g.turn, () => {});
+  check(g.players.p1.hp === wantHp, `PORTAL TILE (${buff || "bez buffu"}): HP po 3 krokoch na dlaždici = ${wantHp}`, `hp=${g.players.p1.hp}`);
+}
+{
+  const timelines = [];
+  const e = createEngine({ seed: 1, emitState: (tl) => { if (tl) timelines.push(tl); } });
+  e.startMatch(e.sanitizeConfig({ ...CFG, arena: "portal", tileWeights: { dmg: 90, ik: 10 } }));
+  e.chooseCharacter("A", "naruto");
+  e.chooseCharacter("B", "lightning");
+  const g = e.game;
+  g.tiles = [{ type: "dmg", x: 0, y: 1 }, { type: "dmg", x: 0, y: 0 }]; g.iks = []; g.portals = []; if (g.pending) g.pending.spawns = [];
+  g.players.p1.clone = { x: 0, y: 0 };
+  e.lockIn("A", [R, S, ML], g.turn, () => {});
+  e.lockIn("B", [R, S, ML], g.turn, () => {});
+  const tl = timelines.flat();
+  const hit = fx(tl, "hit").find(x => x.target === "p1"), ch = fx(tl, "clone_hit")[0];
+  check(hit?.dmg === 2 && JSON.stringify(hit.parts) === "[1,1]", "PORTAL TILE: zásah hráča = jeden hit s rozpisom 1+1", JSON.stringify(hit));
+  check(JSON.stringify(ch?.parts) === "[1,1]", "PORTAL TILE: kozmetický zásah klona má rovnaký rozpis (neprezradí pravého)", JSON.stringify(ch));
+  check(tl.filter(f => (f.effects || []).some(x => x.kind === "tile_proc" && JSON.stringify(x.cell) === "[0,1]")).length === 3,
+    "PORTAL TILE: jedno bliknutie dlaždice za krok (nie dve)");
+}
+
 /* ---- Reload počas čakania na súpera: snapshot vráti LEN mne moju locknutú voľbu (myLock) ---- */
 {
   const e = createEngine({ seed: 1 });

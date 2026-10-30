@@ -86,7 +86,7 @@
           {"p2":{"~":{"mana":2,"shield":true}},"effects":[{"kind":"shield","from":"p2"}],"delayMs":1080},
           {"effects":[],"delayMs":630},
           {"effects":[{"kind":"tile_proc","tile":"dmg","cell":[3,1]}],"delayMs":600},
-          {"p2":{"~":{"hp":8}},"effects":[{"kind":"hit","target":"p2","dmg":2}],"delayMs":1080},
+          {"p2":{"~":{"hp":8}},"effects":[{"kind":"hit","target":"p2","dmg":2,"parts":[1,1]}],"delayMs":1080},
           {"effects":[{"kind":"action","from":"p1","action":{"type":"special","dir":"down_right","to":null}}],"delayMs":250},
           {"effects":[{"kind":"invalid","target":"p1","reason":"mana"}],"delayMs":1080},
           {"p2":{"~":{"shield":false}},"effects":[],"delayMs":630},
@@ -94,7 +94,7 @@
           {"effects":[{"kind":"invalid","target":"p2","reason":"mana"}],"delayMs":1080},
           {"effects":[],"delayMs":630},
           {"effects":[{"kind":"tile_proc","tile":"dmg","cell":[3,1]}],"delayMs":600},
-          {"p2":{"~":{"hp":6}},"effects":[{"kind":"hit","target":"p2","dmg":2}],"delayMs":1080},
+          {"p2":{"~":{"hp":6}},"effects":[{"kind":"hit","target":"p2","dmg":2,"parts":[1,1]}],"delayMs":1080},
           {"effects":[{"kind":"action","from":"p1","action":{"type":"mirror","dir":"down_left","to":null}}],"delayMs":250},
           {"effects":[{"kind":"invalid","target":"p1","reason":"mana"}],"delayMs":1080},
           {"effects":[],"delayMs":630},
@@ -105,7 +105,7 @@
           {"p1":{"~":{"hp":9}},"effects":[{"kind":"hit","target":"p1","dmg":1}],"delayMs":1080},
           {"effects":[],"delayMs":630},
           {"effects":[{"kind":"tile_proc","tile":"dmg","cell":[3,1]}],"delayMs":600},
-          {"p2":{"~":{"hp":4}},"effects":[{"kind":"hit","target":"p2","dmg":2}],"delayMs":1080},
+          {"p2":{"~":{"hp":4}},"effects":[{"kind":"hit","target":"p2","dmg":2,"parts":[1,1]}],"delayMs":1080},
           {"effects":[{"kind":"beat_empty","from":"p1","beat":"gmana"}],"delayMs":630},
           {"effects":[{"kind":"beat_empty","from":"p2","beat":"gmana"}],"delayMs":630},
           {"turn":4,"starter":"p2","tiles":[{"x":0,"y":0,"type":"dmg"},{"x":3,"y":1,"type":"dmg"},{"x":1,"y":1,"type":"dmg"}],"portals":[{"id":"A","type":"hp","ends":[{"x":0,"y":2,"side":"left"},{"x":0,"y":1,"side":"left"}]},{"id":"B","type":"power","ends":[{"x":3,"y":1,"side":"right"},{"x":0,"y":0,"side":"left"}]},{"id":"C","type":"classic","ends":[{"x":3,"y":0,"side":"right"},{"x":2,"y":0,"side":"up"}]},{"id":"D","type":"classic","ends":[{"x":3,"y":2,"side":"right"},{"x":2,"y":2,"side":"down"}]}],"pending":{"ikMoves":[],"spawns":[{"x":2,"y":1,"type":"dmg"}]},"effects":[{"kind":"portal_spawn","id":"D"}],"delayMs":10}
@@ -127,7 +127,7 @@
           {"effects":[{"kind":"invalid","target":"p1","reason":"mana"}],"delayMs":1080},
           {"effects":[],"delayMs":630},
           {"effects":[{"kind":"tile_proc","tile":"dmg","cell":[3,1]}],"delayMs":600},
-          {"p2":{"~":{"hp":2}},"effects":[{"kind":"hit","target":"p2","dmg":2}],"delayMs":1080},
+          {"p2":{"~":{"hp":2}},"effects":[{"kind":"hit","target":"p2","dmg":2,"parts":[1,1]}],"delayMs":1080},
           {"effects":[{"kind":"action","from":"p2","action":{"type":"move","dir":"right","to":null}}],"delayMs":250},
           {"p2":{"~":{"x":0,"y":0}},"effects":[{"kind":"portal_walk","from":"p2","clone":false,"dir":"right","path":[[0,0]],"passes":[{"at":0,"id":"B","type":"power","enter":{"x":3,"y":1,"side":"right"},"exit":{"x":0,"y":0,"side":"left"}}]}],"delayMs":1440},
           {"portals":[{"id":"A","type":"hp","ends":[{"x":0,"y":2,"side":"left"},{"x":0,"y":1,"side":"left"}]},{"id":"C","type":"classic","ends":[{"x":3,"y":0,"side":"right"},{"x":2,"y":0,"side":"up"}]},{"id":"D","type":"classic","ends":[{"x":3,"y":2,"side":"right"},{"x":2,"y":2,"side":"down"}]}],"effects":[{"kind":"portal_close","ids":["B"]}],"delayMs":1080},
@@ -136,7 +136,7 @@
           {"effects":[{"kind":"invalid","target":"p1","reason":"mana"}],"delayMs":1080},
           {"effects":[],"delayMs":630},
           {"effects":[{"kind":"tile_proc","tile":"dmg","cell":[0,0]}],"delayMs":600},
-          {"p2":{"~":{"hp":0}},"effects":[{"kind":"hit","target":"p2","dmg":2}],"delayMs":1080}
+          {"p2":{"~":{"hp":0}},"effects":[{"kind":"hit","target":"p2","dmg":2,"parts":[1,1]}],"delayMs":1080}
         ]
       ],
       "p2view": "same"
