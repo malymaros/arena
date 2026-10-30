@@ -1,7 +1,7 @@
 // public/client/queue.js - lišta kola (round-script): naplánované akcie oboch strán po beatoch, kurzor počas
 // prehrávania, varovania plánu, LOCK IN tlačidlo a odomykanie UI.
 import { ARROW_DIR, displayDir } from "/client/action-log.js";
-import { LS_BADGE_IMG, LH_BADGE_IMG, crackIco, hydratePix } from "/client/pix.js";
+import { LS_BADGE_IMG, LH_BADGE_IMG, breakerIco, hydratePix } from "/client/pix.js";
 import { mageHeadHtml } from "/client/mage-head.js";
 import { usesAltColor } from "/client/sprites.js";
 import { ghostPos, showPreviewCells, cellsForAimPreview, ghostCharAt, clearPreviewCells, planWarnings, foeMirrorImmune, MIRROR_IMMUNE_WARN } from "/client/ghost.js";
@@ -35,10 +35,10 @@ function actionBadgeView(a, ownerSlot) {
     case "shield":        return { cls: "shield",  text: "🛡️" };
     case "mirror":        return { cls: "mirror",  text: "🪞" };
     // Shield/Mirror Breaker (návrh): ikona obrany preškrtnutá čiernou trhlinou, farba svojej obrany
-    case "shield_breaker":        return { cls: "breaker", html: crackIco("🛡️") };
-    case "mirror_breaker":        return { cls: "breaker", html: crackIco("🪞") };
-    case "golden_shield_breaker": return { cls: "breaker-gold", html: crackIco("🛡️", "g-ico") };
-    case "golden_mirror_breaker": return { cls: "breaker-gold", html: crackIco("🪞", "g-ico") };
+    case "shield_breaker":        return { cls: "breaker", html: breakerIco("🛡️") };
+    case "mirror_breaker":        return { cls: "breaker", html: breakerIco("🪞") };
+    case "golden_shield_breaker": return { cls: "breaker-gold", html: breakerIco("🛡️", "g-ico") };
+    case "golden_mirror_breaker": return { cls: "breaker-gold", html: breakerIco("🪞", "g-ico") };
     case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
     case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
     case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };

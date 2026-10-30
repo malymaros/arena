@@ -7,7 +7,7 @@ import { setAnim } from "/client/anim.js";
 import { spawnDamageFloat, spawnFloat } from "/client/board-fx.js";
 import { spawnShieldBlock, spawnMirrorReflect } from "/client/defense-fx.js";
 import { spawnBreakerBeam } from "/client/breaker-fx.js";
-import { crackIco, hydratePix } from "/client/pix.js";
+import { breakerIco, hydratePix } from "/client/pix.js";
 import { costHtml } from "/client/hud.js";
 import { planning } from "/client/planning.js";
 import { renderQueue } from "/client/queue.js";
@@ -109,13 +109,13 @@ import { ACTION_ANIMS } from "/chars/index.js";
   const dmg = (n) => ({ html: costHtml(`${n}{☠️}`) });
   const PICKERS = {
     shield:  { anchor: shieldBtn, html: opt("shield", "shield", '<span class="pix-ico" data-emoji="🛡️"></span>', word("BLOCK"))
-                                       + opt("breaker", "shield_breaker", crackIco("🛡️"), dmg(BRK_DMG.shield)) },
+                                       + opt("breaker", "shield_breaker", breakerIco("🛡️"), dmg(BRK_DMG.shield)) },
     mirror:  { anchor: mirrorBtn, html: opt("mirror", "mirror", '<span class="pix-ico" data-emoji="🪞"></span>', word("REFLECT"))
-                                       + opt("breaker", "mirror_breaker", crackIco("🪞"), dmg(BRK_DMG.mirror)) },
+                                       + opt("breaker", "mirror_breaker", breakerIco("🪞"), dmg(BRK_DMG.mirror)) },
     gshield: { anchor: goldenBtn, html: opt("golden-opt", "golden_shield", '<span class="pix-ico" data-emoji="🛡️"></span>', word("BLOCK"))
-                                       + opt("breaker gold-ring", "golden_shield_breaker", crackIco("🛡️"), dmg(BRK_DMG.shield)) },
+                                       + opt("breaker gold-ring", "golden_shield_breaker", breakerIco("🛡️"), dmg(BRK_DMG.shield)) },
     gmirror: { anchor: goldenBtn, html: opt("golden-opt", "golden_mirror", '<span class="pix-ico" data-emoji="🪞"></span>', word("REFLECT"))
-                                       + opt("breaker gold-ring", "golden_mirror_breaker", crackIco("🪞"), dmg(BRK_DMG.mirror)) },
+                                       + opt("breaker gold-ring", "golden_mirror_breaker", breakerIco("🪞"), dmg(BRK_DMG.mirror)) },
   };
   for (const [key, p] of Object.entries(PICKERS)) {
     if (!p.anchor) continue;
@@ -137,12 +137,12 @@ import { ACTION_ANIMS } from "/chars/index.js";
       planning.goldenArmed = !mirror; planning.goldenMirrorArmed = mirror; planning.goldenBreaker = brk;
       syncGoldenHalves();
       const half = document.querySelector(`.golden-half.${mirror ? "mirror" : "shield"}-half`);
-      if (brk && half) { setIcon(half, crackIco(mirror ? "🪞" : "🛡️", "g-ico")); half.classList.add("breaker"); }
+      if (brk && half) { setIcon(half, breakerIco(mirror ? "🪞" : "🛡️", "g-ico")); half.classList.add("breaker"); }
     } else {
       if (planning.myQueue.length >= 3) return;
       planning.myQueue.push({ type: pick });
       const btn = pick.startsWith("shield") ? shieldBtn : mirrorBtn;
-      if (brk) { setIcon(btn, crackIco(pick.startsWith("shield") ? "🛡️" : "🪞")); btn.classList.add("breaker"); }
+      if (brk) { setIcon(btn, breakerIco(pick.startsWith("shield") ? "🛡️" : "🪞")); btn.classList.add("breaker"); }
     }
     renderQueue();
     // breaker zaberá slot svojej obrany - tlačidlo je „použité" rovnako ako po zvolení obrany
