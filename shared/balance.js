@@ -87,3 +87,11 @@ export const PORTAL_SHOT_RANGE = 3;         // rovná strela v portal realm: dol
 export const PORTAL_TYPES = ["classic", "hp", "mana", "power", "nodef"]; // nodef = Def-breaker
 export const PORTAL_WEIGHTS = { classic: 70, hp: 5, mana: 5, power: 10, nodef: 10 }; // default % v lobby
 export const PORTAL_TILE_WEIGHTS = { dmg: 90, ik: 10 }; // v portal realm sú len Damage a Insta-kill dlaždice
+
+/* -------------------- Shrek Swamp (aréna so Shrekom - neutrálne NPC, docs/SWAMP_PLAN.md) -------------------- */
+export const SHREK_HP = 20;              // Shrekove HP (zobrazené nad hlavou); 0 = padne → fáza smradu
+export const SHREK_ROAR_DMG = [1, 2, 3]; // dmg revu / tackle: HP > 10 → 1, ≤ 10 → 2, ≤ 5 → 3
+export const SHREK_RAGE_HP = [10, 5];    // prahy HP pre 2. a 3. stupeň revu
+export const SHREK_BARREL_MANA = 1;      // reakcia na strelu: sud späť - −1 mana (chýbajúca prejde do HP)
+export const SHREK_PUNCH_MANA = 2;       // reakcia na melee: punch - −2 many (chýbajúca prejde do HP)
+export const STENCH_DMG = 1;             // smrad po Shrekovej smrti: dmg na konci každého kroku (ako dmg dlaždica)

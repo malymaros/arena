@@ -43,6 +43,7 @@ export default {
       // klon-návnada na cieli zomiera (obrana kryje/odráža)
       if (inZone || cloneStruck) ctx.strikeZone(foeS, inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus });
       else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
+      ctx.shrekZone(slot, cells, dmg, tl); // Shrek Swamp: lúč na Shrekovo políčko
     },
   },
 };

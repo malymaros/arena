@@ -89,6 +89,7 @@ const scenarios = [
   ...Array.from({ length: 2 }, (_, i) => [{ format: "tournament", randomChars: true }, 800 + i]),
   ...Array.from({ length: 4 }, (_, i) => [{ format: "single", arena: "portal", tileWeights: { dmg: 90, heal: 0, mana: 0, ik: 10, power: 0, block: 0 },
     portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 }, portalsPerRound: 1 + i }, 900 + i]),
+  ...Array.from({ length: 3 }, (_, i) => [{ format: i ? "bo3" : "single", arena: "swamp" }, 950 + i]),           // Shrek Swamp
   ...Array.from({ length: 2 }, (_, i) => [{ format: "bo3" }, 1000 + i, { retryAt: 4 }]),                            // nedohraný
 ];
 const t0 = performance.now();

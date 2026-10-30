@@ -1,16 +1,18 @@
 // tools/simulate.mjs - headless simulácia zápasov priamo cez engine (bez servera, socketov a čakania).
 // Hráči ťahajú náhodne (tools/random-bot.mjs - náhodné fronty, o platnosti rozhoduje engine),
 // takže výsledky hovoria o stabilite enginu, nie o balanse postáv.
-// Spustenie:  node tools/simulate.mjs [počet zápasov na dvojicu=20] [p1postava p2postava] [--portal]
+// Spustenie:  node tools/simulate.mjs [počet zápasov na dvojicu=20] [p1postava p2postava] [--portal | --swamp]
 //   napr.     node tools/simulate.mjs 50
 //             node tools/simulate.mjs 200 naruto jotaro
 //             node tools/simulate.mjs 20 --portal   (Portal Realm + kontrola invariantov portálov po každom kole)
+//             node tools/simulate.mjs 20 --swamp    (Shrek Swamp + kontrola invariantov Shreka po každom kole)
 import { createEngine } from "../engine/game.js";
 import { CHARS } from "../engine/constants.js";
 import { playBotMatch } from "./random-bot.mjs";
 
 const PORTAL = process.argv.includes("--portal");
-const args = process.argv.slice(2).filter(a => a !== "--portal");
+const SWAMP = process.argv.includes("--swamp");
+const args = process.argv.slice(2).filter(a => a !== "--portal" && a !== "--swamp");
 const N = Number(args[0]) || 20;
 const pairArg = args.slice(1, 3);
 const P1_POOL = [...CHARS, "countess", "luffy"]; // side-postavy viazané na p1
@@ -21,6 +23,7 @@ const CONFIG = {
   tileWeights: { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 },
   ...(PORTAL ? { arena: "portal", tileWeights: { dmg: 90, heal: 0, mana: 0, ik: 10, power: 0, block: 0 },
     portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 } } : {}),
+  ...(SWAMP ? { arena: "swamp" } : {}),
 };
 // Portal Realm invarianty po každom kole: max 7 párov, unikátne hrany a písmená, HP/mana v rozsahu
 function checkPortals(g, where) {
@@ -30,12 +33,24 @@ function checkPortals(g, where) {
   if (bad) throw new Error(`porušený invariant (${where}): ${JSON.stringify({ portals: g.portals, p1: [g.players.p1.hp, g.players.p1.mana], p2: [g.players.p2.hp, g.players.p2.mana] })}`);
 }
 
+// Shrek Swamp invarianty po každom kole: HP Shreka 0–20, živý = 3 rôzne ohlásené skoky na doske, mŕtvy = smrad bez
+// duplicít a bez dlaždíc; HP/mana hráčov v rozsahu
+function checkSwamp(g, where) {
+  const s = g.shrek, on = ([x, y]) => x >= 0 && y >= 0 && x < 4 && y < 3;
+  const bad = !s || s.hp < 0 || s.hp > 20 || !on([s.x, s.y]) || g.tiles.length || g.iks.length
+    || (!s.dead && (s.marks.length !== 3 || !s.marks.every(on)))
+    || (s.dead && (s.marks.length || !s.stench.length || new Set(s.stench.map(String)).size !== s.stench.length || !s.stench.every(on)))
+    || ["p1", "p2"].some(sl => { const p = g.players[sl]; return p.hp < 0 || p.hp > 10 || p.mana < 0 || p.mana > 10; });
+  if (bad) throw new Error(`porušený invariant (${where}): ${JSON.stringify({ shrek: s, tiles: g.tiles, p1: [g.players.p1.hp, g.players.p1.mana], p2: [g.players.p2.hp, g.players.p2.mana] })}`);
+}
+const shrekStats = { died: 0, games: 0 };
+
 function playMatch(ch1, ch2, seed) {
   let result = null, frames = 0;
   const engine = createEngine({
     seed,
     emit: (ev, payload) => { if (ev === "game_result") result = payload; },
-    emitState: (timeline) => { if (timeline) frames += timeline.length; if (PORTAL && timeline) checkPortals(engine.game, `${ch1}/${ch2} seed ${seed}`); },
+    emitState: (timeline) => { if (timeline) frames += timeline.length; if (PORTAL && timeline) checkPortals(engine.game, `${ch1}/${ch2} seed ${seed}`); if (SWAMP && timeline) checkSwamp(engine.game, `${ch1}/${ch2} seed ${seed}`); },
   });
   // Portal Realm: počet párov za kolo cyklí 1–7 podľa seedu (pokrytie plnej dosky)
   engine.startMatch(engine.sanitizeConfig(PORTAL ? { ...CONFIG, portalsPerRound: (seed % 7) + 1 } : CONFIG));
@@ -44,6 +59,7 @@ function playMatch(ch1, ch2, seed) {
   const g = () => engine.game;
   if (g().players.p1.char !== ch1 || g().players.p2.char !== ch2) throw new Error(`voľba postáv zlyhala ${ch1}/${ch2}`);
   const rounds = playBotMatch(engine, seed, () => !!result, MAX_ROUNDS);
+  if (SWAMP) { shrekStats.games++; if (g().shrek?.dead) shrekStats.died++; }
   return { winner: result?.gameWinner ?? null, rounds, frames };
 }
 
@@ -66,6 +82,7 @@ pairs.forEach(([a, b], pi) => {
 });
 const ms = performance.now() - t0;
 console.log(`${games} zápasov, ${totalRounds} kôl za ${(ms / 1000).toFixed(2)} s (${(ms / games).toFixed(1)} ms/zápas), nedohraných: ${unfinished}`);
+if (SWAMP) console.log(`Shrek padol v ${shrekStats.died}/${shrekStats.games} zápasoch`);
 console.log("Úspešnosť pri NÁHODNÝCH ťahoch (nie balans!):");
 for (const [ch, { w, n }] of Object.entries(wins).sort((x, y) => y[1].w / y[1].n - x[1].w / x[1].n))
   console.log(`  ${ch.padEnd(10)} ${(100 * w / n).toFixed(0).padStart(3)} %  (${w}/${n})`);

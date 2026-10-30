@@ -139,3 +139,15 @@ export const COLOR_ROLL_SPIN_MS   = 3400;
 export const COLOR_ROLL_RESULT_MS = 1700;
 export const COLOR_ROLL_FADE_MS   = 450;
 export const COLOR_ROLL_MS = COLOR_ROLL_SPIN_MS + COLOR_ROLL_RESULT_MS + COLOR_ROLL_FADE_MS;
+
+// Shrek Swamp (docs/SWAMP_PLAN.md): Shrekove framy - skok na očíslované políčko, rev, reakcie na zásah, smrť, smrad
+export const SHREK_JUMP_MS    = 550;  // skok (oblúk) na ďalšie políčko
+export const SHREK_ROAR_MS    = 750;  // rev - riadok + stĺpec sa rozsvieti, zásahy padnú v ďalšom frame
+export const SHREK_HIT_MS     = 450;  // Shreka niekto zasiahol (float nad ním)
+export const SHREK_BARREL_MS  = 1150; // zdvihne sud a hodí ho na útočníka (dopad v ďalšom frame)
+export const SHREK_PUNCH_MS   = 550;  // punch útočníka na spoločnom políčku
+export const SHREK_POWERUP_MS = 900;  // nafúknutie pred tacklom
+export const SHREK_TACKLE_MS  = 600;  // beh po riadku po prvú figúru / okraj (zásah v ďalšom frame)
+export const SHREK_RETURN_MS  = 600;  // návrat na štartové políčko
+export const SHREK_DIE_MS     = 1300; // padne (HurtDead) - smrad sa objaví v tom istom frame
+export const STENCH_PROC_MS   = 600;  // smradové políčko sa rozsvieti pred zásahom (ako tile_proc)

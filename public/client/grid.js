@@ -10,6 +10,7 @@ import { cellsForSpecialPreview } from "/client/zones.js";
 import { tileSvg } from "/client/pix.js";
 import { FLAME2_SVG } from "/client/portal-art.js";
 import { renderPortals } from "/client/portals.js";
+import { renderShrek } from "/client/shrek.js";
 import { renderTrapMarkers, renderThreadLines } from "/client/trap-markers.js";
 import { reconcileProjectiles } from "/client/board-fx.js";
 import { updateSpecialCenter } from "/client/center-cast.js";
@@ -189,6 +190,7 @@ export function renderGrid(s, effects = []) {
 
   renderTrapMarkers(s); // pasca Countess/Onre - statická hlava castera v bunke (vidí ju len on)
   renderPortals(s);     // Portal Realm: portály na hranách dosky (otvorenie/zatvorenie podľa rozdielu snapshotov)
+  renderShrek(s);       // Shrek Swamp: Shrek, ohlásené skoky 1-2-3, rev, smrad
 
   reconcileProjectiles(charges, s); // plynulé projektily kĺžu v #actors (mimo mazaného gridu)
 

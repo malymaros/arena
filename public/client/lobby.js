@@ -1,12 +1,12 @@
-// public/client/lobby.js - lobby hosta: aréna (STONE BRIDGE / PORTAL REALM), formát, tiles (počet + váhy, súčet
+// public/client/lobby.js - lobby hosta: aréna (STONE BRIDGE / PORTAL REALM / SHREK SWAMP), formát, tiles (počet + váhy, súčet
 // 100 %), v portal realm aj váhy typov portálov, časovač, náhľad tiles, farba → configure_match. Každá aréna je
 // samostatný formulár so spoločným základom - pri prepnutí si každá pamätá svoje hodnoty. Server konfiguráciu
-// validuje/sanitizuje sám.
+// validuje/sanitizuje sám. Shrek Swamp nemá dlaždice (Shrek ich nahrádza) - sekcie dlaždíc nahradí popis Shreka.
 import { socket } from "/client/net.js";
 import { isTouch } from "/client/viewport.js";
 import { pixSvg } from "/client/pix.js";
 import { PORTAL_TYPES, PORTAL_ORDER, FLAME2_SVG } from "/client/portal-art.js";
-import { PORTAL_WEIGHTS, PORTAL_TILE_WEIGHTS, PORTALS_PER_ROUND, PORTAL_MAX_PAIRS } from "/shared/balance.js";
+import { PORTAL_WEIGHTS, PORTAL_TILE_WEIGHTS, PORTALS_PER_ROUND, PORTAL_MAX_PAIRS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP, STENCH_DMG } from "/shared/balance.js";
 
 const lobbyEl = document.getElementById("lobby");
 
@@ -24,6 +24,7 @@ const FIELDS = { format: "lobby-format", tiles: "lobby-tiles-count", color: "lob
 const ARENA_THUMBS = {
   bridge: ["/arenas/bridge/thumb.png"], // hotové zložené vrstvy (tools/arena-bg/thumbs.mjs)
   portal: ["/arenas/portal-realm/portal-realm-hd.webp"],
+  swamp: ["/arenas/shrek-swamp/shrek-swamp-hd.webp"],
 };
 
 let lobbyBuilt = false;
@@ -71,6 +72,12 @@ function render() {
   for (const [k, id] of Object.entries(FIELDS)) {
     $(id)?.querySelectorAll(".opt").forEach(o => o.classList.toggle("active", o.dataset.val === f.fields[k]));
   }
+  const swamp = arena === "swamp";
+  // bažina: počet/váhy dlaždíc a ich náhľad nemajú zmysel - miesto zostane (rozloženie neskáče), sekcie sa skryjú
+  $("lobby-sec-tiles").style.visibility = swamp ? "hidden" : "";
+  $("lobby-preview-box").style.visibility = swamp ? "hidden" : "";
+  $("lobby-tile-section").style.display = swamp ? "none" : "";
+  $("lobby-swamp-section").style.display = swamp ? "block" : "none";
   $("lobby-weights").innerHTML = TILE_ORDER.filter(k => arena !== "portal" || k in PORTAL_TILE_WEIGHTS).map(k =>
     weightRow("tile", k, TILE_DEF[k].label, k === "dmg" && arena === "portal" ? FLAME2_SVG : pixSvg(TILE_DEF[k].pix), f.tileWeights[k] || 0)).join("");
   const portal = arena === "portal";
@@ -88,7 +95,7 @@ function render() {
 
 function refreshSums() {
   const f = forms[arena];
-  const s1 = sum(f.tileWeights), s2 = arena === "portal" ? sum(f.portalWeights) : 100;
+  const s1 = arena === "swamp" ? 100 : sum(f.tileWeights), s2 = arena === "portal" ? sum(f.portalWeights) : 100;
   $("lobby-weights-sum").textContent = `Total: ${s1}%`;
   $("lobby-weights-sum").classList.toggle("bad", s1 !== 100);
   $("lobby-portal-sum").textContent = `Total: ${s2}%`;
@@ -111,6 +118,10 @@ export function showLobby() {
   forms.bridge = { fields: { ...fields }, tileWeights: { dmg: 75, heal: 5, mana: 5, ik: 5, power: 5, block: 5 } };
   forms.portal = { fields: { ...fields }, tileWeights: { dmg: 0, heal: 0, mana: 0, ik: 0, power: 0, block: 0, ...PORTAL_TILE_WEIGHTS },
     portalWeights: { ...PORTAL_WEIGHTS }, perRound: PORTALS_PER_ROUND };
+  forms.swamp = { fields: { ...fields }, tileWeights: { dmg: 0, heal: 0, mana: 0, ik: 0, power: 0, block: 0 } };
+  // pravidlá Shreka v lobby (čísla z shared/balance.js)
+  $("lobby-swamp-info").innerHTML = `<p>Shrek (${SHREK_HP} HP) marks 3 cells each round, jumps there after each step and roars along the row and column (${SHREK_ROAR_DMG.join(" / ")} dmg as his HP drops below ${SHREK_RAGE_HP.join(" / ")}).</p>
+    <p>Hit him and he hits back. At 0 HP he falls and his stench spreads one cell per round (${STENCH_DMG} dmg per step).</p>`;
 
   lobbyEl.querySelectorAll(".arena-card").forEach(c => {
     drawThumb(c.querySelector("canvas"), ARENA_THUMBS[c.dataset.arena] || []);
@@ -154,7 +165,7 @@ export function showLobby() {
 
   $("lobby-start").addEventListener("click", () => {
     const f = forms[arena];
-    if (sum(f.tileWeights) !== 100 || (arena === "portal" && sum(f.portalWeights) !== 100)) return;
+    if ((arena !== "swamp" && sum(f.tileWeights) !== 100) || (arena === "portal" && sum(f.portalWeights) !== 100)) return;
     const config = {
       format: f.fields.format || "single",
       tilesPerRound: parseInt(f.fields.tiles || "1", 10),
@@ -164,6 +175,7 @@ export function showLobby() {
       colorPref: f.fields.color || "random",
       randomChars: f.fields.random === "on",
       ...(arena === "portal" ? { arena: "portal", portalWeights: { ...f.portalWeights }, portalsPerRound: f.perRound } : {}),
+      ...(arena === "swamp" ? { arena: "swamp" } : {}),
     };
     socket.emit("configure_match", config);
   });

@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shrek Swamp — náhľad animácií</title>
+<!-- DEV náhľad: animácie vyrezané zo SHREK.png cez tools/sprites-shrek/ (detect.cjs → pack.cjs → public/assets/shrek/).
+     Sprity: Shrek Reekin' Havoc / Shrek: Hassle at the Castle, ripped by A.J. Nitro. -->
+<style>
+  :root { --bg: #11160d; --panel: #1d2616; --line: #3b4a2a; --text: #e6efd6; --dim: #9aab84; --acc: #b6e04a; --warn: #ff7a3c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  header { padding: 16px 20px 4px; }
+  h1 { margin: 0; font-size: 22px; color: var(--acc); }
+  h2 { margin: 26px 20px 10px; font-size: 17px; color: var(--acc); }
+  p.note { margin: 4px 20px; color: var(--dim); max-width: 900px; }
+  /* --- ukážka na ploche --- */
+  #stage-wrap { display: flex; gap: 20px; padding: 0 20px; flex-wrap: wrap; align-items: flex-start; }
+  #stage { position: relative; width: 640px; max-width: 100%; aspect-ratio: 640 / 400; border-radius: 10px; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 120%, #4c5d22 0%, #2a3816 45%, #141c0c 100%); border: 1px solid var(--line); }
+  #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  #script { flex: 1; min-width: 260px; max-width: 420px; }
+  #script ol { margin: 0; padding-left: 20px; }
+  #script li { padding: 3px 6px; border-radius: 6px; color: var(--dim); }
+  #script li.on { background: var(--panel); color: var(--text); outline: 1px solid var(--acc); }
+  #script li b { color: var(--acc); }
+  .ctrl { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--acc); }
+  /* --- galéria --- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding: 0 20px 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; text-align: center; }
+  .card canvas { width: 160px; height: 160px; image-rendering: pixelated; background: repeating-conic-gradient(#232d1a 0 25%, #1a2213 0 50%) 0 0 / 20px 20px; border-radius: 6px; }
+  .card .n { font-weight: 600; margin-top: 6px; }
+  .card .m { color: var(--dim); font-size: 12px; }
+  .card .u { color: var(--acc); font-size: 12px; margin-top: 4px; min-height: 2.6em; }
+  footer { color: var(--dim); padding: 10px 20px 30px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Shrek Swamp: náhľad animácií</h1>
+</header>
+<p class="note">Dev stránka, nič sa nenasadzuje. Hore je scénka na ploche 4×3: Shrek ako neutrálne NPC, ktoré každé kolo vopred ohlási, čo urobí (oranžové políčka), a potom to vykoná. Dole sú všetky animácie vyrezané zo sheetu.</p>
+
+<h2>Scénka: zámery Shreka na ploche</h2>
+<div id="stage-wrap">
+  <div id="stage"><canvas id="board" width="640" height="400"></canvas></div>
+  <div id="script">
+    <ol id="steps"></ol>
+    <div class="ctrl">
+      <button id="pause">⏸ pauza</button>
+      <button id="next">⏭ ďalší zámer</button>
+      <button id="slow">🐢 pomaly: vyp</button>
+    </div>
+  </div>
+</div>
+
+<h2>Shrek Reekin' Havoc (hlavný štýl)</h2>
+<div class="grid" id="g-main"></div>
+<h2>Shrek: Hassle at the Castle (iný štýl, iné proporcie)</h2>
+<div class="grid" id="g-hassle"></div>
+<footer>Sprity: <i>Shrek Reekin' Havoc</i> a <i>Shrek: Hassle at the Castle</i>, ripped by A.J. Nitro. Pipeline: <code>tools/sprites-shrek/</code> (detect.cjs → pack.cjs → public/assets/shrek/).</footer>
+
+<script type="module">
+const BASE = "/assets/shrek/";
+const META = await (await fetch(BASE + "anims.json")).json();
+const A = {};
+await Promise.all(META.map((m) => new Promise((res) => {
+  const img = new Image(); img.onload = () => { A[m.name] = { ...m, img }; res(); }; img.src = BASE + m.name + ".png";
+})));
+const loadImg = (src) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+const [mageL, mageR, fireball] = await Promise.all([
+  loadImg("/assets/fire/Idle.png"), loadImg("/assets/fire_2/Idle.png"), loadImg("/assets/fire/Charge.png"),
+]);
+
+/* ---------- galéria ---------- */
+const USE = {
+  Idle: "SPÁNOK: stojí, nič nerobí", Walk: "presun na ohlásené políčko", JumpKick: "DUPOT na ohlásené políčka",
+  Punch: "úder na susedné políčko", CrouchKick: "kop nízko (podrazenie)", PowerUp: "telegraf HNEVU (ide po tom, kto ho trafil)",
+  Tackle: "BEH: zrazí a odstrčí, kto stojí v ceste", HurtDead: "zásah → omráčený (hviezdičky), kolo nič",
+  Climb: "vylezie z bažiny (nástup do arény)", InOut: "KADIBÚDKA: zalezie dnu / vylezie von", Victory: "koniec hry",
+  PickUp: "zdvihne SUD (potom hod)", Push: "TLAČÍ sud po riadku", Roar: "„GET OUT OF MY SWAMP!“: odhodí riadok",
+  SpecialMoves: "švih / úder s efektom",
+  H_Idle: "idle", H_Walk: "chôdza", H_Row6: "škrabanie / idle 2", H_Row8: "úder päsťou", H_Row10: "prikrčenie",
+  H_Row12: "drep", H_Row14: "hod (kameň)", H_Club: "švih palicou", H_Row17: "skok", H_Roar: "rev (2 framy)",
+  H_Row21: "zásah → omráčený", H_Row23: "smiech / provokácia",
+};
+const cards = [];
+for (const m of META) {
+  const card = document.createElement("div"); card.className = "card";
+  const cv = document.createElement("canvas"); cv.width = cv.height = 96;
+  card.append(cv);
+  card.insertAdjacentHTML("beforeend", `<div class="n">${m.name}</div><div class="m">${m.frames} framov · ${m.size}px · ${m.fps} fps${m.loop ? " · slučka" : ""}</div><div class="u">${USE[m.name] || ""}</div>`);
+  document.getElementById(m.hassle ? "g-hassle" : "g-main").append(card);
+  cards.push({ a: A[m.name], ctx: cv.getContext("2d") });
+}
+function drawFrame(ctx, a, f, dx, dy, scale, flip = false, alpha = 1) {
+  const S = a.size;
+  ctx.save(); ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
+  ctx.translate(dx, dy); if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(a.img, f * S, 0, S, S, -S * scale / 2, -S * scale, S * scale, S * scale);
+  ctx.restore();
+}
+const t0 = performance.now();
+function drawCards(now) {
+  for (const { a, ctx } of cards) {
+    // jednorazové animácie: prehrať + chvíľu podržať posledný frame
+    const n = a.frames, dur = n / a.fps;
+    let t = (now - t0) / 1000;
+    let f = a.loop ? Math.floor(t * a.fps) % n : Math.min(n - 1, Math.floor((t % (dur + 0.8)) * a.fps));
+    ctx.clearRect(0, 0, 96, 96);
+    drawFrame(ctx, a, f, 48, 92, 1.05); // jednotná mierka = skutočné proporcie medzi animáciami
+  }
+}
+
+/* ---------- scénka na ploche 4×3 ---------- */
+const cv = document.getElementById("board"), g = cv.getContext("2d");
+const COLS = 4, ROWS = 3, TW = 130, TH = 92, GAP = 8;
+const OX = (640 - (COLS * TW + (COLS - 1) * GAP)) / 2, OY = 70;
+const cellX = (x) => OX + x * (TW + GAP) + TW / 2;
+const cellY = (y) => OY + y * (TH + GAP) + TH - 14; // nohy
+const SH = 2.0; // mierka Shreka (sprite ~45 px → ~90 px)
+
+let slow = 1;
+const st = {
+  shrek: { x: 1, y: 1, px: cellX(1), py: cellY(1), anim: "Idle", start: 0, flip: false, alpha: 1 },
+  mages: [{ x: 0, y: 0, img: mageL, flip: false, hurt: 0 }, { x: 3, y: 2, img: mageR, flip: true, hurt: 0 }],
+  tele: [], teleKind: "", flash: [], shake: 0, barrels: [], outhouses: [], floats: [], ball: null, wave: null, label: "",
+};
+const now = () => performance.now();
+const wait = (ms) => new Promise((r) => setTimeout(r, ms * slow));
+const play = (anim, flip) => { st.shrek.anim = anim; st.shrek.start = now(); if (flip !== undefined) st.shrek.flip = flip; return A[anim].frames / A[anim].fps * 1000; };
+function tween(obj, keys, ms) {
+  const from = {}; for (const k in keys) from[k] = obj[k];
+  const s = now();
+  return new Promise((res) => {
+    const step = () => {
+      const p = Math.min(1, (now() - s) / (ms * slow));
+      for (const k in keys) obj[k] = from[k] + (keys[k] - from[k]) * p;
+      p < 1 ? requestAnimationFrame(step) : res();
+    };
+    step();
+  });
+}
+const float = (text, x, y, color = "#fff") => st.floats.push({ text, x, y, color, born: now() });
+function hitMagesOn(cells, dmg) {
+  for (const m of st.mages) if (cells.some(([x, y]) => x === m.x && y === m.y)) { m.hurt = now(); float(`-${dmg} HP`, cellX(m.x), cellY(m.y) - 100, "#ff5a4a"); }
+}
+
+const STEPS = [
+  { t: "<b>SPÁNOK</b>: Shrek si hovie v bažine, kolo nič nerobí.", run: async () => {
+    play("Idle"); st.label = "💤"; await wait(1800); st.label = "";
+  } },
+  { t: "<b>Nástup</b>: vylezie z bažiny (Climb).", run: async () => {
+    st.shrek.py = cellY(1) + 40; st.shrek.alpha = 0.3;
+    play("Climb"); await Promise.all([tween(st.shrek, { py: cellY(1), alpha: 1 }, 1200)]); play("Idle"); await wait(400);
+  } },
+  { t: "<b>DUPOT</b>: ohlási 3 políčka, potom skočí a dupne. Kto tam stojí, dostane dmg.", run: async () => {
+    const cells = [[0, 0], [1, 0], [2, 0]]; st.tele = cells; st.teleKind = "dupot"; await wait(1500);
+    play("JumpKick"); await wait(450); st.shake = now(); st.flash = cells.map((c) => ({ c, born: now() })); hitMagesOn(cells, 3);
+    st.tele = []; await wait(500); play("Idle"); await wait(500);
+  } },
+  { t: "<b>Presun</b>: prejde na ohlásené políčko (Walk).", run: async () => {
+    st.tele = [[2, 1]]; st.teleKind = "move"; await wait(800); st.tele = [];
+    play("Walk", false); st.shrek.x = 2; await tween(st.shrek, { px: cellX(2) }, 900); play("Idle"); await wait(400);
+  } },
+  { t: "<b>HNEV</b>: hráč vľavo trafil Shreka. Ten sa nafúkne (PowerUp) a ďalšie kolo ide po ňom.", run: async () => {
+    const ball = { x: cellX(0) + 30, y: cellY(0) - 40 };
+    st.mages[0].y = 1; st.ball = ball;
+    await tween(ball, { x: cellX(2) - 20, y: cellY(1) - 45 }, 450); st.ball = null;
+    play("HurtDead"); await wait(300); play("PowerUp", true); st.label = "😡"; await wait(1600); play("Idle"); await wait(300);
+  } },
+  { t: "<b>BEH (tackle)</b>: rozbehne sa po ohlásenom riadku a odstrčí, koho zrazí.", run: async () => {
+    const cells = [[1, 1], [0, 1]]; st.tele = cells; st.teleKind = "beh"; await wait(1200); st.tele = []; st.label = "";
+    const T = A.Tackle; play("Tackle", true);
+    await wait(5 / T.fps * 1000);
+    await tween(st.shrek, { px: cellX(0) + 30 }, 550); st.shrek.x = 0;
+    hitMagesOn(cells, 2); st.shake = now();
+    const m = st.mages[0]; m.y = 0; float("ODHODENÝ!", cellX(0), cellY(0) - 100, "#ffd23c");
+    await wait(500); play("Walk", false); await tween(st.shrek, { px: cellX(1) }, 700); st.shrek.x = 1; play("Idle"); await wait(400);
+  } },
+  { t: "<b>„GET OUT OF MY SWAMP!“</b>: rev (Roar), odhodí každého v riadku o políčko ďalej.", run: async () => {
+    const cells = [[0, 1], [2, 1], [3, 1]]; st.tele = cells; st.teleKind = "rev";
+    st.mages[1].y = 1; await wait(1200); st.tele = [];
+    const d = play("Roar", false); await wait(d * 0.4);
+    st.wave = { born: now(), y: 1 }; hitMagesOn(cells, 1);
+    st.mages[1].y = 2; float("ODHODENÝ!", cellX(3), cellY(2) - 100, "#ffd23c");
+    await wait(d * 0.6); st.wave = null; play("Idle"); await wait(500);
+  } },
+  { t: "<b>HOD SUDOM</b>: zdvihne sud a hodí ho na ohlásené políčko. Sud tam ostane ako kryt.", run: async () => {
+    const tgt = [3, 2]; st.tele = [tgt]; st.teleKind = "sud"; await wait(1200);
+    const d = play("PickUp", false); await wait(d);
+    const b = { x: st.shrek.px, y: st.shrek.py - 100, rot: 0 }; st.ball = { barrel: b };
+    const s = now(), x0 = b.x, y0 = b.y, x1 = cellX(tgt[0]), y1 = cellY(tgt[1]);
+    play("Idle");
+    await new Promise((res) => { const step = () => { const p = Math.min(1, (now() - s) / (700 * slow));
+      b.x = x0 + (x1 - x0) * p; b.y = y0 + (y1 - y0) * p - Math.sin(p * Math.PI) * 120; b.rot = p * 8;
+      p < 1 ? requestAnimationFrame(step) : res(); }; step(); });
+    st.ball = null; st.tele = []; st.shake = now(); hitMagesOn([tgt], 3); st.barrels.push({ x: tgt[0], y: tgt[1] });
+    st.flash = [{ c: tgt, born: now() }]; await wait(700);
+  } },
+  { t: "<b>TLAČENIE</b>: tlačí sud po riadku (Push), sud je pohyblivá prekážka.", run: async () => {
+    st.barrels.push({ x: 2, y: 1, px: cellX(2) - 10 });
+    const b = st.barrels[st.barrels.length - 1];
+    play("Push", false); await tween(b, { px: cellX(3) - 10 }, 1300); b.x = 3; play("Idle"); await wait(500);
+    st.barrels.pop();
+  } },
+  { t: "<b>KADIBÚDKA</b>: zalezie do jednej kadibúdky a vylezie z druhej (ohlásený teleport).", run: async () => {
+    st.outhouses = [{ x: 1, y: 1 }, { x: 2, y: 0 }]; st.tele = [[2, 0]]; st.teleKind = "move"; await wait(1000);
+    play("InOut"); st.shrek.anim = "InOut"; st.shrek.frame = 1; await tween(st.shrek, { alpha: 0 }, 600);
+    st.shrek.x = 2; st.shrek.y = 0; st.shrek.px = cellX(2); st.shrek.py = cellY(0);
+    await wait(300); await tween(st.shrek, { alpha: 1 }, 600); st.shrek.frame = undefined; st.tele = [];
+    play("Idle"); await wait(500); st.outhouses = [];
+  } },
+  { t: "<b>OMRÁČENÝ</b>: dostane zásah a kolo leží s hviezdičkami (HurtDead).", run: async () => {
+    const ball = { x: cellX(3), y: cellY(2) - 40 }; st.ball = ball;
+    await tween(ball, { x: cellX(2) + 20, y: cellY(0) - 45 }, 450); st.ball = null;
+    const d = play("HurtDead"); await wait(d + 900);
+    play("Walk", false); await tween(st.shrek, { py: cellY(1) }, 800); st.shrek.y = 1; play("Idle"); await wait(300);
+  } },
+  { t: "<b>Koniec hry</b>: víťazný tanec (Victory).", run: async () => {
+    play("Victory"); await wait(2000); play("Idle");
+    st.mages[0].x = 0; st.mages[0].y = 0; st.mages[1].x = 3; st.mages[1].y = 2; st.barrels = [];
+    st.shrek.x = 1; st.shrek.y = 1; st.shrek.px = cellX(1); st.shrek.py = cellY(1); await wait(400);
+  } },
+];
+const ol = document.getElementById("steps");
+STEPS.forEach((s) => { const li = document.createElement("li"); li.innerHTML = s.t; ol.append(li); });
+let paused = false, skip = false, idx = 0;
+document.getElementById("pause").onclick = (e) => { paused = !paused; e.target.textContent = paused ? "▶ pokračuj" : "⏸ pauza"; };
+document.getElementById("next").onclick = () => { skip = true; };
+document.getElementById("slow").onclick = (e) => { slow = slow === 1 ? 2.5 : 1; e.target.textContent = `🐢 pomaly: ${slow > 1 ? "zap" : "vyp"}`; };
+(async function loop() {
+  for (;;) {
+    [...ol.children].forEach((li, i) => li.classList.toggle("on", i === idx));
+    await STEPS[idx].run();
+    while (paused && !skip) await new Promise((r) => setTimeout(r, 100));
+    skip = false; idx = (idx + 1) % STEPS.length;
+  }
+})();
+
+function drawBoard(t) {
+  g.save(); g.clearRect(0, 0, 640, 400);
+  if (st.shake && t - st.shake < 300) g.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const px = OX + x * (TW + GAP), py = OY + y * (TH + GAP);
+    g.fillStyle = (x + y) % 2 ? "#3d4a26" : "#465630"; g.fillRect(px, py, TW, TH);
+    g.fillStyle = "rgba(20,40,10,.35)"; g.beginPath(); g.ellipse(px + TW * 0.3, py + TH * 0.7, 22, 7, 0, 0, 7); g.fill(); // kaluž
+    if (st.wave && st.wave.y === y) { g.fillStyle = `rgba(255,230,80,${0.35 + 0.25 * Math.sin(t / 60)})`; g.fillRect(px, py, TW, TH); }
+  }
+  // ohlásený zámer (telegraf)
+  for (const [x, y] of st.tele) {
+    const px = OX + x * (TW + GAP), py = OY + y * (TH + GAP);
+    g.fillStyle = `rgba(255,120,50,${0.18 + 0.12 * Math.sin(t / 150)})`; g.fillRect(px, py, TW, TH);
+    g.strokeStyle = "#ff7a3c"; g.lineWidth = 3; g.setLineDash([10, 6]); g.strokeRect(px + 2, py + 2, TW - 4, TH - 4); g.setLineDash([]);
+    g.font = "22px system-ui"; g.textAlign = "center";
+    g.fillText({ dupot: "🦶", beh: "💨", rev: "📢", sud: "🛢️", move: "👣" }[st.teleKind] || "", px + TW - 18, py + 26);
+  }
+  for (const f of st.flash) { const a = 1 - (t - f.born) / 400; if (a <= 0) continue;
+    g.fillStyle = `rgba(255,255,255,${a * 0.6})`; g.fillRect(OX + f.c[0] * (TW + GAP), OY + f.c[1] * (TH + GAP), TW, TH); }
+  // kadibúdky + sudy
+  for (const o of st.outhouses) { const px = cellX(o.x) + 34, py = cellY(o.y);
+    g.fillStyle = "#6b4426"; g.fillRect(px - 16, py - 56, 32, 56); g.fillStyle = "#4a2d16"; g.fillRect(px - 19, py - 62, 38, 8);
+    g.fillStyle = "#f5d36b"; g.beginPath(); g.moveTo(px, py - 44); g.lineTo(px + 4, py - 38); g.lineTo(px - 4, py - 38); g.fill(); }
+  const P = A.PickUp;
+  for (const b of st.barrels) drawFrame(g, P, 0, (b.px ?? cellX(b.x) - 34), cellY(b.y) + 8, 1.4);
+  // postavy zoradené podľa riadku (hĺbka)
+  const fig = [...st.mages.map((m) => ({ y: m.y, m })), { y: st.shrek.y, s: true }].sort((a, b) => a.y - b.y);
+  for (const o of fig) {
+    if (o.s) {
+      const s = st.shrek, a = A[s.anim];
+      let f = s.frame ?? Math.floor((t - s.start) / 1000 * a.fps / slow);
+      f = a.loop ? f % a.frames : Math.min(a.frames - 1, f);
+      g.fillStyle = "rgba(0,0,0,.3)"; g.beginPath(); g.ellipse(s.px, s.py - 2, 30, 8, 0, 0, 7); g.fill();
+      drawFrame(g, a, f, s.px, s.py + 4, SH, s.flip, s.alpha);
+      if (st.label) { g.font = "30px system-ui"; g.textAlign = "center"; g.fillText(st.label, s.px, s.py - 100 + Math.sin(t / 200) * 4); }
+    } else if (o.m.img) {
+      const m = o.m, img = m.img, S = img.height, n = Math.floor(img.width / S), f = Math.floor(t / 120) % n;
+      const hurt = t - m.hurt < 350;
+      const tx = cellX(m.x) + (m.flip ? 22 : -22), ty = cellY(m.y) + 14;
+      g.save(); if (hurt) g.filter = "brightness(2) saturate(0.4)";
+      g.translate(tx, ty); if (m.flip) g.scale(-1, 1);
+      g.imageSmoothingEnabled = false; g.drawImage(img, f * S, 0, S, S, -S * 0.45, -S * 0.9, S * 0.9, S * 0.9);
+      g.restore();
+    }
+  }
+  if (st.ball) {
+    if (st.ball.barrel) { const b = st.ball.barrel; g.save(); g.translate(b.x, b.y); g.rotate(b.rot); drawFrame(g, P, 0, 0, 20, 1.4); g.restore(); }
+    else if (fireball) { const S = fireball.height; g.imageSmoothingEnabled = false; g.drawImage(fireball, (Math.floor(t / 80) % Math.floor(fireball.width / S)) * S, 0, S, S, st.ball.x - 24, st.ball.y - 24, 48, 48); }
+    else { g.fillStyle = "#ff8a2a"; g.beginPath(); g.arc(st.ball.x, st.ball.y, 8, 0, 7); g.fill(); }
+  }
+  st.floats = st.floats.filter((f) => t - f.born < 1200);
+  for (const f of st.floats) { const p = (t - f.born) / 1200;
+    g.globalAlpha = 1 - p; g.font = "bold 18px system-ui"; g.textAlign = "center"; g.fillStyle = "#000"; g.fillText(f.text, f.x + 1, f.y - p * 30 + 1);
+    g.fillStyle = f.color; g.fillText(f.text, f.x, f.y - p * 30); g.globalAlpha = 1; }
+  g.restore();
+}
+(function raf() { const t = now(); drawCards(t); drawBoard(t); requestAnimationFrame(raf); })();
+</script>
+</body>
+</html>

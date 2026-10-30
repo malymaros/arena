@@ -438,12 +438,13 @@
       <h1 class="lobby-title">ARENA</h1>
       <p class="lobby-sub">Match setup</p>
 
-      <!-- aréna: dva samostatné formuláre so spoločným základom (každý si pamätá svoje hodnoty, client/lobby.js) -->
+      <!-- aréna: tri samostatné formuláre so spoločným základom (každý si pamätá svoje hodnoty, client/lobby.js) -->
       <div class="lobby-section" id="lobby-sec-arena">
         <div class="lobby-label">ARENA</div>
         <div class="arena-pick" id="lobby-arena">
           <button class="arena-card active" data-arena="bridge"><canvas width="320" height="180"></canvas><span>STONE BRIDGE</span></button>
           <button class="arena-card" data-arena="portal"><canvas width="320" height="180"></canvas><span>PORTAL REALM</span></button>
+          <button class="arena-card" data-arena="swamp"><canvas width="320" height="180"></canvas><span>SHREK SWAMP</span></button>
         </div>
       </div>
 
@@ -478,6 +479,11 @@
           <div class="weights" id="lobby-weights"></div>
           <div class="weights-sum" id="lobby-weights-sum">Total: 100%</div>
         </div>
+        <!-- Shrek Swamp: namiesto dlaždíc Shrek (client/lobby.js ukáže túto sekciu namiesto váh) -->
+        <div class="lobby-section" id="lobby-swamp-section">
+          <div class="lobby-label">NO SPECIAL TILES - SHREK</div>
+          <div class="swamp-info" id="lobby-swamp-info"></div>
+        </div>
         <div class="lobby-section" id="lobby-portal-section">
           <div class="lobby-label">PORTAL CHANCE (must total 100%)</div>
           <div class="weights" id="lobby-portal-weights"></div>
@@ -496,7 +502,7 @@
 
       <!-- dva prepínače v jednom riadku: náhľad tiles na ďalšie kolo + náhodný výber postáv (default Off) -->
       <div class="lobby-section lobby-pair" id="lobby-sec-preview">
-        <div>
+        <div id="lobby-preview-box">
           <div class="lobby-label">TILE PREVIEW</div>
           <div class="opt-row" id="lobby-preview">
             <button class="opt active" data-val="on">On</button>

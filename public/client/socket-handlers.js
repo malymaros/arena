@@ -159,7 +159,7 @@ socket.on("state", (s) => {
   // arena
   if (s.arena && s.arena !== arenaEl.dataset.key) {
     arenaEl.dataset.key = s.arena;
-    const ARENAS_CLIENT = { bridge: ["sky-bridge.png","clouds.png","clouds-2.png","tower.png","bridge.png"], "portal-realm": ["portal-realm-hd.webp"] };
+    const ARENAS_CLIENT = { bridge: ["sky-bridge.png","clouds.png","clouds-2.png","tower.png","bridge.png"], "portal-realm": ["portal-realm-hd.webp"], "shrek-swamp": ["shrek-swamp-hd.webp"] };
     renderArenaLayers(s.arena, ARENAS_CLIENT[s.arena] || []);
   }
 

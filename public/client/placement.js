@@ -71,6 +71,7 @@ export const escPrideMul = a => {
   return base * Math.pow(1.2, Math.max(0, Math.min(3, pr)));
 };
 export const PAIR_SHIFT_DEFAULT = 22;
+const SHREK_PAIR_SHIFT = 48;
 // pozn. labyrint: prekliatemu klientovi server skrýva súperovu pozíciu (x null) → pairShift preňho vráti 0.
 // Výnimka: keď lovec PRÁVE stojí na mojej ožiarenej bunke (server flag hunterHere - bunka je aj tak
 // prezradená), vlastný sprite odstúpi presne ako pri normálnej zdieľanej bunke mimo labyrintu.
@@ -80,6 +81,9 @@ export function pairShift(slot, s = state) {
   const a = s?.[slot];
   const mag = PAIR_SHIFT[a?.char] ?? PAIR_SHIFT_DEFAULT; // konštantný odsun (nezávisí od pride veľkosti)
   if (p1.x != null && p1.x === p2.x && p1.y === p2.y) return slot === "p1" ? -mag : mag;
+  // Shrek Swamp: hráč sám so živým Shrekom na políčku odstúpi nabok (Shreka odsunie client/shrek.js na druhú stranu)
+  const sh = s?.shrek;
+  if (sh && !sh.dead && a?.x === sh.x && a?.y === sh.y) return slot === "p1" ? -SHREK_PAIR_SHIFT : SHREK_PAIR_SHIFT;
   if (a?.labyrinth && a.x != null && (a.hunterHere || []).some(([hx, hy]) => hx === a.x && hy === a.y))
     return slot === "p1" ? -mag : mag;
   return 0;

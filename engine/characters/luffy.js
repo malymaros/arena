@@ -47,6 +47,7 @@ function punch(ctx, slot, tl, { cell }) {
   ctx.pushStateFrame(tl, [{ kind: "luffy_punch_hold", from: slot, origin, target }], LUFFY_PUNCH_HIT_MS);
   const dmg = LUFFY_S1_DMG * ctx.dealMul(slot) + pBonus;
   if (inZone || cloneStruck) ctx.strikeZone(ctx.other(slot), inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus });
+  ctx.shrekZone(slot, cells, dmg, tl); // Shrek Swamp: ruka trafila Shreka
   ctx.pushStateFrame(tl, [{ kind: "luffy_punch_back", from: slot, origin, target }], LUFFY_PUNCH_BACK_MS);
 }
 
@@ -80,6 +81,7 @@ function ball(ctx, slot, tl, dir) {
   const dmg = LUFFY_BALL_DMG * ctx.dealMul(slot) + pBonus + pc.power;
   if (inZone || cloneStruck) ctx.strikeZone(ctx.other(slot), inZone, cloneStruck, dmg, tl, { kind: "special", bonus: pBonus, ...pc.opts });
   else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
+  ctx.shrekZone(slot, cells, dmg, tl); // Shrek Swamp: Shrek vo výbuchu
 }
 
 export default {

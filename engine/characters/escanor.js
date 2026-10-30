@@ -50,6 +50,7 @@ export default {
       const dmg = SPECIAL_ZONE_DMG.escanor; // 8
       if (inZone || cloneStruck) ctx.strikeZone(foeS, inZone, cloneStruck, dmg * ctx.dealMul(slot) + pBonus + power, tl, { kind: "special", bonus: pBonus, ...pt });
       else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
+      ctx.shrekZone(slot, cells, dmg * ctx.dealMul(slot) + pBonus + power, tl); // Shrek Swamp: Shrek v zóne slnka
     },
   },
 };

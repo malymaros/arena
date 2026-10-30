@@ -29,6 +29,7 @@ export function zoneStrike(ctx, slot, tl, { dir, cells, cost, dmg, kind, beats =
   const raw = dmg * ctx.dealMul(slot) + pBonus;
   if (inZone || cloneStruck) ctx.strikeZone(foeS, inZone, cloneStruck, raw, tl, { kind: "special", bonus: pBonus });
   else ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
+  ctx.shrekZone(slot, cells, raw, tl); // Shrek Swamp: Shrek v zóne
 }
 
 export default {

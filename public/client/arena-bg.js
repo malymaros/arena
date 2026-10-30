@@ -1,5 +1,5 @@
 // public/client/arena-bg.js - pozadie arény: vrstvy z /arenas/<key>/ renderované do low-res canvasov
-// (ARENA_RES), ktoré CSS roztiahne s image-rendering: pixelated. Portal Realm je maľba (nie pixel-art) - kreslí
+// (ARENA_RES), ktoré CSS roztiahne s image-rendering: pixelated. Portal Realm a Shrek Swamp sú maľby (nie pixel-art) - kreslí
 // sa v PLNOM rozlíšení (plynulé škálovanie) a nad ňou beží „živé pozadie" (ohne, vír, runy, kruh, svetielka -
 // animuje len opacity/transform; pri úspornej grafike html.perf-lite len lite variant, styles.css).
 
@@ -10,7 +10,7 @@ const arenaEl = document.getElementById("arena");
 // čím vzniknú skutočné veľké pixely (menšie čísla = hrubší pixel art)
 const ARENA_RES = { w: 320, h: 180 };
 // arény kreslené v plnom rozlíšení (maľba) + rozmer originálu pre súradnice živých efektov
-const HD_ARENAS = { "portal-realm": { w: 1672, h: 941, fx: portalRealmFx } };
+const HD_ARENAS = { "portal-realm": { w: 1672, h: 941, fx: portalRealmFx }, "shrek-swamp": { w: 1671, h: 941, fx: swampFx } };
 let fxWrap = null, fxSize = null;
 
 export function renderArenaLayers(arenaKey, layerFiles) {
@@ -64,9 +64,9 @@ function layoutFx() {
 }
 window.addEventListener("resize", layoutFx);
 
-/* ---------- Portal Realm: živé pozadie (súradnice v pixeloch originálu 1672×941) ---------- */
-function portalRealmFx(root) {
-  const add = (cls, x, y, w, h, vars = {}) => {
+// prvok živého pozadia v súradniciach originálu (x, y = stred pri afx-glow)
+function fxAdder(root) {
+  return (cls, x, y, w, h, vars = {}) => {
     const el = document.createElement("div");
     el.className = cls;
     el.style.left = x + "px"; el.style.top = y + "px";
@@ -75,6 +75,27 @@ function portalRealmFx(root) {
     root.appendChild(el);
     return el;
   };
+}
+
+/* ---------- Shrek Swamp: živé pozadie (súradnice v pixeloch originálu 1671×941) - fakle + svätojánske mušky ---------- */
+function swampFx(root) {
+  root.classList.add("swamp");
+  const add = fxAdder(root);
+  for (const [x, y] of [[114, 318], [1586, 330]]) {
+    add("afx-halo afx-glow", x, y + 10, 260, 260);
+    add("afx-fire afx-glow", x, y, 70, 90);
+    for (let i = 0; i < 6; i++) add("afx-ember" + (i >= 3 ? " afx-heavy" : ""), x - 12 + (i * 7) % 24, y - 14, 0, 0,
+      { "--d": (1.6 + (i % 3) * 0.45) + "s", "--dl": (i * 0.41) + "s", "--dx": ((i % 2 ? 1 : -1) * (6 + i * 3)) + "px" });
+  }
+  [[60, 640], [180, 820], [380, 880], [610, 860], [1080, 870], [1330, 850], [1530, 700], [1620, 520], [40, 470], [1450, 180],
+    [260, 140], [560, 90], [1150, 100], [1360, 260], [330, 320], [1290, 520]]
+    .forEach(([x, y], i) => add("afx-mote" + (i % 2 ? " afx-heavy" : ""), x, y, 0, 0,
+      { "--d": (6 + (i % 5) * 1.4) + "s", "--dl": (i * 0.8) + "s", "--dx": ((i % 2 ? 1 : -1) * (20 + (i % 4) * 14)) + "px", "--dy": (-25 - (i % 3) * 20) + "px" }));
+}
+
+/* ---------- Portal Realm: živé pozadie (súradnice v pixeloch originálu 1672×941) ---------- */
+function portalRealmFx(root) {
+  const add = fxAdder(root);
   // vír na oblohe (dve vrstvy proti sebe; lite = jedna)
   add("afx-vortex", 830, 18, 520, 520).innerHTML = "<i></i><i></i>";
   add("afx-halo afx-glow", 830, 30, 640, 260);

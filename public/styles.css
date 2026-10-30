@@ -65,6 +65,11 @@ body {
 /* žiadny mix-blend-mode: „screen" nad celým pozadím nútil prehliadač prekresľovať plochu každú snímku (~2× vyťaženie)
    lite (telefón / úsporná grafika): 3 iskry na misku, polovica svetielok, jeden vír - pulzy ohňov, rún a kruhu ostávajú */
 .perf-lite #arena-fx .afx-heavy, .perf-lite #arena-fx .afx-vortex i + i { display: none; }
+/* Shrek Swamp: tie isté prvky, teplé fakle a zelenožlté svätojánske mušky */
+#arena-fx.swamp .afx-fire { background: radial-gradient(circle, rgba(255,240,180,.95) 0 8%, rgba(255,160,40,.7) 25%, rgba(255,90,0,.25) 50%, transparent 70%); }
+#arena-fx.swamp .afx-halo { background: radial-gradient(circle, rgba(255,170,60,.32) 0, rgba(255,120,30,.1) 45%, transparent 70%); }
+#arena-fx.swamp .afx-ember { background: #ffd27a; box-shadow: 0 0 6px 2px rgba(255,140,30,.9); }
+#arena-fx.swamp .afx-mote { background: #f4ffb0; box-shadow: 0 0 8px 3px rgba(200,255,80,.75); }
 
 /* statický CRT overlay - jemné scanlines + tmavšie rohy; bez animácie (šetrí GPU/RDP) */
 .arena::after{
@@ -1702,8 +1707,47 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 }
 .weight .pct{ color: #888; font-size: 10px; flex: 0 0 auto; }
 .weights-sum{ margin-top: 8px; font-size: 10px; color: #ffb300; }
-/* výber arény (STONE BRIDGE / PORTAL REALM) - dve malé tlačidlá s náhľadom pozadia, výška ako ostatné voľby */
-.arena-pick{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* ---------- Shrek Swamp: Shrek, ohlásené skoky, rev, smrad (client/shrek.js) ---------- */
+.shrek-fig { position: absolute; left: 0; top: 0; image-rendering: pixelated; pointer-events: none; will-change: transform; }
+.shrek-fig.hurt { filter: brightness(2.2) saturate(.4); }
+.shrek-hp { position: absolute; left: 0; top: 0; z-index: 8; width: 150px; margin-left: -75px; padding: 5px 7px 4px; box-sizing: border-box;
+  background: rgba(10, 16, 6, .85); box-shadow: 0 0 0 2px #000; border-radius: 3px; pointer-events: none; font-size: 10px; color: #fff;
+  display: grid; grid-template-columns: 1fr auto; row-gap: 3px; }
+.shrek-hp .shp-name { color: #b6e04a; letter-spacing: 1px; font-weight: normal; }
+.shrek-hp .shp-bar { grid-column: 1 / -1; display: flex; gap: 1px; height: 8px; }
+.shrek-hp .shp-bar i { flex: 1; height: 8px; background: #333; }
+.shrek-hp .shp-bar i.on { background: #8fd12a; }
+.shrek-hp.t2 .shp-bar i.on { background: #ffa52e; }
+.shrek-hp.t3 .shp-bar i.on { background: #ff4d3a; }
+.shrek-hp .shp-roar { grid-column: 1 / -1; font-size: 9px; text-align: center; color: #b6e04a; }
+.shrek-hp.t2 .shp-roar { color: #ffa52e; } .shrek-hp.t3 .shp-roar { color: #ff4d3a; }
+.shrek-mark { position: absolute; right: 8px; top: 8px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 20px; font-weight: 900; color: #1c2a06; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, #d8f56a, #8fc21e 70%); box-shadow: 0 0 0 3px #2d3d0c, 0 0 0 5px rgba(214,245,106,.35); }
+.shrek-mark.done { opacity: .25; }
+.shrek-mark.next { animation: shrek-mark 0.7s ease-in-out infinite alternate; }
+@keyframes shrek-mark { to { transform: scale(1.14); } }
+.perf-lite .shrek-mark.next { animation: none; }
+.cell.shrek-roar::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(ellipse at center, rgba(255,240,140,.5), rgba(190,230,60,.2) 70%); box-shadow: inset 0 0 0 3px rgba(255,236,120,.9);
+  animation: shrek-roar .25s ease-in-out infinite alternate; }
+@keyframes shrek-roar { from { opacity: .55; } to { opacity: 1; } }
+.cell .stench { position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: .85;
+  background: radial-gradient(circle at 30% 60%, rgba(140,200,40,.65), transparent 45%), radial-gradient(circle at 70% 40%, rgba(110,170,30,.6), transparent 50%),
+    radial-gradient(circle at 50% 85%, rgba(170,220,60,.55), transparent 55%), rgba(80,130,20,.3);
+  animation: stench-breathe 3.2s ease-in-out infinite; }
+@keyframes stench-breathe { 50% { opacity: .6; } }
+.cell .stench.fresh { animation: stench-in 1.4s ease-out, stench-breathe 3.2s ease-in-out 1.4s infinite; }
+@keyframes stench-in { from { opacity: 0; transform: scale(.4); } }
+.cell.stench-flash .stench { opacity: 1; background-color: rgba(160,230,40,.65); }
+.shrek-roar-float { position: absolute; transform: translateX(-50%); color: #e9ff7a; font-weight: 900; font-size: 22px; letter-spacing: 2px;
+  text-shadow: 2px 2px 0 #000, 0 0 12px rgba(160,230,40,.9); animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9; }
+.shrek-barrel { position: absolute; image-rendering: pixelated; pointer-events: none; z-index: 8; }
+/* Shrek Swamp v lobby: popis Shreka namiesto váh dlaždíc */
+#lobby-swamp-section{ display: none; }
+.swamp-info p{ margin: 0 0 8px; font-size: 10px; line-height: 1.6; color: #cfe6a0; }
+/* výber arény (STONE BRIDGE / PORTAL REALM / SHREK SWAMP) - tri malé tlačidlá s náhľadom pozadia, výška ako ostatné voľby */
+.arena-pick{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .arena-card{ position: relative; height: 38px; cursor: pointer; border: none; padding: 0; border-radius: 2px; overflow: hidden;
   box-shadow: 0 0 0 2px #000; background: #1c1d20; font-family: inherit; }
 .arena-card canvas{ position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: .55; transition: opacity .12s; }

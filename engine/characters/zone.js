@@ -24,6 +24,7 @@ export function zoneSpecial(ctx, slot, tl) {
   // súperov tieňový klon v zóne - zomiera spolu so zásahom hráča (zóna zasahuje oboch naraz)
   const cloneStruck = !!(foe?.clone && inZone(foe.clone.x, foe.clone.y));
   if (ownerHit) ctx.revealLabyrinths(tl);
+  const zone = G.zoneCells(game.board, actor, onDmg); // pred konzumáciou dmg dlaždice (Shrek Swamp: zásah Shreka)
 
   // 3× „nádych" (caster animuje špeciál; klient bliká rozsah)
   for (let r = 0; r < SPECIAL_REPEAT; r++) {
@@ -36,9 +37,11 @@ export function zoneSpecial(ctx, slot, tl) {
   }
   // Naruto + jeho klon = tá istá postava so zdieľanou obranou → ak zóna zasiahne oboch, block/odraz/hit idú NARAZ;
   // zóna minula súpera, ale trafila jeho klona → klon reaguje sám (POWER bonus nesie aj tento zásah)
+  const raw = (SPECIAL_ZONE_DMG[actor.char] || 0) * ctx.dealMul(slot) + pBonus;
   if (ownerHit || cloneStruck) {
-    ctx.strikeZone(foeS, ownerHit, cloneStruck, (SPECIAL_ZONE_DMG[actor.char] || 0) * ctx.dealMul(slot) + pBonus, tl, { kind: "special", bonus: pBonus });
+    ctx.strikeZone(foeS, ownerHit, cloneStruck, raw, tl, { kind: "special", bonus: pBonus });
   } else {
     ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
   }
+  ctx.shrekZone(slot, zone, raw, tl); // Shrek Swamp: Shrek v zóne - reakcia (tackle / rev)
 }

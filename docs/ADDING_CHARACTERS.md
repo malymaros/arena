@@ -188,6 +188,11 @@ Toto je jadro dokumentu. Pri Narutovi sa väčšina iterácií točila práve tu
 ### Dlaždice a IK
 - Reaguje tvoj stav/entita na dmg/heal/mana/IK dlaždice? (Klon: dmg tile ho nezabíja, IK áno; pickupy neberie.)
 
+### Shrek Swamp (`docs/SWAMP_PLAN.md`)
+- Dmg special / Special 1 so zónou musí po zásahu súpera zavolať `ctx.shrekZone(slot, cells, raw, tl)` - inak
+  Shrek v zóne nedostane dmg ani nereaguje (tackle / rev). Vlastné melee volá `ctx.shrekMelee(…)`. Basic strela
+  ide cez `doBasic` (Shrek ju zastaví sám). Charge/trap/statusy Shreka zámerne ignorujú.
+
 ### Timeline / výhra
 - Víťaz sa kontroluje po **každom** zásahu (`winnerNow()`) — „prvá smrť ukončí kolo, žiadna remíza".
   Nové zásahy to musia rešpektovať.

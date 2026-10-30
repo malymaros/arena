@@ -23,6 +23,7 @@ import { timestopModule } from "./timestop.js";
 import { lastStandModule } from "./laststand.js";
 import { tilesModule } from "./tiles.js";
 import { portalsModule } from "./portals.js";
+import { swampModule } from "./swamp.js";
 
 export function createEngine(io = {}) {
   // --- háčiky na vonkajší svet (server: sockety/časovač; headless simulácia ich môže vynechať) ---
@@ -63,6 +64,7 @@ export function createEngine(io = {}) {
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
   const { walkDelay, isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
+  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone } = Object.assign(E, swampModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -76,6 +78,8 @@ export function createEngine(io = {}) {
     killClone, trackSteps, doJotaroWorld, vampShotRoute,
     // Portal Realm: portály pre geometriu (null mimo portal realm), efekty na telo, zatvorenie párov, niť cez prechod
     portalList, bodyEffect, closePortals, trackPath, walkDelay,
+    // Shrek Swamp: zásah Shreka zónovým specialom / melee (reakcia tackle/rev/punch) - mimo bažiny nič
+    shrekZone, shrekMelee,
   };
 
 function newPlayer(slot) {
@@ -149,7 +153,9 @@ function newGame() {
     tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" | "power" | "block" } - pribúdajú od konca 1. kola
     // Portal Realm: páry portálov na hranách dosky [{ id: "A"–"G", type, ends: [{ x, y, side }, …] }]; mimo portal realm prázdne
     portals: [],
-    iks: [],       // [{ x, y }] - insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
+    // Shrek Swamp: { x, y, hp, dead, marks: [[x,y]×3], done, stench: [[x,y]…] } - mimo bažiny null
+    shrek: null,
+    iks: [],      // [{ x, y }] - insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
     pending: null, // { ikMoves: [{x,y}…], spawns: [{x,y,type}…] } - VOPRED vyžrebované zmeny tiles na koniec AKTUÁLNEHO kola (preview pre hráčov)
     // séria zápasov
     seats: { p1: "A", p2: "B" }, // kto sedí na ktorom slote - LOSUJE sa v startMatch (p1 = biely, začína); fixné na celú sériu
@@ -252,6 +258,8 @@ function snapshot() {
     iks: game.iks.map(t => ({ ...t })),
     // Portal Realm: portály sú verejný terén (vidí ich aj prekliaty v labyrinte); kľúč len v portal realm (bridge goldeny)
     ...(isPortalRealm() ? { portals: game.portals.map(p => ({ id: p.id, type: p.type, ends: p.ends.map(e => ({ ...e })) })) } : {}),
+    // Shrek Swamp: Shrek (pozícia, HP, ohlásené skoky, smrad) je verejný terén; kľúč len v bažine (bridge goldeny)
+    ...(isSwamp() ? { shrek: shrekSnapshot() } : {}),
     // preview zmien tiles na konci kola (len ak je zapnutý config.tilePreview) - verejná, symetrická informácia;
     // heal/mana spawny počas labyrintu rediguje redactTilesFor rovnako ako existujúce tiles
     pending: (game.config?.tilePreview && game.pending) ? {
@@ -689,6 +697,8 @@ function doBasic(slot, dir, tl) {
         if (s.done) continue;
         if (p) stepUsed.push(p.id);
         if (s.spent) continue;
+        // Shrek Swamp: živý Shrek zastaví strelu (súper/jeho klon na tom istom políčku má prednosť)
+        if (shrekAt(s.x, s.y) && !(op && op.x === s.x && op.y === s.y) && !(op?.clone && op.clone.x === s.x && op.clone.y === s.y)) { s.done = true; continue; }
         const decoy = op?.clone && op.clone.x === s.x && op.clone.y === s.y && !(op.x === s.x && op.y === s.y);
         if (decoy) { s.spent = true; if (op.shield || op.mirror) s.done = true; continue; } // klon-návnada strelu zožerie
         if (op && op.x === s.x && op.y === s.y) { found = true; break; }
@@ -720,6 +730,7 @@ function doBasic(slot, dir, tl) {
       if (cloneHere && playerHere) { s.done = true; hits.push({ target: "stacked", shot: s }); }
       else if (cloneHere)         { hits.push({ target: "clone", shot: s }); }
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
+      else if (shrekAt(s.x, s.y)) { s.done = true; hits.push({ target: "shrek", shot: s }); } // Shrek Swamp: strela sa o Shreka zastaví
       else { const own = ownAt(s); if (own) { s.done = true; hits.push({ target: own, shot: s }); } }
     }
     // Portal Realm: krok s prechodom portálom je dlhší (PORTAL_SHOT_STEP_MS - strela sa dá sledovať)
@@ -755,6 +766,7 @@ function doBasic(slot, dir, tl) {
     for (const h of hits) {
       if (h.target === "player" || winnerNow()) continue;
       const raw = rawOf(h);
+      if (h.target === "shrek") { shrekShot(slot, h.shot.clone, raw, tl); continue; } // reakcia: sud späť na strelca
       if (h.target === "stacked") {
         // stacknutý pár: obrana kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok prejde na Naruta
         strikeCell(opS, "stacked", raw, tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) });
@@ -833,6 +845,8 @@ function doMelee(slot, tl) {
     // plný dmg ako pri zásahu hráča (vrátane maze 2× a pri klonovom seku plného MELEE_DMG) - prejaví sa na sile odrazu
     strikeCell(opS, "clone", hitFoeCloneByMe ? meleeRaw : cloneMeleeRaw, tl, { kind: "melee", fromClone: !hitFoeCloneByMe });
   }
+  // Shrek Swamp: Shrek na zasahovanej bunke dostane úder tiež (reakcia punch)
+  shrekMelee(slot, cells, cloneCells, meleeRaw, cloneMeleeRaw, tl);
 }
 
 /* ---- Vampire / Onryō: melee + charge + pasca ---- */
@@ -1497,6 +1511,9 @@ function runRoundLoop() {
       if (game.players[slot].stone === 0) pushStateFrame(tl, [{ kind: "unpetrify", target: slot }], SMALL_DELAY_MS);
     }
     if (winnerNow()) { ctx.ended = true; return finishRound(); }
+    // Shrek Swamp: Shrek skočí na ohlásené políčko kroku a zareve (po smrti smrad berie HP)
+    shrekStepEnd(ctx.i, tl, ctx.stonedStep);
+    if (winnerNow()) { ctx.ended = true; return finishRound(); }
     ctx.i++;
     ctx.slotIdx = 0;
   }
@@ -1608,9 +1625,11 @@ function finishRound() {
     // Portal Realm: nové páry portálov (lobby „Portals / round") ako ÚPLNE posledná vec kola - hráči ich vidia od
     // začiatku ďalšieho kola
     const spawned = spawnPortalRound();
+    // Shrek Swamp: nové ohlásené skoky / šírenie smradu - tiež až vo finálnom frame kola
+    const swampFx = shrekRoundEnd();
     const nextTurn    = game.turn + 1;
     const nextStarter = game.starter === "p1" ? "p2" : "p1"; // preklop (hru mohol začínať aj p2)
-    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: spawned.map(p => ({ kind: "portal_spawn", id: p.id })), delayMs: 10 });
+    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: [...spawned.map(p => ({ kind: "portal_spawn", id: p.id })), ...swampFx], delayMs: 10 });
     game.turn    = nextTurn;
     game.starter = nextStarter;
   }
@@ -1699,7 +1718,7 @@ function startMatch(config) {
   const seed = io.seed ?? ARENA_SEED;
   if (seed !== null) rand = seededRng(seed);
   game.config = config;
-  game.arena = config.arena === "portal" ? "portal-realm" : "bridge"; // pozadie (klient ARENAS_CLIENT)
+  game.arena = config.arena === "portal" ? "portal-realm" : config.arena === "swamp" ? "shrek-swamp" : "bridge"; // pozadie (klient ARENAS_CLIENT)
   // BIELY (p1, vľavo) začína hru 1 - náhodné je, KTO je biely: osoby A/B sa vylosujú na sloty
   // ešte PRED animáciou ruletky na klientovi (color_roll nižšie je už len divadlo s hotovým výsledkom).
   // FORCE_FIRST_STARTER=A|B pripne osobu na p1/bieleho (testy). Sloty sú fixné na celú sériu;
@@ -1782,6 +1801,7 @@ function startGame(gameIndex) {
   rollPendingTiles(); // preview spawnov na koniec 1. kola - hráči ho vidia už pri plánovaní prvých akcií
   game.portals = [];
   spawnPortalRound(); // Portal Realm: „Portals / round" párov hneď pri štarte každej hry (mimo portal realm nič)
+  swampStartGame();   // Shrek Swamp: Shrek + ohlásené skoky 1. kola (mimo bažiny null)
   game.phase = "playing";
 
   emitYouAre();
@@ -1828,13 +1848,15 @@ function sanitizeConfig(raw) {
   const w = raw.tileWeights || {};
   // Portal Realm: len Damage + Insta-kill dlaždice (ostatné typy sa vynulujú), váhy typov portálov tiež spolu 100
   const portal = raw.arena === "portal";
+  // Shrek Swamp: špeciálne dlaždice nahrádza Shrek - všetky váhy 0 (rollPendingTiles potom nič nespawne)
+  const swamp = raw.arena === "swamp";
   const weights = {};
   let sum = 0;
   for (const k of ["dmg", "heal", "mana", "ik", "power", "block"]) {
-    const v = (portal && !(k in PORTAL_TILE_WEIGHTS)) ? 0 : Math.max(0, Math.round(Number(w[k]) || 0));
+    const v = (swamp || (portal && !(k in PORTAL_TILE_WEIGHTS))) ? 0 : Math.max(0, Math.round(Number(w[k]) || 0));
     weights[k] = v; sum += v;
   }
-  if (sum !== 100) return null; // percentá musia dať presne 100
+  if (!swamp && sum !== 100) return null; // percentá musia dať presne 100
   let portalWeights = null;
   if (portal) {
     const pw = raw.portalWeights || PORTAL_WEIGHTS;
@@ -1852,7 +1874,8 @@ function sanitizeConfig(raw) {
   return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref,
     ...(raw.randomChars === true ? { randomChars: true } : {}),
     // aréna: kľúč len pre portal realm (stone bridge config ostáva bez zmeny - goldeny)
-    ...(portal ? { arena: "portal", portalWeights, portalsPerRound } : {}) };
+    ...(portal ? { arena: "portal", portalWeights, portalsPerRound } : {}),
+    ...(swamp ? { arena: "swamp" } : {}) };
 }
 
 // vypršal čas na ťah: kto nie je locknutý, zahrá rozpracovaný draft doplnený náhodne; potom vyhodnoť kolo

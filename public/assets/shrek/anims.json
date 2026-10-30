@@ -1,0 +1,218 @@
+[
+ {
+  "name": "Idle",
+  "frames": 5,
+  "size": 50,
+  "fps": 6,
+  "loop": true,
+  "hassle": false
+ },
+ {
+  "name": "Walk",
+  "frames": 7,
+  "size": 52,
+  "fps": 10,
+  "loop": true,
+  "hassle": false
+ },
+ {
+  "name": "JumpKick",
+  "frames": 6,
+  "size": 52,
+  "fps": 10,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "Punch",
+  "frames": 4,
+  "size": 60,
+  "fps": 10,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "CrouchKick",
+  "frames": 3,
+  "size": 54,
+  "fps": 9,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "PowerUp",
+  "frames": 16,
+  "size": 49,
+  "fps": 12,
+  "loop": true,
+  "hassle": false
+ },
+ {
+  "name": "Tackle",
+  "frames": 15,
+  "size": 50,
+  "fps": 14,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "HurtDead",
+  "frames": 13,
+  "size": 60,
+  "fps": 8,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "Climb",
+  "frames": 5,
+  "size": 53,
+  "fps": 8,
+  "loop": true,
+  "hassle": false
+ },
+ {
+  "name": "InOut",
+  "frames": 2,
+  "size": 49,
+  "fps": 4,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "Victory",
+  "frames": 4,
+  "size": 58,
+  "fps": 6,
+  "loop": true,
+  "hassle": false
+ },
+ {
+  "name": "PickUp",
+  "frames": 8,
+  "size": 88,
+  "fps": 8,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "Push",
+  "frames": 6,
+  "size": 48,
+  "fps": 9,
+  "loop": true,
+  "hassle": false
+ },
+ {
+  "name": "Roar",
+  "frames": 20,
+  "size": 79,
+  "fps": 12,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "SpecialMoves",
+  "frames": 8,
+  "size": 84,
+  "fps": 10,
+  "loop": false,
+  "hassle": false
+ },
+ {
+  "name": "H_Idle",
+  "frames": 4,
+  "size": 45,
+  "fps": 6,
+  "loop": true,
+  "hassle": true
+ },
+ {
+  "name": "H_Walk",
+  "frames": 6,
+  "size": 46,
+  "fps": 10,
+  "loop": true,
+  "hassle": true
+ },
+ {
+  "name": "H_Row6",
+  "frames": 4,
+  "size": 46,
+  "fps": 8,
+  "loop": true,
+  "hassle": true
+ },
+ {
+  "name": "H_Row8",
+  "frames": 5,
+  "size": 56,
+  "fps": 10,
+  "loop": false,
+  "hassle": true
+ },
+ {
+  "name": "H_Row10",
+  "frames": 3,
+  "size": 45,
+  "fps": 8,
+  "loop": false,
+  "hassle": true
+ },
+ {
+  "name": "H_Row12",
+  "frames": 2,
+  "size": 42,
+  "fps": 6,
+  "loop": false,
+  "hassle": true
+ },
+ {
+  "name": "H_Row14",
+  "frames": 4,
+  "size": 48,
+  "fps": 9,
+  "loop": false,
+  "hassle": true
+ },
+ {
+  "name": "H_Club",
+  "frames": 5,
+  "size": 56,
+  "fps": 10,
+  "loop": false,
+  "hassle": true
+ },
+ {
+  "name": "H_Row17",
+  "frames": 4,
+  "size": 52,
+  "fps": 8,
+  "loop": true,
+  "hassle": true
+ },
+ {
+  "name": "H_Roar",
+  "frames": 2,
+  "size": 44,
+  "fps": 6,
+  "loop": true,
+  "hassle": true
+ },
+ {
+  "name": "H_Row21",
+  "frames": 8,
+  "size": 45,
+  "fps": 10,
+  "loop": false,
+  "hassle": true
+ },
+ {
+  "name": "H_Row23",
+  "frames": 6,
+  "size": 50,
+  "fps": 10,
+  "loop": false,
+  "hassle": true
+ }
+]
