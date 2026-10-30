@@ -1,7 +1,7 @@
 # Implementačný plán: viac roomiek naraz
 
 Cieľ: umožniť **N nezávislých roomiek** (min. 2) na jednom serveri namiesto dnešnej jedinej globálnej hry.
-Tento dokument je len plán — **nič sa zatiaľ neimplementuje.**
+> **Stav: implementované** — viac roomiek naraz beží (`rooms = new Map()` v `server.js`). Dokument ostáva ako záznam návrhu.
 
 ## 1. Východiskový stav (čo dnes bráni viacerým roomkám)
 

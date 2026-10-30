@@ -421,12 +421,12 @@ Každá fáza = samostatne commitnuteľný, testami krytý celok. Zaškrtávaj.
 - [x] **F3b — THE WORLD:** server pauza/resume + `timestop_actions` + announce/kumulát (TJ5-7,13,14
       zelené); klient pauza + ts UI + filter (kód hotový); `worldUsed` default `false`. ✅ server;
       ⚠️ klientská pauza/ts-mód/reload VIZUÁLNE NEOVERENÉ.
-- [~] **F4 — matica okrajov:** turnaj (TJ12) ✅, naruto klon odložený clone_die (TJ11) ✅.
-      CHÝBA: labyrint (TJ10), tiles (TJ9), pasca (TJ15), Last Stand ručný check — server logika
-      (frozenActive guardy) je hotová, len bez cielených testov.
-- [~] **F5 — dokumentácia + polish:** CLAUDE.md ✅; ability preview text ✅. CHÝBA: choreografia
-      THE WORLD castu (Special_3_P menace/invert flash/„THE WORLD!" float — teraz len generický
-      filter), vizuálne overenie v prehliadači (obe strany, reload počas timestopu).
+- [x] **F4 — matica okrajov:** turnaj (TJ12) ✅, naruto klon odložený clone_die (TJ11) ✅, dlaždice (TJ9),
+      labyrint (TJ10), pasca (TJ15) a Last Stand (TJ16) ✅ — engine-level testy v `test/timestop-edges.mjs`
+      (2026-10-30, overené aj mutáciou guardov).
+- [x] **F5 — dokumentácia + polish:** CLAUDE.md ✅; ability preview text ✅; choreografia THE WORLD castu
+      (`public/client/the-world.js`, `public/chars/fx/jotaro.js`) ✅; browser-smoke `--only jotaro` (bridge aj
+      `--portal`) bez chýb ✅. Ostáva len ručný pohľad očami (offset/veľkosť standu, reload počas timestopu).
 
 ---
 
