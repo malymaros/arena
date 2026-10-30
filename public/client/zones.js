@@ -33,5 +33,10 @@ export function cellsForDemonPreview(p){
   return p ? G.allCells(board, p) : [];
 }
 
+// dosah Shield / Mirror Breakera - celá plocha (mieri na súperovu obranu, nie na políčko; docs/BREAKER_PLAN.md)
+export function cellsForBreakerPreview(){
+  return G.allCells(board);
+}
+
 // 8 smerov (vlkolakov charge, smer strely) - zo shared/geometry.js
 export const WOLF_DIRS_CLIENT = G.DIR8;

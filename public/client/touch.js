@@ -27,7 +27,7 @@ import { board } from "/client/session.js";
 import { planning } from "/client/planning.js";
 import { stripActive, stripCenterCard } from "/client/char-strip.js";
 import { slotOf, labelInfo, openerOf, MANA_BUTTONS } from "/client/touch-label.js";
-import { costMarkup } from "/client/balance-ui.js";
+import { costMarkup, BUTTON_TEXT } from "/client/balance-ui.js";
 import { hydratePix } from "/client/pix.js";
 import { state, me } from "/client/session.js";
 import { rosterFirstCard, selectOverlayBusy } from "/client/char-select.js";
@@ -130,10 +130,12 @@ function showInfo(text) {
 }
 // štítok „TAP AGAIN" nad označenou akciou - aby bolo jasné, že treba ťuknúť ešte raz
 let confirmEl = null;
-function placeConfirm(el, warn = null) {
+// head = účinok zvolenej voľby nad TAP AGAIN (výber obrana | breaker: BLOCK / {☠️}2 - cena je v štítku nad tlačidlom)
+function placeConfirm(el, warn = null, head = null) {
   if (!confirmEl) { confirmEl = document.createElement("div"); confirmEl.id = "touch-confirm"; document.body.appendChild(confirmEl); }
   if (!el || el.classList.contains("char-card") || el.classList.contains("q-badge")) { confirmEl.classList.add("hidden"); return; }
-  confirmEl.innerHTML = (warn ? `<span class="tc-warn">⚠ ${warn}</span>` : "") + "TAP AGAIN";
+  const html = (warn ? `<span class="tc-warn">⚠ ${warn}</span>` : "") + (head ? `<span class="tc-head">${costMarkup(head)}</span>` : "") + "TAP AGAIN";
+  if (confirmEl.dataset.html !== html) { confirmEl.dataset.html = html; confirmEl.innerHTML = html; hydratePix(confirmEl); }
   confirmEl.classList.remove("hidden");
   placeAbove(confirmEl, el);
 }
@@ -177,9 +179,10 @@ function refreshLabel() {
   }
   // štítok visí nad tlačidlom, ktoré otvorilo výber, inak nad označeným tlačidlom akcie
   const opener = openerOf(openPickerEl());
-  // voľba obrana | breaker má vlastnú cenu aj účinok → štítok visí nad ňou (nie nad štítom / mirrorom, ktorý výber otvoril)
+  // voľba obrana | breaker: štítok s cenou ostáva nad štítom / mirrorom (obe stoja rovnako), účinok voľby
+  // (BLOCK / {☠️}2) ukáže bublina TAP AGAIN nad ňou - ako šípky smerového specialu
   const defOpt = armed?.classList?.contains("def-opt") ? armed : null;
-  const host = defOpt || (slotOf(opener) ? opener : (armed && slotOf(armed) ? armed : null));
+  const host = slotOf(opener) ? opener : (armed && slotOf(armed) ? armed : null);
   const info = host ? labelInfo(slotOf(host), host) : null;
   const inPicker = !!armed?.closest?.("#touch-layer");
   const pick = inPicker && host ? labelInfo(slotOf(host), armed) : null;
@@ -198,7 +201,7 @@ function refreshLabel() {
   } else labelEl.classList.add("hidden");
   // bublina nad šípkou / políčkom / hlavou maga: TAP AGAIN (+ varovanie závislé od smeru)
   if (!armed || (host === armed && info?.text)) placeConfirm(null);
-  else placeConfirm(armed, pick?.warn && pick.warn !== info?.warn ? pick.warn : null);
+  else placeConfirm(armed, pick?.warn && pick.warn !== info?.warn ? pick.warn : null, defOpt ? BUTTON_TEXT[slotOf(defOpt)]?.tap : null);
   setFlash(noMana && !!info?.text);
   syncNoMana();
 }

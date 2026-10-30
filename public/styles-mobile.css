@@ -94,6 +94,9 @@
 @keyframes touch-confirm-pulse { 50% { filter: brightness(1.25); } }
 /* varovanie nad TAP AGAIN pri šípke (závislé od smeru - napr. mimo plochy) */
 #touch-confirm .tc-warn { display: block; margin-bottom: calc(3px * var(--ui-k, 1)); color: #7a3b00; }
+/* účinok voľby obrana | breaker (BLOCK / ☠️2) nad TAP AGAIN */
+#touch-confirm .tc-head { display: block; margin-bottom: calc(4px * var(--ui-k, 1)); text-align: center; font-size: calc(12px * var(--ui-k, 1)); }
+#touch-confirm .tc-head .pix-ico.mini { width: calc(14px * var(--ui-k, 1)); height: calc(14px * var(--ui-k, 1)); vertical-align: -.15em; margin: 0 1px; }
 
 /* telefón: štítok akcie - cena a účinok namiesto popisu (touch.js + touch-label.js) */
 #touch-label {
@@ -352,6 +355,7 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 /* tlačidlá nesú len piktogram - cena a účinok sú v štítku po prvom ťuknutí (touch-label.js) */
 .touch .btn.act .cost { display: none; }
 .touch .btn.act > .pix-ico:not(.charge-mark), .touch .golden-half > .g-ico { width: 54px; height: 54px; }
+.touch .btn.act > .brk-ico > .pix-ico { width: 54px; height: 54px; } /* breaker (voľba aj zvolený na tlačidle) = rovnako veľký ako obrana */
 /* skryté postavy (Vampire/Onryō charge, Special 1 Jotara a Luffyho): fialové „???" cez celé tlačidlo */
 .touch .controls-row .btn.act > .pix-ico.charge-mark { width: 100%; height: 100%; font-size: 40px; letter-spacing: -2px; }
 .touch .btn.golden { width: 196px; }

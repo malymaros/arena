@@ -2,10 +2,10 @@
 // Jotaro S1, vlkolakov charge, Vampire/Onryō charge, diagonálna strela, basic) - zóny z ghost pozície, teda
 // po už naplánovaných akciách.
 // hover preview pre special
-import { specialBtn, specialPicker, s1Picker, wolfPicker, meleeBtn, dashPicker, aimPickerDiag, aimPicker } from "/client/dom.js";
+import { specialBtn, specialPicker, s1Picker, wolfPicker, meleeBtn, dashPicker, aimPickerDiag, aimPicker, shieldPicker, mirrorDefPicker } from "/client/dom.js";
 import { ghostCharAt, ghostPos, showPreviewCells, clearPreviewCells, cellsForAimPreview } from "/client/ghost.js";
 import { specialTargetOf } from "/client/controls.js";
-import { cellsForSpecialPreview, cellsForJotaroS1, cellsForMeleePreview, cellsForVampChargePreview } from "/client/zones.js";
+import { cellsForSpecialPreview, cellsForJotaroS1, cellsForMeleePreview, cellsForVampChargePreview, cellsForBreakerPreview } from "/client/zones.js";
 import { state, me, otherSlot } from "/client/session.js";
 import { VAMP_CHARS } from "/chars/index.js";
 if (specialBtn){
@@ -91,3 +91,9 @@ aimPicker.querySelectorAll("button[data-act]").forEach(btn => {
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
+
+// Shield / Mirror Breaker je útok na súperovu obranu, kdekoľvek stojí → náhľad = celá plocha
+for (const btn of [shieldPicker, mirrorDefPicker].flatMap(p => [...(p?.querySelectorAll(".def-opt.breaker") || [])])) {
+  btn.addEventListener("mouseenter", () => showPreviewCells(cellsForBreakerPreview()));
+  btn.addEventListener("mouseleave", clearPreviewCells);
+}

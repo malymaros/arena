@@ -25,11 +25,15 @@ export const BUTTON_TEXT = {
   dash:     { ...act("DASH", `{💧}${DASH_COST}`, "Move up to 2 cells in one direction."), cost: `−${DASH_COST}{💧}`, label: `{💧}${DASH_COST}` },
   melee:    { ...act("MELEE", `{💧}${MELEE_COST} {☠️}${MELEE_DMG}`, "Hits only an opponent standing on your cell."), cost: `−${MELEE_COST}{💧} ${MELEE_DMG}{☠️}`, label: `{💧}${MELEE_COST} {☠️}${MELEE_DMG}` },
   special:  { title: `Special (−${SPECIAL_COST} mana)`, cost: `−${SPECIAL_COST}{💧}`, label: `{💧}${SPECIAL_COST}` },
-  shield:   { ...act("SHIELD", `{💧}${SHIELD_COST}`, "Blocks all damage of the opponent's next action. It's used up by that action, even if it deals no damage."), cost: `−${SHIELD_COST}{💧}`, label: `{💧}${SHIELD_COST} BLOCK` },
-  mirror:   { ...act("MIRROR", `{💧}${MIRROR_COST}`, "Reflects all damage of the opponent's next action back at them. It's used up by that action, even if it deals no damage."), cost: `−${MIRROR_COST}{💧}`, label: `{💧}${MIRROR_COST} REFLECT` },
-  // Shield / Mirror Breaker (docs/BREAKER_PLAN.md) - voľba vo výbere nad štítom / mirrorom; cenovka = len dmg
-  shieldBreaker: { ...act("SHIELD BREAKER", `{💧}${SHIELD_COST} {☠️}${SHIELD_BREAKER_DMG}`, `Attacks the opponent's shield. If they have a shield up right now, it breaks it and deals ${SHIELD_BREAKER_DMG} damage. A mirror reflects it back at you. No defense - nothing happens. Takes the place of your Shield this round.`), cost: `${SHIELD_BREAKER_DMG}{☠️}`, label: `{💧}${SHIELD_COST} {☠️}${SHIELD_BREAKER_DMG}` },
-  mirrorBreaker: { ...act("MIRROR BREAKER", `{💧}${MIRROR_COST} {☠️}${MIRROR_BREAKER_DMG}`, `Attacks the opponent's mirror. If they have a mirror up right now, it breaks it and deals ${MIRROR_BREAKER_DMG} damage. A shield blocks it. No defense - nothing happens. Takes the place of your Mirror this round.`), cost: `${MIRROR_BREAKER_DMG}{☠️}`, label: `{💧}${MIRROR_COST} {☠️}${MIRROR_BREAKER_DMG}` },
+  // tlačidlo štítu / mirroru otvára výber obrana | breaker (docs/BREAKER_PLAN.md) → popis oboch akcií;
+  // obe stoja rovnako, štítok na telefóne je preto len cena (účinok ukáže bublina nad zvolenou voľbou)
+  shield:   { ...act("SHIELD", `{💧}${SHIELD_COST}`, `Choose one: BLOCK - blocks all damage of the opponent's next action (used up by it, even if it deals no damage). SHIELD BREAKER - if the opponent has a shield up right now, breaks it and deals ${SHIELD_BREAKER_DMG} damage; a mirror reflects it back at you, no defense - nothing happens.`), cost: `−${SHIELD_COST}{💧}`, label: `{💧}${SHIELD_COST}` },
+  mirror:   { ...act("MIRROR", `{💧}${MIRROR_COST}`, `Choose one: REFLECT - reflects all damage of the opponent's next action back at them (used up by it, even if it deals no damage). MIRROR BREAKER - if the opponent has a mirror up right now, breaks it and deals ${MIRROR_BREAKER_DMG} damage; a shield blocks it, no defense - nothing happens.`), cost: `−${MIRROR_COST}{💧}`, label: `{💧}${MIRROR_COST}` },
+  // voľby vo výbere; tap = text bublinky nad zvolenou voľbou na telefóne (namiesto „TAP AGAIN" nad ňou)
+  block:    { ...act("SHIELD", `{💧}${SHIELD_COST}`, "Blocks all damage of the opponent's next action. It's used up by that action, even if it deals no damage."), tap: "BLOCK" },
+  reflect:  { ...act("MIRROR", `{💧}${MIRROR_COST}`, "Reflects all damage of the opponent's next action back at them. It's used up by that action, even if it deals no damage."), tap: "REFLECT" },
+  shieldBreaker: { ...act("SHIELD BREAKER", `{💧}${SHIELD_COST} {☠️}${SHIELD_BREAKER_DMG}`, `Attacks the opponent's shield. If they have a shield up right now, it breaks it and deals ${SHIELD_BREAKER_DMG} damage. A mirror reflects it back at you. No defense - nothing happens. Takes the place of your Shield this round.`), cost: `${SHIELD_BREAKER_DMG}{☠️}`, tap: `{☠️}${SHIELD_BREAKER_DMG}` },
+  mirrorBreaker: { ...act("MIRROR BREAKER", `{💧}${MIRROR_COST} {☠️}${MIRROR_BREAKER_DMG}`, `Attacks the opponent's mirror. If they have a mirror up right now, it breaks it and deals ${MIRROR_BREAKER_DMG} damage. A shield blocks it. No defense - nothing happens. Takes the place of your Mirror this round.`), cost: `${MIRROR_BREAKER_DMG}{☠️}`, tap: `{☠️}${MIRROR_BREAKER_DMG}` },
   recharge: { ...act("RECHARGE", `+${RECHARGE_GAIN}{💧}`, `Gain mana (max ${MAX_MANA}).`), cost: `+${RECHARGE_GAIN}{💧}`, label: `+${RECHARGE_GAIN}{💧}` },
   goldenShield: { ...act("GOLDEN SHIELD", `{💧}${GOLDEN_COST}`, "Extra action before the round starts. Only when you go second. Works like Shield."), cost: `−${GOLDEN_COST}{💧}`, label: `{💧}${GOLDEN_COST} BLOCK` },
   goldenMirror: { ...act("GOLDEN MIRROR", `{💧}${GOLDEN_MIRROR_COST}`, "Extra action before the round starts. Only when you go second. Works like Mirror."), cost: `−${GOLDEN_MIRROR_COST}{💧}`, label: `{💧}${GOLDEN_MIRROR_COST} REFLECT` },
@@ -53,9 +57,9 @@ const STATIC = [
   ["#special-btn", "special", ".cost"],
   ['.btn.act.shield[data-act="shield"]', "shield", ".cost"],
   ["#mirror-btn", "mirror", ".cost"],
-  ['#shield-picker [data-act="shield"]', "shield", null],
+  ['#shield-picker [data-act="shield"]', "block", null],
   ['#shield-picker [data-act="shield_breaker"]', "shieldBreaker", ".cost"],
-  ['#mirror-def-picker [data-act="mirror"]', "mirror", null],
+  ['#mirror-def-picker [data-act="mirror"]', "reflect", null],
   ['#mirror-def-picker [data-act="mirror_breaker"]', "mirrorBreaker", ".cost"],
   ['.btn.act.mana[data-act="recharge"]', "recharge", ".cost"],
   [".golden-half.shield-half", "goldenShield", ".cost"],

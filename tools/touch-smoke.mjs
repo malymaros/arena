@@ -298,12 +298,17 @@ try {
     await tap(".controls-row .btn.act.shield");
     check(await ev(`!document.getElementById("shield-picker").classList.contains("hidden") && !!document.querySelector("#touch-layer #shield-picker")`),
       "ťuk na štít otvorí výber obrana | breaker na boarde");
+    const tc = () => ev(`(() => { const t = document.getElementById("touch-confirm"); return t && !t.classList.contains("hidden") ? t.textContent : ""; })()`);
+    check(/2/.test(await label()) && !(await label()).includes("BLOCK"), "štítok nad štítom = len cena (bez BLOCK)", await label());
     await tap('#touch-layer .def-opt[data-act="shield"]');
-    const sl = await label();
-    check(sl.includes("BLOCK") && (sl.includes("EXPIRES UNUSED") || sl.includes("TAP AGAIN")), "štítok štítu: BLOCK (+ varovanie na poslednom mieste kola)", sl);
+    check(/2/.test(await label()) && !(await label()).includes("BLOCK") && (await tc()).includes("BLOCK") && (await tc()).includes("TAP AGAIN"),
+      "voľba štítu: cena ostáva nad štítom, BLOCK + TAP AGAIN nad voľbou", `${await label()} | ${await tc()}`);
+    check((await ev(`(() => { const a = document.querySelector('#touch-layer .def-opt[data-act="shield"] > .pix-ico'), b = document.querySelector('#touch-layer .def-opt[data-act="shield_breaker"] .brk-ico > .pix-ico'); return Math.round(a.getBoundingClientRect().width) === Math.round(b.getBoundingClientRect().width); })()`)),
+      "ikona Shield Breakera je rovnako veľká ako ikona štítu");
     await shot("shield-label");
     await tap('#touch-layer .def-opt[data-act="shield_breaker"]');
-    check(/2/.test(await label()), "štítok Shield Breakera: cena + dmg", await label());
+    check(!(await tc()).includes("BLOCK") && /2/.test(await tc()) && (await preview()) === 12, "voľba Shield Breakera: bublina ☠️2, bliká celá plocha", `${await tc()} | ${await preview()}`);
+    await shot("shield-breaker-armed");
     await tap('#touch-layer .def-opt[data-act="shield_breaker"]');
     check((await queue())[2] === "breaker" && await ev(`document.querySelector(".controls-row .btn.act.shield").classList.contains("brk-chosen")`),
       "druhý ťuk zaradí Shield Breaker, tlačidlo štítu ukáže ikonu breakera", JSON.stringify(await queue()));

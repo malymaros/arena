@@ -6,7 +6,7 @@ import { mageHeadHtml } from "/client/mage-head.js";
 import { usesAltColor } from "/client/sprites.js";
 import { ghostPos, showPreviewCells, cellsForAimPreview, ghostCharAt, clearPreviewCells, planWarnings, foeMirrorImmune, MIRROR_IMMUNE_WARN } from "/client/ghost.js";
 import { VAMP_CHARS, CHARS_BY_KEY } from "/chars/index.js";
-import { cellsForVampChargePreview, cellsForSpecialPreview, cellsForJotaroS1, cellsForMeleePreview, cellsForDemonPreview } from "/client/zones.js";
+import { cellsForVampChargePreview, cellsForSpecialPreview, cellsForJotaroS1, cellsForMeleePreview, cellsForDemonPreview, cellsForBreakerPreview } from "/client/zones.js";
 import { state, otherSlot, me, isSpectator } from "/client/session.js";
 import { playback } from "/client/playback.js";
 import { planning } from "/client/planning.js";
@@ -89,6 +89,9 @@ function attachQueueHover(el, a, idx) {
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "demon") {
     el.addEventListener("mouseenter", () => { const p = ghostPos(idx); if (p) showPreviewCells(cellsForDemonPreview(p)); });
+    el.addEventListener("mouseleave", clearPreviewCells);
+  } else if (a.type === "shield_breaker" || a.type === "mirror_breaker") {
+    el.addEventListener("mouseenter", () => showPreviewCells(cellsForBreakerPreview()));
     el.addEventListener("mouseleave", clearPreviewCells);
   }
 }

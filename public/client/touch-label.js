@@ -26,7 +26,7 @@ export function slotOf(el) {
   if (el === shieldBtn) return "shield";
   if (el === rechargeBtn) return "recharge";
   // výber obrana | breaker (docs/BREAKER_PLAN.md)
-  if (el.classList.contains("def-opt")) return { shield: "shield", mirror: "mirror", shield_breaker: "shieldBreaker", mirror_breaker: "mirrorBreaker" }[el.dataset.act] ?? null;
+  if (el.classList.contains("def-opt")) return { shield: "block", mirror: "reflect", shield_breaker: "shieldBreaker", mirror_breaker: "mirrorBreaker" }[el.dataset.act] ?? null;
   if (el === demonBtn) return "demon";
   if (el === lastHopeBtn) return "lastHope";
   if (el.classList.contains("shield-half")) return "goldenShield";
