@@ -36,6 +36,15 @@ súperova akcia bez dmg. Breaker ju trestá, ak súper obranu prečíta.
 - **Labyrint:** zásah (aj blokovaný / odrazený) labyrint ukončí ako každý zásah; reveal pred animáciou.
 - **Escanor:** zásah breakerom aj odrazený Shield Breaker = zásah od súpera → −1 pride.
 - **THE WORLD:** Jotaro smie Shield Breaker aj v zmrazených akciách (súperova obrana trvá celé zamrazenie).
+  Schválené 2026-10-30 — zmrazené zásahy sa so štítom vyhodnocujú **PO PORADÍ**:
+  - Shield Breaker do zmrazeného štítu: lúč + roztrieštenie sa prehrá hneď v zamrazení, štít je odvtedy
+    **zničený** (aj skutočný `shield` súpera aj zachytený `timestop.foeShield`); jeho 2 dmg sa len ohlási a zaráta.
+  - Zmrazené zásahy **pred** breakerom štít zablokuje (0), zásahy **po** ňom dopadnú plne.
+    Príklad: breaker → melee = 2 + 8 = 10; melee → breaker = 0 + 2 = 2.
+  - Obnovenie času: jeden kumulatívny zásah (súčet s `parts`), bez bloku, ak bol štít zničený.
+  - Súper má mirror: Shield Breaker je zlá obrana → pripočíta sa k odrazu ako ostatné zmrazené zásahy (Jotaro dostane
+    súčet; jeho štít nabitý v zamrazení odraz zablokuje). Bez obrany: breaker nič, ostatné zásahy normálne.
+  - Bez breakera sa nič nemení (štít v zamrazení blokuje všetky zmrazené zásahy naraz ako doteraz).
 
 ## 2. Vizuál (schvaľuje sa v náhľade)
 
@@ -60,8 +69,9 @@ súperova akcia bez dmg. Breaker ju trestá, ak súper obranu prečíta.
   cez **`resolveStrike`** (nový `kind: "breaker"` s `breakerKind`: obíde len zhodnú obranu → `break` frame + hit;
   nezhodná obrana ide bežnou cestou block/reflect; bez obrany `breaker_fizzle`). Nikdy nový `apply*` variant.
 - `runRoundLoop`: obrana sa spotrebuje ako pri každej akcii (bez zmeny).
-- THE WORLD: intercept v `resolveStrike` — zmrazený breaker len ohlási; `applyTimestopResume` musí vedieť, že niektorý
-  zmrazený zásah bol Shield Breaker (štít sa rozbije a dmg dopadne namiesto bloku). Dorozhodnúť pri implementácii.
+- THE WORLD: `timestop.hits` nesú poradie a príznak breakera; zmrazený Shield Breaker pri zachytenom `foeShield` prehrá
+  roztrieštenie hneď a vypne `foeShield` + súperov `shield`; `applyTimestopResume` sčíta len zásahy PO breakeri (tie pred
+  ním zablokoval štít) — pravidlá v bode 1.
 - Redakcia (labyrint): efekty breakera ako ostatné súperove efekty; `frame.act` tag automaticky.
 - Telemetria / replay: nové typy akcií idú cez `lock` (bez zmeny), skontrolovať `round` segmenty.
 
