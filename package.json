@@ -5,7 +5,7 @@
     "scripts": {
         "start": "node server.js",
         "lint": "eslint .",
-        "test": "node test/balance-ui.mjs && node test/sounds.mjs && node test/sound-events.mjs && node test/sound-fit.mjs && node test/sound-trim.mjs && node test/sound-pack.mjs && node tools/sound-pack.mjs check && node tools/sound-windows.mjs --check && node test/engine-scenarios.mjs && node test/timestop-edges.mjs && node test/breaker.mjs && node test/portals.mjs && node test/swamp.mjs && node test/labyrinth-peek.mjs && node test/telemetry.mjs && node test/game-test.mjs",
+        "test": "node test/balance-ui.mjs && node test/sounds.mjs && node test/sound-events.mjs && node test/sound-fit.mjs && node test/sound-trim.mjs && node test/sound-pack.mjs && node tools/sound-pack.mjs check && node tools/sound-windows.mjs --check && node test/engine-scenarios.mjs && node test/timestop-edges.mjs && node test/breaker.mjs && node test/portals.mjs && node test/swamp.mjs && node test/labyrinth-peek.mjs && node test/telemetry.mjs && node test/bug-report.mjs && node test/game-test.mjs",
         "golden": "node test/golden.mjs",
         "golden:update": "node test/golden.mjs --update",
         "sim": "node tools/simulate.mjs",

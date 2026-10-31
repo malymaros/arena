@@ -3066,6 +3066,30 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .ui-modal .um-close { width: 40px; height: 40px; font-size: 16px; background: #3a2f25;
   box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610; }
 
+/* okno REPORT BUG (bug-report.js): textový formulár, okno sa roluje (.ui-modal overflow: auto); kb-open = na dotyku
+   je hore klávesnica - okno sa prilepí k hornému okraju viditeľnej časti (top/max-height nastaví JS) */
+#bug-win .bug-hint { margin: 0; font-size: 10px; line-height: 1.6; color: #b8ab92; }
+#bug-win .bug-text {
+  flex: none; width: 100%; box-sizing: border-box; min-height: 120px; resize: vertical; padding: 8px 10px;
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: 0; /* 16 px: iOS pri písaní nepribližuje */
+  color: #f2e6c9; background: #120d09; border: none; border-radius: 0; outline: none;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #000;
+}
+#bug-win .bug-text:focus { box-shadow: 0 0 0 2px #ffb300, inset 2px 2px 0 #000; }
+#bug-win .bug-count { align-self: flex-end; font-size: 8px; color: #8a7f6a; }
+#bug-win .bug-device { font-size: 9px; color: #ffd24a; }
+#bug-win .bug-status { min-height: 12px; font-size: 9px; line-height: 1.5; }
+#bug-win .bug-status.err { color: #ff7a5c; }
+#bug-win .bug-status.ok { color: #8fe36b; }
+#bug-win .bug-send { align-items: center; background: #2f5a1f; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #4f8a35, inset -2px -2px 0 #16290e; }
+#bug-win .bug-send:hover { background: #3a6e26; }
+#bug-win .bug-send:disabled { opacity: .5; cursor: default; }
+#bug-win.kb-open { transform: translate(-50%, 0) scale(var(--ui-k, 1)); transform-origin: 50% 0; gap: 6px; padding-top: 6px; }
+/* nad klávesnicou je málo miesta: preč nápoveda, počítadlo a zariadenie, nižšie pole - SEND ostane viditeľné */
+#bug-win.kb-open .bug-hint, #bug-win.kb-open .bug-count, #bug-win.kb-open .bug-device { display: none; }
+#bug-win.kb-open .bug-text { min-height: 56px; height: 56px; }
+#bug-win.kb-open .bug-status:empty { display: none; }
+
 /* položky menu - celé riadky, 48 px vysoké (prst) */
 .menu-item {
   display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px;
@@ -3076,7 +3100,12 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .menu-item small { font-size: 8px; color: #b8ab92; letter-spacing: 0; }
 .menu-item.danger { background: #5a1a1a; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #8e2a2a, inset -2px -2px 0 #2a0b0b; }
 .menu-item.danger:hover { background: #6e2020; }
-.menu-sep { margin-top: 2px; font-size: 9px; color: #e0402f; text-align: center; letter-spacing: 3px; }
+/* admin: prepínač kariet MENU | ADMIN pod hlavičkou */
+.menu-tabs { display: flex; gap: 8px; }
+.menu-tab { flex: 1; min-height: 36px; font-size: 10px; letter-spacing: 2px; background: #1c1610; color: #8a7f6a !important;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #000; }
+.menu-tab.on { background: #3a2f25; color: #ffb300 !important; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610; }
+.menu-tab.admin.on { background: #5a1a1a; color: #ffd0c0 !important; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #8e2a2a, inset -2px -2px 0 #2a0b0b; }
 
 /* zvukové okno: MUTE + 3 riadky [label][−][posuvník][+][%] */
 #sound-win .snd-mute { display: flex; align-items: center; gap: 12px; min-height: 40px; cursor: pointer; text-shadow: 2px 2px 0 #000; }

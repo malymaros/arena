@@ -94,6 +94,26 @@ if (telemetry) {
 }
 // jednorazové tokeny na stiahnutie dát z menu ☰ (admin socket si ho vypýta; heslo tak nejde do URL)
 const dataTokens = new Map(); // token → expirácia (ms)
+
+// bug reporty (menu ☰ → REPORT BUG, public/client/bug-report.js): záznam t:"bug" do telemetrie (bez mena hráča),
+// vždy aj riadok do logu servera. Ochrana pred zahltením: 1 hlásenie / BUG_GAP_MS na socket, max BUG_DAY_MAX za deň.
+const BUG_TEXT_MAX = 1000, BUG_GAP_MS = 20 * 1000, BUG_DAY_MAX = 300;
+const bugDay = { date: "", count: 0 };
+const clip = (v, n) => (typeof v === "string" ? v.slice(0, n) : v == null ? null : String(v).slice(0, n));
+// údaje zariadenia z klienta - len známe polia, orezané
+function bugClient(c = {}) {
+  const d = c.device || {};
+  return {
+    device: {
+      kind: ["mobile", "tablet", "pc"].includes(d.kind) ? d.kind : "?",
+      os: clip(d.os, 30), browser: clip(d.browser, 30), app: !!d.app, screen: clip(d.screen, 30), view: clip(d.view, 30),
+      dpr: Number(d.dpr) || null, orient: clip(d.orient, 20), graphics: clip(d.graphics, 10), lang: clip(d.lang, 20),
+    },
+    ua: clip(c.ua, 300),
+    screenName: clip(c.screenName, 30),
+    errors: Array.isArray(c.errors) ? c.errors.slice(-5).map(e => clip(e, 300)) : [],
+  };
+}
 function takeDataToken(token) {
   const exp = dataTokens.get(token);
   if (!exp) return false;
@@ -416,8 +436,17 @@ function onTurnTimeout() {
     broadcastRooms();              // ostatní na room-browseri vidia aktuálny počet hráčov
   }
 
+  // kontext pre bug report: zápas v telemetrii (replay), hra, kolo, fáza a strana hlásiaceho (bez identity)
+  function bugContext(socket) {
+    const g = engine.game;
+    const person = personSockets.A === socket ? "A" : personSockets.B === socket ? "B" : null;
+    const side = person ? (g.seats?.p1 === person ? "white" : g.seats?.p2 === person ? "black" : null) : (spectators.has(socket) ? "spectator" : null);
+    return { room: id, match: engine.matchId || null, g: g.series?.gameIndex ?? null, turn: g.turn ?? null, phase: g.phase,
+      arena: g.config?.arena || "bridge", side, chars: { white: g.players?.p1?.char || null, black: g.players?.p2?.char || null } };
+  }
+
   return {
-    id, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset,
+    id, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset, bugContext,
     isEmpty: roomEmpty, onConfigure, onChooseTeam, onChooseCharacter, onLockIn, onTimestopActions, onDraftQueue, onRetry, onDisconnect,
   };
 }
@@ -550,6 +579,25 @@ io.on("connection", (socket) => {
     const token = crypto.randomBytes(16).toString("hex");
     dataTokens.set(token, Date.now() + 60 * 1000);
     ack({ token });
+  });
+
+  // bug report z menu ☰ - ack { ok } / { error: "empty" | "wait" | "limit" }
+  socket.on("bug_report", (arg, ack) => {
+    if (typeof ack !== "function") ack = () => {};
+    const text = clip(arg?.text, BUG_TEXT_MAX)?.trim();
+    if (!text) { ack({ error: "empty" }); return; }
+    const now = Date.now();
+    if (now - (socket.data.lastBug || 0) < BUG_GAP_MS) { ack({ error: "wait" }); return; }
+    const date = new Date(now).toISOString().slice(0, 10);
+    if (bugDay.date !== date) { bugDay.date = date; bugDay.count = 0; }
+    if (bugDay.count >= BUG_DAY_MAX) { ack({ error: "limit" }); return; }
+    socket.data.lastBug = now;
+    bugDay.count++;
+    const rec = { t: "bug", ts: new Date(now).toISOString(), commit: telemetryMeta.commit,
+      ...(roomForSocket(socket)?.bugContext(socket) || { room: null, match: null }), text, ...bugClient(arg?.client) };
+    telemetry?.append(rec);
+    console.log(`bug report [${rec.device.kind} ${rec.device.os}/${rec.device.browser}] room ${rec.room ?? "-"}: ${text.slice(0, 160).replace(/s+/g, " ")}`);
+    ack({ ok: true });
   });
 
   // --- admin reset LEN tejto roomky (rohový button / menu): odpojí jej hráčov aj divákov a roomku zruší

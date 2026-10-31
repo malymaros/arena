@@ -261,7 +261,10 @@ export function createRecordedEngine(io = {}, opts = {}) {
     engine.newGame();
   }
 
-  return Object.assign(Object.create(engine), {
+  const api = Object.assign(Object.create(engine), {
     startMatch, chooseTeam, chooseCharacter, lockIn, timestopActions, autoLock, newGame, abort,
   });
+  // id práve zapisovaného zápasu (bug report naň odkáže; null = nič sa nezapisuje) - getter, Object.assign by ho zmrazil
+  Object.defineProperty(api, "matchId", { get: () => m });
+  return api;
 }
