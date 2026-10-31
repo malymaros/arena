@@ -54,7 +54,13 @@ function playMatch(ch1, ch2, seed) {
   let result = null, frames = 0;
   const engine = createEngine({
     seed,
-    emit: (ev, payload) => { if (ev === "game_result") result = payload; },
+    emit: (ev, payload) => {
+      if (ev !== "game_result") return;
+      result = payload;
+      // remíza nesmie nastať: zásahy sa vyhodnocujú po jednom (1. hráč kola prvý), prvá smrť končí hru
+      const { p1, p2 } = engine.game.players;
+      if (p1.hp <= 0 && p2.hp <= 0) throw new Error(`remíza (obaja na 0 HP) ${ch1}/${ch2} seed ${seed}`);
+    },
     emitState: (timeline) => { if (timeline) frames += timeline.length; if (PORTAL && timeline) checkPortals(engine.game, `${ch1}/${ch2} seed ${seed}`); if (SWAMP && timeline) checkSwamp(engine.game, `${ch1}/${ch2} seed ${seed}`, timeline); },
   });
   // Portal Realm: počet párov za kolo cyklí 1–7 podľa seedu (pokrytie plnej dosky)

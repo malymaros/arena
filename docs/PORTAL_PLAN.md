@@ -146,6 +146,10 @@ Zmenšenú verziu do `public/arenas/portal-realm/` vyrobí `node tools/arena-bg/
 - **Escanor stráca pride** aj za zásah sám sebou.
 - **Labyrint sa neukončí.**
 - Hráč, ktorý zabije sám seba, prehrá — **vyhráva súper**.
+- **Strelec a súper na jednom políčku** (strela sa cez portál vráti na spoločné políčko): zásah dostanú
+  **obaja** rovnakým dmg (rozhodnutie 2026-10-31). Poradie je deterministické: **najprv hráč, ktorý je
+  v kole 1. (starter)**, potom druhý; ak prvý zásah zabije, hra končí a druhý zásah sa už nevyhodnotí →
+  **remíza nikdy nenastane** (`doBasic`: `strikeSelf`/`strikeFoe` podľa `game.starter`).
 
 ### 2.11 THE WORLD
 - Jotarov pohyb v zastavenom čase beží naživo (teleport portálom hneď), ale **portál nezmizne a efekt

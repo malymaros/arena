@@ -235,6 +235,26 @@ console.log("Strely");
   check(h && h.dmg === 3 && h.self, "S3: rohový pár - strelec sa trafí za 3", J(h));
 }
 {
+  // strela cez portál sa vráti na políčko, kde stojí strelec AJ súper → dmg obom, 1. hráč kola prvý
+  const A = P("A", "classic", [0, 0, "up"], [0, 0, "left"]);
+  const both = (g) => { g.players.p1.x = 0; g.players.p1.y = 0; g.players.p2.x = 0; g.players.p2.y = 0; g.portals = [A]; };
+  const sc = scenario("fire", "fire", both);
+  const tl = sc.round([atk("up"), R, S], PASS3);
+  const hits = fx(tl, "hit");
+  check(sc.game.players.p1.hp === 7 && sc.game.players.p2.hp === 7 && hits[0]?.target === "p1" && hits[1]?.target === "p2",
+    "S3b: spoločné políčko - strela cez portál zasiahne oboch (3+3), najprv 1. hráča kola", J(hits));
+  // obaja na 3 HP: strelec je 1. v kole → padne on, súper prežije (žiadna remíza)
+  const d1 = scenario("fire", "fire", (g) => { both(g); g.players.p1.hp = 3; g.players.p2.hp = 3; });
+  d1.round([atk("up"), R, S], PASS3);
+  check(d1.game.players.p1.hp === 0 && d1.game.players.p2.hp === 3, "S3c: smrteľné pre oboch - padne strelec (1. v kole), súper bez zásahu",
+    J([d1.game.players.p1.hp, d1.game.players.p2.hp]));
+  // strieľa 2. hráč kola → najprv dostane 1. hráč (súper strelca) a padne, strelec prežije
+  const d2 = scenario("fire", "fire", (g) => { both(g); g.players.p1.hp = 3; g.players.p2.hp = 3; });
+  d2.round([R, PASS, PASS], [atk("up"), R, S]);
+  check(d2.game.players.p1.hp === 0 && d2.game.players.p2.hp === 3, "S3d: strieľa 2. hráč kola - padne 1. hráč (súper), strelec bez zásahu",
+    J([d2.game.players.p1.hp, d2.game.players.p2.hp]));
+}
+{
   const A = P("A", "classic", [3, 1, "right"], [3, 0, "up"]);
   const sc = scenario("fire", "fire", (g) => { g.players.p1.x = 3; g.players.p1.y = 1; g.players.p2.x = 0; g.players.p2.y = 2; g.portals = [A]; });
   sc.round([atk("right"), R, S], PASS3);
