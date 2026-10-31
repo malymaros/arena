@@ -19,13 +19,13 @@ function readRecords(p) {
 
 const bugs = inputs.flatMap(readRecords).filter(r => r.t === "bug");
 if (args.includes("--json")) { for (const b of bugs) console.log(JSON.stringify(b)); process.exit(0); }
-const KIND = { mobile: "📱 MOBILE", tablet: "📱 TABLET", pc: "🖥 PC" };
+const KIND = { mobile: "MOBILE", tablet: "TABLET", pc: "PC" };
 for (const b of bugs) {
   const d = b.device || {};
   console.log(`── ${b.ts?.slice(0, 16).replace("T", " ")} UTC  ${KIND[d.kind] || d.kind}  ${d.os}/${d.browser}${d.app ? " APP" : ""}  ${d.screen} ${d.orient} ${d.graphics}`);
   console.log(`   obrazovka: ${b.screenName}  room ${b.room ?? "-"}  ${b.arena ?? ""}  strana ${b.side ?? "-"}  ${b.chars ? `${b.chars.white ?? "?"} vs ${b.chars.black ?? "?"}` : ""}`);
   if (b.match) console.log(`   zápas ${b.match}  hra ${b.g ?? "-"}  kolo ${b.turn ?? "-"}  (${b.phase})  commit ${b.commit}  → node tools/replay.mjs <dáta> --match ${b.match} --rounds`);
   console.log(`   ${b.text.replace(/\n/g, "\n   ")}`);
-  for (const e of b.errors || []) console.log(`   ⚠ ${e}`);
+  for (const e of b.errors || []) console.log(`   JS chyba: ${e}`);
 }
 console.log(`\n${bugs.length} hlásení`);

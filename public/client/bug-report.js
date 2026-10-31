@@ -39,7 +39,7 @@ function browserName() {
   return "?";
 }
 const KIND = isPhone ? "mobile" : isTouch ? "tablet" : "pc";
-const KIND_LABEL = { mobile: "📱 MOBILE", tablet: "📱 TABLET", pc: "🖥 PC" }[KIND];
+const KIND_LABEL = { mobile: "MOBILE", tablet: "TABLET", pc: "PC" }[KIND];
 
 function device() {
   return {
@@ -85,7 +85,7 @@ const updateCount = () => { countEl.textContent = `${ta.value.length} / ${TEXT_M
 
 export function openBugWindow() {
   const d = device();
-  win.querySelector(".bug-device").textContent = `${KIND_LABEL} · ${d.os} · ${d.browser}${d.app ? " · APP" : ""}`;
+  win.querySelector(".bug-device").textContent = `SENT FROM ${KIND_LABEL} · ${d.os} · ${d.browser}${d.app ? " · APP" : ""}`;
   setStatus("");
   sendBtn.disabled = false;
   updateCount();

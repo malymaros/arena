@@ -59,7 +59,7 @@ function render() {
     ${canFullscreen ? `<button type="button" class="menu-item" data-act="fullscreen">⛶ ${fsLabel}</button>` : ""}
     <button type="button" class="menu-item" data-act="sound">♪ SOUND</button>
     <button type="button" class="menu-item" data-act="graphics">◐ GRAPHICS: ${perf.lite ? "LITE" : "FULL"}</button>
-    <button type="button" class="menu-item" data-act="bug">🐞 REPORT BUG</button>`;
+    <button type="button" class="menu-item" data-act="bug">REPORT BUG</button>`;
 }
 export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
 export function closeMenu() { backdrop.classList.add("hidden"); panel.classList.add("hidden"); }
