@@ -33,6 +33,7 @@ function scenario(c1, c2, setup, cfg = CFG, seed = 1) {
   setup?.(e.game);
   return {
     e,
+    timelines,
     get game() { return e.game; },
     round(q1, q2) {
       const n = timelines.length;
@@ -375,6 +376,71 @@ console.log("Shrek preview (skoky ďalšieho kola)");
   const b = createEngine({ seed: 1, emitState: () => {} });
   b.startMatch(b.sanitizeConfig({ ...CFG, arena: undefined, tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 } }));
   check(!("shrekPreview" in b.game.config), "P5: stone bridge config bez kľúča shrekPreview");
+}
+
+/* ==================== Medúza skamení Shreka ==================== */
+console.log("Medúza skamení Shreka");
+{
+  // Medúza (0,1) special doprava: Shrek (1,0) v zóne → skamenie, 2 skoky vynechá, 3. skočí
+  const s1 = scenario("medusa", "lightning", (g) => shrekSet(g, { x: 1, y: 0, marks: [[2, 0], [3, 0], [2, 2]] }));
+  const t1 = s1.round([sp({ dir: "right" }), PASS, PASS], PASS3);
+  check(fx(t1, "shrek_petrify").length === 1, "M1: Shrek v Medúzinej zóne skamenie", J(fx(t1, "shrek_petrify")));
+  check(fx(t1, "shrek_stoned").length === 2 && fx(t1, "shrek_unpetrify").length === 1 && J(fx(t1, "shrek_jump").map(j => j.n)) === "[3]",
+    "M2: skamenený vynechá 2 skoky, potom odkamenie a skočí", J(fx(t1, "shrek_jump")));
+  check(s1.game.shrek.stone === 0 && s1.game.shrek.x === 2 && s1.game.shrek.y === 2, "M3: koniec kola - odkamenený na 3. políčku", J(s1.game.shrek));
+  // skamenený dostane dmg, ale bez výkriku a reakcie
+  const s2 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, stone: 2, marks: QUIET }));
+  const t2 = s2.round([atk("right"), PASS, PASS], PASS3);
+  const h2 = fx(t2, "shrek_hit")[0];
+  check(s2.game.shrek.hp === SHREK_HP - 3 && h2?.stone === true && !fx(t2, "shrek_scream").length && fx(t2, "shrek_roar").length === 1
+    && s2.game.players.p1.hp === 10, "M4: socha dostane dmg bez výkriku a revu (rev len zo 3. skoku)", J([s2.game.shrek.hp, h2, fx(t2, "shrek_roar").length]));
+  // smrteľný zásah sochy - padne normálne
+  const s3 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, hp: 2, stone: 2, marks: QUIET }));
+  const t3 = s3.round([atk("right"), PASS, PASS], PASS3);
+  check(s3.game.shrek.dead && s3.game.shrek.stone === 0 && fx(t3, "shrek_die").length === 1, "M5: skamenený Shrek môže padnúť (smrad ako vždy)", J(s3.game.shrek));
+  // už skamenený - Medúza counter neobnoví
+  const s4 = scenario("medusa", "lightning", (g) => shrekSet(g, { x: 1, y: 0, stone: 1, marks: QUIET }));
+  const t4 = s4.round([sp({ dir: "right" }), PASS, PASS], PASS3);
+  check(!fx(t4, "shrek_petrify").length && fx(t4, "shrek_stoned").length === 1, "M6: už skamenený Shrek sa znova neskamení", J(fx(t4, "shrek_stoned")));
+}
+
+/* ==================== THE WORLD (Jotaro) ==================== */
+console.log("Shrek počas THE WORLD");
+{
+  // p2 = Jotaro (nestartér kola 1): THE WORLD ako 1. akcia → pauza → 3 zmrazené akcie → zvyšok kola
+  const world = (setup, frozen) => {
+    const s = scenario("fire", "jotaro", (g) => { g.players.p2.mana = 10; setup(g); });
+    const tl1 = s.round(PASS3, [sp(), PASS, PASS]);
+    if (!fx(tl1, "timestop_wait").length) throw new Error("THE WORLD nepozastavil kolo");
+    const n = s.timelines.length;
+    s.e.timestopActions("B", frozen, (r) => { if (!r?.ok) throw new Error("timestop_actions odmietnuté " + J(r)); });
+    return { s, tl: s.timelines.slice(n).flat() };
+  };
+  const endAt = (tl) => idx(tl, e => e.kind === "timestop_end");
+  const PASS_R = () => R; // zmrazená trojica nepozná pass - výplň recharge
+  const FAR = [[0, 2], [1, 2], [0, 2]];
+  // strela do Shreka v zamrazenom čase: zastaví sa o neho, zásah sa ohlási, dmg + rev až po obnovení času
+  {
+    const { s, tl } = world((g) => { shrekSet(g, { x: 2, y: 0, marks: FAR }); }, [atk("up_left"), PASS_R(), { type: "shield" }]);
+    const ts = idx(tl, e => e.kind === "shrek_ts_hit"), hit = idx(tl, e => e.kind === "shrek_hit"), end = endAt(tl);
+    check(ts >= 0 && ts < end, "W1: strela do Shreka v zamrazenom čase sa ohlási (shrek_ts_hit)", J([ts, end]));
+    check(hit > end && fx(tl, "shrek_hit")[0]?.dmg === 3 && idx(tl, e => e.kind === "shrek_roar") > hit,
+      "W2: dmg (3) a rev dopadnú až po obnovení času", J(fx(tl, "shrek_hit")));
+    const shots = fx(tl, "charge").filter(c => c.from === "p2");
+    check(shots.length === 1 && shots[0].cell.join() === "2,0" && s.game.shrek.hp <= SHREK_HP - 3, "W3: strela sa o Shreka zastaví (neodrazí sa ďalej)", J(shots));
+  }
+  // Special 1 (zóna) z iného stĺpca → po obnovení času tackle
+  {
+    const { tl } = world((g) => { shrekSet(g, { x: 2, y: 0, marks: FAR }); }, [{ type: "special1", dir: "left" }, PASS_R(), { type: "shield" }]);
+    check(idx(tl, e => e.kind === "shrek_tackle") > endAt(tl), "W4: Special 1 v zamrazenom čase → tackle po obnovení", J(fx(tl, "shrek_tackle")));
+  }
+  // Jotaro počas zamrazenia zbiera itemy (pohyb beží naživo)
+  {
+    const { s, tl } = world((g) => { shrekSet(g, { x: 1, y: 0, marks: FAR }); g.players.p2.hp = 8; g.items = [{ x: 3, y: 0, type: "heal" }]; },
+      [{ type: "move", dir: "up" }, PASS_R(), { type: "shield" }]);
+    const pick = idx(tl, e => e.kind === "item_pick" && e.target === "p2");
+    check(pick >= 0 && pick < endAt(tl) && s.game.players.p2.hp >= 9, "W5: Jotaro zoberie item počas zamrazenia", J(fx(tl, "item_pick")));
+  }
 }
 
 console.log(`\n${passes} PASS, ${failures} FAIL`);

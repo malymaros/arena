@@ -100,7 +100,7 @@ function doVampMelee(ctx, slot, tl) {
     }
   }
   vampMeleeLand(ctx, slot, raw, 0, tl, false, pBonus); // own-cell melee bez heal/drain bonusu; klon-návnada/stacknutý pár rieši helper
-  ctx.shrekMelee(slot, [[me.x, me.y]], [], raw, 0, tl); // Shrek Swamp: Shrek na vlastnej bunke - reakcia punch
+  ctx.shrekMelee(slot, [[me.x, me.y]], [], raw, 0, tl); // Shrek Swamp: Shrek na vlastnej bunke - okamžitý rev
 }
 
 // Charge Vampire/Onryō (nahrádza dash, rovnaká cena): pohybové melee - beh zvoleným smerom po PRVÚ

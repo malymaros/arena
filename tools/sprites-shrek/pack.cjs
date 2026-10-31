@@ -78,32 +78,4 @@ for (const a of ANIMS) {
 }
 fs.writeFileSync(path.join(OUT, "anims.json"), JSON.stringify(meta, null, 1));
 
-// piktogram Shrekovej hlavy (HUD ikona z Reekin' Havoc, 24×24) - značka ohlásených políčok 1/2/3.
-// Originál sa usmieva - prekreslí sa na ZAMRAČENÉHO (zlostné obočie, ústa oblúkom dole).
-{
-  const [x0, y0, w, h] = rows[0].cells[5];
-  const head = new PNG({ width: w, height: h });
-  for (let y = 0; y < h; y++) src.data.copy(head.data, y * w * 4, ((y0 + y) * W + x0) * 4, ((y0 + y) * W + x0 + w) * 4);
-  const C = { c: [144, 192, 0], e: [128, 152, 56], k: [44, 36, 8], m: [120, 28, 18] };
-  const at = (x, y) => (y * w + x) * 4;
-  const set = (x, y, k) => { const i = at(x, y); [head.data[i], head.data[i + 1], head.data[i + 2]] = C[k]; head.data[i + 3] = 255; };
-  const dark = (x, y) => { const i = at(x, y); return head.data[i + 1] <= 112 && head.data[i] <= 88; };
-  // pôvodné ústa a obočie preč (tmavé pixely → pleť: svetlá strana vľavo, tieň vpravo)
-  for (const [ya, yb, xa, xb] of [[11, 18, 5, 18], [4, 6, 5, 18]])
-    for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) if (dark(x, y)) set(x, y, x < 12 ? "c" : "e");
-  // zlostné obočie: vonkajší koniec hore, vnútorný dole nad nosom (2 px hrubé)
-  for (const [x, y] of [[5, 4], [6, 4], [6, 5], [7, 5], [8, 5], [8, 6], [9, 6], [10, 6], [10, 7],
-                        [18, 4], [17, 4], [17, 5], [16, 5], [15, 5], [15, 6], [14, 6], [13, 6], [13, 7]]) set(x, y, "k");
-  // ústa: veľký otvorený oblúk ∩ (stred hore, kútiky visia dole), tmavočervené vnútro
-  const MOUTH = [
-    "....kkkkkk....",  // y12, x = 5 + index
-    "...kmmmmmmk...",
-    "..kmmmmmmmmk..",
-    ".kmmmkkkkmmmk.",
-    ".kmmk....kmmk.",
-    ".kkk......kkk.",
-  ];
-  MOUTH.forEach((row, dy) => [...row].forEach((ch, dx) => { if (ch !== ".") set(5 + dx, 12 + dy, ch); }));
-  fs.writeFileSync(path.join(OUT, "Head.png"), PNG.sync.write(head));
-}
 console.log(meta.map((m) => `${m.name} ${m.frames}f ${m.size}px`).join("\n"));

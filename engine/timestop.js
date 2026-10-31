@@ -67,7 +67,7 @@ function doJotaroWorld(slot, tl) {
     slot, foeSlot: foeS,
     foeShield: !!foe?.shield, foeShieldGold: !!foe?.shieldGold,
     foeMirror: !!foe?.mirror, foeMirrorGold: !!foe?.mirrorGold,
-    hits: [], cloneEvents: [], mode: "waiting",
+    hits: [], cloneEvents: [], shrekHits: [], mode: "waiting",
   };
   return PAUSE;
 }
@@ -77,14 +77,16 @@ function runTimestopActions(queue) {
   const ts = E.game.timestop, ctx = E.game.roundCtx, tl = ctx.tl;
   ts.mode = "frozen";
   const slot = ts.slot;
-  // actionSteps zámerne null (D4): pasce sa počas zamrazenia netriggerujú a prejdené bunky sa nezbierajú;
-  // trackSteps ale niť labyrintu pletie ďalej (D5 - je to Jotarov reálny pohyb)
-  E.actionSteps = null;
+  // pasce sa počas zamrazenia netriggerujú (D4) - resolveTrapsAfterAction sa nevolá; prejdené bunky (actionSteps)
+  // slúžia len na zber itemov v Shrek Swamp (Jotaro sa hýbe naživo); trackSteps niť labyrintu pletie ďalej (D5)
   for (const act of queue) {
+    E.actionSteps = { p1: [], p2: [], p1c: [], p2c: [] };
     // frozen:true - klient túto akciu NEzaráta do round-scriptu (kurzor ostáva na THE WORLD), len ju animuje
     E.beginAct(slot); // labyrint peek: aj zmrazená akcia z bunky prekliateho sa mu odhalí
     E.pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null }, frozen: true }], 250);
     E.doAction(slot, act, tl); // frozen: zásah na súpera sa cez guardy v apply* len ohlási (ts_hit/ts_mirror)
+    E.pickupItems(E.actionSteps, tl);
+    E.actionSteps = null;
     E.pushStateFrame(tl, [], ACTION_GAP_MS);
     E.endAct();
   }
@@ -116,6 +118,7 @@ function applyTimestopResume() {
 
   if (ts.hits.length === 0) {
     // žiadny zásah na hráča (nanajvýš zomrel decoy klon) → nabitá obrana OSTÁVA (D1), labyrint (ak decoy) NEkončí
+    E.shrekResume(ts, tl);
     E.game.timestop = null;
     return;
   }
@@ -147,6 +150,7 @@ function applyTimestopResume() {
     E.pushStateFrame(tl, [{ kind: "hit", target: foeS, dmg: total, ...(parts.length > 1 ? { parts } : {}) }], SMALL_DELAY_MS);
   }
   E.endLabyrinths(tl); // aspoň jeden zásah/blok/odraz dopadol → labyrint končí (aj blokovaný/odrazený)
+  if (!E.winnerNow()) E.shrekResume(ts, tl); // Shrek Swamp: zamrazené zásahy Shreka až po súperovi
   E.game.timestop = null;
 }
 

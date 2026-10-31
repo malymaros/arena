@@ -36,6 +36,8 @@ export const DIRECT = {
   breaker: "breaker",
   // Shrek Swamp: zásah od hráča → hit (výkrik), potom útok (rev, nafúknutie pred tacklom) → roar; skoky 1/2/3 len roar
   shrek_hit: "shrek.hit", shrek_die: "death", shrek_roar: "shrek.roar", shrek_powerup: "shrek.roar",
+  // skamenený Shrek (Medúza): rovnaké zvuky ako skamenená postava
+  shrek_petrify: "petrify", shrek_stoned: "stoned", shrek_unpetrify: "unpetrify",
 };
 // efekty opakované v po sebe idúcich frame-och (let strely po bunkách, beaty castu) → zaznejú raz za beh;
 // okno = celý beh. Melee sem nepatrí - zvuk úderu znie pri každom z 3 švihov.
@@ -162,7 +164,7 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
       }
       continue;
     }
-    if (e.kind === "shrek_hit" && e.lethal) continue; // smrteľný zásah Shreka nekričí - zaznie pád (shrek_die → death)
+    if (e.kind === "shrek_hit" && (e.lethal || e.stone)) continue; // smrteľný zásah nekričí (zaznie pád - shrek_die → death), socha tiež nie
     const key = DIRECT[e.kind];
     if (!key) continue;
     let windowMs = PHASE_SPAN[e.kind] ? phaseWindow(timeline, i, PHASE_SPAN[e.kind]) : win;

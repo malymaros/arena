@@ -3,11 +3,13 @@
 // kroku skočí na k-te a zareve: zasiahne políčko dopadu + jeho ortogonálnych susedov. Sila revu rastie s klesajúcimi HP
 // (SHREK_ROAR_DMG / SHREK_RAGE_HP).
 // Kto ho zasiahne, spustí reakciu: strela a melee → okamžitý rev; special zboku → PowerUp + tackle po riadku
-// k útočníkovi (prvá figúra v ceste, Shrek sa vráti), special od útočníka v tom istom stĺpci → okamžitý rev. Fáza 2: pri 0 HP padne (leží, nič neblokuje) a z tela
-// sa šíri smrad - kolo smrti jeho políčko, každé ďalšie kolo + ortogonálni susedia; smrad = STENCH_DMG na konci kroku.
+// k útočníkovi (prvá figúra v ceste, Shrek sa vráti), special od útočníka v tom istom stĺpci → okamžitý rev.
+// Skoky ďalšieho kola sa losujú o kolo vopred (game.shrek.next, náhľad pri config.shrekPreview).
+// Medúzin special ho v zóne skamení (stone = STONE_ACTIONS skokov vynechá); skamenený dostáva dmg, ale nekričí
+// a nereaguje (ako skamenená postava).
+// Fáza 2: pri 0 HP padne (leží, nič neblokuje) a z tela sa šíri smrad - kolo smrti jeho políčko, každé ďalšie kolo + ortogonálni susedia; smrad = STENCH_DMG na konci kroku.
 // Shrekove útoky (rev, tackle) kryje nabitá obrana hráča a Shrek ju tým MINIE (viď guardOf); smrad je dlaždica
-// a obrany ignoruje. ½ pri Last Stand/Hope platí, skamenenú postavu
-// nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá). Počas THE WORLD
+// a obrany ignoruje. ½ pri Last Stand/Hope platí, skamenenú postavu nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá). Počas THE WORLD
 // je Shrek inertný (strely ním prejdú).
 // Itemy (namiesto dlaždíc): srdiečko (+1 HP) a kvapka (+1 mana) padnú na voľné políčka na štarte
 // hry a na konci každého kola (config.itemsPerRound, itemWeights, max ITEM_MAX); hráč ich zoberie hneď pri vstupe
@@ -16,7 +18,7 @@
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js), ako ostatné moduly mechaník.
 import {
   START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP,
-  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MANA_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_CALL_MS, SHREK_POWERUP_MS,
+  STENCH_DMG, STONE_ACTIONS, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MANA_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_CALL_MS, SHREK_POWERUP_MS,
   SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS, MIRROR_BEAM_MS,
 } from "./constants.js";
 
@@ -26,10 +28,32 @@ const shrek = () => (isSwamp() ? E.game.shrek : null);
 const order = () => (E.game.starter === "p1" ? ["p1", "p2"] : ["p2", "p1"]);
 const same = (a, b) => a[0] === b[0] && a[1] === b[1];
 
-// živý Shrek na bunke - počas THE WORLD (zamrazený čas) je inertný: strely/údery ním prejdú bez reakcie
+// živý Shrek na bunke (aj počas THE WORLD - strela sa o neho zastaví, zásah sa len ohlási a dopadne pri obnovení času)
 function shrekAt(x, y) {
   const s = shrek();
-  return !!s && !s.dead && !E.frozenActive() && s.x === x && s.y === y;
+  return !!s && !s.dead && s.x === x && s.y === y;
+}
+
+// THE WORLD: Jotarov zásah Shreka v zamrazenom čase - HP sa nemení, len ohlás (shrek_ts_hit) a zaeviduj;
+// dopadne kumulatívne pri obnovení času (shrekResume). Vráti true, ak je čas zamrazený.
+function frozenHit(slot, raw, kind, tl) {
+  if (!E.frozenActive()) return false;
+  const s = E.game.shrek;
+  E.game.timestop.shrekHits.push({ raw, kind });
+  E.pushStateFrame(tl, [{ kind: "shrek_ts_hit", from: slot, cell: [s.x, s.y], dmg: raw }], SMALL_DELAY_MS);
+  return true;
+}
+
+// obnovenie času (applyTimestopResume, po súperovom kumulatívnom beate): súčet zamrazených zásahov naraz
+// (jeden shrek_hit) + jedna reakcia - zásah specialom (Special 1) z iného stĺpca = tackle k Jotarovi, inak rev
+function shrekResume(ts, tl) {
+  const s = shrek(), hits = ts.shrekHits;
+  if (!s || s.dead || !hits.length) return;
+  swampActionStart();
+  if (damageShrek(ts.slot, hits.reduce((a, h) => a + h.raw, 0), tl)) return;
+  const jo = E.game.players[ts.slot];
+  if (hits.some(h => h.kind === "zone") && jo.x !== s.x) tackle(jo.x > s.x ? 1 : -1, tl);
+  else roar(tl);
 }
 
 function roarDmg() {
@@ -59,7 +83,7 @@ function swampStartGame() {
   const start = randomCell((x, y) => !Object.values(START_POS).some(p => p.x === x && p.y === y));
   const marks = rollMarks(start);
   // next = skoky NASLEDUJÚCEHO kola, losované o kolo vopred (z políčka 3. skoku) - lobby „SHREK PREVIEW" ich ukáže
-  E.game.shrek = { x: start[0], y: start[1], hp: SHREK_HP, dead: false, marks, next: rollMarks(marks[2]), done: 0, stench: [] };
+  E.game.shrek = { x: start[0], y: start[1], hp: SHREK_HP, dead: false, stone: 0, marks, next: rollMarks(marks[2]), done: 0, stench: [] };
   E.game.items = [];
   spawnItems();
 }
@@ -123,11 +147,11 @@ function shrekPickup(tl) {
 // verejný stav pre snapshot (marks sú ohlásené vopred - vidia ich obaja aj prekliaty v labyrinte)
 function shrekSnapshot() {
   const s = E.game.shrek;
-  return s ? { x: s.x, y: s.y, hp: s.hp, dead: s.dead, marks: s.marks.map(c => [...c]),
+  return s ? { x: s.x, y: s.y, hp: s.hp, dead: s.dead, stone: s.stone, marks: s.marks.map(c => [...c]),
     ...(E.game.config?.shrekPreview ? { next: s.next.map(c => [...c]) } : {}), done: s.done, stench: s.stench.map(c => [...c]) } : null;
 }
 
-// zásah hráča prostredím (rev, tackle, sud/punch cez HP, smrad) - ako dlaždica: bez obrán, ½ pri Last Stand/Hope.
+// zásah hráča prostredím (rev, tackle, smrad) - ako dlaždica: ½ pri Last Stand/Hope (obrany rieši volajúci - guardOf).
 // Smrteľný zásah počas labyrintu prehrá rovnakú sekvenciu ako dlaždica (odhalenie pred, koniec labyrintu po).
 function envHit(slot, raw, tl) {
   const p = E.game.players[slot];
@@ -220,6 +244,13 @@ function shrekStepEnd(k, tl, stoned) {
   swampActionStart(); // priame zásahy poslednej akcie sa skoku netýkajú
   const to = s.marks[k];
   if (!to) return;
+  // skamenený: skok vynechá (políčko sa ráta ako odskákané); po STONE_ACTIONS vynechaných skokoch odkamenie
+  if (s.stone > 0) {
+    s.stone--; s.done = k + 1;
+    E.pushStateFrame(tl, [{ kind: "shrek_stoned", cell: [...to] }], SMALL_DELAY_MS);
+    if (s.stone === 0) E.pushStateFrame(tl, [{ kind: "shrek_unpetrify", cell: [s.x, s.y] }], SMALL_DELAY_MS);
+    return;
+  }
   const from = [s.x, s.y];
   // pred skokom bliká cieľové políčko ako vyhodnocovaná špeciálna dlaždica (bez výkriku - ten je len po zásahu)
   E.pushStateFrame(tl, [{ kind: "shrek_call", cell: [...to], n: k + 1 }], SHREK_CALL_MS);
@@ -274,18 +305,22 @@ function shrekRoundEnd() {
   return [...drops, ...(added.length ? [{ kind: "stench_spread", cells: added.map(c => [...c]) }] : [])];
 }
 
-// zásah Shreka hráčom; vráti true, ak Shrek padol (reakcia sa potom nekoná)
+// zásah Shreka hráčom; vráti true, ak sa reakcia nekoná (Shrek padol alebo je skamenený)
 function damageShrek(atkSlot, raw, tl) {
   const s = E.game.shrek;
   s.hp = Math.max(0, s.hp - raw);
-  // lethal: smrteľný zásah - klient nekričí (bez zvuku hitu), pád hrá zvuk smrti ako pri hráčovi
-  E.pushStateFrame(tl, [{ kind: "shrek_hit", from: atkSlot, cell: [s.x, s.y], dmg: raw, ...(s.hp <= 0 ? { lethal: true } : {}) }], SHREK_HIT_MS);
+  // lethal: smrteľný zásah - klient nekričí (bez zvuku hitu), pád hrá zvuk smrti ako pri hráčovi;
+  // stone: socha - len float s dmg, bez zvuku, výkriku aj reakcie
+  const stone = s.stone > 0 && s.hp > 0;
+  E.pushStateFrame(tl, [{ kind: "shrek_hit", from: atkSlot, cell: [s.x, s.y], dmg: raw, ...(s.hp <= 0 ? { lethal: true } : {}), ...(stone ? { stone: true } : {}) }], SHREK_HIT_MS);
+  if (stone) return true;
   if (s.hp > 0) {
     // výkrik po zásahu (zvuk hitu dohrá celý), Shrekovo políčko bliká - až potom reakcia (rev / tackle)
     E.pushStateFrame(tl, [{ kind: "shrek_scream", cell: [s.x, s.y] }], SHREK_HIT_SOUND_MS - SHREK_HIT_MS);
     return false;
   }
   s.dead = true;
+  s.stone = 0;
   s.marks = [];
   s.next = [];
   s.stench = [[s.x, s.y]];
@@ -295,7 +330,7 @@ function damageShrek(atkSlot, raw, tl) {
 
 // basic strela zastavená Shrekom (doBasic; aj strela Narutovho klona) → okamžitý rev
 function shrekShot(slot, raw, tl) {
-  if (damageShrek(slot, raw, tl)) return;
+  if (frozenHit(slot, raw, "shot", tl) || damageShrek(slot, raw, tl)) return;
   roar(tl);
 }
 
@@ -306,7 +341,8 @@ function shrekMelee(slot, cells, cloneCells, raw, cloneRaw, tl) {
   const has = (cs) => cs.some(([x, y]) => shrekAt(x, y));
   const byMe = has(cells), byClone = has(cloneCells);
   if (!byMe && !byClone) return;
-  if (damageShrek(slot, (byMe ? raw : 0) + (byClone ? cloneRaw : 0), tl)) return;
+  const dmg = (byMe ? raw : 0) + (byClone ? cloneRaw : 0);
+  if (frozenHit(slot, dmg, "melee", tl) || damageShrek(slot, dmg, tl)) return;
   roar(tl); // melee → okamžitý rev (útočník stojí na jeho políčku, takže ho rev zasiahne)
 }
 
@@ -315,10 +351,18 @@ function shrekZone(slot, cells, raw, tl) {
   const s = shrek();
   if (!s || E.winnerNow()) return;
   if (!cells.some(([x, y]) => shrekAt(x, y))) return;
-  if (damageShrek(slot, raw, tl)) return;
+  if (frozenHit(slot, raw, "zone", tl) || damageShrek(slot, raw, tl)) return;
   const a = E.game.players[slot];
   if (a.x === s.x) roar(tl);
   else tackle(a.x > s.x ? 1 : -1, tl);
+}
+
+// Medúzin special: Shrek v zóne skamenie (už skamenený - bez zmeny, ako pri hráčovi). Mimo bažiny / mŕtvy nič.
+function shrekPetrify(cells, tl) {
+  const s = shrek();
+  if (!s || s.stone > 0 || E.winnerNow() || !cells.some(([x, y]) => shrekAt(x, y))) return;
+  s.stone = STONE_ACTIONS;
+  E.pushStateFrame(tl, [{ kind: "shrek_petrify", cell: [s.x, s.y] }], SMALL_DELAY_MS);
 }
 
 // PowerUp + beh po vlastnom riadku po prvú figúru (hráč aj klon; na spoločnom políčku všetci) alebo po okraj, späť
@@ -356,5 +400,5 @@ function tackle(dx, tl) {
   reflectOnShrek(reflects, tl); // odraz dopadne, keď je Shrek späť na svojom políčku
 }
 
-return { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, swampActionStart, noteDefense };
+return { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, shrekResume, swampActionStart, noteDefense };
 }

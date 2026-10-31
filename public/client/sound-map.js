@@ -31,7 +31,7 @@ export function syncMusic(s, finalRound = false) {
   else if (finalRound) setMusic("music.final", "music.battle");
   // Portal Realm má vlastnú bojovú hudbu (bez nej hrá bežná music.battle)
   else if (s.config?.arena === "portal") setMusic("music.battle.portal", "music.battle");
-  // Shrek Swamp: All Star (vo FINAL ROUND hrá finálna hudba ako všade)
+  // Shrek Swamp: vlastná hudba bažiny (vo FINAL ROUND hrá finálna hudba ako všade)
   else if (s.config?.arena === "swamp") setMusic("music.battle.swamp", "music.battle");
   else setMusic("music.battle");
 }

@@ -1,6 +1,7 @@
-// public/client/shrek.js - Shrek Swamp (docs/SWAMP_PLAN.md): Shrek na doske (sprite canvas medzi figúrami, HP lišta
-// nad hlavou), ohlásené skoky 1/2/3 a smrad v bunkách (renderShrek z renderGrid) a choreografia jeho efektov
-// z timeline (shrekEffect): skok, rev (kríž okolo dopadu), zásah, sud, punch, PowerUp + tackle + návrat, pád, smrad.
+// public/client/shrek.js - Shrek Swamp (docs/SWAMP_PLAN.md): Shrek na doske (sprite canvas medzi figúrami, číslo HP
+// nad hlavou), ohlásené skoky 1/2/3 + náhľad ďalšieho kola a smrad v bunkách, itemy vo vrstve nad figúrami
+// (renderShrek z renderGrid) a choreografia jeho efektov z timeline (shrekEffect): blik cieľa, skok, rev (kríž okolo
+// dopadu), zásah + výkrik, PowerUp + tackle + návrat, pád, smrad, padnutie a zber itemov.
 // Stav nesie server v state.shrek (verejný - aj prekliatemu v labyrinte); klient len prehráva. Sprity sú pásy
 // z tools/sprites-shrek (public/assets/shrek/*.png + anims.json).
 import { state } from "/client/session.js";
@@ -8,6 +9,7 @@ import { cellToPx, TILE_W, TILE_H, gridEl, actorsEl, figuresEl, rowZ } from "/cl
 import { spawnFloat, spawnCellFloat, spawnManaFloat } from "/client/board-fx.js";
 import { pixSvg } from "/client/pix.js";
 import { perf } from "/client/perf.js";
+import { setStyle } from "/client/style-cache.js";
 import { SHREK_RAGE_HP } from "/shared/balance.js";
 
 const DIR = "/assets/shrek/";
@@ -81,9 +83,6 @@ export function renderShrek(s) {
     const m = document.createElement("div");
     m.className = "shrek-mark" + (phase ? " " + phase : "");
     m.innerHTML = `<img src="${DIR}Mark.png" alt=""><b>${i + 1}</b>`;
-    // viac čísel na jednej bunke (napr. 1 a 3) - ďalšia hlava vedľa, nech sa neprekryjú
-    const prior = cell.querySelectorAll(".shrek-mark").length;
-    if (prior) m.style.marginLeft = (-17 + prior * 100) + "px";
     cell.appendChild(m);
   });
   // náhľad skokov ďalšieho kola (config.shrekPreview): len číslo vpravo dole v bunke, v odtieni Shrekovej hlavy
@@ -139,6 +138,7 @@ export function renderShrek(s) {
     view.px = p.x; view.py = p.y; view.motion = null;
     play("Idle");
   }
+  fig.classList.toggle("stoned", sh.stone > 0 && !sh.dead); // Medúzino skamenenie - sivá socha (ako postava)
   fig.style.zIndex = sh.dead ? 1 : rowZ(sh.y) - 1; // mŕtvy leží za všetkými figúrami, živý za hráčmi na svojom riadku
   // nad hlavou len číslo HP: 20–11 zelené, 10–6 oranžové, 5–0 červené (prahy revu SHREK_RAGE_HP)
   hpEl.style.display = sh.dead ? "none" : "";
@@ -149,8 +149,6 @@ export function renderShrek(s) {
 
 /* ---------- efekty timeline ---------- */
 export function shrekEffect(e, hold) {
-  const sh = state?.shrek;
-  if (!sh && !e.kind.startsWith("shrek_") && !e.kind.startsWith("stench_") && !e.kind.startsWith("item_")) return;
   const now = performance.now();
   switch (e.kind) {
     case "shrek_jump": {
@@ -168,9 +166,22 @@ export function shrekEffect(e, hold) {
       roar = { cells: e.cells || [], until: now + hold };
       spawnCellFloat(e.cell, "ROAR!", "shrek-roar-float");
       break;
+    case "shrek_ts_hit": // THE WORLD: zásah v zamrazenom čase sa len ohlási (dopadne pri obnovení)
+      floatOverShrek(`-${e.dmg} HP`, "ts-float");
+      break;
     case "shrek_hit":
-      view.hurtUntil = now + 350;
+      if (!e.stone) view.hurtUntil = now + 350; // socha sa nestrhne
       floatOverShrek(`-${e.dmg} HP`, "dmg-float");
+      break;
+    // Medúzino skamenenie: socha (sivý filter + zmrazený Idle), vynechaný skok, odkamenenie
+    case "shrek_petrify":
+      floatOverShrek("🗿 PETRIFIED", "stone-float");
+      break;
+    case "shrek_stoned":
+      floatOverShrek("🗿 STONED", "stone-float");
+      break;
+    case "shrek_unpetrify":
+      play("Idle");
       break;
     // políčko bliká ako vyhodnocovaná špeciálna dlaždica: pred skokom 1/2/3 cieľ skoku (Shrek len stojí),
     // po zásahu hráčom Shrekovo políčko + výkrik (zvuk shrek.hit) s H_Roar v slučke
@@ -272,14 +283,16 @@ function tick(now) {
   // jednorazová animácia dohrala → späť do Idle (mŕtvy ostáva ležať)
   let m = META[view.anim] || META.Idle;
   if (!m) return;
+  const stoned = sh.stone > 0 && !sh.dead; // socha: prvý frame Idle, žiadna animácia
   // výkrik H_Roar je slučka s danou dĺžkou - po nej späť do Idle (inak by po odraze mirrorom ostal kričať)
   const oneShotDone = (!m.loop || view.anim === "H_Roar") && view.anim !== "HurtDead" && view.ms && now - view.start > view.ms + 60;
   if (oneShotDone || (sh.dead && view.anim !== "HurtDead")) { play(sh.dead ? "HurtDead" : "Idle"); if (sh.dead) view.start = 0; m = META[view.anim]; }
-  const f = frameIndex(m, now);
+  if (stoned) m = META.Idle || m;
+  const f = stoned ? 0 : frameIndex(m, now);
   const hurt = now < view.hurtUntil;
   const key = `${view.anim}|${f}|${view.flip}|${hurt}`;
-  fig.style.transform = `translate(${Math.round(view.px - CW / 2)}px, ${Math.round(view.py - CH - lift)}px)`;
-  hpEl.style.transform = `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 180)}px)`;
+  setStyle(fig, "transform", `translate(${Math.round(view.px - CW / 2)}px, ${Math.round(view.py - CH - lift)}px)`);
+  setStyle(hpEl, "transform", `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 180)}px)`);
   if (key === view.lastKey) return;
   view.lastKey = key;
   const g = fig.getContext("2d");

@@ -3,9 +3,7 @@
 Návrh vlastníka 2026-10-30. Shrek je **neutrálne NPC v aréne, nie hrateľná postava**. Nahrádza špeciálne
 dlaždice: tlačí hru ku koncu a hráči ho môžu využiť proti súperovi.
 
-Náhľady:
-- `public/dev/swamp.html` je scénka pravidiel (dev mock-up),
-- `public/dev/shrek.html` je galéria všetkých animácií zo sheetu.
+Náhľad: `public/dev/shrek.html` je galéria všetkých animácií zo sheetu.
 
 ## 1. Pravidlá
 
@@ -66,7 +64,7 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
   Zber číta prejdené bunky akcie (`actionSteps`) pred vyhodnotením pasce. Pri plnom HP alebo mane sa item aj tak
   spotrebuje.
 - Narutov klon itemy neberie. Prekliaty v labyrinte vidí item len na fakľovej bunke, ako heal/mana dlaždice.
-  Počas THE WORLD sa itemy nezbierajú (čas stojí).
+  Jotaro počas THE WORLD itemy zbiera (jeho pohyb beží naživo, rozhodnutie 2026-10-31).
 
 ### Zvuky Shreka
 
@@ -100,8 +98,9 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
 | Narutov klon zasiahne Shreka | Okamžitý rev ako pri hráčovi; klon v reve dostane len kozmetický zásah a ostane. |
 | Strela a Shrek s hráčom na jednom políčku | Strela zasiahne hráča. Shrek je zasiahnutý, len keď stojí na políčku sám. |
 | Charge (vlkolak, Vampire/Onryō), pasca, démon, breaker | Shreka ignorujú: bežia cez neho a nereaguje. |
-| Statusy (petrify, labyrint) | Na Shreka nepôsobia. |
-| THE WORLD (zamrazený čas) | Shrek je inertný. Strely ním prejdú bez reakcie. |
+| Medúzino skamenenie | Shrek v zóne Medúzinho specialu skamenie (`shrek.stone` = `STONE_ACTIONS`): vynechá najbližšie 2 skoky (políčka sa rátajú ako odskákané), potom odkamenie. Ako socha dostáva dmg (strela ho stále zastaví), ale nekričí, nemá zvuk zásahu a nereaguje (žiadny rev ani tackle); smrteľný zásah ho zloží normálne. Už skamenený sa znova neskamení. Zvuky ako pri postave (`petrify`/`stoned`/`unpetrify`). Rozhodnutie 2026-10-31. |
+| Labyrint (Minotaurov special) | Na Shreka nepôsobí. |
+| THE WORLD (zamrazený čas) | Shrek neskáče, ale je terčom (rozhodnutie 2026-10-31): Jotarova strela sa o neho zastaví, strela/melee/Special 1 ho zasiahnu - zásah sa len ohlási (`shrek_ts_hit`, fialový float). Po obnovení času, až po súperovom kumulatívnom beate, dostane súčet naraz (jeden `shrek_hit`) a raz zareaguje: Special 1 z iného stĺpca = tackle k Jotarovi, inak rev (`shrekResume`). |
 | Labyrint | Shrek je verejný (vidí ho aj prekliaty). Reakcie a zásahy, ktoré by prekliatemu prezradili bunku skrytého lovca (`shrek_hit` s `from` = lovec, zásahy lovca, `shrek_tackle`/`shrek_return` k lovcovi), sa redigujú. Shrekove HP v snapshote ostávajú verejné. |
 | Escanor pride | Shrekov zásah sa neráta ako zásah od súpera. |
 | Dlaždice | V bažine nie sú (lobby váhy sa ignorujú, server ich vynuluje). |
@@ -110,7 +109,7 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
 
 ### Engine
 
-- `engine/swamp.js` (`swampModule(E)`) obsahuje stav `game.shrek = { x, y, hp, dead, marks, done, stench }`.
+- `engine/swamp.js` (`swampModule(E)`) obsahuje stav `game.shrek = { x, y, hp, dead, marks, next, done, stench }` a `game.items`.
   Funkcie:
   - `swampStartGame` (nová hra),
   - `shrekStepEnd` (koniec kroku v `runRoundLoop`: skok a rev, alebo smrad),
@@ -122,7 +121,7 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
     `luffy` ruka a guľa).
 - Config: `config.arena = "swamp"` → `game.arena = "shrek-swamp"`. Kľúč `shrek` je v snapshote len v bažine,
   takže bridge a portal goldeny sú bit po bite rovnaké.
-- Efekty timeline: `shrek_jump`, `shrek_roar`, `shrek_hit`, `shrek_die`, `shrek_powerup`, `shrek_tackle`, `shrek_return`, `stench_proc`, `stench_spread`. Zásahy hráčov
+- Efekty timeline: `shrek_call`, `shrek_jump`, `shrek_roar`, `shrek_hit`, `shrek_scream`, `shrek_die`, `shrek_powerup`, `shrek_tackle`, `shrek_return`, `stench_proc`, `stench_spread`, `item_drop`, `item_pick`. Zásahy hráčov
   idú cez bežný `hit` so značkou `shrek: true`.
 - Čísla sú v `shared/balance.js` (`SHREK_*`, `STENCH_DMG`), časovanie v `shared/timing.js` (`SHREK_*_MS`,
   `STENCH_PROC_MS`).
@@ -132,7 +131,7 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
 - `public/client/shrek.js` kreslí Shreka do canvasu medzi figúrami (mŕtvy leží za nimi), číslo HP nad hlavou,
   čísla skokov a smrad v bunkách (`renderShrek` z `renderGrid`) a prehráva efekty (`shrekEffect` z `timeline.js`).
   Hráč sám so Shrekom na políčku odstúpi nabok (`pairShift` v `placement.js`).
-- Lobby: karta SHREK SWAMP. Sekcie dlaždíc sú skryté a nahrádza ich popis Shreka (`public/client/lobby.js`).
+- Lobby: karta SHREK SWAMP. Ovládače dlaždíc nastavujú itemy (ITEMS PER ROUND, ITEM CHANCE) a TILE PREVIEW je SHREK PREVIEW (`public/client/lobby.js`).
 - Pozadie je maľba v plnom rozlíšení (`public/arenas/shrek-swamp/shrek-swamp-hd.webp`, HD_ARENAS v
   `arena-bg.js`) so živými fakľami a svätojánskymi muškami. Originál je v `tools/arena-bg/src/shrek-swamp/`,
   prevod robí `node tools/arena-bg/hd-webp.mjs <src.png> <dst.webp>`.
@@ -144,16 +143,19 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
 - Postup:
   1. `node tools/sprites-shrek/detect.cjs` → `cells.json`,
   2. `node tools/sprites-shrek/pack.cjs` → `public/assets/shrek/*.png` + `anims.json`.
-- Hra používa pásy `Idle`, `Walk`, `JumpKick`, `Roar`, `PowerUp`, `Tackle` a `HurtDead`. Farby sú pôvodné zo sheetu
+- Hra používa pásy `Idle`, `Walk`, `JumpKick`, `Roar`, `H_Roar`, `PowerUp`, `Tackle` a `HurtDead`.
+- Značka ohláseného skoku `Mark.png` je vystrihnutý odznak: `node tools/sprites-shrek/marker.mjs` (zdroj `marker-src.jpg`). Farby sú pôvodné zo sheetu
   (tmavší skin sa skúšal 2026-10-31 a vlastník ho zamietol).
 
 ## 4. Testy
 
-- `test/swamp.mjs` (súčasť `npm test`) obsahuje 51 kontrol:
+- `test/swamp.mjs` (súčasť `npm test`) obsahuje 93 kontrol:
   - config a štart,
   - skoky a rev vrátane prahov HP,
   - reakcie (strela a melee → okamžitý rev, tackle, Narutov klon),
   - smrť a smrad,
+  - itemy (aj Shrekov zber), štít/mirror proti Shrekovi, náhľad skokov ďalšieho kola,
+  - Medúzino skamenenie, THE WORLD (zásahy Shreka po obnovení času, Jotarov zber itemov),
   - redakcia v labyrinte.
 - `node tools/simulate.mjs 20 --swamp` spustí náhodné zápasy a po každom kole skontroluje invarianty Shreka.
 - `node tools/browser-smoke.mjs --swamp` je dymový test klienta.

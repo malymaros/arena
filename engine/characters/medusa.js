@@ -25,6 +25,7 @@ export default {
       for (let r = 0; r < SPECIAL_REPEAT; r++) {
         ctx.pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells }], SPECIAL_BEAT_MS);
       }
+      ctx.shrekPetrify(cells, tl); // Shrek Swamp: Shrek v zóne skamenie (nemá obrany)
       if (!inZone && !cloneInZone) {
         ctx.pushStateFrame(tl, [], SMALL_DELAY_MS);
         return;

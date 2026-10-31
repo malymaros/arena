@@ -64,7 +64,7 @@ export function createEngine(io = {}) {
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
   const { walkDelay, isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
-  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, swampActionStart, noteDefense } = Object.assign(E, swampModule(E));
+  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, swampActionStart, noteDefense } = Object.assign(E, swampModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -78,8 +78,8 @@ export function createEngine(io = {}) {
     killClone, trackSteps, doJotaroWorld, vampShotRoute,
     // Portal Realm: portály pre geometriu (null mimo portal realm), efekty na telo, zatvorenie párov, niť cez prechod
     portalList, bodyEffect, closePortals, trackPath, walkDelay,
-    // Shrek Swamp: zásah Shreka zónovým specialom / melee (reakcia tackle/rev/punch) - mimo bažiny nič
-    shrekZone, shrekMelee,
+    // Shrek Swamp: zásah Shreka zónovým specialom / melee (reakcia tackle / rev), Medúzino skamenenie - mimo bažiny nič
+    shrekZone, shrekMelee, shrekPetrify,
   };
 
 function newPlayer(slot) {
@@ -153,7 +153,7 @@ function newGame() {
     tiles: [],     // { x, y, type: "dmg" | "heal" | "mana" | "power" | "block" } - pribúdajú od konca 1. kola
     // Portal Realm: páry portálov na hranách dosky [{ id: "A"–"G", type, ends: [{ x, y, side }, …] }]; mimo portal realm prázdne
     portals: [],
-    // Shrek Swamp: { x, y, hp, dead, marks: [[x,y]×3], done, stench: [[x,y]…] } - mimo bažiny null
+    // Shrek Swamp: { x, y, hp, dead, stone, marks: [[x,y]×3], next: [[x,y]×3], done, stench: [[x,y]…] } - mimo bažiny null
     shrek: null,
     items: [], // Shrek Swamp: [{ x, y, type: "heal" | "mana" }] - srdiečka a kvapky namiesto dlaždíc
     iks: [],      // [{ x, y }] - insta-kill tiles; viac súčasne, každé kolo menia pozíciu, navzájom sa neprekrývajú
@@ -847,7 +847,7 @@ function doMelee(slot, tl) {
     // plný dmg ako pri zásahu hráča (vrátane maze 2× a pri klonovom seku plného MELEE_DMG) - prejaví sa na sile odrazu
     strikeCell(opS, "clone", hitFoeCloneByMe ? meleeRaw : cloneMeleeRaw, tl, { kind: "melee", fromClone: !hitFoeCloneByMe });
   }
-  // Shrek Swamp: Shrek na zasahovanej bunke dostane úder tiež (reakcia punch)
+  // Shrek Swamp: Shrek na zasahovanej bunke dostane úder tiež (reakcia okamžitý rev)
   shrekMelee(slot, cells, cloneCells, meleeRaw, cloneMeleeRaw, tl);
 }
 
