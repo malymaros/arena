@@ -117,7 +117,7 @@ export const SOUNDS = {
 
   /* ---------- Shrek Swamp ---------- */
   "shrek.hit":    { files: ["custom/shrek/shrek-hit.mp3"], vol: 0.47, fit: "keep", status: "picked", note: "Shreka zasiahol hráč (shrek_hit) - výkrik dohrá celý, až potom rev / tackle" },
-  "shrek.roar":   { files: ["custom/shrek/shrek-roar.mp3"], vol: 0.3, fit: "keep", status: "picked", note: "Shrekov útok: rev (shrek_roar) a nafúknutie pred tacklom (shrek_powerup)" },
+  "shrek.roar":   { files: ["custom/shrek/shrek-roar.mp3"], vol: 0.3, fit: "fade", status: "picked", note: "Shrekov útok: rev (shrek_roar) a nafúknutie pred tacklom (shrek_powerup); nahrávka 2,2 s sa stíši na konci okna (rev 1,1 s), nech nerevie po návrate do Idle" },
 
   /* ---------- statusy a mechaniky ---------- */
   "labyrinth":      { files: [SCI + "doorClose_000.ogg"], vol: 0.6, status: "default", note: "kliatba labyrintu" },

@@ -11,7 +11,7 @@ import { perf } from "/client/perf.js";
 import { SHREK_RAGE_HP } from "/shared/balance.js";
 
 const DIR = "/assets/shrek/";
-const K = 4.3;                       // mierka sprite-u (~45 px Shrek → ~190 px, o niečo väčší než mágovia)
+const K = 3.2;                       // mierka sprite-u (75 % pôvodných 4,3: ~45 px Shrek → ~145 px)
 const CW = Math.round(96 * K), CH = CW; // canvas: najväčší pás (88 px) + rezerva
 const SIDE = 62;                     // odsun Shreka nabok, keď s ním na políčku stojí hráč (hráča odsúva pairShift)
 const META = {};
@@ -146,7 +146,7 @@ export function shrekEffect(e, hold) {
       if (view.px == null) { view.px = fromC.x; view.py = fromC.y; }
       view.flip = to.x < view.px;
       play("JumpKick", hold);
-      moveTo(to, hold * 0.85, 150);
+      moveTo(to, hold * 0.85, 120);
       break;
     }
     case "shrek_roar":
@@ -216,7 +216,7 @@ function floatOverShrek(text, cls) {
   el.className = cls;
   el.textContent = text;
   el.style.left = view.px + "px";
-  el.style.top = (view.py - 250) + "px";
+  el.style.top = (view.py - 200) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
 }
@@ -263,7 +263,7 @@ function tick(now) {
   const hurt = now < view.hurtUntil;
   const key = `${view.anim}|${f}|${view.flip}|${hurt}`;
   fig.style.transform = `translate(${Math.round(view.px - CW / 2)}px, ${Math.round(view.py - CH - lift)}px)`;
-  hpEl.style.transform = `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 232)}px)`;
+  hpEl.style.transform = `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 180)}px)`;
   if (key === view.lastKey) return;
   view.lastKey = key;
   const g = fig.getContext("2d");
