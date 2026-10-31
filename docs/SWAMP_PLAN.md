@@ -36,7 +36,7 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 
 | Útok | Reakcia | Následok |
 |---|---|---|
-| Basic strela | Okamžitý rev. | Kríž okolo Shreka za dmg revu; strelca zasiahne, len ak stojí vedľa (do 2026-10-31 sud: −1 mana) |
+| Basic strela (aj keď Shrek stojí na políčku so súperom - dmg dostanú obaja) | Okamžitý rev. | Kríž okolo Shreka za dmg revu; strelca zasiahne, len ak stojí vedľa (do 2026-10-31 sud: −1 mana) |
 | Melee (Shrek na zasahovanej bunke) | Okamžitý rev. | Útočník stojí na Shrekovom políčku, takže ho rev zasiahne (do 2026-10-31 punch: −2 many) |
 | Special / Special 1 od útočníka v inom stĺpci | PowerUp a tackle po svojom riadku smerom k útočníkovi. | Zasiahne prvú figúru v ceste (na spoločnom políčku všetky) za dmg revu. Potom sa Shrek vráti na štartové políčko. |
 | Special od útočníka v tom istom stĺpci (nad, pod alebo na jeho políčku) | Okamžitý rev. | Nevie, kam by bežal, preto zareve hneď. |
@@ -98,7 +98,8 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
 | Skamenený hráč | Rev, tackle ani smrad ho nezasiahnu (socha sa ráta, akoby na políčku nikto nestál, ako pri dlaždiciach). |
 | Narutov klon v dosahu revu, tacklu alebo smradu | Dostane len kozmetický `clone_hit` a nezomrie. Nesmie prezradiť, ktorá figúra je pravá. |
 | Narutov klon zasiahne Shreka | Okamžitý rev ako pri hráčovi; klon v reve dostane len kozmetický zásah a ostane. |
-| Strela a Shrek s hráčom na jednom políčku | Strela zasiahne hráča. Shrek je zasiahnutý, len keď stojí na políčku sám. |
+| Strela a Shrek s hráčom na jednom políčku | Strela zasiahne **oboch** rovnakým dmg (rozhodnutie 2026-10-31; predtým len hráča): najprv súpera (jeho obrana kryje len jeho - štít/mirror Shreka nechráni), potom Shreka, ktorý zareaguje revom. Platí aj pre klon-návnadu Naruta na Shrekovom políčku (klon padne, Shrek dostane zásah - inak by prezradil, ktorá figúra je klon). Strela na tom políčku končí. |
+| Rev / tackle / smrad smrteľný pre oboch hráčov | Nikdy remíza: zásahy sa vyhodnocujú po jednom v poradí kola - **najprv hráč, ktorý je v kole 1. (starter)**, potom druhý; prvá smrť končí hru a druhý hráč zásah už nedostane (rozhodnutie 2026-10-31). |
 | Charge (vlkolak, Vampire/Onryō), pasca, démon, breaker | Shreka ignorujú: bežia cez neho a nereaguje. |
 | Statusy (petrify, labyrint) | Na Shreka nepôsobia. |
 | THE WORLD (zamrazený čas) | Shrek je inertný. Strely ním prejdú bez reakcie. |

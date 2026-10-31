@@ -116,6 +116,43 @@ console.log("Skoky a rev (veža)");
   check(st.game.players.p1.hp === 10, "R8: skamenený hráč v riadku revu nedostane dmg", String(st.game.players.p1.hp));
 }
 
+/* ==================== Strela na spoločné políčko súpera a Shreka ==================== */
+console.log("Strela na políčko súpera so Shrekom");
+{
+  const FAR = [[0, 0], [0, 2], [1, 0]]; // skoky, ktorých rev netrafí (2,1) ani (3,1)
+  // p1 (2,1) strieľa doprava na (3,1), kde stojí súper aj Shrek: 3 dmg obom, súper prvý; potom rev (kríž okolo (3,1))
+  const s = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 3, y: 1, marks: FAR }); g.players.p1.x = 2; });
+  const tl = s.round([atk("right"), PASS, PASS], PASS3);
+  const g = s.game, hitAt = idx(tl, e => e.kind === "hit" && e.target === "p2" && !e.shrek), shrekAt = idx(tl, e => e.kind === "shrek_hit");
+  check(g.shrek.hp === SHREK_HP - 3, "SH1: Shrek na políčku súpera dostane rovnaký dmg strely", String(g.shrek.hp));
+  check(hitAt >= 0 && shrekAt > hitAt, "SH2: najprv zásah súpera, potom Shreka", J([hitAt, shrekAt]));
+  check(g.players.p2.hp === 10 - 3 - 1 && g.players.p1.hp === 9, "SH3: potom rev zasiahne súpera aj strelca vedľa", J([g.players.p1.hp, g.players.p2.hp]));
+  // štít súpera (p2 začína kolo, štít kryje strelu v tom istom kroku): blok na súperovi, Shrek zásah aj tak dostane
+  const s2 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 3, y: 1, marks: FAR }); g.players.p1.x = 2; g.starter = "p2"; });
+  s2.round([atk("right"), PASS, PASS], [{ type: "shield" }, PASS, PASS]);
+  check(s2.game.shrek.hp === SHREK_HP - 3 && s2.game.players.p2.hp === 9, "SH4: štít kryje súpera, Shrek zásah dostane (súper potom len rev)",
+    J([s2.game.shrek.hp, s2.game.players.p2.hp]));
+  // klon-návnada Naruta na Shrekovom políčku: klon padne, Shrek dostane zásah (inak by prezradil, že je to klon)
+  const s3 = scenario("fire", "naruto", (g) => { shrekSet(g, { x: 3, y: 1, marks: FAR }); g.players.p1.x = 2; g.players.p2.x = 3; g.players.p2.y = 2; g.players.p2.clone = { x: 3, y: 1 }; });
+  const tl3 = s3.round([atk("right"), PASS, PASS], PASS3);
+  check(fx(tl3, "clone_die").length === 1 && s3.game.shrek.hp === SHREK_HP - 3, "SH5: návnada na Shrekovom políčku - klon padne aj Shrek dostane zásah",
+    J([fx(tl3, "clone_die").length, s3.game.shrek.hp]));
+}
+
+/* ==================== Rev zabije oboch → bez remízy ==================== */
+console.log("Rev smrteľný pre oboch - deterministicky padne 1. hráč kola");
+for (const starter of ["p1", "p2"]) {
+  // skok 1 na (0,1): rev zasiahne (0,1) aj (1,1) - obaja hráči majú 1 HP
+  const s = scenario("fire", "lightning", (g) => {
+    shrekSet(g, { x: 3, y: 2, marks: [[0, 1], [2, 2], [1, 2]] });
+    g.players.p1.x = 0; g.players.p1.y = 1; g.players.p2.x = 1; g.players.p2.y = 1;
+    g.players.p1.hp = 1; g.players.p2.hp = 1; g.starter = starter;
+  });
+  s.round([R, PASS, PASS], [R, PASS, PASS]);
+  const { p1, p2 } = s.game.players, other = starter === "p1" ? "p2" : "p1";
+  check(s.game.players[starter].hp === 0 && s.game.players[other].hp === 1, `D${starter === "p1" ? 1 : 2}: rev zabije len ${starter} (1. v kole), ${other} prežije`, J([p1.hp, p2.hp]));
+}
+
 /* ==================== Reakcie ==================== */
 console.log("Reakcie na zásah");
 {

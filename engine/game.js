@@ -732,8 +732,11 @@ function doBasic(slot, dir, tl) {
       if (cloneHere && playerHere) { s.done = true; hits.push({ target: "stacked", shot: s }); }
       else if (cloneHere)         { hits.push({ target: "clone", shot: s }); }
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
-      else if (shrekAt(s.x, s.y)) { s.done = true; hits.push({ target: "shrek", shot: s }); } // Shrek Swamp: strela sa o Shreka zastaví
-      else { const own = ownAt(s); if (own) { s.done = true; hits.push({ target: own, shot: s }); } }
+      // na bunke so súperovou figúrou dostanú zásah AJ ostatné figúry na nej (strela tam končí):
+      // Portal Realm - vlastná figúra strelca (strela sa cez portál vrátila), Shrek Swamp - Shrek
+      const own = ownAt(s);
+      if (own) { s.done = true; hits.push({ target: own, shot: s }); }
+      if (shrekAt(s.x, s.y)) { s.done = true; hits.push({ target: "shrek", shot: s }); } // Shrek Swamp: strela sa o Shreka zastaví
     }
     // Portal Realm: krok s prechodom portálom je dlhší (PORTAL_SHOT_STEP_MS - strela sa dá sledovať)
     if (fx.length) { anyCharge = true; pushStateFrame(tl, fx, stepUsed.length ? PORTAL_SHOT_STEP_MS : CHARGE_STEP_MS); }
@@ -760,26 +763,38 @@ function doBasic(slot, dir, tl) {
     // súperove „player" zásahy z TOHTO kroku: stacknutý Naruto+klon strieľajúci rovnakým smerom trafí
     // z jednej bunky dvakrát → na NEKRYTÉ HP to spojíme do JEDNÉHO úderu so súčtom dmg (nie dva animačne
     // oddelené); pri obrane (štít/mirror) strikeOwnerMulti vráti false a rieši sa každá strela zvlášť.
-    const playerHits = hits.filter(h => h.target === "player");
-    const ownerBonus = playerHits.some(h => !h.shot.clone) ? pBonus : 0; // bonus nesie len majiteľova strela
-    if (playerHits.length && !strikeOwnerMulti(opS, playerHits.map(rawOf), tl, "basic", ownerBonus)) {
-      for (const h of playerHits) { strikeCell(opS, "player", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) }); if (winnerNow()) break; }
-    }
-    for (const h of hits) {
-      if (h.target === "player" || winnerNow()) continue;
-      const raw = rawOf(h);
-      if (h.target === "shrek") { shrekShot(slot, raw, tl); continue; } // reakcia: okamžitý rev
-      if (h.target === "stacked") {
-        // stacknutý pár: obrana kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok prejde na Naruta
-        strikeCell(opS, "stacked", raw, tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) });
-      } else if (h.target === "clone") { // clone (návnada mimo majiteľovej bunky)
-        const defended = op.shield || op.mirror; // obrana strelu zastaví (block/odraz), inak preletí cez dym
-        strikeCell(opS, "clone", raw, tl, { kind: "basic", fromClone: h.shot.clone, ...portalOpts(h) });
-        if (defended && !portalOpts(h).defBreak) h.shot.done = true; else h.shot.spent = true;
-      } else {
-        // Portal Realm: strela sa cez portál vrátila na vlastnú figúru (strelec / jeho klon)
-        selfStrike(slot, h.target, raw, tl);
+    // Poradie zásahov v kroku je deterministické a vylučuje remízu: najprv figúry hráča, ktorý je v kole 1.
+    // (starter), potom druhého (súper vs. vlastná figúra cez portál), Shrek až nakoniec. Po každom zásahu
+    // kontrola smrti - prvá smrť končí hru, druhý hráč už zásah nedostane.
+    const strikeFoe = () => {
+      const playerHits = hits.filter(h => h.target === "player");
+      const ownerBonus = playerHits.some(h => !h.shot.clone) ? pBonus : 0; // bonus nesie len majiteľova strela
+      if (playerHits.length && !strikeOwnerMulti(opS, playerHits.map(rawOf), tl, "basic", ownerBonus)) {
+        for (const h of playerHits) { strikeCell(opS, "player", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) }); if (winnerNow()) return; }
       }
+      for (const h of hits) {
+        if (winnerNow()) return;
+        if (h.target === "stacked") {
+          // stacknutý pár: obrana kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok prejde na Naruta
+          strikeCell(opS, "stacked", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) });
+        } else if (h.target === "clone") { // clone (návnada mimo majiteľovej bunky)
+          const defended = op.shield || op.mirror; // obrana strelu zastaví (block/odraz), inak preletí cez dym
+          strikeCell(opS, "clone", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, ...portalOpts(h) });
+          if (!h.shot.done) { if (defended && !portalOpts(h).defBreak) h.shot.done = true; else h.shot.spent = true; }
+        }
+      }
+    };
+    // Portal Realm: strela sa cez portál vrátila na vlastnú figúru (strelec / jeho klon)
+    const strikeSelf = () => {
+      for (const h of hits) {
+        if (winnerNow()) return;
+        if (h.target.startsWith("self")) selfStrike(slot, h.target, rawOf(h), tl);
+      }
+    };
+    for (const run of game.starter === slot ? [strikeSelf, strikeFoe] : [strikeFoe, strikeSelf]) { run(); if (winnerNow()) break; }
+    for (const h of hits) {
+      if (winnerNow() || h.target !== "shrek" || !shrekAt(h.shot.x, h.shot.y)) continue;
+      shrekShot(slot, rawOf(h), tl); // reakcia: okamžitý rev
     }
     if (winnerNow()) break; // prvá smrť končí hru - zvyšok letu sa už nehrá
   }
