@@ -558,5 +558,26 @@ console.log("Charge, démon a pasca proti Shrekovi");
   }
 }
 
+console.log("Escanor pride a Narutov summon pri Shrekovi");
+{
+  // Shrekov rev zasiahne Escanora → pride −1 (ako zásah od súpera); bez zásahu +1
+  {
+    const s = scenario("escanor", "fire", (g) => { shrekSet(g, { x: 2, y: 2, marks: [[0, 0], [2, 2], [1, 2]] }); g.players.p1.pride = 2; });
+    const tl = s.round(PASS3, PASS3);
+    check(fx(tl, "hit").some(h => h.target === "p1" && h.shrek) && s.game.players.p1.pride === 1, "EP1: Shrekov rev zníži Escanorovi pride", J({ pride: s.game.players.p1.pride }));
+    const q = scenario("escanor", "fire", (g) => { shrekSet(g, { x: 2, y: 2, marks: QUIET }); g.players.p1.pride = 2; });
+    q.round(PASS3, PASS3);
+    check(q.game.players.p1.pride === 3, "EP2: bez zásahu Shrekom pride +1", J({ pride: q.game.players.p1.pride }));
+  }
+  // Shrek na Narutovej bunke summon zablokuje (mana sa minie, klon nevznikne)
+  {
+    const s = scenario("naruto", "fire", (g) => { shrekSet(g, { x: 0, y: 1, marks: QUIET }); g.players.p1.mana = 6; });
+    const tl = s.round([sp(), PASS, PASS], PASS3);
+    const inv = fx(tl, "invalid").find(e => e.target === "p1");
+    check(inv?.reason === "not_alone" && !fx(tl, "clone_born").length && s.game.players.p1.clone === null,
+      "NS1: Shrek na Narutovej bunke zablokuje summon klona", J({ inv, clone: s.game.players.p1.clone }));
+  }
+}
+
 console.log(`\n${passes} PASS, ${failures} FAIL`);
 if (failures) process.exit(1);

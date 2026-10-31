@@ -1,5 +1,5 @@
 // Naruto: special nedáva dmg - TIEŇOVÝ KLON. Range self: nedá sa blokovať ani odraziť, ale Naruto musí
-// stáť na bunke SÁM (bez súpera; vlastný klon nevadí). Recast s aktívnym klonom: starý klon najprv zmizne
+// stáť na bunke SÁM (bez súpera a bez Shreka v Shrek Swamp; vlastný klon nevadí). Recast s aktívnym klonom: starý klon najprv zmizne
 // ako po zásahu, potom beží bežný summon. Klon vzniká na Narutovej bunke.
 import { SPECIAL_COST, SPECIAL_REPEAT, SPECIAL_BEAT_MS, SMALL_DELAY_MS, CLONE_SUMMON_MS } from "../constants.js";
 
@@ -14,7 +14,8 @@ export default {
       // zablokovať; mana sa minie aj tak. Starý klon zaniká VŽDY (recast aj blok) ešte PRED pečaťami.
       actor.mana -= SPECIAL_COST;
       ctx.killClone(slot, tl);
-      if (foe && foe.x === actor.x && foe.y === actor.y) {
+      // Shrek Swamp: živý Shrek na Narutovej bunke summon zablokuje rovnako ako súper
+      if ((foe && foe.x === actor.x && foe.y === actor.y) || ctx.shrekAt(actor.x, actor.y)) {
         for (let r = 0; r < SPECIAL_REPEAT; r++)
           ctx.pushStateFrame(tl, [{ kind: "special", from: slot, cells: [[actor.x, actor.y]] }], SPECIAL_BEAT_MS);
         ctx.pushInvalid(tl, slot, SMALL_DELAY_MS, "not_alone");

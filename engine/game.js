@@ -79,7 +79,7 @@ export function createEngine(io = {}) {
     // Portal Realm: portály pre geometriu (null mimo portal realm), efekty na telo, zatvorenie párov, niť cez prechod
     portalList, bodyEffect, closePortals, trackPath, walkDelay,
     // Shrek Swamp: zásah Shreka zónovým specialom / melee (reakcia tackle / rev), Medúzino skamenenie - mimo bažiny nič
-    shrekZone, shrekMelee, shrekPetrify, shrekCell,
+    shrekZone, shrekMelee, shrekPetrify, shrekCell, shrekAt,
   };
 
 function newPlayer(slot) {

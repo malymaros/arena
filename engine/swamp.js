@@ -161,7 +161,8 @@ function shrekSnapshot() {
 
 // zásah hráča prostredím (rev, tackle, smrad) - ako dlaždica: ½ pri Last Stand/Hope (obrany rieši volajúci - guardOf).
 // Smrteľný zásah počas labyrintu prehrá rovnakú sekvenciu ako dlaždica (odhalenie pred, koniec labyrintu po).
-function envHit(slot, raw, tl) {
+// byShrek: zásah Shrekovým útokom (rev, tackle) - Escanorovi znižuje pride ako zásah od súpera; smrad nie (dlaždica).
+function envHit(slot, raw, tl, byShrek = false) {
   const p = E.game.players[slot];
   if (p.hp <= 0) return;
   const d = E.recvDmg(slot, raw);
@@ -169,6 +170,7 @@ function envHit(slot, raw, tl) {
   if (lethalInLab) E.revealLabyrinths(tl);
   p.hp = Math.max(0, p.hp - d);
   E.pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d, shrek: true }], SMALL_DELAY_MS);
+  if (byShrek && d > 0) E.notePrideHit(slot); // Escanor pride: Shrekov zásah sa ráta ako zásah od súpera
   if (lethalInLab) E.endLabyrinths(tl);
 }
 
@@ -237,7 +239,7 @@ function roar(tl, stoned = null) {
       if (back) reflects.push({ slot, dmg: back });
       continue;
     }
-    if (ownerIn) envHit(slot, dmg, tl);
+    if (ownerIn) envHit(slot, dmg, tl, true);
     if (E.winnerNow()) return;
     if (cloneIn) cloneCosmetic(slot, dmg, tl);
   }
@@ -402,7 +404,7 @@ function tackle(dx, tl) {
     }
     for (const v of mine) {
       if (v.clone) cloneCosmetic(slot, dmg, tl);
-      else if (!stonedNow(slot)) envHit(slot, dmg, tl);
+      else if (!stonedNow(slot)) envHit(slot, dmg, tl, true);
       if (E.winnerNow()) return;
     }
   }
