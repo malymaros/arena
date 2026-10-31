@@ -49,8 +49,8 @@ export const SOUNDS = {
   "music.menu":   { files: [MUS + "cynic-town-theme.mp3"],     vol: 0.45, status: "default", note: "lobby, výber postavy, draft" },
   "music.battle": { files: [MUS + "cynic-battle-theme-a.mp3"], vol: 0.40, status: "default", note: "hra (obe postavy zvolené)" },
   "music.battle.portal": { files: [],                          vol: 0.40, status: "default", note: "hra v Portal Realm - prázdne = hrá music.battle" },
-  "music.battle.swamp": { files: ["custom/music/shrek-all-star.mp3"], vol: 1.0, trim: { "custom/music/shrek-all-star.mp3": [514, 66737] }, status: "picked",
-    note: "hra v Shrek Swamp (mimo FINAL ROUND) - All Star, úsek 40,4–107,6 s originálu; nahrávka je tichá (−17,9 LUFS, vrchol −7 dBFS) - vol 1,0 = −17,9 LUFS ako music.battle; slučka 28 taktov (103,5 BPM), prechod 1,5 s na takt" },
+  "music.battle.swamp": { files: ["custom/music/shrek-swamp.mp3"], vol: 0.3, trim: { "custom/music/shrek-swamp.mp3": [497, 38847] }, status: "picked",
+    note: "hra v Shrek Swamp (mimo FINAL ROUND) - shrek-swamp-audio, úsek 48,8–88,2 s originálu (tools/music-loop.mjs); slučka 16 taktov (103,5 BPM), prechod 1,5 s na takt; nahrávka −7,3 LUFS → vol 0,3 = −17,9 LUFS ako music.battle" },
   "music.final":  { files: [],                                 vol: 0.40, status: "default", note: "FINAL ROUND (Last Stand) - prázdne = hrá ďalej music.battle" },
 
   /* ---------- Portal Realm ---------- */
@@ -114,6 +114,10 @@ export const SOUNDS = {
   "tile.mana":    { files: [DIG + "phaserUp3.ogg"], vol: 0.5, status: "default" },
   "tile.ik":      { files: [SCI + "lowFrequency_explosion_001.ogg"], vol: 0.6, status: "default" },
   "tile_consume": { files: [UI + "drop_002.ogg"], vol: 0.5, status: "default", note: "Fire/power tile spotrebovaná" },
+
+  /* ---------- Shrek Swamp ---------- */
+  "shrek.hit":    { files: ["custom/shrek/shrek-hit.mp3"], vol: 0.47, fit: "keep", status: "picked", note: "Shrek skáče na políčko revu (shrek_jump) alebo ho zasiahol hráč (shrek_hit) - vždy pred revom" },
+  "shrek.roar":   { files: ["custom/shrek/shrek-roar.mp3"], vol: 0.3, fit: "keep", status: "picked", note: "Shrekov útok: rev (shrek_roar) a nafúknutie pred tacklom (shrek_powerup)" },
 
   /* ---------- statusy a mechaniky ---------- */
   "labyrinth":      { files: [SCI + "doorClose_000.ogg"], vol: 0.6, status: "default", note: "kliatba labyrintu" },

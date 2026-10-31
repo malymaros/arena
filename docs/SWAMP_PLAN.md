@@ -68,12 +68,21 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 - Narutov klon itemy neberie. Prekliaty v labyrinte vidí item len na fakľovej bunke, ako heal/mana dlaždice.
   Počas THE WORLD sa itemy nezbierajú (čas stojí).
 
+### Zvuky Shreka
+
+- `shrek.hit` (`custom/shrek/shrek-hit.mp3`, 3,3 s) zaznie pri skoku na políčko revu (`shrek_jump`) a keď Shreka
+  zasiahne hráč (`shrek_hit`). `shrek.roar` (`custom/shrek/shrek-roar.mp3`) zaznie pri reve (`shrek_roar`) a pri
+  nafúknutí pred tacklom (`shrek_powerup`). Hlasitosť oboch je −18 LUFS (`node tools/voice-loudness.mjs`).
+- Hit vždy dohrá celý, až potom príde rev: za skokom aj za zásahom je pauza do `SHREK_HIT_SOUND_MS` (3,3 s,
+  `shared/timing.js`; po výmene nahrávky ju treba zmeniť). Kolo s tromi skokmi je tým o ~8 s dlhšie.
+
 ### Hudba
 
-`music.battle.swamp` hrá *All Star* počas hry v bažine. Nahrávka je tichá (−17,9 LUFS, vrchol −7 dBFS), preto má
-`vol` 1,0: vychádza na −17,9 LUFS rovnako ako `music.battle` (−9,9 LUFS × 0,40). Vo FINAL ROUND hrá finálna hudba ako v iných arénach.
-Súbor `public/sounds/custom/music/shrek-all-star.mp3` je orezaný úsek 40,4–107,6 s originálu (rez po MP3 rámcoch,
-prepočítaná Xing hlavička). Slučka `trim [514, 66737]` má 28 taktov pri 103,5 BPM a prechod 1,5 s na takt.
+`music.battle.swamp` hrá skladbu `shrek-swamp-audio` (`custom/music/shrek-swamp.mp3`) počas hry v bažine. Vo FINAL ROUND
+hrá finálna hudba ako v iných arénach. Slučku pripravuje `node tools/music-loop.mjs <vstup.mp3> <výstup.mp3> [--bars 16-40]`:
+nájde úsek o celý počet taktov s rovnakou hudbou na prechode, vyreže ho po MP3 rámcoch (prepočítaná Xing hlavička) a
+vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16 taktov (≈ 38 s, 103,5 BPM, podobnosť na prechode
+0,83; dlhšie úseky sa v tejto verzii na prechode líšia), nahrávka −7,3 LUFS → `vol` 0,3 = −17,9 LUFS ako `music.battle`.
 
 ## 2. Rozhodnutia k okrajovým prípadom (zvolené pri implementácii, vlastník ich môže zmeniť)
 

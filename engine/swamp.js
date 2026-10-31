@@ -14,7 +14,7 @@
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js), ako ostatné moduly mechaník.
 import {
   START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP,
-  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_POWERUP_MS,
+  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_POWERUP_MS,
   SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS,
 } from "./constants.js";
 
@@ -160,6 +160,7 @@ function shrekStepEnd(k, tl, stoned) {
   const from = [s.x, s.y];
   s.x = to[0]; s.y = to[1]; s.done = k + 1;
   E.pushStateFrame(tl, [{ kind: "shrek_jump", from, to: [...to], n: k + 1 }], SHREK_JUMP_MS);
+  E.pushStateFrame(tl, [], SHREK_HIT_SOUND_MS - SHREK_JUMP_MS); // zvuk hitu dohrá celý, až potom rev
   roar(tl, stoned);
 }
 
@@ -207,7 +208,10 @@ function damageShrek(atkSlot, raw, tl) {
   const s = E.game.shrek;
   s.hp = Math.max(0, s.hp - raw);
   E.pushStateFrame(tl, [{ kind: "shrek_hit", from: atkSlot, cell: [s.x, s.y], dmg: raw }], SHREK_HIT_MS);
-  if (s.hp > 0) return false;
+  if (s.hp > 0) {
+    E.pushStateFrame(tl, [], SHREK_HIT_SOUND_MS - SHREK_HIT_MS); // zvuk hitu dohrá celý, až potom reakcia (rev / tackle)
+    return false;
+  }
   s.dead = true;
   s.marks = [];
   s.stench = [[s.x, s.y]];

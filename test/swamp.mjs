@@ -4,6 +4,7 @@
 // Spustenie: node test/swamp.mjs  (súčasť npm test)
 import { createEngine } from "../engine/game.js";
 import { SHREK_HP } from "../shared/balance.js";
+import { SHREK_HIT_SOUND_MS, SHREK_JUMP_MS } from "../shared/timing.js";
 
 let failures = 0, passes = 0;
 function check(cond, label, detail = "") {
@@ -98,6 +99,9 @@ console.log("Skoky a rev (veža)");
   const firstJump = idx(tl, e => e.kind === "shrek_jump");
   const actions = tl.slice(0, firstJump).flatMap(f => (f.effects || []).filter(e => e.kind === "action"));
   check(actions.length === 2, "R6: skok 1 až po 1. akcii oboch hráčov", String(actions.length));
+  const j1 = idx(tl, e => e.kind === "shrek_jump"), r1 = idx(tl, e => e.kind === "shrek_roar");
+  check(r1 === j1 + 2 && tl[j1].delayMs + tl[j1 + 1].delayMs === SHREK_HIT_SOUND_MS && tl[j1].delayMs === SHREK_JUMP_MS,
+    "R6b: po skoku rev až keď dohrá zvuk hitu", J([j1, r1]));
 
   for (const [hp, dmg] of [[10, 2], [6, 2], [5, 3], [1, 3]]) {
     const t = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, hp, marks: [[0, 0], [2, 0], [1, 0]] }));
@@ -120,7 +124,8 @@ console.log("Reakcie na zásah");
   check(s.game.shrek.hp === SHREK_HP - 3, "A1: strela sa zastaví o Shreka (3 dmg zblízka)", String(s.game.shrek.hp));
   check(p2.hp === 10, "A2: súper za Shrekom nedostane nič", String(p2.hp));
   const hitAt = idx(tl, e => e.kind === "shrek_hit"), roarAt = idx(tl, e => e.kind === "shrek_roar");
-  check(hitAt >= 0 && roarAt === hitAt + 1 && J(fx(tl, "shrek_roar")[0].cell) === "[1,1]", "A3: strela → okamžitý rev hneď po zásahu", J([hitAt, roarAt]));
+  check(hitAt >= 0 && roarAt === hitAt + 2 && J(fx(tl, "shrek_roar")[0].cell) === "[1,1]" && tl[hitAt].delayMs + tl[hitAt + 1].delayMs === SHREK_HIT_SOUND_MS,
+    "A3: strela → rev po zásahu, až keď dohrá zvuk hitu", J([hitAt, roarAt]));
   check(p1.hp === 9 && p1.mana === 6 - 1 - 2 - 2, "A4: rev zasiahne strelca stojaceho vedľa Shreka (1 dmg), mana sa nemení", J([p1.hp, p1.mana]));
   check(!tl.some(f => (f.effects || []).some(e => e.kind === "shrek_barrel" || e.kind === "shrek_punch" || e.kind === "shrek_mana")), "A5: žiadny sud, punch ani strata many");
 
@@ -134,7 +139,7 @@ console.log("Reakcie na zásah");
   const s3 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 0, y: 1, marks: QUIET }); g.players.p1.mana = 5; });
   const tl3 = s3.round([M, R, PASS], PASS3);
   check(s3.game.shrek.hp === SHREK_HP - 8, "A7: melee na Shrekovom políčku (8 dmg)", String(s3.game.shrek.hp));
-  check(idx(tl3, e => e.kind === "shrek_roar") === idx(tl3, e => e.kind === "shrek_hit") + 1 && s3.game.players.p1.hp === 9,
+  check(idx(tl3, e => e.kind === "shrek_roar") === idx(tl3, e => e.kind === "shrek_hit") + 2 && s3.game.players.p1.hp === 9,
     "A8: melee → okamžitý rev, zasiahne útočníka na políčku", J([s3.game.players.p1.hp]));
 
   // special zboku → tackle: Fire (0,1) special na riadok 1 - súper (3,1) aj Shrek (2,1); tackle doľava → prvý v ceste p1
@@ -158,7 +163,7 @@ console.log("Reakcie na zásah");
   const s6 = scenario("lightning", "fire", (g) => { shrekSet(g, { x: 1, y: 1, marks: QUIET }); g.players.p1.x = 1; g.players.p1.y = 0; });
   const tl6 = s6.round([sp(), PASS, PASS], PASS3);
   const hitAt6 = idx(tl6, e => e.kind === "shrek_hit"), roarAt6 = idx(tl6, e => e.kind === "shrek_roar");
-  check(hitAt6 >= 0 && roarAt6 === hitAt6 + 1 && !fx(tl6, "shrek_tackle").length, "A14: útočník nad Shrekom → rev hneď po zásahu, bez tacklu", J([hitAt6, roarAt6]));
+  check(hitAt6 >= 0 && roarAt6 === hitAt6 + 2 && !fx(tl6, "shrek_tackle").length, "A14: útočník nad Shrekom → rev hneď po zásahu, bez tacklu", J([hitAt6, roarAt6]));
   check(s6.game.shrek.hp === SHREK_HP - 3, "A15: Lightning special zasiahne Shreka na políčku opačnej farby", String(s6.game.shrek.hp));
 
   // Narutov klon trafí Shreka → okamžitý rev; klon vedľa Shreka dostane len kozmetický zásah a ostane
