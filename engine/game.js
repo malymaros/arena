@@ -1888,7 +1888,8 @@ function sanitizeConfig(raw) {
     ...(raw.randomChars === true ? { randomChars: true } : {}),
     // aréna: kľúč len pre portal realm (stone bridge config ostáva bez zmeny - goldeny)
     ...(portal ? { arena: "portal", portalWeights, portalsPerRound } : {}),
-    ...(swamp ? { arena: "swamp", itemsPerRound, itemWeights } : {}) };
+    // bažina: náhľad Shrekových skokov na ďalšie kolo (lobby „SHREK PREVIEW", default zapnutý)
+    ...(swamp ? { arena: "swamp", itemsPerRound, itemWeights, shrekPreview: raw.shrekPreview !== false } : {}) };
 }
 
 // vypršal čas na ťah: kto nie je locknutý, zahrá rozpracovaný draft doplnený náhodne; potom vyhodnoť kolo

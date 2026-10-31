@@ -20,7 +20,7 @@ fetch(DIR + "anims.json").then(r => r.json()).then(list => Promise.all(list.filt
   new Promise(res => { const img = new Image(); img.onload = () => { META[m.name] = { ...m, img }; res(); }; img.onerror = res; img.src = DIR + m.name + ".png"; }))))
   .then(() => { ready = true; }).catch(() => {});
 
-let fig = null, hpEl = null;
+let fig = null, hpEl = null, itemsEl = null; // itemsEl: vrstva itemov nad figúrami
 const view = { anim: "Idle", start: 0, ms: 0, flip: false, px: null, py: null, motion: null, hurtUntil: 0, lastKey: "" };
 let roar = null;                     // { cells, until } - rozsvietené políčka revu (kríž)
 let freshStench = new Map();         // "x,y" → do kedy sa bunka smradu „rozlieva" (animácia nástupu)
@@ -38,6 +38,9 @@ function ensureEls() {
   hpEl = document.createElement("div");
   hpEl.className = "shrek-hp";
   actorsEl.appendChild(hpEl);
+  itemsEl = document.createElement("div");
+  itemsEl.className = "swamp-items";
+  actorsEl.appendChild(itemsEl);
 }
 
 const cellCenter = (x, y) => { const { left, top } = cellToPx(x, y); return { x: left + TILE_W / 2, y: top + TILE_H }; };
@@ -64,7 +67,7 @@ function moveTo(to, ms, arc = 0) {
 /* ---------- render z renderGrid (každý snapshot / frame) ---------- */
 export function renderShrek(s) {
   const sh = s?.shrek;
-  if (!sh) { if (fig) { fig.style.display = "none"; hpEl.style.display = "none"; } return; }
+  if (!sh) { if (fig) { fig.style.display = "none"; hpEl.style.display = "none"; itemsEl.replaceChildren(); } return; }
   ensureEls();
   fig.style.display = "block";
   // bunky: ohlásené skoky - políčko podfarbené ako špeciálna dlaždica + Shrekova hlava (Mark.png) s číslom
@@ -83,6 +86,15 @@ export function renderShrek(s) {
     if (prior) m.style.marginLeft = (-17 + prior * 100) + "px";
     cell.appendChild(m);
   });
+  // náhľad skokov ďalšieho kola (config.shrekPreview): len číslo vpravo dole v bunke, v odtieni Shrekovej hlavy
+  for (const [i, [x, y]] of (sh.next || []).entries()) {
+    const cell = cells[y * w + x];
+    if (!cell) continue;
+    const n = document.createElement("span");
+    n.className = "shrek-next";
+    n.textContent = i + 1;
+    cell.appendChild(n);
+  }
   for (const [x, y] of sh.stench) {
     const cell = cells[y * w + x];
     if (!cell) continue;
@@ -95,13 +107,15 @@ export function renderShrek(s) {
     cell.appendChild(m);
   }
   // itemy: srdiečko / kvapka (pixel ikony dlaždíc) bez krúžku, vznášajú sa nad tieňom; čerstvé padajú zhora
+  // Kreslia sa do vlastnej vrstvy nad figúrami - vždy najviac vpredu, aj pred hráčmi a mŕtvym Shrekom.
+  itemsEl.replaceChildren();
   for (const it of s.items || []) {
-    const cell = cells[it.y * w + it.x];
-    if (!cell) continue;
+    const { left, top } = cellToPx(it.x, it.y);
     const el = document.createElement("div");
     el.className = `swamp-item ${it.type}` + ((freshItems.get(`${it.x},${it.y}`) || 0) > now ? " fresh" : "");
+    el.style.left = (left + TILE_W / 2) + "px"; el.style.top = (top + TILE_H / 2) + "px";
     el.innerHTML = `<i>${pixSvg(it.type === "heal" ? "heart" : "drop")}</i>`;
-    cell.appendChild(el);
+    itemsEl.appendChild(el);
   }
   if (roar && roar.until > now) for (const [x, y] of roar.cells) cells[y * w + x]?.classList.add("shrek-roar");
   for (const [k, until] of flashCells) {
@@ -162,7 +176,7 @@ export function shrekEffect(e, hold) {
     // po zásahu hráčom Shrekovo políčko + výkrik (zvuk shrek.hit) s H_Roar v slučke
     case "shrek_call":
     case "shrek_scream":
-      if (e.kind === "shrek_scream") play("H_Roar");
+      if (e.kind === "shrek_scream") play("H_Roar", hold); // slučka len na dĺžku výkriku (po odraze mirrorom nenasleduje reakcia)
       else view.flip = cellCenter(e.cell[0], e.cell[1]).x < view.px;
       alertCells.set(`${e.cell[0]},${e.cell[1]}`, now + hold);
       gridEl.children[e.cell[1] * (state?.board?.w || 4) + e.cell[0]]?.classList.add("shrek-alert");
@@ -199,9 +213,10 @@ export function shrekEffect(e, hold) {
       for (const it of e.items || []) freshItems.set(`${it.x},${it.y}`, now + 900);
       break;
     case "item_pick":
-      // item zmizne (stav ho už nemá) - krátky záblesk na bunke + float hráčovi
+      // item zmizne (stav ho už nemá) - krátky záblesk na bunke + float hráčovi / Shrekovi (ten berie len HP)
       spawnCellFloat(e.cell, e.type === "heal" ? "❤" : "💧", "item-pop");
-      if (e.type === "heal") spawnFloat(e.target, `+${e.amount} HP`, "heal-float");
+      if (e.target === "shrek") { if (e.amount > 0) floatOverShrek(`+${e.amount} HP`, "heal-float"); }
+      else if (e.type === "heal") spawnFloat(e.target, `+${e.amount} HP`, "heal-float");
       else spawnManaFloat(e.target, e.amount);
       break;
     case "stench_spread":
@@ -257,7 +272,8 @@ function tick(now) {
   // jednorazová animácia dohrala → späť do Idle (mŕtvy ostáva ležať)
   let m = META[view.anim] || META.Idle;
   if (!m) return;
-  const oneShotDone = !m.loop && view.anim !== "HurtDead" && view.ms && now - view.start > view.ms + 60;
+  // výkrik H_Roar je slučka s danou dĺžkou - po nej späť do Idle (inak by po odraze mirrorom ostal kričať)
+  const oneShotDone = (!m.loop || view.anim === "H_Roar") && view.anim !== "HurtDead" && view.ms && now - view.start > view.ms + 60;
   if (oneShotDone || (sh.dead && view.anim !== "HurtDead")) { play(sh.dead ? "HurtDead" : "Idle"); if (sh.dead) view.start = 0; m = META[view.anim]; }
   const f = frameIndex(m, now);
   const hurt = now < view.hurtUntil;

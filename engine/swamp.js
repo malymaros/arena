@@ -12,6 +12,7 @@
 // Itemy (namiesto dlaždíc): srdiečko (+1 HP) a kvapka (+1 mana) padnú na voľné políčka na štarte
 // hry a na konci každého kola (config.itemsPerRound, itemWeights, max ITEM_MAX); hráč ich zoberie hneď pri vstupe
 // na políčko alebo prechode cezeň (prejdené bunky akcie z actionSteps - rovnaký zber ako pri pasci). Klon ich neberie.
+// Shrek ich zoberie pri dopade skoku (shrekPickup: srdiečko = +1 HP jemu, kvapka len zmizne).
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js), ako ostatné moduly mechaník.
 import {
   START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP,
@@ -56,7 +57,9 @@ function rollMarks(from) {
 function swampStartGame() {
   if (!isSwamp()) { E.game.shrek = null; return; }
   const start = randomCell((x, y) => !Object.values(START_POS).some(p => p.x === x && p.y === y));
-  E.game.shrek = { x: start[0], y: start[1], hp: SHREK_HP, dead: false, marks: rollMarks(start), done: 0, stench: [] };
+  const marks = rollMarks(start);
+  // next = skoky NASLEDUJÚCEHO kola, losované o kolo vopred (z políčka 3. skoku) - lobby „SHREK PREVIEW" ich ukáže
+  E.game.shrek = { x: start[0], y: start[1], hp: SHREK_HP, dead: false, marks, next: rollMarks(marks[2]), done: 0, stench: [] };
   E.game.items = [];
   spawnItems();
 }
@@ -106,10 +109,22 @@ function pickupItems(moved, tl) {
   }
 }
 
+// Shrek pri dopade skoku 1-2-3 zoberie item na políčku: srdiečko ho vylieči o ITEM_HEAL_GAIN (max SHREK_HP),
+// kvapka many len zmizne (Shrek manu nemá). Pri tackli nič nezbiera.
+function shrekPickup(tl) {
+  const s = E.game.shrek, idx = E.game.items.findIndex(i => i.x === s.x && i.y === s.y);
+  if (idx < 0) return;
+  const it = E.game.items.splice(idx, 1)[0];
+  const amount = it.type === "heal" ? Math.min(SHREK_HP, s.hp + ITEM_HEAL_GAIN) - s.hp : 0;
+  s.hp += amount;
+  E.pushStateFrame(tl, [{ kind: "item_pick", target: "shrek", cell: [s.x, s.y], type: it.type, amount }], SMALL_DELAY_MS);
+}
+
 // verejný stav pre snapshot (marks sú ohlásené vopred - vidia ich obaja aj prekliaty v labyrinte)
 function shrekSnapshot() {
   const s = E.game.shrek;
-  return s ? { x: s.x, y: s.y, hp: s.hp, dead: s.dead, marks: s.marks.map(c => [...c]), done: s.done, stench: s.stench.map(c => [...c]) } : null;
+  return s ? { x: s.x, y: s.y, hp: s.hp, dead: s.dead, marks: s.marks.map(c => [...c]),
+    ...(E.game.config?.shrekPreview ? { next: s.next.map(c => [...c]) } : {}), done: s.done, stench: s.stench.map(c => [...c]) } : null;
 }
 
 // zásah hráča prostredím (rev, tackle, sud/punch cez HP, smrad) - ako dlaždica: bez obrán, ½ pri Last Stand/Hope.
@@ -210,6 +225,7 @@ function shrekStepEnd(k, tl, stoned) {
   E.pushStateFrame(tl, [{ kind: "shrek_call", cell: [...to], n: k + 1 }], SHREK_CALL_MS);
   s.x = to[0]; s.y = to[1]; s.done = k + 1;
   E.pushStateFrame(tl, [{ kind: "shrek_jump", from, to: [...to], n: k + 1 }], SHREK_JUMP_MS);
+  shrekPickup(tl);
   roar(tl, stoned);
 }
 
@@ -238,7 +254,13 @@ function shrekRoundEnd() {
   if (!s) return [];
   s.done = 0;
   const drops = spawnItems();
-  if (!s.dead) { s.marks = rollMarks([s.x, s.y]); return drops; }
+  if (!s.dead) {
+    // ohlásené skoky ďalšieho kola sa stanú platnými (poistka: Shrek nestojí tam, kde čakal - nové losovanie)
+    const here = [s.x, s.y];
+    s.marks = s.next.length === 3 && !s.next.some(c => same(c, here)) ? s.next : rollMarks(here);
+    s.next = rollMarks(s.marks[2]);
+    return drops;
+  }
   const added = [];
   for (const [x, y] of s.stench) {
     for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
@@ -265,6 +287,7 @@ function damageShrek(atkSlot, raw, tl) {
   }
   s.dead = true;
   s.marks = [];
+  s.next = [];
   s.stench = [[s.x, s.y]];
   E.pushStateFrame(tl, [{ kind: "shrek_die", cell: [s.x, s.y] }], SHREK_DIE_MS);
   return true;

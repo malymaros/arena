@@ -1725,6 +1725,10 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   font-family: "Press Start 2P", Impact, sans-serif; font-size: 36px; color: #c6cc0a;
   text-shadow: 3px 3px 0 #1a1a08, -2px -2px 0 #1a1a08, 2px -2px 0 #1a1a08, -2px 2px 0 #1a1a08, 0 0 12px rgba(0,0,0,.6); }
 .shrek-mark.done { opacity: .3; }
+/* náhľad skoku na ďalšie kolo (config.shrekPreview): len číslo vpravo dole, statické ako .tile-pending */
+.shrek-next { position: absolute; right: 8px; bottom: 6px; z-index: 2; pointer-events: none; line-height: 1;
+  font-family: "Press Start 2P", Impact, sans-serif; font-size: 18px; color: #c6cc0a; opacity: .8;
+  text-shadow: 2px 2px 0 #1a1a08, -1px -1px 0 #1a1a08, 1px -1px 0 #1a1a08, -1px 1px 0 #1a1a08; }
 .shrek-mark.next { animation: shrek-mark 0.7s ease-in-out infinite alternate; }
 @keyframes shrek-mark { to { transform: scale(1.12); } }
 .perf-lite .shrek-mark.next { animation: none; }
@@ -1742,7 +1746,9 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 /* Shrekov výkrik: políčko (cieľ skoku / zasiahnutý Shrek) bliká ako vyhodnocovaná špeciálna dlaždica, kým výkrik trvá */
 .cell.shrek-alert { animation: tile-proc-blink 300ms ease-in-out infinite; }
 /* itemy (srdiečko / mana): ikona bez krúžku v strede bunky, vznáša sa nad tieňom; čerstvý padne zhora */
-.swamp-item { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; z-index: 2; pointer-events: none; }
+/* vrstva itemov v #actors nad figúrami (rowZ 10–30): item je vždy najviac vpredu */
+.swamp-items { position: absolute; left: 0; top: 0; z-index: 40; pointer-events: none; }
+.swamp-item { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; pointer-events: none; }
 .swamp-item i { display: block; width: 100%; height: 100%; animation: item-bob 1.6s ease-in-out infinite; filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
 .swamp-item svg { display: block; width: 100%; height: 100%; }
 .swamp-item::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: -6px; height: 5px; border-radius: 50%; background: rgba(0,0,0,.35); }

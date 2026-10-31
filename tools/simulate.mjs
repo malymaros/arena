@@ -34,8 +34,12 @@ function checkPortals(g, where) {
 }
 
 // Shrek Swamp invarianty po každom kole: HP Shreka 0–20, živý = 3 rôzne ohlásené skoky na doske, mŕtvy = smrad bez
-// duplicít a bez dlaždíc; najviac 4 itemy, každý na inom políčku; HP/mana hráčov v rozsahu
-function checkSwamp(g, where) {
+// duplicít a bez dlaždíc; najviac 4 itemy, každý na inom políčku a nikdy nepadne pod hráča/klona; HP/mana hráčov v rozsahu
+function checkSwamp(g, where, timeline = []) {
+  for (const f of timeline) for (const e of f.effects || []) if (e.kind === "item_drop") for (const it of e.items) {
+    const under = ["p1", "p2"].some(sl => { const p = f[sl]; return p && ((p.x === it.x && p.y === it.y) || (p.clone && p.clone.x === it.x && p.clone.y === it.y)); });
+    if (under) throw new Error(`item padol pod figúru (${where}): ${JSON.stringify(it)}`);
+  }
   const s = g.shrek, on = ([x, y]) => x >= 0 && y >= 0 && x < 4 && y < 3;
   const bad = !s || s.hp < 0 || s.hp > 20 || !on([s.x, s.y]) || g.tiles.length || g.iks.length
     || (!s.dead && (s.marks.length !== 3 || !s.marks.every(on)))
@@ -51,7 +55,7 @@ function playMatch(ch1, ch2, seed) {
   const engine = createEngine({
     seed,
     emit: (ev, payload) => { if (ev === "game_result") result = payload; },
-    emitState: (timeline) => { if (timeline) frames += timeline.length; if (PORTAL && timeline) checkPortals(engine.game, `${ch1}/${ch2} seed ${seed}`); if (SWAMP && timeline) checkSwamp(engine.game, `${ch1}/${ch2} seed ${seed}`); },
+    emitState: (timeline) => { if (timeline) frames += timeline.length; if (PORTAL && timeline) checkPortals(engine.game, `${ch1}/${ch2} seed ${seed}`); if (SWAMP && timeline) checkSwamp(engine.game, `${ch1}/${ch2} seed ${seed}`, timeline); },
   });
   // Portal Realm: počet párov za kolo cyklí 1–7 podľa seedu (pokrytie plnej dosky)
   engine.startMatch(engine.sanitizeConfig(PORTAL ? { ...CONFIG, portalsPerRound: (seed % 7) + 1 } : CONFIG));

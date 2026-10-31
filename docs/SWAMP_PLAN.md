@@ -92,6 +92,8 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
 | Situácia | Rozhodnutie |
 |---|---|
 | Štít / mirror proti Shrekovi (rev, tackle, smrad) | Nabitý štít/mirror kryje **každý** rev/tackle (bežné skoky 1-2-3 aj reakcie) a Shrek ho tým **minie**: štít zablokuje, mirror odrazí dmg do Shreka (len zásah, bez ďalšej reakcie). Hráč potom ostane nekrytý pred súperovou akciou a súperov breaker už nemá čo rozbiť. Ak súperova akcia zasiahla obrancu aj priamo, obrana sa minie na priamom zásahu (vyhodnotí sa skôr) a reakciu tej istej akcie už nekryje. Smrad obrany ignoruje (dlaždica). Rozhodnutie 2026-10-31. |
+| Shrek a itemy | Pri dopade skoku 1-2-3 zoberie item na políčku: srdiečko mu dá +1 HP (max 20), kvapka many len zmizne. Pri tackli nezbiera. Klient kreslí itemy vo vrstve nad všetkými figúrami (aj pred mŕtvym Shrekom). Rozhodnutie 2026-10-31. |
+| Náhľad skokov ďalšieho kola | Skoky kola N+1 sa losujú o kolo vopred (`shrek.next`, z políčka 3. skoku). Lobby prepínač **SHREK PREVIEW** (na mieste TILE PREVIEW, vľavo od RANDOM CHARACTERS, default On, `config.shrekPreview`) - zapnutý: v bunke vpravo dole malé číslo 1/2/3; vypnutý: server `next` zo snapshotu vynechá. Rozhodnutie 2026-10-31. |
 | Last Stand / Last Hope | Prijatý dmg sa delí na ½ (`recvDmg`), ako pri dlaždiciach. |
 | Skamenený hráč | Rev, tackle ani smrad ho nezasiahnu (socha sa ráta, akoby na políčku nikto nestál, ako pri dlaždiciach). |
 | Narutov klon v dosahu revu, tacklu alebo smradu | Dostane len kozmetický `clone_hit` a nezomrie. Nesmie prezradiť, ktorá figúra je pravá. |

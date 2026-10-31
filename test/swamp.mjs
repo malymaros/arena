@@ -341,5 +341,41 @@ console.log("Štít / mirror proti Shrekovi");
   check(s8.game.players.p2.hp === 10 && s8.game.shrek.hp === SHREK_HP - 1, "D8: mirror odrazí bežný skok do Shreka", J([s8.game.players.p2.hp, s8.game.shrek.hp]));
 }
 
+/* ==================== Shrek zbiera itemy ==================== */
+console.log("Shrek zbiera itemy pri dopade skoku");
+{
+  const s1 = scenario("fire", "lightning", (g) => {
+    shrekSet(g, { x: 1, y: 1, hp: 15, marks: [[1, 0], [2, 2], [1, 2]] });
+    g.items = [{ x: 1, y: 0, type: "heal" }, { x: 2, y: 2, type: "mana" }, { x: 2, y: 1, type: "heal" }];
+  });
+  const t1 = s1.round(PASS3, PASS3);
+  const picks = fx(t1, "item_pick").filter(p => p.target === "shrek");
+  check(J(picks.map(p => [p.type, p.amount])) === J([["heal", 1], ["mana", 0]]) && s1.game.shrek.hp === 16,
+    "S1: srdiečko na dopade = +1 HP Shrekovi, kvapka len zmizne", J([picks, s1.game.shrek.hp]));
+  check(s1.game.items.some(i => i.x === 2 && i.y === 1), "S2: item, cez ktorý len preskočil, ostáva", J(s1.game.items));
+  const pi = idx(t1, e => e.kind === "item_pick" && e.target === "shrek"), ji = idx(t1, e => e.kind === "shrek_jump"), ri = idx(t1, e => e.kind === "shrek_roar");
+  check(ji < pi && pi < ri, "S3: zber medzi dopadom a revom", J([ji, pi, ri]));
+  const s2 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, marks: QUIET }); g.items = [{ x: 1, y: 0, type: "heal" }]; });
+  s2.round(PASS3, PASS3);
+  check(s2.game.shrek.hp === SHREK_HP, "S4: plné HP - srdiečko ho nevylieči nad maximum", String(s2.game.shrek.hp));
+}
+
+/* ==================== Náhľad skokov ďalšieho kola ==================== */
+console.log("Shrek preview (skoky ďalšieho kola)");
+{
+  const s1 = scenario("fire", "lightning");
+  const g = s1.game, snap = s1.e.snapshot().shrek;
+  check(g.config.shrekPreview === true && Array.isArray(snap.next) && snap.next.length === 3, "P1: default zapnutý - snapshot nesie 3 skoky ďalšieho kola", J(snap));
+  check(new Set([...snap.next, g.shrek.marks[2]].map(String)).size === 4, "P2: ďalšie skoky sú 3 rôzne a žiadny nie je na políčku 3. skoku", J([snap.next, g.shrek.marks]));
+  const next = J(snap.next);
+  s1.round(PASS3, PASS3);
+  check(J(g.shrek.marks) === next && g.shrek.next.length === 3, "P3: po kole platia ohlásené skoky a losuje sa nový náhľad", J([g.shrek.marks, next]));
+  const s2 = scenario("fire", "lightning", null, { ...CFG, shrekPreview: false });
+  check(s2.game.config.shrekPreview === false && !("next" in s2.e.snapshot().shrek), "P4: vypnutý - snapshot bez náhľadu");
+  const b = createEngine({ seed: 1, emitState: () => {} });
+  b.startMatch(b.sanitizeConfig({ ...CFG, arena: undefined, tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 } }));
+  check(!("shrekPreview" in b.game.config), "P5: stone bridge config bez kľúča shrekPreview");
+}
+
 console.log(`\n${passes} PASS, ${failures} FAIL`);
 if (failures) process.exit(1);

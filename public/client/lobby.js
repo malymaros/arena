@@ -78,7 +78,8 @@ function render() {
   // (miesto ostane, rozloženie neskáče)
   $("lobby-sec-tiles").querySelector(".lobby-label").textContent = swamp ? "ITEMS PER ROUND" : "SPECIAL TILES PER ROUND";
   $("lobby-tile-section").querySelector(".lobby-label").textContent = swamp ? "ITEM CHANCE (must total 100%)" : "TILE CHANCE (must total 100%)";
-  $("lobby-preview-box").style.visibility = swamp ? "hidden" : "";
+  // bažina: na mieste náhľadu dlaždíc je náhľad Shrekových skokov na ďalšie kolo (rovnaký prepínač, default On)
+  $("lobby-preview-box").querySelector(".lobby-label").textContent = swamp ? "SHREK PREVIEW" : "TILE PREVIEW";
   $("lobby-weights").innerHTML = TILE_ORDER.filter(k => swamp ? (k === "heal" || k === "mana") : (arena !== "portal" || k in PORTAL_TILE_WEIGHTS)).map(k =>
     weightRow("tile", k, swamp && k === "heal" ? "Heart" : TILE_DEF[k].label, k === "dmg" && arena === "portal" ? FLAME2_SVG : pixSvg(TILE_DEF[k].pix), f.tileWeights[k] || 0)).join("");
   const portal = arena === "portal";
@@ -173,7 +174,8 @@ export function showLobby() {
       colorPref: f.fields.color || "random",
       randomChars: f.fields.random === "on",
       ...(arena === "portal" ? { arena: "portal", portalWeights: { ...f.portalWeights }, portalsPerRound: f.perRound } : {}),
-      ...(arena === "swamp" ? { arena: "swamp", itemsPerRound: parseInt(f.fields.tiles || "1", 10), itemWeights: { heal: f.tileWeights.heal, mana: f.tileWeights.mana } } : {}),
+      ...(arena === "swamp" ? { arena: "swamp", itemsPerRound: parseInt(f.fields.tiles || "1", 10), itemWeights: { heal: f.tileWeights.heal, mana: f.tileWeights.mana },
+        shrekPreview: (f.fields.preview || "on") === "on" } : {}),
     };
     socket.emit("configure_match", config);
   });
