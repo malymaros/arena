@@ -113,28 +113,29 @@ console.log("Skoky a rev (veža)");
 /* ==================== Reakcie ==================== */
 console.log("Reakcie na zásah");
 {
-  // strela → sud: Shrek (1,1) zastaví strelu p1 (0,1) → 3 dmg Shrekovi, p2 (3,1) nič; sud −1 mana
+  // strela → okamžitý rev: Shrek (1,1) zastaví strelu p1 (0,1) → 3 dmg Shrekovi; rev (kríž okolo (1,1)) zasiahne p1 vedľa
   const s = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, marks: QUIET }));
   const tl = s.round([atk("right"), PASS, PASS], PASS3);
   const p1 = s.game.players.p1, p2 = s.game.players.p2;
   check(s.game.shrek.hp === SHREK_HP - 3, "A1: strela sa zastaví o Shreka (3 dmg zblízka)", String(s.game.shrek.hp));
   check(p2.hp === 10, "A2: súper za Shrekom nedostane nič", String(p2.hp));
-  const barrel = fx(tl, "shrek_barrel")[0];
-  check(barrel && J(barrel.to) === "[0,1]" && barrel.target === "p1", "A3: sud letí na strelca", J(barrel));
-  check(fx(tl, "shrek_mana").some(e => e.target === "p1" && e.amount === 1) && p1.mana === 0 && p1.hp === 10, "A4: sud = −1 mana (6 −1 strela −1 sud −2 −2 pass)", J([p1.mana, p1.hp]));
-  check(idx(tl, e => e.kind === "shrek_hit") < idx(tl, e => e.kind === "shrek_barrel"), "A5: najprv zásah Shreka, potom sud");
+  const hitAt = idx(tl, e => e.kind === "shrek_hit"), roarAt = idx(tl, e => e.kind === "shrek_roar");
+  check(hitAt >= 0 && roarAt === hitAt + 1 && J(fx(tl, "shrek_roar")[0].cell) === "[1,1]", "A3: strela → okamžitý rev hneď po zásahu", J([hitAt, roarAt]));
+  check(p1.hp === 9 && p1.mana === 6 - 1 - 2 - 2, "A4: rev zasiahne strelca stojaceho vedľa Shreka (1 dmg), mana sa nemení", J([p1.hp, p1.mana]));
+  check(!tl.some(f => (f.effects || []).some(e => e.kind === "shrek_barrel" || e.kind === "shrek_punch" || e.kind === "shrek_mana")), "A5: žiadny sud, punch ani strata many");
 
-  // sud bez many → −1 HP
-  const s2 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, marks: QUIET }); g.players.p1.mana = 1; });
-  s2.round([atk("right"), R, PASS], PASS3);
-  check(s2.game.players.p1.hp === 9, "A6: sud pri 0 mane = −1 HP", String(s2.game.players.p1.hp));
+  // vzdialená strela: rev okolo Shreka (2,1) zasiahne súpera (3,1) vedľa neho, strelca (0,1) nie
+  const s2 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 2, y: 1, marks: QUIET }));
+  s2.round([atk("right"), PASS, PASS], PASS3);
+  check(s2.game.shrek.hp === SHREK_HP - 2 && s2.game.players.p1.hp === 10 && s2.game.players.p2.hp === 9,
+    "A6: rev po vzdialenej strele zasiahne súpera vedľa Shreka, strelca nie", J([s2.game.shrek.hp, s2.game.players.p1.hp, s2.game.players.p2.hp]));
 
-  // melee → punch: 5 many −4 melee = 1 → punch 2: −1 mana a −1 HP
+  // melee → okamžitý rev: útočník stojí na Shrekovom políčku, takže ho rev zasiahne
   const s3 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 0, y: 1, marks: QUIET }); g.players.p1.mana = 5; });
   const tl3 = s3.round([M, R, PASS], PASS3);
   check(s3.game.shrek.hp === SHREK_HP - 8, "A7: melee na Shrekovom políčku (8 dmg)", String(s3.game.shrek.hp));
-  check(fx(tl3, "shrek_punch").length === 1 && fx(tl3, "shrek_mana").some(e => e.amount === 1) && s3.game.players.p1.hp === 9,
-    "A8: punch −2 many, chýbajúca mana prejde do HP", J([s3.game.players.p1.mana, s3.game.players.p1.hp]));
+  check(idx(tl3, e => e.kind === "shrek_roar") === idx(tl3, e => e.kind === "shrek_hit") + 1 && s3.game.players.p1.hp === 9,
+    "A8: melee → okamžitý rev, zasiahne útočníka na políčku", J([s3.game.players.p1.hp]));
 
   // special zboku → tackle: Fire (0,1) special na riadok 1 - súper (3,1) aj Shrek (2,1); tackle doľava → prvý v ceste p1
   const s4 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 2, y: 1, marks: QUIET }));
@@ -156,20 +157,18 @@ console.log("Reakcie na zásah");
   // special od útočníka v tom istom stĺpci → okamžitý rev (bez tacklu)
   const s6 = scenario("lightning", "fire", (g) => { shrekSet(g, { x: 1, y: 1, marks: QUIET }); g.players.p1.x = 1; g.players.p1.y = 0; });
   const tl6 = s6.round([sp(), PASS, PASS], PASS3);
-  const hitAt = idx(tl6, e => e.kind === "shrek_hit"), roarAt = idx(tl6, e => e.kind === "shrek_roar");
-  check(hitAt >= 0 && roarAt === hitAt + 1 && !fx(tl6, "shrek_tackle").length, "A14: útočník nad Shrekom → rev hneď po zásahu, bez tacklu", J([hitAt, roarAt]));
+  const hitAt6 = idx(tl6, e => e.kind === "shrek_hit"), roarAt6 = idx(tl6, e => e.kind === "shrek_roar");
+  check(hitAt6 >= 0 && roarAt6 === hitAt6 + 1 && !fx(tl6, "shrek_tackle").length, "A14: útočník nad Shrekom → rev hneď po zásahu, bez tacklu", J([hitAt6, roarAt6]));
   check(s6.game.shrek.hp === SHREK_HP - 3, "A15: Lightning special zasiahne Shreka na políčku opačnej farby", String(s6.game.shrek.hp));
 
-  // Narutov klon trafí Shreka → sud na klona, klon sa rozplynie, majiteľ nič neplatí
+  // Narutov klon trafí Shreka → okamžitý rev; klon vedľa Shreka dostane len kozmetický zásah a ostane
   const s7 = scenario("naruto", "lightning", (g) => {
-    shrekSet(g, { x: 1, y: 0, marks: [[2, 2], [1, 2], [2, 2]] });
+    shrekSet(g, { x: 1, y: 0, marks: [[2, 2], [1, 2], [3, 2]] });
     g.players.p1.x = 0; g.players.p1.y = 2; g.players.p1.clone = { x: 0, y: 0 };
   });
   const tl7 = s7.round([atk("right"), R, PASS], PASS3);
-  const b7 = fx(tl7, "shrek_barrel")[0];
-  check(b7?.clone === true && J(b7.to) === "[0,0]" && fx(tl7, "clone_die").length === 1 && !s7.game.players.p1.clone,
-    "A16: strela klona → sud na klona, klon zmizne", J(b7));
-  check(!fx(tl7, "shrek_mana").length, "A17: majiteľ za klonov zásah nič neplatí");
+  check(s7.game.shrek.hp < SHREK_HP && J(fx(tl7, "shrek_roar")[0]?.cell) === "[1,0]", "A16: strela klona → okamžitý rev", J(s7.game.shrek.hp));
+  check(!fx(tl7, "clone_die").length && !!s7.game.players.p1.clone && fx(tl7, "clone_hit").length >= 1, "A17: klon v reve dostane len kozmetický zásah a ostane");
 }
 
 /* ==================== Smrť a smrad ==================== */
@@ -179,7 +178,7 @@ console.log("Smrť a smrad");
   const tl = s.round([atk("right"), PASS, PASS], PASS3);
   const sh = s.game.shrek;
   check(sh.dead && sh.hp === 0 && fx(tl, "shrek_die").length === 1, "D1: pri 0 HP Shrek padne");
-  check(!fx(tl, "shrek_barrel").length && !fx(tl, "shrek_jump").length, "D2: mŕtvy Shrek nereaguje ani neskáče");
+  check(!fx(tl, "shrek_roar").length && !fx(tl, "shrek_jump").length, "D2: mŕtvy Shrek nereaguje ani neskáče");
   check(sh.marks.length === 0, "D3: mŕtvy Shrek nemá ohlásené skoky");
   // kolo smrti: smrad na jeho políčku; koniec kola: + ortogonálni susedia
   check(sh.stench.length === 5 && fx(tl, "stench_spread").length === 1, "D4: koniec kola smrti - smrad na políčku + 4 susedia", J(sh.stench));
@@ -253,7 +252,8 @@ console.log("Itemy (srdiečko / mana)");
 /* ==================== Labyrint ==================== */
 console.log("Labyrint (redakcia)");
 {
-  // p1 prekliaty, lovec p2 (3,1) strelí do Shreka (2,1) → sud na lovca; prekliaty nesmie vidieť sud ani zásah Shreka
+  // p1 prekliaty, lovec p2 (3,1) strelí do Shreka (2,1) → rev zasiahne lovca vedľa Shreka; prekliaty vidí rev (Shrek je
+  // verejný), ale nie zásah Shreka lovcom ani zásah lovca
   const s = scenario("fire", "minotaur", (g) => {
     shrekSet(g, { x: 2, y: 1, marks: QUIET });
     g.players.p1.x = 0; g.players.p1.y = 0;
@@ -262,9 +262,9 @@ console.log("Labyrint (redakcia)");
   });
   const tl = s.round(PASS3, [atk("left"), PASS, PASS]);
   const view = JSON.parse(JSON.stringify(s.e.redactTimelineFor("p1", tl)));
-  check(fx(tl, "shrek_barrel").length === 1, "L1: lovec trafil Shreka - sud letí naňho");
-  check(!fx(view, "shrek_barrel").length && !fx(view, "shrek_hit").length && !fx(view, "shrek_mana").length,
-    "L2: prekliaty nevidí sud, zásah Shreka ani stratu many lovca");
+  check(fx(tl, "shrek_roar").length >= 1 && fx(tl, "hit").some(h => h.shrek && h.target === "p2"), "L1: lovec trafil Shreka - rev zasiahne lovca");
+  check(!fx(view, "shrek_hit").length && !fx(view, "hit").some(h => h.target === "p2"),
+    "L2: prekliaty nevidí zásah Shreka lovcom ani zásah lovca");
   check(view.every(f => f.shrek), "L3: Shrek je pre prekliateho verejný (pozícia, HP, skoky)");
   // tackle k skrytému lovcovi: beh aj návrat sa prekliatemu redigujú (zastavenie by prezradilo bunku).
   // Prekliaty je p2, lovec Fire (p1) v riadku Shreka napravo od neho.

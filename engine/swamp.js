@@ -2,20 +2,19 @@
 // Fáza 1: pred kolom ohlási 3 očíslované políčka (game.shrek.marks - tri rôzne, žiadne nie je jeho aktuálne), po k-tom
 // kroku skočí na k-te a zareve: zasiahne políčko dopadu + jeho ortogonálnych susedov. Sila revu rastie s klesajúcimi HP
 // (SHREK_ROAR_DMG / SHREK_RAGE_HP).
-// Kto ho zasiahne, dostane reakciu: strela → sud späť (−mana, chýbajúca do HP), melee → punch (−2 many, prelieva
-// sa do HP), special zboku → PowerUp + tackle po riadku k útočníkovi (prvá figúra v ceste, Shrek sa vráti),
-// special od útočníka v tom istom stĺpci → okamžitý rev. Fáza 2: pri 0 HP padne (leží, nič neblokuje) a z tela
+// Kto ho zasiahne, spustí reakciu: strela a melee → okamžitý rev; special zboku → PowerUp + tackle po riadku
+// k útočníkovi (prvá figúra v ceste, Shrek sa vráti), special od útočníka v tom istom stĺpci → okamžitý rev. Fáza 2: pri 0 HP padne (leží, nič neblokuje) a z tela
 // sa šíri smrad - kolo smrti jeho políčko, každé ďalšie kolo + ortogonálni susedia; smrad = STENCH_DMG na konci kroku.
 // Shrekove útoky sú ako dlaždice: obchádzajú štít/mirror, ½ pri Last Stand/Hope platí, skamenenú postavu
-// nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá); klon, ktorý
-// Shreka zasiahol, reakciu dostane a rozplynie sa. Počas THE WORLD je Shrek inertný (strely ním prejdú).
+// nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá). Počas THE WORLD
+// je Shrek inertný (strely ním prejdú).
 // Itemy (namiesto dlaždíc): srdiečko (+1 HP, Lightning na plno) a kvapka (plná mana) padnú na voľné políčka na štarte
 // hry a na konci každého kola (config.itemsPerRound, itemWeights, max ITEM_MAX); hráč ich zoberie hneď pri vstupe
 // na políčko alebo prechode cezeň (prejdené bunky akcie z actionSteps - rovnaký zber ako pri pasci). Klon ich neberie.
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js), ako ostatné moduly mechaník.
 import {
-  START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP, SHREK_BARREL_MANA, SHREK_PUNCH_MANA,
-  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_BARREL_MS, SHREK_PUNCH_MS, SHREK_POWERUP_MS,
+  START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP,
+  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_POWERUP_MS,
   SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS,
 } from "./constants.js";
 
@@ -216,28 +215,13 @@ function damageShrek(atkSlot, raw, tl) {
   return true;
 }
 
-// sud / punch: mana sa odpočíta, čo chýba, prejde do HP
-function payMana(slot, n, tl) {
-  const p = E.game.players[slot];
-  if (p.hp <= 0) return;
-  const take = Math.min(p.mana, n);
-  p.mana -= take;
-  if (take) E.pushStateFrame(tl, [{ kind: "shrek_mana", target: slot, amount: take }], SMALL_DELAY_MS);
-  if (n - take > 0) envHit(slot, n - take, tl);
-}
-
-// basic strela zastavená Shrekom (doBasic): fromClone = strelu vypustil Narutov klon → sud letí na klona a rozplynie ho
-function shrekShot(slot, fromClone, raw, tl) {
+// basic strela zastavená Shrekom (doBasic; aj strela Narutovho klona) → okamžitý rev
+function shrekShot(slot, raw, tl) {
   if (damageShrek(slot, raw, tl)) return;
-  const s = E.game.shrek, p = E.game.players[slot];
-  const onClone = fromClone && !!p.clone;
-  const at = onClone ? [p.clone.x, p.clone.y] : [p.x, p.y];
-  E.pushStateFrame(tl, [{ kind: "shrek_barrel", from: [s.x, s.y], to: at, target: slot, clone: onClone }], SHREK_BARREL_MS);
-  if (onClone) E.killClone(slot, tl);
-  else payMana(slot, SHREK_BARREL_MANA, tl);
+  roar(tl);
 }
 
-// melee (doMelee / Vampire-Onryō vlastná bunka): Shrek na niektorej zasahovanej bunke majiteľa alebo jeho klona
+// melee (doMelee / Vampire-Onryō vlastná bunka): Shrek na niektorej zasahovanej bunke majiteľa alebo jeho klona → okamžitý rev
 function shrekMelee(slot, cells, cloneCells, raw, cloneRaw, tl) {
   const s = shrek();
   if (!s || E.winnerNow()) return;
@@ -245,9 +229,7 @@ function shrekMelee(slot, cells, cloneCells, raw, cloneRaw, tl) {
   const byMe = has(cells), byClone = has(cloneCells);
   if (!byMe && !byClone) return;
   if (damageShrek(slot, (byMe ? raw : 0) + (byClone ? cloneRaw : 0), tl)) return;
-  E.pushStateFrame(tl, [{ kind: "shrek_punch", cell: [s.x, s.y], target: slot, clone: byClone && !byMe }], SHREK_PUNCH_MS);
-  if (byMe) payMana(slot, SHREK_PUNCH_MANA, tl);
-  if (byClone) E.killClone(slot, tl);
+  roar(tl); // melee → okamžitý rev (útočník stojí na jeho políčku, takže ho rev zasiahne)
 }
 
 // dmg special / Special 1 (zóna cells): Shrek v zóne → útočník v tom istom stĺpci = okamžitý rev, inak tackle k nemu

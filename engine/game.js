@@ -768,7 +768,7 @@ function doBasic(slot, dir, tl) {
     for (const h of hits) {
       if (h.target === "player" || winnerNow()) continue;
       const raw = rawOf(h);
-      if (h.target === "shrek") { shrekShot(slot, h.shot.clone, raw, tl); continue; } // reakcia: sud späť na strelca
+      if (h.target === "shrek") { shrekShot(slot, raw, tl); continue; } // reakcia: okamžitý rev
       if (h.target === "stacked") {
         // stacknutý pár: obrana kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok prejde na Naruta
         strikeCell(opS, "stacked", raw, tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) });

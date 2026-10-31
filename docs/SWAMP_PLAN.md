@@ -36,8 +36,8 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 
 | Útok | Reakcia | Následok |
 |---|---|---|
-| Basic strela | Hodí sud späť na strelca. | −1 mana, pri 0 mane −1 HP |
-| Melee (Shrek na zasahovanej bunke) | Punch. | −2 many, chýbajúca mana prejde do HP |
+| Basic strela | Okamžitý rev. | Kríž okolo Shreka za dmg revu; strelca zasiahne, len ak stojí vedľa (do 2026-10-31 sud: −1 mana) |
+| Melee (Shrek na zasahovanej bunke) | Okamžitý rev. | Útočník stojí na Shrekovom políčku, takže ho rev zasiahne (do 2026-10-31 punch: −2 many) |
 | Special / Special 1 od útočníka v inom stĺpci | PowerUp a tackle po svojom riadku smerom k útočníkovi. | Zasiahne prvú figúru v ceste (na spoločnom políčku všetky) za dmg revu. Potom sa Shrek vráti na štartové políčko. |
 | Special od útočníka v tom istom stĺpci (nad, pod alebo na jeho políčku) | Okamžitý rev. | Nevie, kam by bežal, preto zareve hneď. |
 
@@ -79,16 +79,16 @@ prepočítaná Xing hlavička). Slučka `trim [514, 66737]` má 28 taktov pri 10
 
 | Situácia | Rozhodnutie |
 |---|---|
-| Štít / mirror proti Shrekovi (rev, tackle, sud, punch, smrad) | Neblokujú. Shrekove útoky sú prostredie ako dlaždice. |
+| Štít / mirror proti Shrekovi (rev, tackle, smrad) | Neblokujú. Shrekove útoky sú prostredie ako dlaždice. |
 | Last Stand / Last Hope | Prijatý dmg sa delí na ½ (`recvDmg`), ako pri dlaždiciach. |
 | Skamenený hráč | Rev, tackle ani smrad ho nezasiahnu (socha sa ráta, akoby na políčku nikto nestál, ako pri dlaždiciach). |
 | Narutov klon v dosahu revu, tacklu alebo smradu | Dostane len kozmetický `clone_hit` a nezomrie. Nesmie prezradiť, ktorá figúra je pravá. |
-| Narutov klon zasiahne Shreka | Sud alebo punch letí na klon a klon sa rozplynie. Majiteľ nič neplatí. |
+| Narutov klon zasiahne Shreka | Okamžitý rev ako pri hráčovi; klon v reve dostane len kozmetický zásah a ostane. |
 | Strela a Shrek s hráčom na jednom políčku | Strela zasiahne hráča. Shrek je zasiahnutý, len keď stojí na políčku sám. |
 | Charge (vlkolak, Vampire/Onryō), pasca, démon, breaker | Shreka ignorujú: bežia cez neho a nereaguje. |
 | Statusy (petrify, labyrint) | Na Shreka nepôsobia. |
 | THE WORLD (zamrazený čas) | Shrek je inertný. Strely ním prejdú bez reakcie. |
-| Labyrint | Shrek je verejný (vidí ho aj prekliaty). Reakcie a zásahy, ktoré by prekliatemu prezradili bunku skrytého lovca (`shrek_hit`/`shrek_barrel`/`shrek_mana` s `from`/`target` = lovec, `shrek_tackle`/`shrek_return` k lovcovi), sa redigujú. Shrekove HP v snapshote ostávajú verejné. |
+| Labyrint | Shrek je verejný (vidí ho aj prekliaty). Reakcie a zásahy, ktoré by prekliatemu prezradili bunku skrytého lovca (`shrek_hit` s `from` = lovec, zásahy lovca, `shrek_tackle`/`shrek_return` k lovcovi), sa redigujú. Shrekove HP v snapshote ostávajú verejné. |
 | Escanor pride | Shrekov zásah sa neráta ako zásah od súpera. |
 | Dlaždice | V bažine nie sú (lobby váhy sa ignorujú, server ich vynuluje). |
 
@@ -108,8 +108,7 @@ prepočítaná Xing hlavička). Slučka `trim [514, 66737]` má 28 taktov pri 10
     `luffy` ruka a guľa).
 - Config: `config.arena = "swamp"` → `game.arena = "shrek-swamp"`. Kľúč `shrek` je v snapshote len v bažine,
   takže bridge a portal goldeny sú bit po bite rovnaké.
-- Efekty timeline: `shrek_jump`, `shrek_roar`, `shrek_hit`, `shrek_die`, `shrek_barrel`, `shrek_punch`,
-  `shrek_mana`, `shrek_powerup`, `shrek_tackle`, `shrek_return`, `stench_proc`, `stench_spread`. Zásahy hráčov
+- Efekty timeline: `shrek_jump`, `shrek_roar`, `shrek_hit`, `shrek_die`, `shrek_powerup`, `shrek_tackle`, `shrek_return`, `stench_proc`, `stench_spread`. Zásahy hráčov
   idú cez bežný `hit` so značkou `shrek: true`.
 - Čísla sú v `shared/balance.js` (`SHREK_*`, `STENCH_DMG`), časovanie v `shared/timing.js` (`SHREK_*_MS`,
   `STENCH_PROC_MS`).
@@ -131,14 +130,15 @@ prepočítaná Xing hlavička). Slučka `trim [514, 66737]` má 28 taktov pri 10
 - Postup:
   1. `node tools/sprites-shrek/detect.cjs` → `cells.json`,
   2. `node tools/sprites-shrek/pack.cjs` → `public/assets/shrek/*.png` + `anims.json`.
-- Hra používa pásy `Idle`, `Walk`, `JumpKick`, `Roar`, `PickUp`, `Punch`, `PowerUp`, `Tackle` a `HurtDead`.
+- Hra používa pásy `Idle`, `Walk`, `JumpKick`, `Roar`, `PowerUp`, `Tackle` a `HurtDead`. Farby sú pôvodné zo sheetu
+  (tmavší skin sa skúšal 2026-10-31 a vlastník ho zamietol).
 
 ## 4. Testy
 
 - `test/swamp.mjs` (súčasť `npm test`) obsahuje 51 kontrol:
   - config a štart,
   - skoky a rev vrátane prahov HP,
-  - reakcie (sud, punch s prelievaním, tackle, okamžitý rev, Narutov klon),
+  - reakcie (strela a melee → okamžitý rev, tackle, Narutov klon),
   - smrť a smrad,
   - redakcia v labyrinte.
 - `node tools/simulate.mjs 20 --swamp` spustí náhodné zápasy a po každom kole skontroluje invarianty Shreka.

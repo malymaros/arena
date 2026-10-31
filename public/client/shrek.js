@@ -152,19 +152,6 @@ export function shrekEffect(e, hold) {
       view.hurtUntil = now + 350;
       floatOverShrek(`-${e.dmg} HP`, "dmg-float");
       break;
-    case "shrek_barrel": {
-      const to = cellCenter(e.to[0], e.to[1]);
-      view.flip = to.x < view.px;
-      play("PickUp", hold * 0.55);
-      setTimeout(() => throwBarrel({ x: view.px, y: view.py }, to, hold * 0.45), hold * 0.55);
-      break;
-    }
-    case "shrek_punch":
-      play("Punch", hold);
-      break;
-    case "shrek_mana":
-      spawnFloat(e.target, `−${e.amount} MANA`, "drain-float");
-      break;
     case "shrek_powerup":
       view.flip = e.dir === "left";
       play("PowerUp", hold);
@@ -219,24 +206,6 @@ function floatOverShrek(text, cls) {
   setTimeout(() => el.remove(), 1000);
 }
 
-// sud letí oblúkom zo Shrekových rúk na cieľ (prvý frame PickUp = samotný sud)
-function throwBarrel(from, to, ms) {
-  const m = META.PickUp;
-  if (!m) return;
-  const S = m.size, k = 1.6;
-  const c = document.createElement("canvas");
-  c.width = S; c.height = S;
-  c.className = "shrek-barrel";
-  c.getContext("2d").drawImage(m.img, 0, 0, S, S, 0, 0, S, S);
-  c.style.width = S * k + "px"; c.style.height = S * k + "px";
-  c.style.left = (from.x - S * k / 2) + "px"; c.style.top = (from.y - 120) + "px";
-  actorsEl.appendChild(c);
-  const dx = to.x - from.x, dy = (to.y - 110) - (from.y - 120);
-  const kf = [0, 0.25, 0.5, 0.75, 1].map(p => ({ transform: `translate(${dx * p}px, ${dy * p - Math.sin(p * Math.PI) * 160}px) rotate(${p * 540}deg)` }));
-  c.animate(kf, { duration: Math.max(200, ms), easing: "linear", fill: "forwards" });
-  setTimeout(() => c.remove(), Math.max(200, ms) + 60);
-}
-
 /* ---------- kreslenie (vlastná slučka; kreslí len pri zmene framu/polohy) ---------- */
 // jednorazová animácia sa zrýchli, aby sa zmestila do framu timeline (view.ms); PowerUp sa točí dookola
 // mŕtvy Shrek: po páde donekonečna točí posledné framy s hviezdičkami okolo hlavy (STAR_FRAMES)
@@ -264,7 +233,11 @@ function tick(now) {
     view.px = mo.from.x + (mo.to.x - mo.from.x) * p;
     view.py = mo.from.y + (mo.to.y - mo.from.y) * p;
     lift = Math.sin(p * Math.PI) * mo.arc;
-    if (p >= 1) view.motion = null;
+    if (p >= 1) {
+      view.motion = null;
+      // návrat po tackli (Walk je slučka) - po dobehnutí späť do Idle, tvárou do stredu dosky
+      if (view.anim === "Walk" && !sh.dead) { play("Idle"); view.flip = sh.x >= (state?.board?.w || 4) / 2; }
+    }
   }
   // jednorazová animácia dohrala → späť do Idle (mŕtvy ostáva ležať)
   let m = META[view.anim] || META.Idle;

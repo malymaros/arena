@@ -1737,7 +1737,6 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .cell.stench-flash { background: rgba(182,232,70,.45); }
 .shrek-roar-float { position: absolute; transform: translateX(-50%); color: #e9ff7a; font-weight: 900; font-size: 22px; letter-spacing: 2px;
   text-shadow: 2px 2px 0 #000, 0 0 12px rgba(160,230,40,.9); animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9; }
-.shrek-barrel { position: absolute; image-rendering: pixelated; pointer-events: none; z-index: 8; }
 /* itemy (srdiečko / mana): ikona bez krúžku v strede bunky, vznáša sa nad tieňom; čerstvý padne zhora */
 .swamp-item { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; z-index: 2; pointer-events: none; }
 .swamp-item i { display: block; width: 100%; height: 100%; animation: item-bob 1.6s ease-in-out infinite; filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)); }
