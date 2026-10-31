@@ -56,9 +56,9 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 
 ### Itemy (namiesto dlaždíc)
 
-- **Srdiečko** dá +1 HP (Lightning sa vylieči do plna, ako pri heal dlaždici). **Kvapka** doplní manu na plno.
+- **Srdiečko** dá +1 HP (aj Lightning, bez liečenia do plna). **Kvapka** dá +1 manu (`ITEM_HEAL_GAIN` / `ITEM_MANA_GAIN`).
   Itemy vyzerajú ako pixel ikony dlaždíc bez krúžku (variant C4, polovičná veľkosť) a vznášajú sa nad tieňom.
-- V lobby bažiny: *Items per round* 1 / 2 / 3 (`config.itemsPerRound`, default 1) a šanca srdiečko / mana
+- V lobby bažiny sú len nastavenia (popis Shreka tam nie je): *Items per round* 1 / 2 / 3 (`config.itemsPerRound`, default 1) a šanca srdiečko / mana
   (`config.itemWeights`, default 60 / 40, spolu 100).
 - Itemy padnú na štarte hry a na konci každého kola na voľné políčko (bez itemu, hráča, klona a živého Shreka).
   Na ploche je naraz najviac 4 (`ITEM_MAX`).
@@ -75,6 +75,8 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 - **Zásah hráčom:** `shrek.hit` (`custom/shrek/shrek-hit.mp3`, 3,3 s) dohrá celý, Shrek pritom kričí (H_Roar v slučke)
   a jeho políčko bliká (`shrek_hit` + `shrek_scream`, spolu `SHREK_HIT_SOUND_MS`; po výmene nahrávky treba zmeniť).
   Až potom príde rev alebo nafúknutie pred tacklom (`shrek_powerup`), oboje so zvukom `shrek.roar`.
+- **Smrteľný zásah:** `shrek_hit` nesie `lethal` - Shrek nekričí (bez `shrek.hit` a výkriku), pád (`shrek_die`) hrá
+  zvuk smrti `death` ako pri hráčovi.
 - Hlasitosť oboch zvukov je −18 LUFS (`node tools/voice-loudness.mjs`).
 
 ### Hudba

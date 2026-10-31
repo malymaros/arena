@@ -8,13 +8,13 @@
 // Shrekove útoky sú ako dlaždice: obchádzajú štít/mirror, ½ pri Last Stand/Hope platí, skamenenú postavu
 // nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá). Počas THE WORLD
 // je Shrek inertný (strely ním prejdú).
-// Itemy (namiesto dlaždíc): srdiečko (+1 HP, Lightning na plno) a kvapka (plná mana) padnú na voľné políčka na štarte
+// Itemy (namiesto dlaždíc): srdiečko (+1 HP) a kvapka (+1 mana) padnú na voľné políčka na štarte
 // hry a na konci každého kola (config.itemsPerRound, itemWeights, max ITEM_MAX); hráč ich zoberie hneď pri vstupe
 // na políčko alebo prechode cezeň (prejdené bunky akcie z actionSteps - rovnaký zber ako pri pasci). Klon ich neberie.
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js), ako ostatné moduly mechaník.
 import {
   START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP,
-  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_CALL_MS, SHREK_POWERUP_MS,
+  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MANA_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_CALL_MS, SHREK_POWERUP_MS,
   SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS,
 } from "./constants.js";
 
@@ -96,10 +96,9 @@ function pickupItems(moved, tl) {
       E.game.items.splice(idx, 1);
       let amount;
       if (it.type === "heal") {
-        const to = E.kitOf(p.char).healTile === "full" ? START_HP : Math.min(START_HP, p.hp + ITEM_HEAL_GAIN);
-        amount = Math.max(0, to - p.hp); p.hp += amount;
+        amount = Math.min(START_HP, p.hp + ITEM_HEAL_GAIN) - p.hp; p.hp += amount;
       } else {
-        amount = MAX_MANA - p.mana; p.mana = MAX_MANA;
+        amount = Math.min(MAX_MANA, p.mana + ITEM_MANA_GAIN) - p.mana; p.mana += amount;
       }
       E.pushStateFrame(tl, [{ kind: "item_pick", target: slot, cell: [x, y], type: it.type, amount }], SMALL_DELAY_MS);
     }
@@ -208,7 +207,8 @@ function shrekRoundEnd() {
 function damageShrek(atkSlot, raw, tl) {
   const s = E.game.shrek;
   s.hp = Math.max(0, s.hp - raw);
-  E.pushStateFrame(tl, [{ kind: "shrek_hit", from: atkSlot, cell: [s.x, s.y], dmg: raw }], SHREK_HIT_MS);
+  // lethal: smrteľný zásah - klient nekričí (bez zvuku hitu), pád hrá zvuk smrti ako pri hráčovi
+  E.pushStateFrame(tl, [{ kind: "shrek_hit", from: atkSlot, cell: [s.x, s.y], dmg: raw, ...(s.hp <= 0 ? { lethal: true } : {}) }], SHREK_HIT_MS);
   if (s.hp > 0) {
     // výkrik po zásahu (zvuk hitu dohrá celý), Shrekovo políčko bliká - až potom reakcia (rev / tackle)
     E.pushStateFrame(tl, [{ kind: "shrek_scream", cell: [s.x, s.y] }], SHREK_HIT_SOUND_MS - SHREK_HIT_MS);

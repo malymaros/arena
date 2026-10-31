@@ -1750,9 +1750,6 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .perf-lite .swamp-item i { animation: none; }
 .item-pop { position: absolute; transform: translateX(-50%); font-size: 26px; animation: item-pop .5s ease-out forwards; pointer-events: none; z-index: 9; }
 @keyframes item-pop { from { opacity: 1; transform: translateX(-50%) translateY(60px) scale(1); } to { opacity: 0; transform: translateX(-50%) translateY(30px) scale(1.8); } }
-/* Shrek Swamp v lobby: popis Shreka namiesto váh dlaždíc */
-#lobby-swamp-section{ display: none; }
-.swamp-info p{ margin: 0 0 8px; font-size: 10px; line-height: 1.6; color: #cfe6a0; }
 /* výber arény (STONE BRIDGE / PORTAL REALM / SHREK SWAMP) - tri malé tlačidlá s náhľadom pozadia, výška ako ostatné voľby */
 .arena-pick{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .arena-card{ position: relative; height: 38px; cursor: pointer; border: none; padding: 0; border-radius: 2px; overflow: hidden;

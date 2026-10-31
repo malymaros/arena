@@ -4,6 +4,7 @@
 // Spustenie: node test/swamp.mjs  (súčasť npm test)
 import { createEngine } from "../engine/game.js";
 import { SHREK_HP } from "../shared/balance.js";
+import { eventsForFrame, newTracker } from "../public/sounds/events.js";
 import { SHREK_HIT_SOUND_MS, SHREK_JUMP_MS, SHREK_CALL_MS } from "../shared/timing.js";
 
 let failures = 0, passes = 0;
@@ -185,6 +186,13 @@ console.log("Smrť a smrad");
   const tl = s.round([atk("right"), PASS, PASS], PASS3);
   const sh = s.game.shrek;
   check(sh.dead && sh.hp === 0 && fx(tl, "shrek_die").length === 1, "D1: pri 0 HP Shrek padne");
+  // zvuk: smrteľný zásah nekričí (bez shrek.hit, bez výkriku), pád hrá zvuk smrti ako pri hráčovi
+  {
+    const keys = []; const tr = newTracker();
+    tl.forEach((f, i) => keys.push(...eventsForFrame(tl, i, { p1: f.p1, p2: f.p2 }, tr).map(e => e.key)));
+    check(fx(tl, "shrek_hit")[0]?.lethal === true && !fx(tl, "shrek_scream").length && !keys.includes("shrek.hit") && keys.includes("death"),
+      "D1b: smrteľný zásah - bez kriku (shrek.hit), pád so zvukom smrti", J(keys.filter(k => k.startsWith("shrek") || k === "death")));
+  }
   check(!fx(tl, "shrek_roar").length && !fx(tl, "shrek_jump").length, "D2: mŕtvy Shrek nereaguje ani neskáče");
   check(sh.marks.length === 0, "D3: mŕtvy Shrek nemá ohlásené skoky");
   // kolo smrti: smrad na jeho políčku; koniec kola: + ortogonálni susedia
@@ -228,11 +236,11 @@ console.log("Itemy (srdiečko / mana)");
   // dash cez kvapku: zoberie ju aj na prebehnutom políčku (mana na plno po zaplatení dashu)
   const b = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.items = [{ x: 1, y: 1, type: "mana" }]; });
   const tlb = b.round([{ type: "dash", dir: "right" }, PASS, PASS], PASS3);
-  check(b.game.players.p1.x === 2 && b.game.players.p1.mana === 10 - 4 && fx(tlb, "item_pick").some(e => e.type === "mana" && J(e.cell) === "[1,1]" && e.amount === 8), "I7: dash cez kvapku → plná mana (zaplatený dash 6−4=2 → +8; potom 2× pass)", J([b.game.players.p1.mana, b.game.players.p1.x]));
+  check(b.game.players.p1.x === 2 && fx(tlb, "item_pick").some(e => e.type === "mana" && J(e.cell) === "[1,1]" && e.amount === 1), "I7: dash cez kvapku → +1 mana", J([b.game.players.p1.mana, b.game.players.p1.x]));
   // Lightning sa zo srdiečka vylieči do plna
   const c = scenario("lightning", "fire", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.players.p1.hp = 3; g.items = [{ x: 1, y: 1, type: "heal" }]; });
   c.round([{ type: "move", dir: "right" }, PASS, PASS], PASS3);
-  check(c.game.players.p1.hp === 10, "I8: Lightning zo srdiečka na plné HP", String(c.game.players.p1.hp));
+  check(c.game.players.p1.hp === 4, "I8: srdiečko dá aj Lightning len +1 HP", String(c.game.players.p1.hp));
   // Narutov klon itemy neberie
   const d = scenario("naruto", "lightning", (g) => {
     shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] });
