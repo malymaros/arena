@@ -295,5 +295,51 @@ console.log("Labyrint (redakcia)");
   check(!fx(vw, "shrek_tackle").length && !fx(vw, "shrek_return").length, "L5: prekliaty nevidí tackle ani návrat (bunka lovca)");
 }
 
+/* ==================== Obrany proti Shrekovej reakcii ==================== */
+console.log("Štít / mirror proti Shrekovi");
+{
+  // p1 (0,1) strelí do Shreka (2,1), rev zasiahne p2 (3,1) so štítom → blok, štít kryje súperovu akciu
+  const s1 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 2, y: 1, marks: QUIET }); g.players.p2.shield = true; });
+  const t1 = s1.round([atk("right"), PASS, PASS], PASS3);
+  check(s1.game.players.p2.hp === 10 && fx(t1, "block").some(b => b.target === "p2") && !fx(t1, "hit").some(h => h.shrek && h.target === "p2"),
+    "D1: štít zablokuje rev, ktorý vyprovokoval súper", J([s1.game.players.p2.hp, fx(t1, "block")]));
+  // mirror → odraz do Shreka (bez ďalšej reakcie)
+  const s2 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 2, y: 1, marks: QUIET }); g.players.p2.mirror = true; });
+  const t2 = s2.round([atk("right"), PASS, PASS], PASS3);
+  const m2 = fx(t2, "mirror").find(m => m.target === "p2");
+  check(s2.game.players.p2.hp === 10 && s2.game.shrek.hp === SHREK_HP - 2 - 1 && J(m2?.destCell) === "[2,1]"
+    && fx(t2, "shrek_hit").length === 2 && fx(t2, "shrek_roar").length === 1 + 3,
+    "D2: mirror odrazí rev do Shreka (len zásah, žiadny ďalší rev)", J([s2.game.players.p2.hp, s2.game.shrek.hp, m2]));
+  // Fire (0,1) special na riadok: p2 (1,1) so štítom zablokuje priamy zásah → štít sa minie, tackle Shreka (2,1) doľava p2 zasiahne
+  const s3 = scenario("fire", "lightning", (g) => {
+    shrekSet(g, { x: 2, y: 1, marks: [[3, 0], [3, 2], [2, 0]] }); g.players.p2.x = 1; g.players.p2.shield = true;
+  });
+  const t3 = s3.round([sp(), PASS, PASS], PASS3);
+  check(fx(t3, "block").length === 1 && fx(t3, "shrek_tackle")[0]?.target === "p2" && s3.game.players.p2.hp === 9,
+    "D3: štít sa minie na priamom zásahu - tackle tej istej akcie už nekryje", J([fx(t3, "block").length, s3.game.players.p2.hp]));
+  const s4 = scenario("fire", "lightning", (g) => {
+    shrekSet(g, { x: 2, y: 1, marks: [[3, 0], [3, 2], [2, 0]] }); g.players.p2.x = 1; g.players.p2.mirror = true;
+  });
+  const t4 = s4.round([sp(), PASS, PASS], PASS3);
+  check(fx(t4, "mirror").length === 1 && s4.game.players.p1.hp === 5 && s4.game.players.p2.hp === 9 && s4.game.shrek.hp === SHREK_HP - 5,
+    "D4: mirror odrazí priamy zásah, tackle potom dopadne (do Shreka sa nič neodráža)", J([s4.game.players.p1.hp, s4.game.players.p2.hp, s4.game.shrek.hp]));
+  // nabitá obrana kryje aj rev, ktorý vyprovokoval sám obranca (A4: strelec vedľa Shreka)
+  const s5 = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, marks: QUIET }); g.players.p1.shield = true; });
+  s5.round([atk("right"), PASS, PASS], PASS3);
+  check(s5.game.players.p1.hp === 10, "D5: nabitý štít kryje aj vlastný vyprovokovaný rev", String(s5.game.players.p1.hp));
+  // bežný skok 1-2-3: p2 si nabije štít, rev po kroku 1 ho zasiahne → blok a štít je preč
+  // → Shield Breaker p1 v kroku 2 už nemá čo rozbiť
+  const s6 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, marks: [[3, 2], [1, 0], [1, 2]] }));
+  const t6 = s6.round([PASS, { type: "shield_breaker" }, PASS], [{ type: "shield" }, PASS, PASS]);
+  const b6 = idx(t6, e => e.kind === "block" && e.target === "p2"), j6 = idx(t6, e => e.kind === "shrek_roar");
+  check(s6.game.players.p2.hp === 10 && b6 > j6 && j6 >= 0, "D6: štít zablokuje bežný skok Shreka", J([s6.game.players.p2.hp, j6, b6]));
+  check(t6[b6 + 1]?.p2?.shield === false && fx(t6, "breaker")[0]?.result === "none",
+    "D7: Shrek štít minie - súperov Shield Breaker potom nemá efekt", J(fx(t6, "breaker")));
+  // mirror na bežnom skoku odrazí do Shreka
+  const s8 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, marks: [[3, 2], [1, 0], [1, 2]] }));
+  s8.round(PASS3, [{ type: "mirror" }, PASS, PASS]);
+  check(s8.game.players.p2.hp === 10 && s8.game.shrek.hp === SHREK_HP - 1, "D8: mirror odrazí bežný skok do Shreka", J([s8.game.players.p2.hp, s8.game.shrek.hp]));
+}
+
 console.log(`\n${passes} PASS, ${failures} FAIL`);
 if (failures) process.exit(1);

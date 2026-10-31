@@ -67,7 +67,7 @@ export function renderShrek(s) {
   if (!sh) { if (fig) { fig.style.display = "none"; hpEl.style.display = "none"; } return; }
   ensureEls();
   fig.style.display = "block";
-  // bunky: ohlásené skoky - políčko podfarbené ako špeciálna dlaždica + piktogram Shrekovej hlavy s číslom
+  // bunky: ohlásené skoky - políčko podfarbené ako špeciálna dlaždica + Shrekova hlava (Mark.png) s číslom
   // (už odskákané vyblednú), smrad, rev, blik smradu
   const cells = gridEl.children, w = state?.board?.w || 4, now = performance.now();
   sh.marks.forEach(([x, y], i) => {
@@ -77,10 +77,10 @@ export function renderShrek(s) {
     if (phase !== "done") cell.classList.add("shrek-cell");
     const m = document.createElement("div");
     m.className = "shrek-mark" + (phase ? " " + phase : "");
-    m.innerHTML = `<img src="${DIR}Head.png" alt=""><b>${i + 1}</b>`;
+    m.innerHTML = `<img src="${DIR}Mark.png" alt=""><b>${i + 1}</b>`;
     // viac čísel na jednej bunke (napr. 1 a 3) - ďalšia hlava vedľa, nech sa neprekryjú
     const prior = cell.querySelectorAll(".shrek-mark").length;
-    if (prior) m.style.left = (8 + prior * 52) + "px";
+    if (prior) m.style.marginLeft = (-17 + prior * 100) + "px";
     cell.appendChild(m);
   });
   for (const [x, y] of sh.stench) {

@@ -1715,13 +1715,15 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   font-size: 22px; font-weight: 900; color: #8fd12a; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .shrek-hp.t2 { color: #ffa52e; }
 .shrek-hp.t3 { color: #ff4d3a; }
-/* ohlásené políčko skoku: podfarbené ako špeciálna dlaždica (svetlozelená) + piktogram Shrekovej hlavy s číslom */
+/* ohlásené políčko skoku: podfarbené ako špeciálna dlaždica (svetlozelená) + v strede Shrekova hlava (Mark.png)
+   s veľkým číslom vľavo v odtieni hlavy */
 .cell.shrek-cell { background: rgba(182,232,70,.2); box-shadow: inset 0 0 0 3px #b6e846; }
-.shrek-mark { position: absolute; left: 8px; top: 6px; width: 44px; height: 44px; z-index: 2; pointer-events: none;
+.shrek-mark { position: absolute; left: 50%; top: 50%; width: 55px; height: 55px; margin: -27px 0 0 -17px; z-index: 2; pointer-events: none;
   filter: drop-shadow(0 2px 0 rgba(0,0,0,.5)); }
-.shrek-mark img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-.shrek-mark b { position: absolute; right: -6px; bottom: -6px; min-width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
-  font-size: 13px; color: #1c2a06; background: #b6e846; box-shadow: 0 0 0 2px #1c2a06; }
+.shrek-mark img { display: block; width: 100%; height: 100%; opacity: .85; }
+.shrek-mark b { position: absolute; left: -38px; top: 50%; transform: translateY(-50%); line-height: 1;
+  font-family: "Press Start 2P", Impact, sans-serif; font-size: 36px; color: #c6cc0a;
+  text-shadow: 3px 3px 0 #1a1a08, -2px -2px 0 #1a1a08, 2px -2px 0 #1a1a08, -2px 2px 0 #1a1a08, 0 0 12px rgba(0,0,0,.6); }
 .shrek-mark.done { opacity: .3; }
 .shrek-mark.next { animation: shrek-mark 0.7s ease-in-out infinite alternate; }
 @keyframes shrek-mark { to { transform: scale(1.12); } }

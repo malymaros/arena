@@ -91,7 +91,7 @@ vypíše `trim` a `vol` pre manifest. Aktuálne: úsek 48,8–88,2 s, slučka 16
 
 | Situácia | Rozhodnutie |
 |---|---|
-| Štít / mirror proti Shrekovi (rev, tackle, smrad) | Neblokujú. Shrekove útoky sú prostredie ako dlaždice. |
+| Štít / mirror proti Shrekovi (rev, tackle, smrad) | Nabitý štít/mirror kryje **každý** rev/tackle (bežné skoky 1-2-3 aj reakcie) a Shrek ho tým **minie**: štít zablokuje, mirror odrazí dmg do Shreka (len zásah, bez ďalšej reakcie). Hráč potom ostane nekrytý pred súperovou akciou a súperov breaker už nemá čo rozbiť. Ak súperova akcia zasiahla obrancu aj priamo, obrana sa minie na priamom zásahu (vyhodnotí sa skôr) a reakciu tej istej akcie už nekryje. Smrad obrany ignoruje (dlaždica). Rozhodnutie 2026-10-31. |
 | Last Stand / Last Hope | Prijatý dmg sa delí na ½ (`recvDmg`), ako pri dlaždiciach. |
 | Skamenený hráč | Rev, tackle ani smrad ho nezasiahnu (socha sa ráta, akoby na políčku nikto nestál, ako pri dlaždiciach). |
 | Narutov klon v dosahu revu, tacklu alebo smradu | Dostane len kozmetický `clone_hit` a nezomrie. Nesmie prezradiť, ktorá figúra je pravá. |

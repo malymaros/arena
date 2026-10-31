@@ -5,7 +5,8 @@
 // Kto ho zasiahne, spustí reakciu: strela a melee → okamžitý rev; special zboku → PowerUp + tackle po riadku
 // k útočníkovi (prvá figúra v ceste, Shrek sa vráti), special od útočníka v tom istom stĺpci → okamžitý rev. Fáza 2: pri 0 HP padne (leží, nič neblokuje) a z tela
 // sa šíri smrad - kolo smrti jeho políčko, každé ďalšie kolo + ortogonálni susedia; smrad = STENCH_DMG na konci kroku.
-// Shrekove útoky sú ako dlaždice: obchádzajú štít/mirror, ½ pri Last Stand/Hope platí, skamenenú postavu
+// Shrekove útoky (rev, tackle) kryje nabitá obrana hráča a Shrek ju tým MINIE (viď guardOf); smrad je dlaždica
+// a obrany ignoruje. ½ pri Last Stand/Hope platí, skamenenú postavu
 // nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá). Počas THE WORLD
 // je Shrek inertný (strely ním prejdú).
 // Itemy (namiesto dlaždíc): srdiečko (+1 HP) a kvapka (+1 mana) padnú na voľné políčka na štarte
@@ -15,7 +16,7 @@
 import {
   START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP,
   STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MANA_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_CALL_MS, SHREK_POWERUP_MS,
-  SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS,
+  SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS, MIRROR_BEAM_MS,
 } from "./constants.js";
 
 export function swampModule(E) {
@@ -131,6 +132,44 @@ function cloneCosmetic(slot, raw, tl) {
   E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [p.clone.x, p.clone.y], dmg: E.recvDmg(slot, raw) }], SMALL_DELAY_MS);
 }
 
+// Obrana proti Shrekovi: nabitý štít/mirror kryje KAŽDÝ Shrekov rev/tackle (bežný skok 1-2-3 aj reakciu) a Shrek ju
+// tým spotrebuje - hráč potom ostane nekrytý pred súperom a súperov breaker už nemá čo rozbiť. Štít zablokuje,
+// mirror odrazí dmg do Shreka (len zásah, bez ďalšej reakcie). Výnimka: ak súperova akcia zasiahla obrancu priamo,
+// obrana sa minula na tom zásahu (vyhodnotí sa skôr; resolveStrike → noteDefense) a reakciu tej istej akcie nekryje.
+const spent = { p1: false, p2: false };
+function swampActionStart() { spent.p1 = false; spent.p2 = false; }
+function noteDefense(slot) { spent[slot] = true; }
+function guardOf(slot) {
+  const p = E.game.players[slot];
+  if (spent[slot]) return null;
+  return p.shield ? "shield" : p.mirror ? "mirror" : null;
+}
+
+// figúry hráča (majiteľ / klon) zasiahnuté reakciou, kryté obranou: blok / odraz na každej v JEDNOM beate (stacknutý
+// pár = jedna figúra, ako v resolveStrike). Vráti dmg, ktorý mirror odrazí do Shreka (0 pri štíte).
+function guardHit(slot, def, ownerIn, cloneIn, dmg, tl) {
+  const p = E.game.players[slot], s = E.game.shrek;
+  const cloneCell = cloneIn ? [p.clone.x, p.clone.y] : null;
+  const stacked = ownerIn && cloneIn && cloneCell[0] === p.x && cloneCell[1] === p.y;
+  const figs = [...(ownerIn ? [{}] : []), ...(cloneIn && !stacked ? [{ cell: cloneCell }] : [])];
+  const gold = def === "shield" ? !!p.shieldGold : !!p.mirrorGold;
+  p.shield = false; p.shieldGold = false; p.mirror = false; p.mirrorGold = false; // Shrek obranu minie
+  if (def === "shield") {
+    E.pushStateFrame(tl, figs.map(f => ({ kind: "block", target: slot, gold, ...f })), SMALL_DELAY_MS);
+    return 0;
+  }
+  E.pushStateFrame(tl, figs.map(f => ({ kind: "mirror", target: slot, dmg, atk: "special", gold, destCell: [s.x, s.y], ...f })), MIRROR_BEAM_MS);
+  return dmg * figs.length;
+}
+
+// odraz mirrorom do Shreka: zásah ako od hráča (hit + výkrik / smrť), ale bez ďalšej reakcie
+function reflectOnShrek(reflects, tl) {
+  for (const { slot, dmg } of reflects) {
+    if (E.game.shrek.dead || E.winnerNow()) return;
+    damageShrek(slot, dmg, tl);
+  }
+}
+
 const stonedNow = (slot, stoned) => !!(stoned?.[slot]) || E.game.players[slot].stone > 0;
 
 // rev: Shrekovo políčko + jeho ortogonálni susedia (kríž, na okraji/rohu menší)
@@ -140,13 +179,22 @@ function roar(tl, stoned = null) {
   const cells = [];
   for (let y = 0; y < E.game.board.h; y++) for (let x = 0; x < E.game.board.w; x++) if (inLine(x, y)) cells.push([x, y]);
   E.pushStateFrame(tl, [{ kind: "shrek_roar", cell: [s.x, s.y], cells, dmg }], SHREK_ROAR_MS);
+  const reflects = [];
   for (const slot of order()) {
     const p = E.game.players[slot];
     if (stonedNow(slot, stoned)) continue; // socha sa ráta, akoby na políčku nikto nestál (ako pri dlaždiciach)
-    if (p.hp > 0 && inLine(p.x, p.y)) envHit(slot, dmg, tl);
+    const ownerIn = p.hp > 0 && inLine(p.x, p.y), cloneIn = !!p.clone && inLine(p.clone.x, p.clone.y);
+    const def = (ownerIn || cloneIn) && guardOf(slot);
+    if (def) {
+      const back = guardHit(slot, def, ownerIn, cloneIn, dmg, tl);
+      if (back) reflects.push({ slot, dmg: back });
+      continue;
+    }
+    if (ownerIn) envHit(slot, dmg, tl);
     if (E.winnerNow()) return;
-    if (p.clone && inLine(p.clone.x, p.clone.y)) cloneCosmetic(slot, dmg, tl);
+    if (cloneIn) cloneCosmetic(slot, dmg, tl);
   }
+  reflectOnShrek(reflects, tl);
 }
 
 // koniec kroku k (0–2): živý Shrek skočí na k-te ohlásené políčko a zareve; mŕtvy → smrad berie HP
@@ -154,6 +202,7 @@ function shrekStepEnd(k, tl, stoned) {
   const s = shrek();
   if (!s) return;
   if (s.dead) { stenchTick(tl, stoned); return; }
+  swampActionStart(); // priame zásahy poslednej akcie sa skoku netýkajú
   const to = s.marks[k];
   if (!to) return;
   const from = [s.x, s.y];
@@ -264,14 +313,25 @@ function tackle(dx, tl) {
   }
   // target = majiteľ prvej zasiahnutej figúry - prekliatemu v labyrinte sa beh k skrytému lovcovi rediguje
   E.pushStateFrame(tl, [{ kind: "shrek_tackle", from: [s.x, y], to: [stop, y], dir, ...(victims.length ? { target: victims[0].slot } : {}) }], SHREK_TACKLE_MS);
-  const dmg = roarDmg();
-  for (const v of victims) {
-    if (v.clone) cloneCosmetic(v.slot, dmg, tl);
-    else if (!stonedNow(v.slot)) envHit(v.slot, dmg, tl);
-    if (E.winnerNow()) return;
+  const dmg = roarDmg(), reflects = [];
+  for (const slot of order()) {
+    const mine = victims.filter(v => v.slot === slot);
+    const ownerIn = mine.some(v => !v.clone && !stonedNow(slot)), cloneIn = mine.some(v => v.clone);
+    const def = (ownerIn || cloneIn) && guardOf(slot);
+    if (def) {
+      const back = guardHit(slot, def, ownerIn, cloneIn, dmg, tl);
+      if (back) reflects.push({ slot, dmg: back });
+      continue;
+    }
+    for (const v of mine) {
+      if (v.clone) cloneCosmetic(slot, dmg, tl);
+      else if (!stonedNow(slot)) envHit(slot, dmg, tl);
+      if (E.winnerNow()) return;
+    }
   }
   E.pushStateFrame(tl, [{ kind: "shrek_return", from: [stop, y], to: [s.x, y], dir, ...(victims.length ? { target: victims[0].slot } : {}) }], SHREK_RETURN_MS);
+  reflectOnShrek(reflects, tl); // odraz dopadne, keď je Shrek späť na svojom políčku
 }
 
-return { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone };
+return { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, swampActionStart, noteDefense };
 }

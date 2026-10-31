@@ -64,7 +64,7 @@ export function createEngine(io = {}) {
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
   const { walkDelay, isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
-  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone } = Object.assign(E, swampModule(E));
+  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, swampActionStart, noteDefense } = Object.assign(E, swampModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -1009,6 +1009,7 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
   }
 
   // --- Portal Realm: Def-breaker - nabitá obrana sa rozbije (minie) a zásah pokračuje ako nekrytý
+  if (o.shield || o.mirror) noteDefense(defSlot); // Shrek Swamp: obrana sa minula na priamom zásahu - Shrekovu reakciu už nekryje
   if (defBreak && (o.shield || o.mirror)) {
     pushStateFrame(tl, [{ kind: "dispel", target: defSlot, what: o.shield ? "shield" : "mirror",
       gold: o.shield ? !!o.shieldGold : !!o.mirrorGold, ...(cloneFig ? { cloneCell } : {}) }], SMALL_DELAY_MS);
@@ -1476,6 +1477,7 @@ function runRoundLoop() {
       }
       // pasca (Countess/Onre): zbieraj bunky prejdené počas akcie; trigger sa vyhodnotí AŽ PO jej dokončení
       actionSteps = { p1: [], p2: [], p1c: [], p2c: [] };
+      swampActionStart();
       const res = doAction(slot, act, tl);
       // Jotaro THE WORLD: kolo sa POZASTAVÍ - pošli čiastočnú timeline (končí timestop_wait) a čakaj na
       // timestop_actions. Súperovu obranu NEspotrebuj (ostáva armed cez zamrazenie), pasce nevyhodnocuj (čas stojí).
