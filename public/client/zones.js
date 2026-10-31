@@ -23,10 +23,11 @@ export function cellsForMeleePreview(p, char){
 }
 // dráha charge Vampire/Onryō (dash slot): z pozície zvoleným smerom po prvú VIDITEĽNÚ figúru súpera
 // (aj klon) alebo okraj - zrkadlí doVampCharge na serveri (skrytý súper v labyrinte má x null → beh na okraj)
-export function cellsForVampChargePreview(p, dir, foe){
+// shrek = bunka Shreka v kroku akcie (Shrek Swamp, ghostShrek) - charge sa o neho zastaví
+export function cellsForVampChargePreview(p, dir, foe, shrek = null){
   const delta = G.DIR4[dir];
-  if (p && delta && state?.portals) return G.runPathPortals(board, p.x, p.y, dir, foe, state.portals).path; // Portal Realm
-  return p && delta ? G.runPath(board, p.x, p.y, delta, foe).path : [];
+  if (p && delta && state?.portals) return G.runPathPortals(board, p.x, p.y, dir, foe, state.portals, shrek).path; // Portal Realm
+  return p && delta ? G.runPath(board, p.x, p.y, delta, foe, shrek).path : [];
 }
 // dosah démon útoku - všetky políčka okrem toho, na ktorom kaster (ghost) stojí
 export function cellsForDemonPreview(p){

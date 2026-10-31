@@ -3,7 +3,8 @@
 // sa framy timeline aj výsledný stav.
 // Spustenie: node test/swamp.mjs  (súčasť npm test)
 import { createEngine } from "../engine/game.js";
-import { SHREK_HP } from "../shared/balance.js";
+import { SHREK_HP, WOLF_MOON_DMG, VAMP_CHARGE_DMG, VAMP_TRAP_DMG, DEMON_DMG } from "../shared/balance.js";
+import * as G from "../shared/geometry.js";
 import { eventsForFrame, newTracker } from "../public/sounds/events.js";
 import { SHREK_HIT_SOUND_MS, SHREK_JUMP_MS, SHREK_CALL_MS } from "../shared/timing.js";
 
@@ -477,6 +478,83 @@ console.log("Shrek počas THE WORLD");
       [{ type: "move", dir: "up" }, PASS_R(), { type: "shield" }]);
     const pick = idx(tl, e => e.kind === "item_pick" && e.target === "p2");
     check(pick >= 0 && pick < endAt(tl) && s.game.players.p2.hp >= 9, "W5: Jotaro zoberie item počas zamrazenia", J(fx(tl, "item_pick")));
+  }
+}
+
+console.log("Charge, démon a pasca proti Shrekovi");
+{
+  const strikeAt = (tl, kind) => fx(tl, kind).map(e => e.cell?.join());
+  const nohealOrDrain = (tl) => !fx(tl, "heal").length && !fx(tl, "mana_drain").length && !fx(tl, "vamp_heal_cast").length;
+  // vlkolak: charge doprava sa zastaví na Shrekovi (súper stojí až za ním)
+  {
+    const s = scenario("werewolf", "fire", (g) => { shrekSet(g, { x: 2, y: 1, marks: QUIET }); });
+    const tl = s.round([sp({ dir: "right" }), PASS, PASS], PASS3);
+    const hit = fx(tl, "shrek_hit")[0];
+    check(strikeAt(tl, "wolf_strike").join() === "2,1" && s.game.players.p1.x === 2 && s.game.players.p1.y === 1,
+      "CH1: vlkolakov charge zastaví Shrek (seknutie na jeho políčku, vlkolak tam ostane)", J({ strike: strikeAt(tl, "wolf_strike"), p1: [s.game.players.p1.x, s.game.players.p1.y] }));
+    check(hit && hit.from === "p1" && hit.dmg === WOLF_MOON_DMG[0] && idx(tl, e => e.kind === "shrek_roar") > idx(tl, e => e.kind === "shrek_hit"),
+      "CH2: Shrek dostane dmg mesačnej fázy a zareaguje revom", J(hit));
+    check(!fx(tl, "hit").some(h => h.target === "p2" && !h.shrek), "CH3: súper za Shrekom charge nedostal", J(fx(tl, "hit")));
+  }
+  // vlkolak: Shrek a súper na jednom políčku - zásah oboch, najprv súper
+  {
+    const s = scenario("werewolf", "fire", (g) => { shrekSet(g, { x: 2, y: 1, marks: QUIET }); g.players.p2.x = 2; });
+    const tl = s.round([sp({ dir: "right" }), PASS, PASS], PASS3);
+    const foeHit = idx(tl, e => e.kind === "hit" && e.target === "p2" && !e.shrek), shrekHit = idx(tl, e => e.kind === "shrek_hit");
+    check(foeHit >= 0 && shrekHit > foeHit, "CH4: Shrek so súperom na bunke - zásah súpera, potom Shreka", J([foeHit, shrekHit]));
+  }
+  // Vampire: charge zastaví Shrek, dmg bez healu
+  {
+    const s = scenario("countess", "fire", (g) => { shrekSet(g, { x: 2, y: 1, marks: QUIET }); g.players.p1.hp = 5; });
+    const tl = s.round([{ type: "dash", dir: "right" }, PASS, PASS], PASS3);
+    const hit = fx(tl, "shrek_hit")[0];
+    check(s.game.players.p1.x === 2 && hit?.dmg === VAMP_CHARGE_DMG && nohealOrDrain(tl),
+      "CH5: Vampire charge zastaví Shrek - dmg bez healu", J({ hit, heal: fx(tl, "heal") }));
+  }
+  // Onryō: charge zastaví Shrek, dmg bez drainu many
+  {
+    const s = scenario("fire", "onre", (g) => { shrekSet(g, { x: 1, y: 1, marks: QUIET }); g.players.p1.mana = 6; });
+    const tl = s.round(PASS3, [{ type: "dash", dir: "left" }, PASS, PASS]);
+    const hit = fx(tl, "shrek_hit")[0];
+    check(s.game.players.p2.x === 1 && hit?.dmg === VAMP_CHARGE_DMG && nohealOrDrain(tl),
+      "CH6: Onryō charge zastaví Shrek - dmg bez drainu", J({ hit, p2: s.game.players.p2.x, drain: fx(tl, "mana_drain") }));
+  }
+  // démon zasiahne Shreka (zóna všetkých políčok okrem kasterovho)
+  {
+    const s = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 2, y: 0, marks: QUIET }); g.players.p1.lastStandBuff = true; g.players.p1.mana = 10; g.players.p2.x = 0; }); // súper na kasterovej (bezpečnej) bunke - inak ho démon zabije a hra skončí
+    const tl = s.round([{ type: "demon" }, PASS, PASS], PASS3);
+    const hit = fx(tl, "shrek_hit")[0];
+    check(hit?.from === "p1" && hit.dmg === DEMON_DMG && idx(tl, e => e.kind === "shrek_hit") > idx(tl, e => e.kind === "demon_attack"),
+      "CH7: démon zasiahne Shreka", J(hit));
+  }
+  // pasca: Shrek skočí priamo na ňu → teleport castera, úder Shreka bez healu, rev
+  {
+    const s = scenario("countess", "fire", (g) => { shrekSet(g, { x: 2, y: 2, marks: [[1, 0], [2, 2], [1, 2]] }); g.players.p1.trap = { x: 1, y: 0 }; g.players.p1.hp = 5; });
+    const tl = s.round(PASS3, PASS3);
+    const trig = idx(tl, e => e.kind === "trap_trigger" && e.from === "p1"), jump = idx(tl, e => e.kind === "shrek_jump");
+    const hit = fx(tl, "shrek_hit")[0];
+    check(trig > jump && jump >= 0 && s.game.players.p1.trap === null, "TR1: Shrekov skok na pascu ju spustí (po dopade)", J([jump, trig]));
+    check(hit?.from === "p1" && hit.dmg === VAMP_TRAP_DMG && nohealOrDrain(tl), "TR2: caster sa teleportne a udrie Shreka - bez healu", J(hit));
+    check(fx(tl, "trap_tp_in").length === 1, "TR3: teleport castera na pascu");
+  }
+  // pasca: Shrek ňou prebehne tacklom → teleport, úder naprázdno (Shrek je už späť)
+  {
+    const s = scenario("fire", "onre", (g) => { shrekSet(g, { x: 2, y: 1, marks: QUIET }); g.players.p2.x = 3; g.players.p2.y = 2; g.players.p2.trap = { x: 1, y: 1 }; });
+    const tl = s.round([sp(), PASS, PASS], PASS3);
+    const tackle = idx(tl, e => e.kind === "shrek_tackle"), ret = idx(tl, e => e.kind === "shrek_return"), trig = idx(tl, e => e.kind === "trap_trigger" && e.from === "p2");
+    check(tackle >= 0 && trig > ret, "TR4: tackle cez pascu ju spustí (po návrate Shreka)", J([tackle, ret, trig]));
+    check(s.game.players.p2.x === 1 && s.game.players.p2.y === 1 && fx(tl, "shrek_hit").length === 1,
+      "TR5: Onryō sa teleportne na pascu, úder ide naprázdno (Shrek dostal len zásah specialom)", J({ p2: [s.game.players.p2.x, s.game.players.p2.y], hits: fx(tl, "shrek_hit") }));
+  }
+  // ghost simulácia (klient = validácia servera): charge sa zastaví tam, kde bude Shrek v kroku akcie
+  {
+    const B = { w: 4, h: 3 };
+    const sh = { x: 3, y: 0, dead: false, stone: 0, done: 0, marks: [[2, 1], [0, 0], [3, 2]] };
+    const sim = G.simulateQueue(B, { x: 0, y: 1, char: "werewolf" }, [PASS, sp({ dir: "right" }), PASS], null, {}, null, sh);
+    check(sim[2].x === 2 && sim[2].y === 1, "CH8: ghost - charge v 2. kroku zastaví Shrek po 1. skoku (2,1)", J(sim));
+    const stoned = G.simulateQueue(B, { x: 0, y: 1, char: "werewolf" }, [PASS, sp({ dir: "right" }), PASS], null, {}, null, { ...sh, stone: 2 });
+    check(stoned[2].x === 3, "CH9: ghost - skamenený Shrek neskáče (charge prebehne na okraj)", J(stoned));
+    check(G.shrekCellAt({ ...sh, dead: true }, 1) === null, "CH10: mŕtvy Shrek charge nezastaví");
   }
 }
 

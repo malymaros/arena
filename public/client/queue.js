@@ -4,7 +4,7 @@ import { ARROW_DIR, displayDir } from "/client/action-log.js";
 import { LS_BADGE_IMG, LH_BADGE_IMG, breakerIco, hydratePix } from "/client/pix.js";
 import { mageHeadHtml } from "/client/mage-head.js";
 import { usesAltColor } from "/client/sprites.js";
-import { ghostPos, showPreviewCells, cellsForAimPreview, ghostCharAt, clearPreviewCells, planWarnings, foeMirrorImmune, MIRROR_IMMUNE_WARN } from "/client/ghost.js";
+import { ghostPos, ghostShrek, showPreviewCells, cellsForAimPreview, ghostCharAt, clearPreviewCells, planWarnings, foeMirrorImmune, MIRROR_IMMUNE_WARN } from "/client/ghost.js";
 import { VAMP_CHARS, CHARS_BY_KEY } from "/chars/index.js";
 import { cellsForVampChargePreview, cellsForSpecialPreview, cellsForJotaroS1, cellsForMeleePreview, cellsForDemonPreview, cellsForBreakerPreview } from "/client/zones.js";
 import { state, otherSlot, me, isSpectator } from "/client/session.js";
@@ -60,7 +60,7 @@ function attachQueueHover(el, a, idx) {
     // Vampire/Onryō: dash = charge - hover ukáže dráhu behu (stop na viditeľnej figúre súpera)
     el.addEventListener("mouseenter", () => {
       const p = ghostPos(idx); const char = ghostCharAt(idx);
-      if (p && VAMP_CHARS[char]) showPreviewCells(cellsForVampChargePreview(p, a.dir, state?.[otherSlot()]));
+      if (p && VAMP_CHARS[char]) showPreviewCells(cellsForVampChargePreview(p, a.dir, state?.[otherSlot()], ghostShrek(idx)));
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special") {
@@ -71,7 +71,7 @@ function attachQueueHover(el, a, idx) {
     el.addEventListener("mouseenter", () => {
       if (a.cell) { showPreviewCells([[a.cell.x, a.cell.y]]); return; }
       const char = ghostCharAt(idx); const p = ghostPos(idx);
-      if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, worldUsed: state?.[me]?.worldUsed, foe: state?.[otherSlot()] }, a.dir));
+      if (char && p) showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, pride: state?.[me]?.pride, worldUsed: state?.[me]?.worldUsed, foe: state?.[otherSlot()], shrek: ghostShrek(idx) }, a.dir));
     });
     el.addEventListener("mouseleave", clearPreviewCells);
   } else if (a.type === "special1") {

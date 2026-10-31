@@ -5,12 +5,14 @@
 // Kto ho zasiahne, spustí reakciu: strela a melee → okamžitý rev; special zboku → PowerUp + tackle po riadku
 // k útočníkovi (prvá figúra v ceste, Shrek sa vráti), special od útočníka v tom istom stĺpci → okamžitý rev.
 // Skoky ďalšieho kola sa losujú o kolo vopred (game.shrek.next, náhľad pri config.shrekPreview).
+// Charge (vlkolak, Vampire/Onryō) sa o neho zastaví a zasiahne ho, démon ho zasiahne ako zóna, pascu spustí skokom
+// na ňu alebo prebehnutím tacklom (caster sa teleportne a udrie; Vampire/Onryō mu dávajú dmg bez healu a drainu).
 // Medúzin special ho v zóne skamení (stone = STONE_ACTIONS skokov vynechá); skamenený dostáva dmg, ale nekričí
 // a nereaguje (ako skamenená postava).
 // Fáza 2: pri 0 HP padne (leží, nič neblokuje) a z tela sa šíri smrad - kolo smrti jeho políčko, každé ďalšie kolo + ortogonálni susedia; smrad = STENCH_DMG na konci kroku.
 // Shrekove útoky (rev, tackle) kryje nabitá obrana hráča a Shrek ju tým MINIE (viď guardOf); smrad je dlaždica
 // a obrany ignoruje. ½ pri Last Stand/Hope platí, skamenenú postavu nezasiahnu, tieňový klon dostane len kozmetický zásah (nesmie prezradiť, ktorá figúra je pravá). Počas THE WORLD
-// je Shrek inertný (strely ním prejdú).
+// neskáče, ale je terčom - zamrazené zásahy dopadnú naraz po obnovení času (shrekResume).
 // Itemy (namiesto dlaždíc): srdiečko (+1 HP) a kvapka (+1 mana) padnú na voľné políčka na štarte
 // hry a na konci každého kola (config.itemsPerRound, itemWeights, max ITEM_MAX); hráč ich zoberie hneď pri vstupe
 // na políčko alebo prechode cezeň (prejdené bunky akcie z actionSteps - rovnaký zber ako pri pasci). Klon ich neberie.
@@ -32,6 +34,12 @@ const same = (a, b) => a[0] === b[0] && a[1] === b[1];
 function shrekAt(x, y) {
   const s = shrek();
   return !!s && !s.dead && s.x === x && s.y === y;
+}
+
+// bunka živého Shreka pre geometriu behu (charge sa o neho zastaví) - { x, y } | null
+function shrekCell() {
+  const s = shrek();
+  return s && !s.dead ? { x: s.x, y: s.y } : null;
 }
 
 // THE WORLD: Jotarov zásah Shreka v zamrazenom čase - HP sa nemení, len ohlás (shrek_ts_hit) a zaeviduj;
@@ -258,6 +266,8 @@ function shrekStepEnd(k, tl, stoned) {
   E.pushStateFrame(tl, [{ kind: "shrek_jump", from, to: [...to], n: k + 1 }], SHREK_JUMP_MS);
   shrekPickup(tl);
   roar(tl, stoned);
+  // pasca na políčku dopadu sa spustí po celom skoku (dopad + rev), ako pri hráčovi po dokončení akcie
+  if (!E.winnerNow()) E.shrekTraps([[s.x, s.y]], tl);
 }
 
 function stenchTick(tl, stoned) {
@@ -398,7 +408,12 @@ function tackle(dx, tl) {
   }
   E.pushStateFrame(tl, [{ kind: "shrek_return", from: [stop, y], to: [s.x, y], dir, ...(victims.length ? { target: victims[0].slot } : {}) }], SHREK_RETURN_MS);
   reflectOnShrek(reflects, tl); // odraz dopadne, keď je Shrek späť na svojom políčku
+  // pasca na prebehnutom políčku (aj na bunke obete) sa spustí po celom tackli - Shrek je už späť, takže
+  // úder castera ide naprázdno, ak na bunke nestojí súper (ako keď ňou hráč len prebehne)
+  const run = [];
+  for (let x = s.x + dx; dx > 0 ? x <= stop : x >= stop; x += dx) run.push([x, y]);
+  if (!E.winnerNow() && !E.game.shrek.dead) E.shrekTraps(run, tl);
 }
 
-return { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, shrekResume, swampActionStart, noteDefense };
+return { isSwamp, shrekAt, shrekCell, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, shrekResume, swampActionStart, noteDefense };
 }

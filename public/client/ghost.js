@@ -17,7 +17,7 @@ function simulatedPositions(){
   if (!mine) return [];
   // skrytý súper v labyrinte má x null → charge beží na okraj (shared figureAt ho ignoruje)
   const sim = G.simulateQueue(board, { x: mine.x, y: mine.y, char: mine.char, worldUsed: !!mine.worldUsed },
-    planning.myQueue, state?.[otherSlot()], VAMP_CHARS, state?.portals || null); // Portal Realm: ghost ide aj cez portály
+    planning.myQueue, state?.[otherSlot()], VAMP_CHARS, state?.portals || null, state?.shrek || null); // Portal Realm: ghost ide aj cez portály; Shrek Swamp: charge zastaví Shrek
   return sim.slice(1).map(({ x, y }) => ({ x, y }));
 }
 // pozícia, z ktorej sa vykoná akcia s indexom idx (= po akciách 0..idx-1);
@@ -29,6 +29,10 @@ export function ghostPos(idx = planning.myQueue.length){
   const sims = simulatedPositions();
   if (!sims.length) return { x: mine.x, y: mine.y };
   return sims[Math.min(idx, sims.length) - 1];
+}
+// Shrek Swamp: kde bude živý Shrek pri akcii s indexom idx (po idx skokoch) - charge sa o neho zastaví; inak null
+export function ghostShrek(idx = planning.myQueue.length){
+  return G.shrekCellAt(state?.shrek, idx);
 }
 // budúca pozícia VLASTNÉHO tieňového klona po fronte - kopíruje move/dash majiteľa s inverznou vertikálou
 // a vlastným clampom; hýbe sa aj keď majiteľ narazí do steny (ako na serveri doMove/doDash)

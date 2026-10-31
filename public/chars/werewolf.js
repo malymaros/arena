@@ -47,11 +47,11 @@ export default {
   },
   specialTarget: "wolf", // 8-smerový picker
   // dráha charge: zvoleným z 8 smerov po PRVÚ figúru súpera (aj jeho klon) alebo okraj - zrkadlí server.
-  // Súpera dodáva volajúci cez me.foe; bez neho (char-select) alebo so skrytým súperom (x null) až na okraj.
+  // Súpera dodáva volajúci cez me.foe, Shreka (Shrek Swamp) cez me.shrek; bez neho (char-select) alebo so skrytým súperom (x null) až na okraj.
   specialZone: ({ G, board, me, dir, portals }) => {
     const delta = G.DIR8[dir];
-    if (delta && portals && G.DIR4[dir]) return G.runPathPortals(board, me.x, me.y, dir, me.foe, portals).path; // Portal Realm: ortogonálne cez portály
-    return delta ? G.runPath(board, me.x, me.y, delta, me.foe).path : [];
+    if (delta && portals && G.DIR4[dir]) return G.runPathPortals(board, me.x, me.y, dir, me.foe, portals, me.shrek).path; // Portal Realm: ortogonálne cez portály
+    return delta ? G.runPath(board, me.x, me.y, delta, me.foe, me.shrek).path : []; // Shrek Swamp: me.shrek = Shrek v kroku akcie
   },
   // veľkosť podľa fázy mesiaca: nov = zmenšená základná forma 0.7×, spln ≈ 1.21×
   sizeLevel: { stat: "moon", base: 0.7 },

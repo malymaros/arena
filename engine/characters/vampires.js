@@ -104,7 +104,7 @@ function doVampMelee(ctx, slot, tl) {
 }
 
 // Charge Vampire/Onryō (nahrádza dash, rovnaká cena): pohybové melee - beh zvoleným smerom po PRVÚ
-// figúru súpera (klon-návnada pred hráčom) alebo po okraj (bez cieľa = čisté premiestnenie);
+// figúru súpera (klon-návnada pred hráčom), po Shreka (Shrek Swamp - dmg bez bonusu) alebo po okraj (bez cieľa = čisté premiestnenie);
 // VAMP_CHARGE_DMG + VAMP_CHARGE_BONUS pri dopadnutom dmg. Na bunke terča OSTÁVA STÁŤ aj pri bloku.
 // Charge do steny z okrajovej bunky = wall rule (mana preč, náraz, neprečiarkuje sa).
 function doVampCharge(ctx, slot, dir, tl) {
@@ -122,9 +122,10 @@ function doVampCharge(ctx, slot, dir, tl) {
 
   // dráha: krok za krokom po okraj; stop na PRVEJ figúre (klon-návnada / hráč / stacknutý pár);
   // Portal Realm: charge beží aj cez portály (len efekty tela HP/mana - powerup ani Def-breaker nie)
-  const { path, target, passes } = ctx.portalList()
-    ? G.runPathPortals(ctx.game.board, me.x, me.y, dir, op, ctx.portalList())
-    : { ...G.runPath(ctx.game.board, me.x, me.y, delta, op), passes: [] };
+  // Shrek Swamp: živý Shrek charge zastaví ako súper (shrek = na cieľovej bunke stojí Shrek)
+  const { path, target, passes, shrek } = ctx.portalList()
+    ? G.runPathPortals(ctx.game.board, me.x, me.y, dir, op, ctx.portalList(), ctx.shrekCell())
+    : { ...G.runPath(ctx.game.board, me.x, me.y, delta, op, ctx.shrekCell()), passes: [] };
   const hit = !!target;
   if (!path.length) {
     ctx.pushStateFrame(tl, [{ kind: "wall_bump", from: slot, dir }], SMALL_DELAY_MS);
@@ -140,11 +141,13 @@ function doVampCharge(ctx, slot, dir, tl) {
   ctx.pushStateFrame(tl, fx, ctx.walkDelay(fx)); // cez portál so stropom rýchlosti (dlhý beh trvá dlhšie)
   for (const ps of passes) ctx.bodyEffect(slot, ps, tl);
   ctx.closePortals(passes.map(ps => ps.id), tl);
-  if (!hit) return; // dobehla na okraj bez terča - len presun
+  if (!hit && !shrek) return; // dobehla na okraj bez terča - len presun
   // Vampire seká A1 (jednotný úder podľa attack guide), Onryō pôvodný vampstrike (alias Attack_3)
   ctx.pushStateFrame(tl, [{ kind: "vamp_strike", from: slot, cell: [me.x, me.y],
     ...(me.char === "countess" ? { anim: "va1" } : {}) }], WOLF_STRIKE_MS);
-  vampMeleeLand(ctx, slot, raw, VAMP_CHARGE_BONUS, tl, false, pBonus); // hráč / klon-návnada / stacknutý pár rieši helper
+  if (hit) vampMeleeLand(ctx, slot, raw, VAMP_CHARGE_BONUS, tl, false, pBonus); // hráč / klon-návnada / stacknutý pár rieši helper
+  // Shrek Swamp: Shrek na bunke terča dostane dmg charge (BEZ healu/drainu) a zareaguje okamžitým revom
+  if (shrek) ctx.shrekMelee(slot, [[me.x, me.y]], [], raw, 0, tl);
 }
 
 const trapSpecial = (key) => ({

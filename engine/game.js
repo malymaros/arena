@@ -57,14 +57,14 @@ export function createEngine(io = {}) {
     get rand() { return rand; }, set rand(v) { rand = v; },
     pushStateFrame, beginAct, endAct, other, attackDirOk, special1ArgsOk, winnerNow, notePrideHit, doAction,
     runRoundLoop, finishRound, pushInvalid, killClone, breakTrap, strikeZone,
-    kitOf, trackCloneSteps,
+    kitOf, trackCloneSteps, shrekTraps,
   };
   const { redactHunterActor, redactSnapshotFor, redactRosterMana, redactTimelineFor, labyrinthMul, endLabyrinths, revealLabyrinths, applyLabyrinth, loseInLabyrinth, trackSteps } = Object.assign(E, labyrinthModule(E));
   const { PAUSE, frozenActive, noteFrozenHit, noteFrozenClone, validTimestopQueue, doJotaroWorld, runTimestopActions } = Object.assign(E, timestopModule(E));
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
   const { walkDelay, isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
-  const { isSwamp, shrekAt, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, swampActionStart, noteDefense } = Object.assign(E, swampModule(E));
+  const { isSwamp, shrekAt, shrekCell, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, swampActionStart, noteDefense } = Object.assign(E, swampModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -79,7 +79,7 @@ export function createEngine(io = {}) {
     // Portal Realm: portály pre geometriu (null mimo portal realm), efekty na telo, zatvorenie párov, niť cez prechod
     portalList, bodyEffect, closePortals, trackPath, walkDelay,
     // Shrek Swamp: zásah Shreka zónovým specialom / melee (reakcia tackle / rev), Medúzino skamenenie - mimo bažiny nič
-    shrekZone, shrekMelee, shrekPetrify,
+    shrekZone, shrekMelee, shrekPetrify, shrekCell,
   };
 
 function newPlayer(slot) {
@@ -493,7 +493,7 @@ function validQueue(queue, slot) {
     // ghost simulácia fronty (move/dash/charge/vlkolak, Luffyho guľa, swap) - tá istá funkcia ako
     // klientský ghost; v labyrinte je súper skrytý → charge beží na okraj (prekliaty ho nevidí)
     const sim = G.simulateQueue(game.board, { x: meP?.x, y: meP?.y, char: meP?.char, worldUsed: meP?.worldUsed },
-      q, meP?.labyrinth ? null : foe, DASH_IS_CHARGE, portalList());
+      q, meP?.labyrinth ? null : foe, DASH_IS_CHARGE, portalList(), isSwamp() ? game.shrek : null);
     for (let i = 0; i < q.length; i++) {
       const a = q[i];
       const { x: sx, y: sy, char: simChar } = sim[i]; // stav PRED akciou i
@@ -944,8 +944,28 @@ function triggerTrap(ownerSlot, tl) {
   // (consumeDefense). Heal beaty A2→A3→A4 + doplnenie HP / mana drain rieši vampBonus vnútri helpera;
   // stacknutý pár Naruto+klon: klon pohltí CLONE_DMG, zvyšok prejde na Naruta a bonus je z toho zvyšku.
   const hitSomething = vampMeleeLand(ctx, ownerSlot, raw, VAMP_TRAP_BONUS, tl, true);
-  if (!hitSomething) pushStateFrame(tl, [], SMALL_DELAY_MS); // súper bunkou len prebehol - úder naprázdno
+  // Shrek Swamp: Shrek na bunke pasce dostane úder tiež (bez healu/drainu) a zareaguje okamžitým revom
+  const shrekHere = shrekAt(cell.x, cell.y);
+  if (shrekHere && !winnerNow()) shrekMelee(ownerSlot, [[cell.x, cell.y]], [], raw, 0, tl);
+  if (!hitSomething && !shrekHere) pushStateFrame(tl, [], SMALL_DELAY_MS); // súper bunkou len prebehol - úder naprázdno
   return true;
+}
+
+// Shrek Swamp: Shrek vstúpil na bunky `cells` (dopad skoku / prebehnutie tacklom) - spustí pascu KTORÉHOKOĽVEK
+// hráča na nich (je neutrálny), v poradí kola; každá pasca sa triggerom spotrebuje. Teleport castera sa zbiera
+// do actionSteps bežiacej akcie (reťaz na pascu druhej strany vyhodnotí resolveTrapsAfterAction ako pri hráčovi).
+function shrekTraps(cells, tl) {
+  const hit = (t) => t && cells.some(([x, y]) => x === t.x && y === t.y);
+  if (!hit(game.players.p1.trap) && !hit(game.players.p2.trap)) return;
+  // mimo akcie (skok na konci kroku) si zber pohybov založ sám, nech teleport môže reťaziť pascu druhej strany
+  const own = !actionSteps;
+  if (own) actionSteps = { p1: [], p2: [], p1c: [], p2c: [] };
+  for (const ownerSlot of (game.starter === "p1" ? ["p1", "p2"] : ["p2", "p1"])) {
+    if (!hit(game.players[ownerSlot].trap)) continue;
+    triggerTrap(ownerSlot, tl);
+    if (winnerNow()) break;
+  }
+  if (own) { if (!winnerNow()) resolveTrapsAfterAction(tl); actionSteps = null; }
 }
 
 // aplikuje zásah cez prípadné obrany obrancu (shield blokuje celý dmg, mirror ho odrazí do útočníka)

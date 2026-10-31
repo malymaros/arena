@@ -53,6 +53,8 @@ function doDemon(slot, tl) {
     E.pushStateFrame(tl, [], SMALL_DELAY_MS);
   }
   if (!defended) E.pushStateFrame(tl, [{ kind: "demon_center_out", from: slot }], SMALL_DELAY_MS); // inak démon zmizne až po zásahu
+  // Shrek Swamp: Shrek v dosahu (mimo kasterovej bunky) dostane rovnaký zásah ako zóna specialu - reakcia tackle / rev
+  if (!E.winnerNow()) E.shrekZone(slot, cells, DEMON_DMG + pBonus, tl);
 }
 
 // pomocné: plynulé prepísanie HP+many cez zopár frame-ov (HUD sa hýbe zo snapshotov)

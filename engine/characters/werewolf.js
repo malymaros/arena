@@ -1,5 +1,5 @@
 // Vlkolak: „moon charge" - rozbehne sa jedným z 8 smerov a zastane na PRVEJ figúre súpera v dráhe
-// (klon-návnada absorbuje úder skôr než súper) alebo na okraji plochy. Zásah = WOLF_MOON_DMG[moon] bez
+// (klon-návnada absorbuje úder skôr než súper), na Shrekovi (Shrek Swamp) alebo na okraji plochy. Zásah = WOLF_MOON_DMG[moon] bez
 // falloffu, cez obrany ako každý dmg special - vlkolak na bunke terča OSTÁVA STÁŤ aj pri bloku/odraze.
 // Bez terča je akcia len presun; charge z okrajovej bunky von sa VYKONÁ podľa wall pravidla.
 import { SPECIAL_COST, SMALL_DELAY_MS, WOLF_DIRS, WOLF_CAST_MS, WOLF_STRIKE_MS, WOLF_MOON_DMG, moonLevelFor } from "../constants.js";
@@ -26,9 +26,10 @@ export default {
       const foe = game.players[foeS];
       // dráha po prvú figúru: target null | "clone" | "player" | "stacked" (stacknutý pár = soak, nie plný bait);
       // Portal Realm: ortogonálny charge beží aj cez portály (diagonála do portálov nevchádza)
-      const { path, target, passes } = G.DIR4[dir] && ctx.portalList()
-        ? G.runPathPortals(game.board, actor.x, actor.y, dir, foe, ctx.portalList())
-        : { ...G.runPath(game.board, actor.x, actor.y, delta, foe), passes: [] };
+      // Shrek Swamp: živý Shrek charge zastaví ako súper (shrek = na cieľovej bunke stojí Shrek)
+      const { path, target, passes, shrek } = G.DIR4[dir] && ctx.portalList()
+        ? G.runPathPortals(game.board, actor.x, actor.y, dir, foe, ctx.portalList(), ctx.shrekCell())
+        : { ...G.runPath(game.board, actor.x, actor.y, delta, foe, ctx.shrekCell()), passes: [] };
       // charge do steny z okrajovej bunky - rozbehová póza + náraz (OUT OF BOUNDS)
       if (!path.length) {
         ctx.pushStateFrame(tl, [{ kind: "special", from: slot, dir, cells: [] }], WOLF_CAST_MS);
@@ -51,10 +52,12 @@ export default {
       // Portal Realm: telo dostane HP/manu, použité páry sa zatvoria
       for (const ps of passes) ctx.bodyEffect(slot, ps, tl);
       ctx.closePortals(passes.map(ps => ps.id), tl);
-      if (!target) return; // dobehol na okraj bez terča - len presun
+      if (!target && !shrek) return; // dobehol na okraj bez terča - len presun
       // seknutie (Attack_2) na bunke terča; dmg/block/odraz dopadne až po ňom
       ctx.pushStateFrame(tl, [{ kind: "wolf_strike", from: slot, cell: [actor.x, actor.y] }], WOLF_STRIKE_MS);
-      ctx.strikeCell(foeS, target, raw, tl, { kind: "special", bonus: pBonus });
+      if (target) ctx.strikeCell(foeS, target, raw, tl, { kind: "special", bonus: pBonus });
+      // Shrek Swamp: Shrek na bunke terča dostane rovnaký úder (po súperovi) - vlkolak stojí na jeho políčku → okamžitý rev
+      if (shrek) ctx.shrekMelee(slot, [[actor.x, actor.y]], [], raw, 0, tl);
     },
   },
 };

@@ -3,7 +3,7 @@
 // po už naplánovaných akciách.
 // hover preview pre special
 import { specialBtn, specialPicker, s1Picker, wolfPicker, meleeBtn, dashPicker, aimPickerDiag, aimPicker, shieldPicker, mirrorDefPicker } from "/client/dom.js";
-import { ghostCharAt, ghostPos, showPreviewCells, clearPreviewCells, cellsForAimPreview } from "/client/ghost.js";
+import { ghostCharAt, ghostPos, ghostShrek, showPreviewCells, clearPreviewCells, cellsForAimPreview } from "/client/ghost.js";
 import { specialTargetOf } from "/client/controls.js";
 import { cellsForSpecialPreview, cellsForJotaroS1, cellsForMeleePreview, cellsForVampChargePreview, cellsForBreakerPreview } from "/client/zones.js";
 import { state, me, otherSlot } from "/client/session.js";
@@ -45,7 +45,7 @@ wolfPicker?.querySelectorAll("button[data-act]").forEach(btn => {
     const p = ghostPos();
     const char = ghostCharAt();
     if (specialTargetOf(char) === "wolf" && p)
-      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, foe: state?.[otherSlot()] }, dir));
+      showPreviewCells(cellsForSpecialPreview({ x: p.x, y: p.y, char, foe: state?.[otherSlot()], shrek: ghostShrek() }, dir));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });
@@ -67,7 +67,7 @@ dashPicker?.querySelectorAll("button[data-act]").forEach(btn => {
     const p = ghostPos();
     const char = ghostCharAt();
     if (VAMP_CHARS[char] && p) // dash = charge
-      showPreviewCells(cellsForVampChargePreview(p, dir, state?.[otherSlot()]));
+      showPreviewCells(cellsForVampChargePreview(p, dir, state?.[otherSlot()], ghostShrek()));
   });
   btn.addEventListener("mouseleave", clearPreviewCells);
 });

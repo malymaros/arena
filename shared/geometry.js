@@ -25,19 +25,39 @@ export function figureAt(foe, x, y) {
   return playerHere ? "player" : null;
 }
 
+// Shrek Swamp: živý Shrek ako prekážka behu (charge) - { x, y } | null
+const shrekOn = (shrek, x, y) => !!shrek && shrek.x === x && shrek.y === y;
+
 // beh/strela z (x,y) smerom delta po okraj; ak je daný súper, zastaví sa na PRVEJ jeho figúre.
-// Vracia { path: [[x,y]…] (bez štartovej bunky), target: figureAt na poslednej bunke | null }.
+// shrek (Shrek Swamp) = bunka živého Shreka { x, y } | null - charge sa o neho zastaví ako o súpera.
+// Vracia { path: [[x,y]…] (bez štartovej bunky), target: figureAt na poslednej bunke | null,
+// shrek: true ak na poslednej bunke stojí Shrek (aj spolu so súperom) }.
 // Vlkolakov charge, charge Vampire/Onryō, ghost simulácia aj ich náhľady.
-export function runPath(board, x, y, delta, foe = null) {
+export function runPath(board, x, y, delta, foe = null, shrek = null) {
   const path = [];
-  let target = null;
+  let target = null, hitShrek = false;
   while (inBounds(board, x + delta[0], y + delta[1])) {
     x += delta[0]; y += delta[1];
     path.push([x, y]);
     target = figureAt(foe, x, y);
-    if (target) break;
+    hitShrek = shrekOn(shrek, x, y);
+    if (target || hitShrek) break;
   }
-  return { path, target };
+  return { path, target, shrek: hitShrek };
+}
+
+// Shrek Swamp: kde bude živý Shrek PRED akciou kroku `step` (0–2) - po každom kroku skočí na ďalšie ohlásené
+// políčko (marks), skamenený skok vynechá. Reakcie (tackle) ho vracajú na jeho políčko, takže poloha je daná
+// vopred; nepredvídateľná je len smrť uprostred kola (akceptovaná neistota ako pohyb súpera). null = žiadny živý Shrek.
+export function shrekCellAt(shrek, step) {
+  if (!shrek || shrek.dead || shrek.x == null) return null;
+  let x = shrek.x, y = shrek.y, stone = shrek.stone || 0;
+  const marks = shrek.marks || [];
+  for (let k = shrek.done || 0; k < step && k < marks.length; k++) {
+    if (stone > 0) stone--;
+    else [x, y] = marks[k];
+  }
+  return { x, y };
 }
 
 /* ---------- portály (Portal Realm, docs/PORTAL_PLAN.md) ---------- */
@@ -80,9 +100,9 @@ export function portalStep(board, portals, x, y, dir, closed = null) {
 // beh (charge) z (x, y) ortogonálnym smerom dir cez portály po PRVÚ figúru súpera alebo stenu; každý pár
 // sa v jednom behu použije najviac raz (po prechode sa zatvára). Bez portálov = runPath.
 // Vracia { path, target, passes: [{ at, ...portal }] } - at = index výstupnej bunky v path.
-export function runPathPortals(board, x, y, dir, foe = null, portals = null) {
+export function runPathPortals(board, x, y, dir, foe = null, portals = null, shrek = null) {
   const path = [], passes = [], closed = new Set();
-  let target = null;
+  let target = null, hitShrek = false;
   for (let guard = 0; guard < 64; guard++) {
     const st = portalStep(board, portals, x, y, dir, closed);
     if (!st) break;
@@ -90,9 +110,10 @@ export function runPathPortals(board, x, y, dir, foe = null, portals = null) {
     path.push([x, y]);
     if (st.portal) { passes.push({ at: path.length - 1, ...st.portal }); closed.add(st.portal.id); }
     target = figureAt(foe, x, y);
-    if (target) break;
+    hitShrek = shrekOn(shrek, x, y);
+    if (target || hitShrek) break;
   }
-  return { path, target, passes };
+  return { path, target, passes, shrek: hitShrek };
 }
 // rovná strela (náhľad mierenia / pre-scan): dolet `range` políčok spolu, cez portály (každý pár raz).
 // Vracia [{ x, y, dir, portal? }] - bunky letu; zastavenie o figúry rieši volajúci.
@@ -259,13 +280,16 @@ export function luffyBallCells(board, me, dir, portals = null) {
 // Vracia pole stavov dĺžky queue.length + 1: [0] = štart, [i + 1] = po akcii i ({ x, y, char, worldUsed }).
 // portals (Portal Realm) = portály na doske: pohyb/dash/charge/guľa nimi prechádza a použitý pár sa pre ďalšie
 // akcie fronty zatvorí (súperove prechody sa nesimulujú - akceptovaná neistota ako pri pasciach).
-export function simulateQueue(board, start, queue, foe, vampChars, portals = null) {
+// shrek (Shrek Swamp) = verejný stav Shreka (x, y, marks, stone, dead, done): charge sa zastaví na bunke, kde
+// bude Shrek v kroku akcie (shrekCellAt).
+export function simulateQueue(board, start, queue, foe, vampChars, portals = null, shrek = null) {
   let { x, y, char } = start;
   let worldUsed = !!start.worldUsed;
   let open = portals ? [...portals] : null; // dostupné páry (použité vypadávajú)
   const close = (ids) => { if (open && ids.length) open = open.filter(p => !ids.includes(p.id)); };
   const out = [{ x, y, char, worldUsed }];
-  for (const a of queue || []) {
+  for (const [i, a] of (queue || []).entries()) {
+    const sh = shrekCellAt(shrek, i);                                              // Shrek Swamp: Shrek v kroku akcie
     if (a?.type === "swap" && a.to) char = a.to;                                   // turnajový swap mení maga
     const d = DIR4[a?.dir];
     const walk = (n) => {
@@ -282,13 +306,13 @@ export function simulateQueue(board, start, queue, foe, vampChars, portals = nul
     if (a?.type === "move" && d) walk(1);
     if (a?.type === "dash" && d) {
       if (vampChars[char]) {                                                       // charge po prvú figúru/okraj
-        const r = runPathPortals(board, x, y, a.dir, foe, open);
+        const r = runPathPortals(board, x, y, a.dir, foe, open, sh);
         ({ x, y } = endOf(r, x, y)); close(r.passes.map(p => p.id));
       } else walk(2);
     }
     if (a?.type === "special" && char === "werewolf" && DIR8[a.dir]) {
-      if (DIR4[a.dir]) { const r = runPathPortals(board, x, y, a.dir, foe, open); ({ x, y } = endOf(r, x, y)); close(r.passes.map(p => p.id)); }
-      else ({ x, y } = endOf(runPath(board, x, y, DIR8[a.dir], foe), x, y));       // diagonála do portálov nevchádza
+      if (DIR4[a.dir]) { const r = runPathPortals(board, x, y, a.dir, foe, open, sh); ({ x, y } = endOf(r, x, y)); close(r.passes.map(p => p.id)); }
+      else ({ x, y } = endOf(runPath(board, x, y, DIR8[a.dir], foe, sh), x, y));       // diagonála do portálov nevchádza
     }
     // Luffy: guľa (pred prvým použitím v hre) ho prekotúľa o bunku ←/→; Special 2 po nej nehýbe
     if (a?.type === "special" && char === "luffy" && !worldUsed) {
