@@ -34,8 +34,8 @@ export const DIRECT = {
   portal_spawn: "portal.open", portal_close: "portal.close",
   // Shield / Mirror Breaker - lúč (okno = frame lúča: zohrievanie až po roztrieštenie, resp. krátky lúč)
   breaker: "breaker",
-  // Shrek Swamp: skok na políčko revu / zásah od hráča → hit, potom útok (rev, nafúknutie pred tacklom) → roar
-  shrek_jump: "shrek.hit", shrek_hit: "shrek.hit", shrek_roar: "shrek.roar", shrek_powerup: "shrek.roar",
+  // Shrek Swamp: zásah od hráča → hit (výkrik), potom útok (rev, nafúknutie pred tacklom) → roar; skoky 1/2/3 len roar
+  shrek_hit: "shrek.hit", shrek_roar: "shrek.roar", shrek_powerup: "shrek.roar",
 };
 // efekty opakované v po sebe idúcich frame-och (let strely po bunkách, beaty castu) → zaznejú raz za beh;
 // okno = celý beh. Melee sem nepatrí - zvuk úderu znie pri každom z 3 švihov.

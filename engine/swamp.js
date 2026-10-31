@@ -14,7 +14,7 @@
 // Továreň dostane E = vnútorný scope enginu (createEngine v engine/game.js), ako ostatné moduly mechaník.
 import {
   START_POS, SMALL_DELAY_MS, SHREK_HP, SHREK_ROAR_DMG, SHREK_RAGE_HP,
-  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_POWERUP_MS,
+  STENCH_DMG, START_HP, MAX_MANA, ITEMS_PER_ROUND, ITEM_WEIGHTS, ITEM_HEAL_GAIN, ITEM_MAX, SHREK_JUMP_MS, SHREK_ROAR_MS, SHREK_HIT_MS, SHREK_HIT_SOUND_MS, SHREK_CALL_MS, SHREK_POWERUP_MS,
   SHREK_TACKLE_MS, SHREK_RETURN_MS, SHREK_DIE_MS, STENCH_PROC_MS,
 } from "./constants.js";
 
@@ -158,9 +158,10 @@ function shrekStepEnd(k, tl, stoned) {
   const to = s.marks[k];
   if (!to) return;
   const from = [s.x, s.y];
+  // pred skokom bliká cieľové políčko ako vyhodnocovaná špeciálna dlaždica (bez výkriku - ten je len po zásahu)
+  E.pushStateFrame(tl, [{ kind: "shrek_call", cell: [...to], n: k + 1 }], SHREK_CALL_MS);
   s.x = to[0]; s.y = to[1]; s.done = k + 1;
   E.pushStateFrame(tl, [{ kind: "shrek_jump", from, to: [...to], n: k + 1 }], SHREK_JUMP_MS);
-  E.pushStateFrame(tl, [], SHREK_HIT_SOUND_MS - SHREK_JUMP_MS); // zvuk hitu dohrá celý, až potom rev
   roar(tl, stoned);
 }
 
@@ -209,7 +210,8 @@ function damageShrek(atkSlot, raw, tl) {
   s.hp = Math.max(0, s.hp - raw);
   E.pushStateFrame(tl, [{ kind: "shrek_hit", from: atkSlot, cell: [s.x, s.y], dmg: raw }], SHREK_HIT_MS);
   if (s.hp > 0) {
-    E.pushStateFrame(tl, [], SHREK_HIT_SOUND_MS - SHREK_HIT_MS); // zvuk hitu dohrá celý, až potom reakcia (rev / tackle)
+    // výkrik po zásahu (zvuk hitu dohrá celý), Shrekovo políčko bliká - až potom reakcia (rev / tackle)
+    E.pushStateFrame(tl, [{ kind: "shrek_scream", cell: [s.x, s.y] }], SHREK_HIT_SOUND_MS - SHREK_HIT_MS);
     return false;
   }
   s.dead = true;

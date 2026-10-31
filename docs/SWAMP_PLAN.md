@@ -70,11 +70,12 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
 
 ### Zvuky Shreka
 
-- `shrek.hit` (`custom/shrek/shrek-hit.mp3`, 3,3 s) zaznie pri skoku na políčko revu (`shrek_jump`) a keď Shreka
-  zasiahne hráč (`shrek_hit`). `shrek.roar` (`custom/shrek/shrek-roar.mp3`) zaznie pri reve (`shrek_roar`) a pri
-  nafúknutí pred tacklom (`shrek_powerup`). Hlasitosť oboch je −18 LUFS (`node tools/voice-loudness.mjs`).
-- Hit vždy dohrá celý, až potom príde rev: za skokom aj za zásahom je pauza do `SHREK_HIT_SOUND_MS` (3,3 s,
-  `shared/timing.js`; po výmene nahrávky ju treba zmeniť). Kolo s tromi skokmi je tým o ~8 s dlhšie.
+- **Skok 1/2/3:** cieľové políčko krátko blikne ako vyhodnocovaná špeciálna dlaždica (`shrek_call`, `SHREK_CALL_MS`
+  600 ms), potom skok a rev so zvukom `shrek.roar` (`custom/shrek/shrek-roar.mp3`).
+- **Zásah hráčom:** `shrek.hit` (`custom/shrek/shrek-hit.mp3`, 3,3 s) dohrá celý, Shrek pritom kričí (H_Roar v slučke)
+  a jeho políčko bliká (`shrek_hit` + `shrek_scream`, spolu `SHREK_HIT_SOUND_MS`; po výmene nahrávky treba zmeniť).
+  Až potom príde rev alebo nafúknutie pred tacklom (`shrek_powerup`), oboje so zvukom `shrek.roar`.
+- Hlasitosť oboch zvukov je −18 LUFS (`node tools/voice-loudness.mjs`).
 
 ### Hudba
 

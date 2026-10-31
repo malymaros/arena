@@ -11,12 +11,12 @@ import { perf } from "/client/perf.js";
 import { SHREK_RAGE_HP } from "/shared/balance.js";
 
 const DIR = "/assets/shrek/";
-const K = 2.15;                      // mierka sprite-u (~45 px Shrek → ~95 px)
+const K = 4.3;                       // mierka sprite-u (~45 px Shrek → ~190 px, o niečo väčší než mágovia)
 const CW = Math.round(96 * K), CH = CW; // canvas: najväčší pás (88 px) + rezerva
 const SIDE = 62;                     // odsun Shreka nabok, keď s ním na políčku stojí hráč (hráča odsúva pairShift)
 const META = {};
 let ready = false;
-fetch(DIR + "anims.json").then(r => r.json()).then(list => Promise.all(list.filter(m => !m.name.startsWith("H_")).map(m =>
+fetch(DIR + "anims.json").then(r => r.json()).then(list => Promise.all(list.filter(m => !m.name.startsWith("H_") || m.name === "H_Roar").map(m =>
   new Promise(res => { const img = new Image(); img.onload = () => { META[m.name] = { ...m, img }; res(); }; img.onerror = res; img.src = DIR + m.name + ".png"; }))))
   .then(() => { ready = true; }).catch(() => {});
 
@@ -25,6 +25,7 @@ const view = { anim: "Idle", start: 0, ms: 0, flip: false, px: null, py: null, m
 let roar = null;                     // { cells, until } - rozsvietené políčka revu (kríž)
 let freshStench = new Map();         // "x,y" → do kedy sa bunka smradu „rozlieva" (animácia nástupu)
 const flashCells = new Map();        // "x,y" → do kedy bliká (stench_proc)
+const alertCells = new Map();        // "x,y" → do kedy bliká ako vyhodnocovaná dlaždica (výkrik: cieľ skoku / zasiahnutý Shrek)
 const freshItems = new Map();        // "x,y" → do kedy item „padá" (item_drop)
 
 function ensureEls() {
@@ -108,6 +109,11 @@ export function renderShrek(s) {
     const [x, y] = k.split(",").map(Number);
     cells[y * w + x]?.classList.add("stench-flash");
   }
+  for (const [k, until] of alertCells) {
+    if (until < now) { alertCells.delete(k); continue; }
+    const [x, y] = k.split(",").map(Number);
+    cells[y * w + x]?.classList.add("shrek-alert");
+  }
   if (view.px == null || (!view.motion && !sh.dead)) {
     const p = restPos(sh);
     if (view.px == null) { view.px = p.x; view.py = p.y; }
@@ -140,7 +146,7 @@ export function shrekEffect(e, hold) {
       if (view.px == null) { view.px = fromC.x; view.py = fromC.y; }
       view.flip = to.x < view.px;
       play("JumpKick", hold);
-      moveTo(to, hold * 0.85, 90);
+      moveTo(to, hold * 0.85, 150);
       break;
     }
     case "shrek_roar":
@@ -151,6 +157,15 @@ export function shrekEffect(e, hold) {
     case "shrek_hit":
       view.hurtUntil = now + 350;
       floatOverShrek(`-${e.dmg} HP`, "dmg-float");
+      break;
+    // políčko bliká ako vyhodnocovaná špeciálna dlaždica: pred skokom 1/2/3 cieľ skoku (Shrek len stojí),
+    // po zásahu hráčom Shrekovo políčko + výkrik (zvuk shrek.hit) s H_Roar v slučke
+    case "shrek_call":
+    case "shrek_scream":
+      if (e.kind === "shrek_scream") play("H_Roar");
+      else view.flip = cellCenter(e.cell[0], e.cell[1]).x < view.px;
+      alertCells.set(`${e.cell[0]},${e.cell[1]}`, now + hold);
+      gridEl.children[e.cell[1] * (state?.board?.w || 4) + e.cell[0]]?.classList.add("shrek-alert");
       break;
     case "shrek_powerup":
       view.flip = e.dir === "left";
@@ -201,7 +216,7 @@ function floatOverShrek(text, cls) {
   el.className = cls;
   el.textContent = text;
   el.style.left = view.px + "px";
-  el.style.top = (view.py - 150) + "px";
+  el.style.top = (view.py - 250) + "px";
   actorsEl.appendChild(el);
   setTimeout(() => el.remove(), 1000);
 }
@@ -248,7 +263,7 @@ function tick(now) {
   const hurt = now < view.hurtUntil;
   const key = `${view.anim}|${f}|${view.flip}|${hurt}`;
   fig.style.transform = `translate(${Math.round(view.px - CW / 2)}px, ${Math.round(view.py - CH - lift)}px)`;
-  hpEl.style.transform = `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 128)}px)`;
+  hpEl.style.transform = `translate(${Math.round(view.px)}px, ${Math.round(view.py - lift - 232)}px)`;
   if (key === view.lastKey) return;
   view.lastKey = key;
   const g = fig.getContext("2d");

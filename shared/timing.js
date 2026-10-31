@@ -144,9 +144,10 @@ export const COLOR_ROLL_MS = COLOR_ROLL_SPIN_MS + COLOR_ROLL_RESULT_MS + COLOR_R
 export const SHREK_JUMP_MS    = 550;  // skok (oblúk) na ďalšie políčko
 export const SHREK_ROAR_MS    = 750;  // rev - kríž okolo dopadu sa rozsvieti, zásahy padnú v ďalšom frame
 export const SHREK_HIT_MS     = 450;  // Shreka niekto zasiahol (float nad ním)
-// zvuk shrek.hit (skok na políčko revu / zásah hráčom) dohrá celý, až potom príde rev / nafúknutie pred tacklom -
-// za skokom aj za zásahom je pauza do tejto dĺžky (= dĺžka nahrávky public/sounds/custom/shrek/shrek-hit.mp3)
+// zásah hráčom: zvuk shrek.hit dohrá celý (shrek_hit + výkrik shrek_scream spolu), až potom rev / nafúknutie pred
+// tacklom (= dĺžka public/sounds/custom/shrek/shrek-hit.mp3)
 export const SHREK_HIT_SOUND_MS = 3300;
+export const SHREK_CALL_MS    = 600;  // pred skokom 1/2/3 bliká cieľové políčko (ako vyhodnocovaná špeciálna dlaždica)
 export const SHREK_POWERUP_MS = 900;  // nafúknutie pred tacklom
 export const SHREK_TACKLE_MS  = 600;  // beh po riadku po prvú figúru / okraj (zásah v ďalšom frame)
 export const SHREK_RETURN_MS  = 600;  // návrat na štartové políčko

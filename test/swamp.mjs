@@ -4,7 +4,7 @@
 // Spustenie: node test/swamp.mjs  (súčasť npm test)
 import { createEngine } from "../engine/game.js";
 import { SHREK_HP } from "../shared/balance.js";
-import { SHREK_HIT_SOUND_MS, SHREK_JUMP_MS } from "../shared/timing.js";
+import { SHREK_HIT_SOUND_MS, SHREK_JUMP_MS, SHREK_CALL_MS } from "../shared/timing.js";
 
 let failures = 0, passes = 0;
 function check(cond, label, detail = "") {
@@ -99,9 +99,10 @@ console.log("Skoky a rev (veža)");
   const firstJump = idx(tl, e => e.kind === "shrek_jump");
   const actions = tl.slice(0, firstJump).flatMap(f => (f.effects || []).filter(e => e.kind === "action"));
   check(actions.length === 2, "R6: skok 1 až po 1. akcii oboch hráčov", String(actions.length));
-  const j1 = idx(tl, e => e.kind === "shrek_jump"), r1 = idx(tl, e => e.kind === "shrek_roar");
-  check(r1 === j1 + 2 && tl[j1].delayMs + tl[j1 + 1].delayMs === SHREK_HIT_SOUND_MS && tl[j1].delayMs === SHREK_JUMP_MS,
-    "R6b: po skoku rev až keď dohrá zvuk hitu", J([j1, r1]));
+  const c1 = idx(tl, e => e.kind === "shrek_call"), j1 = idx(tl, e => e.kind === "shrek_jump"), r1 = idx(tl, e => e.kind === "shrek_roar");
+  check(j1 === c1 + 1 && r1 === j1 + 1 && tl[c1].delayMs === SHREK_CALL_MS && tl[j1].delayMs === SHREK_JUMP_MS
+    && J(fx(tl, "shrek_call")[0].cell) === "[0,0]" && tl[c1].shrek.x === 1 && !fx(tl, "shrek_scream").length,
+    "R6b: krátky blik cieľa → skok → rev (bez výkriku); počas bliku Shrek stojí", J([c1, j1, r1]));
 
   for (const [hp, dmg] of [[10, 2], [6, 2], [5, 3], [1, 3]]) {
     const t = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, hp, marks: [[0, 0], [2, 0], [1, 0]] }));
@@ -124,7 +125,8 @@ console.log("Reakcie na zásah");
   check(s.game.shrek.hp === SHREK_HP - 3, "A1: strela sa zastaví o Shreka (3 dmg zblízka)", String(s.game.shrek.hp));
   check(p2.hp === 10, "A2: súper za Shrekom nedostane nič", String(p2.hp));
   const hitAt = idx(tl, e => e.kind === "shrek_hit"), roarAt = idx(tl, e => e.kind === "shrek_roar");
-  check(hitAt >= 0 && roarAt === hitAt + 2 && J(fx(tl, "shrek_roar")[0].cell) === "[1,1]" && tl[hitAt].delayMs + tl[hitAt + 1].delayMs === SHREK_HIT_SOUND_MS,
+  check(hitAt >= 0 && roarAt === hitAt + 2 && J(fx(tl, "shrek_roar")[0].cell) === "[1,1]" && tl[hitAt].delayMs + tl[hitAt + 1].delayMs === SHREK_HIT_SOUND_MS
+    && J(fx([tl[hitAt + 1]], "shrek_scream")[0]?.cell) === "[1,1]",
     "A3: strela → rev po zásahu, až keď dohrá zvuk hitu", J([hitAt, roarAt]));
   check(p1.hp === 9 && p1.mana === 6 - 1 - 2 - 2, "A4: rev zasiahne strelca stojaceho vedľa Shreka (1 dmg), mana sa nemení", J([p1.hp, p1.mana]));
   check(!tl.some(f => (f.effects || []).some(e => e.kind === "shrek_barrel" || e.kind === "shrek_punch" || e.kind === "shrek_mana")), "A5: žiadny sud, punch ani strata many");

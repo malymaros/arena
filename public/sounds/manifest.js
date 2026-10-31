@@ -116,7 +116,7 @@ export const SOUNDS = {
   "tile_consume": { files: [UI + "drop_002.ogg"], vol: 0.5, status: "default", note: "Fire/power tile spotrebovaná" },
 
   /* ---------- Shrek Swamp ---------- */
-  "shrek.hit":    { files: ["custom/shrek/shrek-hit.mp3"], vol: 0.47, fit: "keep", status: "picked", note: "Shrek skáče na políčko revu (shrek_jump) alebo ho zasiahol hráč (shrek_hit) - vždy pred revom" },
+  "shrek.hit":    { files: ["custom/shrek/shrek-hit.mp3"], vol: 0.47, fit: "keep", status: "picked", note: "Shreka zasiahol hráč (shrek_hit) - výkrik dohrá celý, až potom rev / tackle" },
   "shrek.roar":   { files: ["custom/shrek/shrek-roar.mp3"], vol: 0.3, fit: "keep", status: "picked", note: "Shrekov útok: rev (shrek_roar) a nafúknutie pred tacklom (shrek_powerup)" },
 
   /* ---------- statusy a mechaniky ---------- */
