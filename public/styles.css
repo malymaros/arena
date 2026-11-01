@@ -1741,7 +1741,7 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .cell.tile-stench { background: rgba(182,232,70,.26); box-shadow: inset 0 0 0 3px #b6e846; animation: ik-pulse 1s ease-in-out infinite; } /* pulzuje ako IK */
 .cell.stench-fresh .stench-marker { animation: stench-in .9s ease-out; }
 @keyframes stench-in { from { opacity: 0; transform: scale(.3); } }
-.cell.stench-flash { background: rgba(182,232,70,.45); }
+.cell.tile-stench.tile-proc { animation: tile-proc-blink 300ms ease-in-out 2; } /* vyhodnocovanie = žltý blik ako dmg dlaždica (prebije ik-pulse) */
 .shrek-roar-float { position: absolute; transform: translateX(-50%); color: #e9ff7a; font-weight: 900; font-size: 22px; letter-spacing: 2px;
   text-shadow: 2px 2px 0 #000, 0 0 12px rgba(160,230,40,.9); animation: floatUp 1s ease-out forwards; pointer-events: none; z-index: 9; }
 /* Shrekov výkrik: políčko (cieľ skoku / zasiahnutý Shrek) bliká ako vyhodnocovaná špeciálna dlaždica, kým výkrik trvá */
@@ -3169,7 +3169,7 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .perf-lite .hud-box.death-golden .bar { animation: none; box-shadow: 0 0 0 2px #000, 0 0 10px 1px rgba(255,210,74,.8); }
 .perf-lite .hud-box.hope-red .bar     { animation: none; box-shadow: 0 0 0 2px #000, 0 0 10px 1px rgba(255,70,70,.8); }
 /* IK dlaždice (sú na ploche skoro stále) - bez pulzu jasu */
-.perf-lite .cell.tile-ik, .perf-lite .cell.tile-stench { animation: none; }
+.perf-lite .cell.tile-ik:not(.tile-proc), .perf-lite .cell.tile-stench:not(.tile-proc) { animation: none; } /* krátky proc blik ostáva aj v lite */
 /* portrét pri kritickom HP a max level ikony - statické */
 .perf-lite .hud-char.critical { animation: none;
   filter: saturate(.35) brightness(.62) sepia(.85) hue-rotate(-35deg) drop-shadow(0 0 12px rgba(255,20,20,.8)); }

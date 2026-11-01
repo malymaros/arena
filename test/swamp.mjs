@@ -332,6 +332,16 @@ console.log("Labyrint (redakcia)");
   const vw = JSON.parse(JSON.stringify(w.e.redactTimelineFor("p2", tlw)));
   check(fx(tlw, "shrek_tackle")[0]?.target === "p1", "L4: special lovca zboku → tackle k lovcovi");
   check(!fx(vw, "shrek_tackle").length && !fx(vw, "shrek_return").length, "L5: prekliaty nevidí tackle ani návrat (bunka lovca)");
+  // smrad: blik stench_proc na lovcovej bunke by prezradil jeho pozíciu - prekliaty vidí len blik vlastnej bunky (ako tile_proc)
+  const st = scenario("fire", "minotaur", (g) => {
+    shrekSet(g, { x: 1, y: 1, dead: true, hp: 0, marks: [], stench: [[0, 0], [3, 1]] });
+    g.players.p1.x = 0; g.players.p1.y = 0;
+    Object.assign(g.players.p1, { labyrinth: true, thread: [[0, 0]] });
+  });
+  const tls = st.round(PASS3, PASS3);
+  const vs = JSON.parse(JSON.stringify(st.e.redactTimelineFor("p1", tls)));
+  check(fx(tls, "stench_proc").some(e => J(e.cell) === "[3,1]") && fx(vs, "stench_proc").length === 3 && fx(vs, "stench_proc").every(e => J(e.cell) === "[0,0]"),
+    "L6: prekliaty nevidí stench_proc na bunke lovca, len na svojej", J(fx(vs, "stench_proc")));
 }
 
 /* ==================== Obrany proti Shrekovej reakcii ==================== */

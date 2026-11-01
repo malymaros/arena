@@ -32,7 +32,7 @@ export default function escanorFx(C) {
   // odvtedy je idle Stand. transformed drží, či daný slot už premenu odohral; prevChar deteguje (re)nasadenie.
   let transformed = { p1: false, p2: false };
   const prevChar = { p1: null, p2: null };
-  let specialFired = false; // celá choreografia sa spustí len raz za special (nie na každom beate)
+  let specialFired = { p1: false, p2: false }; // choreografia sa spustí raz za special (nie na každom beate) - per slot, Escanor vs Escanor hrá obe
 
   // FX (WinSun, melee center, letiace slnko, výbuch, charge strela) škálujú s Pridom rovnako ako telo:
   // pride0 = súčasná (autorská) veľkosť ako u ostatných postáv, rast NAD ňu (1.2^pride, pride3 ≈ 1.73×) - nikdy menšie.
@@ -259,7 +259,7 @@ export default function escanorFx(C) {
     // začiatok prehrávania kola: zruš zvyšky choreografie a RAZ prehraj premenu (WeakIdle→Stand) pred prvými
     // akciami; ak sú dvaja Escanori, paralelne. Timeline sa o dĺžku premeny oneskorí (len prvé kolo po nasadení).
     roundIntro() {
-      specialFired = false; // choreografia specialu sa spustí max raz za kolo
+      specialFired = { p1: false, p2: false }; // choreografia specialu sa spustí max raz za kolo na slot
       C.actorsEl.querySelectorAll(".sun-fx, .esc-big").forEach(n => n.remove());
       let delay = 0;
       for (const slot of ["p1", "p2"]) {
@@ -276,8 +276,8 @@ export default function escanorFx(C) {
     effect(e) {
       // special fáza 2: po caste (WinSun+Win) malá postava prejde na CruelSunHold a na cieľovej bunke
       // (políčko pred Escanorom v zvolenom smere) sa prehrá SunBurst→SunFade. Spustí sa RAZ za special.
-      if (e.kind === "special" && !specialFired) {
-        specialFired = true;
+      if (e.kind === "special" && !specialFired[e.from]) {
+        specialFired[e.from] = true;
         // offboard = hod do autu: slnko odletí von z plochy a vyhasne (bez burstu), OUT OF BOUNDS float
         runSpecial(e.from, e.dir, e.cells, !!e.offboard, e.portal || null); // WinSun (raz) → CruelSunHold → slnko na cieľ → SunBurst (blik políčok) → dmg → SunFade
       }

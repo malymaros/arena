@@ -120,7 +120,7 @@ export function renderShrek(s) {
   for (const [k, until] of flashCells) {
     if (until < now) { flashCells.delete(k); continue; }
     const [x, y] = k.split(",").map(Number);
-    cells[y * w + x]?.classList.add("stench-flash");
+    cells[y * w + x]?.classList.add("tile-proc"); // žltý blik ako vyhodnocovaná dmg dlaždica
   }
   for (const [k, until] of alertCells) {
     if (until < now) { alertCells.delete(k); continue; }

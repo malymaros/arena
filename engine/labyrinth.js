@@ -85,8 +85,8 @@ function redactEffect(mySlot, oppSlot, e, frame) {
   }
   if (e.from === oppSlot && e.kind !== "beat_empty") return null; // charge/special/melee/recharge/gold/demon… prezrádzajú pozíciu alebo úmysel
   if (e.target === oppSlot) return null;                          // hit/heal/invalid na súperovi (napr. tile dmg) = pozícia
-  if (e.kind === "tile_proc") {
-    // tiles samotné prekliaty vidí, ale PROC blik cudzej bunky = súper na nej stojí → len vlastná bunka
+  if (e.kind === "tile_proc" || e.kind === "stench_proc") {
+    // tiles/smrad samotné prekliaty vidí, ale PROC blik cudzej bunky = súper na nej stojí → len vlastná bunka
     const p = frame[mySlot];
     if (!p || !Array.isArray(e.cell) || e.cell[0] !== p.x || e.cell[1] !== p.y) return null;
   }
