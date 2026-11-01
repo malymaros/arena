@@ -47,21 +47,23 @@ function render() {
   const fsLabel = document.fullscreenElement ? "EXIT FULL SCREEN" : "FULL SCREEN";
   const admin = isAdmin();
   if (!admin) adminOn = false;
-  const head = `<div class="um-head"><span>MENU</span><button type="button" class="um-close" aria-label="Close">✕</button></div>${
-    admin ? `<button type="button" class="menu-admin${adminOn ? " on" : ""}" aria-pressed="${adminOn}">ADMIN</button>` : ""}`;
-  if (adminOn) {
-    panel.innerHTML = head
-      + item("data", "download", "DOWNLOAD DATA", "menu-data")
-      + (inRoom() ? item("reset-room", "resetRoom", "RESET THIS ROOM", "danger") : "")
-      + item("reset-all", "resetAll", "RESET ALL ROOMS", "danger");
-    return;
-  }
-  panel.innerHTML = head
-    + item("reload", "reload", "RELOAD GAME")
+  // admin: prepínač ADMIN v hlavičke vedľa ✕ (nie samostatný riadok)
+  const head = `<div class="um-head"><span>MENU</span>${
+    admin ? `<button type="button" class="menu-admin${adminOn ? " on" : ""}" aria-pressed="${adminOn}">ADMIN</button>` : ""
+  }<button type="button" class="um-close" aria-label="Close">✕</button></div>`;
+  const main = item("reload", "reload", "RELOAD GAME")
     + (canFullscreen ? item("fullscreen", "fullscreen", fsLabel) : "")
     + item("sound", "sound", "SOUND")
     + item("graphics", "graphics", `GRAPHICS: ${perf.lite ? "LITE" : "FULL"}`)
     + item("bug", "bug", "REPORT BUG", "report");
+  if (!admin) { panel.innerHTML = head + main; return; }
+  // admin: obe strany v jednej bunke mriežky, neaktívna je neviditeľná - okno má stále rovnakú veľkosť a neskáče
+  const adminItems = item("data", "download", "DOWNLOAD DATA", "menu-data")
+    + (inRoom() ? item("reset-room", "resetRoom", "RESET THIS ROOM", "danger") : "")
+    + item("reset-all", "resetAll", "RESET ALL ROOMS", "danger");
+  panel.innerHTML = `${head}<div class="menu-pages">
+    <div class="menu-page${adminOn ? " off" : ""}">${main}</div>
+    <div class="menu-page${adminOn ? "" : " off"}">${adminItems}</div></div>`;
 }
 export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
 export function closeMenu() { backdrop.classList.add("hidden"); panel.classList.add("hidden"); }

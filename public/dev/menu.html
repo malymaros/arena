@@ -33,12 +33,13 @@
 </style>
 </head>
 <body>
-<div id="dev-bar"><b>Návrh menu ☰</b> — väčšie pixel ikonky (24 px, biele s čiernym tieňom), REPORT BUG s bielym chrobáčikom, admin: jediný prepínač ADMIN (vypnutý / zapnutý = červený), poradie DOWNLOAD DATA → RESET THIS ROOM → RESET ALL ROOMS. Vľavo pôvodný stav na porovnanie.</div>
+<div id="dev-bar"><b>Návrh menu ☰</b> — väčšie pixel ikonky (24 px, biele s čiernym tieňom), REPORT BUG s bielym chrobáčikom, admin: prepínač ADMIN v hlavičke vedľa ✕ (vypnutý / zapnutý = červený, okno pri prepnutí neskáče), poradie DOWNLOAD DATA → RESET THIS ROOM → RESET ALL ROOMS. Vľavo pôvodný stav na porovnanie.</div>
 <div class="row" id="out"></div>
 <script type="module">
   import { menuIcon } from "/client/menu-icons.js";
-  const head = (tabs, on) => `<div class="um-head"><span>MENU</span><button type="button" class="um-close">✕</button></div>${tabs ? `<div class="menu-tabs">
-    <button type="button" class="menu-tab admin${on === "admin" ? " on" : ""}">ADMIN</button></div>` : ""}`;
+  // ADMIN v hlavičke vedľa ✕ (ako client/menu.js); kliknutím sa dá prepínať
+  const head = (tabs, on) => `<div class="um-head"><span>MENU</span>${tabs ? `<button type="button" class="menu-admin${on === "admin" ? " on" : ""}">ADMIN</button>` : ""}<button type="button" class="um-close">✕</button></div>`;
+  const pages = (on) => `<div class="menu-pages"><div class="menu-page${on === "admin" ? " off" : ""}">${MAIN}</div><div class="menu-page${on === "admin" ? "" : " off"}">${ADMIN}</div></div>`;
   const item = (ico, lbl, cls = "") => `<button type="button" class="menu-item ${cls}"><span class="ico-box">${menuIcon(ico)}</span><span class="menu-lbl">${lbl}</span></button>`;
   const MAIN = item("reload", "RELOAD GAME") + item("fullscreen", "FULL SCREEN") + item("sound", "SOUND")
     + item("graphics", "GRAPHICS: LITE") + item("bug", "REPORT BUG", "report");
@@ -51,8 +52,13 @@
   document.getElementById("out").innerHTML =
     panel("Pôvodne", "", head(false) + OLD)
     + panel("Návrh — hráč", "new", head(false) + MAIN)
-    + panel("Návrh — admin, ADMIN vypnutý", "new", head(true, "main") + MAIN)
-    + panel("Návrh — admin, ADMIN zapnutý", "new", head(true, "admin") + ADMIN);
+    + panel("Návrh — admin, ADMIN vypnutý (klikni na ADMIN)", "new", head(true, "main") + pages("main"))
+    + panel("Návrh — admin, ADMIN zapnutý (klikni na ADMIN)", "new", head(true, "admin") + pages("admin"));
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest(".menu-admin"); if (!b) return;
+    const on = b.classList.toggle("on");
+    b.closest(".ui-modal").querySelectorAll(".menu-page").forEach((p, i) => p.classList.toggle("off", on ? i === 0 : i === 1));
+  });
 </script>
 </body>
 </html>

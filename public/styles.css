@@ -3182,10 +3182,14 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .menu-item.report:hover { background: #8e6c10; }
 .menu-item.menu-data { background: #2f5a1f; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #4f8a35, inset -2px -2px 0 #16290e; }
 .menu-item.menu-data:hover { background: #3a6e26; }
-/* admin: prepínač ADMIN pod hlavičkou - vypnutý tmavý, zapnutý červený */
-.ui-modal .menu-admin { min-height: 36px; flex: none; font-size: 10px; letter-spacing: 2px; background: #1c1610; color: #8a7f6a;
+/* admin: prepínač ADMIN v hlavičke vľavo od ✕ (rovnako vysoký) - vypnutý tmavý, zapnutý červený */
+.ui-modal .menu-admin { height: 40px; flex: none; margin: 0 12px 0 auto; padding: 0 14px; font-size: 10px; letter-spacing: 2px; background: #1c1610; color: #8a7f6a;
   box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #000; }
 .ui-modal .menu-admin.on { background: #5a1a1a; color: #ffd0c0; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #8e2a2a, inset -2px -2px 0 #2a0b0b; }
+/* admin: bežné aj admin položky v jednej bunke mriežky (menu.js) - veľkosť okna = väčšia z nich, prepnutie neskáče */
+.menu-pages { display: grid; flex: none; }
+.menu-page { grid-area: 1 / 1; display: flex; flex-direction: column; gap: 8px; }
+.menu-page.off { visibility: hidden; }
 
 /* zvukové okno: MUTE + 3 riadky [label][−][posuvník][+][%] */
 #sound-win .snd-mute { display: flex; align-items: center; gap: 12px; min-height: 40px; cursor: pointer; text-shadow: 2px 2px 0 #000; }
