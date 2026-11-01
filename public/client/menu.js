@@ -1,15 +1,16 @@
 // public/client/menu.js - menu ☰ v ľavom dolnom rohu, dostupné vždy (aj nad char-selectom, lobby, zoznamom
 // roomiek a zaseknutými overlaymi): RELOAD GAME (= obnovenie stránky; server hráča vráti na jeho miesto),
 // celá obrazovka (kde to prehliadač vie), zvuk (okno zo sound-ui.js), REPORT BUG (okno z bug-report.js) a pre admina (prihlásený admin heslom)
-// reset tejto roomky / všetkých roomiek a stiahnutie zozbieraných herných dát (docs/TELEMETRY.md) - admin má hore
-// prepínač MENU | ADMIN (admin položky na vlastnej karte, menu sa tak vojde aj na telefón bez rolovania; bežný hráč
-// prepínač nevidí). GRAPHICS prepína úspornú grafiku LITE ↔ FULL (perf.js; kým hráč neklikne, platí auto). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
+// stiahnutie zozbieraných herných dát (docs/TELEMETRY.md) a reset tejto roomky / všetkých roomiek - admin má hore
+// prepínač ADMIN (zapnutý = červený, admin položky namiesto bežných - menu sa tak vojde aj na telefón bez rolovania;
+// bežný hráč prepínač nevidí). Položky majú pixel ikonky (menu-icons.js); REPORT BUG je žltý, DOWNLOAD DATA zelený. GRAPHICS prepína úspornú grafiku LITE ↔ FULL (perf.js; kým hráč neklikne, platí auto). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
 import { socket } from "/client/net.js";
 import { isAdmin, onAdminChange } from "/client/admin-state.js";
 import { canFullscreen, toggleFullscreen } from "/client/viewport.js";
 import { openSoundWindow } from "/client/sound-ui.js";
 import { openBugWindow } from "/client/bug-report.js";
 import { perf, setPerfMode } from "/client/perf.js";
+import { menuIcon } from "/client/menu-icons.js";
 
 // pixel-art ☰ 12×12
 const ICON = ["............", "............", ".bbbbbbbbbb.", ".bbbbbbbbbb.", "............", ".bbbbbbbbbb.",
@@ -36,30 +37,31 @@ document.body.append(backdrop, panel, btn);
 const inRoom = () => document.getElementById("rooms")?.classList.contains("hidden") !== false
   && document.getElementById("login")?.classList.contains("hidden") !== false && socket.connected;
 
-let tab = "main"; // admin: "main" | "admin"
+let adminOn = false; // admin: prepínač ADMIN zapnutý = admin položky namiesto bežného menu
+
+// položka = pixel ikonka (menu-icons.js) + text
+const item = (act, icon, label, cls = "") =>
+  `<button type="button" class="menu-item${cls ? " " + cls : ""}" data-act="${act}"><span class="ico-box">${menuIcon(icon)}</span><span class="menu-lbl">${label}</span></button>`;
 
 function render() {
   const fsLabel = document.fullscreenElement ? "EXIT FULL SCREEN" : "FULL SCREEN";
   const admin = isAdmin();
-  if (!admin) tab = "main";
+  if (!admin) adminOn = false;
   const head = `<div class="um-head"><span>MENU</span><button type="button" class="um-close" aria-label="Close">✕</button></div>${
-    admin ? `<div class="menu-tabs">
-      <button type="button" class="menu-tab${tab === "main" ? " on" : ""}" data-tab="main">MENU</button>
-      <button type="button" class="menu-tab admin${tab === "admin" ? " on" : ""}" data-tab="admin">ADMIN</button>
-    </div>` : ""}`;
-  if (tab === "admin") {
-    panel.innerHTML = `${head}
-      ${inRoom() ? `<button type="button" class="menu-item danger" data-act="reset-room">✖ RESET THIS ROOM</button>` : ""}
-      <button type="button" class="menu-item menu-data" data-act="data">⬇ DOWNLOAD DATA</button>
-      <button type="button" class="menu-item danger" data-act="reset-all">✖ RESET ALL ROOMS</button>`;
+    admin ? `<button type="button" class="menu-admin${adminOn ? " on" : ""}" aria-pressed="${adminOn}">ADMIN</button>` : ""}`;
+  if (adminOn) {
+    panel.innerHTML = head
+      + item("data", "download", "DOWNLOAD DATA", "menu-data")
+      + (inRoom() ? item("reset-room", "resetRoom", "RESET THIS ROOM", "danger") : "")
+      + item("reset-all", "resetAll", "RESET ALL ROOMS", "danger");
     return;
   }
-  panel.innerHTML = `${head}
-    <button type="button" class="menu-item" data-act="reload">⟳ RELOAD GAME</button>
-    ${canFullscreen ? `<button type="button" class="menu-item" data-act="fullscreen">⛶ ${fsLabel}</button>` : ""}
-    <button type="button" class="menu-item" data-act="sound">♪ SOUND</button>
-    <button type="button" class="menu-item" data-act="graphics">◐ GRAPHICS: ${perf.lite ? "LITE" : "FULL"}</button>
-    <button type="button" class="menu-item" data-act="bug">REPORT BUG</button>`;
+  panel.innerHTML = head
+    + item("reload", "reload", "RELOAD GAME")
+    + (canFullscreen ? item("fullscreen", "fullscreen", fsLabel) : "")
+    + item("sound", "sound", "SOUND")
+    + item("graphics", "graphics", `GRAPHICS: ${perf.lite ? "LITE" : "FULL"}`)
+    + item("bug", "bug", "REPORT BUG", "report");
 }
 export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
 export function closeMenu() { backdrop.classList.add("hidden"); panel.classList.add("hidden"); }
@@ -72,8 +74,7 @@ onAdminChange(() => { if (!panel.classList.contains("hidden")) render(); });
 
 panel.addEventListener("click", (ev) => {
   if (ev.target.closest(".um-close")) { closeMenu(); return; }
-  const t = ev.target.closest(".menu-tab")?.dataset.tab;
-  if (t) { tab = t; render(); return; }
+  if (ev.target.closest(".menu-admin")) { adminOn = !adminOn; render(); return; }
   const act = ev.target.closest(".menu-item")?.dataset.act;
   if (!act) return;
   if (act === "reload") { location.reload(); return; }

@@ -254,10 +254,10 @@ try {
     await br.evaluate(`document.getElementById("menu-btn").click()`);
     await sleep(300);
     await shot(dev, "11-menu");
-    await br.evaluate(`document.querySelector('#menu-panel [data-tab="admin"]').click()`);
+    await br.evaluate(`document.querySelector('#menu-panel .menu-admin').click()`);
     await sleep(200);
     await shot(dev, "11b-menu-admin");
-    await br.evaluate(`document.querySelector('#menu-panel [data-tab="main"]').click()`);
+    await br.evaluate(`document.querySelector('#menu-panel .menu-admin').click()`);
     await br.evaluate(`document.querySelector('#menu-panel [data-act="bug"]').click()`);
     await sleep(300);
     await shot(dev, "11c-bug-report");
