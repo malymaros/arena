@@ -62,7 +62,9 @@ Každý riadok je JSON s `t` (typ) a `m` (id zápasu). `at` = ms od začiatku z�
 - `end` = stav oboch strán po kole: `char`, `pos`, `hp`, `mana`, `stone`, `pride`, `moon`, `clone`, `trap`,
   `worldUsed`, `labyrinth`, `manaRefills`, `lastStand`, `lastHope`.
 
-**`game_end`** – `g`, `winner`, `rounds`, `starter` (kto otváral 1. kolo hry), `chars`, `random`,
+**`game_end`** – `g`, `winner`, `rounds`, `starter` (kto otváral 1. kolo hry), `arena` (`bridge` | `portal` |
+`swamp`; pri kocke aj `randomArena: true` - aréna sa vylosovala v `startMatch`, `match_start.config.arena` je vtedy
+`"random"` s nastaveniami všetkých troch arén v `config.arenas`), `chars`, `random`,
 `final` (HP/mana), `lastHit` (segment, v ktorom porazený naposledy stratil HP: `{ side, type }` akcie, alebo
 `{ side: null, fx }` pri dlaždici a pod.), v turnaji `roster` (HP a mana všetkých mágov oboch strán po hre).
 

@@ -187,21 +187,22 @@ try {
     await waitPage(`document.querySelector(".room-btn.create")`, 10000, "rooms");
     await sleep(400);
     await shot(dev, "02-rooms");
-    await br.evaluate(`document.querySelector(".room-btn.create").click()`);
+    // lobby si pamätá nastavenia v localStorage - snímky vždy z defaultov
+    await br.evaluate(`localStorage.removeItem("arena.lobby.v1"); document.querySelector(".room-btn.create").click()`);
     await waitPage(visible("#lobby"), 8000, "lobby");
     await sleep(500);
     await shot(dev, "03-lobby");
-    // Portal Realm formulár (obe záložky na telefóne), Shrek Swamp, potom späť na stone bridge - zvyšok scenára beží na ňom
-    await br.evaluate(`document.querySelector('.arena-card[data-arena="portal"]').click()`);
-    await sleep(300);
-    await shot(dev, "03b-lobby-portal");
-    await br.evaluate(`document.querySelector('#lobby-wtabs [data-tab="portals"]')?.click()`);
+    // kocka (náhodná aréna), potom ADVANCED SETTINGS každej arény; späť na stone bridge - zvyšok scenára beží na ňom
+    await br.evaluate(`document.querySelector('#lobby-arena [data-arena="random"]').click()`);
     await sleep(200);
-    await shot(dev, "03c-lobby-portal-tab");
-    await br.evaluate(`document.querySelector('#lobby-wtabs [data-tab="tiles"]')?.click(); document.querySelector('.arena-card[data-arena="swamp"]').click()`);
-    await sleep(300);
-    await shot(dev, "03d-lobby-swamp");
-    await br.evaluate(`document.querySelector('.arena-card[data-arena="bridge"]').click()`);
+    await shot(dev, "03a-lobby-random");
+    await br.evaluate(`document.getElementById("lobby-adv-open").click()`);
+    for (const [arena, stage] of [["bridge", "03b-adv-bridge"], ["portal", "03c-adv-portal"], ["swamp", "03d-adv-swamp"]]) {
+      await br.evaluate(`document.querySelector('#lobby-adv-tabs [data-tab="${arena}"]').click()`);
+      await sleep(250);
+      await shot(dev, stage);
+    }
+    await br.evaluate(`document.getElementById("lobby-adv-done").click(); document.querySelector('#lobby-arena [data-arena="bridge"]').click()`);
     await sleep(200);
     await br.evaluate(`document.getElementById("lobby-start").click()`);
     await waitPage(visible("#host-wait"), 8000, "host-wait");
@@ -293,6 +294,19 @@ try {
     await sleep(1000);
     await shot(dev, "19-intermission");
     await br.evaluate(`document.getElementById("intermission").classList.add("hidden")`);
+    // losovanie arény (kocka) - počas skákania a pri odhalení; potom divácka opona (stav oboch strán)
+    await br.evaluate(`(async () => { const { startArenaRoll } = await import("/client/arena-roll.js"); startArenaRoll({ arena: "swamp" }); })()`);
+    await sleep(1200);
+    await shot(dev, "20-arenaroll");
+    await sleep(2000); // odhalenie ~2.8 s od štartu, výsledok drží do ~4.3 s
+    await shot(dev, "20b-arenaroll-result");
+    await br.evaluate(`(async () => { (await import("/client/arena-roll.js")).stopArenaRoll(); })()`);
+    await br.evaluate(`(async () => { const s = await import("/client/session.js"); s.setSpectator(true);
+      (await import("/client/spectator-curtain.js")).syncSpectatorScreens({ curtain: { white: "ready", black: "choosing" }, names: { p1: "PLAYERA", p2: "BOTB" } }, false); })()`);
+    await sleep(300);
+    await shot(dev, "21-curtain");
+    await br.evaluate(`(async () => { const s = await import("/client/session.js"); s.setSpectator(false);
+      (await import("/client/spectator-curtain.js")).syncSpectatorScreens(null, false); })()`);
     console.log(`${dev.name}: ok`);
     bot.sock.close();
     await br.send("Page.navigate", { url: "about:blank" });

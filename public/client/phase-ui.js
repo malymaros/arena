@@ -2,11 +2,12 @@
 // skóre série.
 import { isSpectator, isHost, me } from "/client/session.js";
 import { lobbyEl, hostWaitEl, lobbyWaitEl, teamWaitEl, selEl, crownsP1El, crownsP2El } from "/client/dom.js";
-import { showLobby } from "/client/lobby.js";
+import { showLobby, hideLobbyAdvanced } from "/client/lobby.js";
 import { updateCharSelectHp, resetCharSelectOpen, hiddenMode, setCharPage, charPage, syncTeamUi, startCharSelectPreview, stopCharSelectPreview } from "/client/char-select.js";
 import { hideDeathCenter } from "/client/last-stand.js";
 import { renderMageHeads } from "/client/hud.js";
 import { pixSvg } from "/client/pix.js";
+import { syncSpectatorScreens } from "/client/spectator-curtain.js";
 
 /* ---------- Phase UI (lobby / waiting / char-select) ---------- */
 
@@ -14,8 +15,10 @@ export function applyPhaseUI(s) {
   const phase = s?.phase || "playing";
   const controls = document.querySelector(".controls-row");
 
-  // lobby: host vidí nastavenia; po START ak súper nie je → „čakám na druhého hráča"; druhý hráč čaká na hosta
-  if (phase === "lobby" && !isSpectator) {
+  // lobby: host vidí nastavenia; po START ak súper nie je → „čakám na druhého hráča"; druhý hráč aj divák čakajú na hosta
+  if (phase === "lobby" && isSpectator) {
+    lobbyEl.classList.add("hidden"); hostWaitEl?.classList.add("hidden"); lobbyWaitEl.classList.remove("hidden");
+  } else if (phase === "lobby") {
     if (isHost) {
       if (s?.awaitingOpponent) { lobbyEl.classList.add("hidden"); hostWaitEl?.classList.remove("hidden"); }
       else { showLobby(s); hostWaitEl?.classList.add("hidden"); }
@@ -28,6 +31,7 @@ export function applyPhaseUI(s) {
     lobbyWaitEl.classList.add("hidden");
     hostWaitEl?.classList.add("hidden");
   }
+  if (lobbyEl.classList.contains("hidden")) hideLobbyAdvanced(); // okno ADVANCED SETTINGS patrí k lobby
 
   // turnajový draft: kým nepotvrdím tím, char-select beží v team-mode (toggle výber + confirm);
   // po potvrdení „TEAM LOCKED" čakačka, kým tím nepotvrdí aj súper (server vtedy prepne na playback.playing)
@@ -49,6 +53,7 @@ export function applyPhaseUI(s) {
   } else if (!selEl.classList.contains("hidden")) { selEl.classList.add("hidden"); stopCharSelectPreview(); }
 
   if (controls && !isSpectator) controls.style.display = (phase === "playing") ? "" : "none";
+  syncSpectatorScreens(s, phase === "lobby" && isSpectator);
 }
 
 // séria: v HUD boxe každého hráča rad placeholderov - BO3 = koruny za výhry,

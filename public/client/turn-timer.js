@@ -8,6 +8,7 @@ import { planning } from "/client/planning.js";
 import { renderQueue } from "/client/queue.js";
 import { sfx } from "/client/sound.js";
 import { charRollActive } from "/client/char-roll.js";
+import { arenaRollActive } from "/client/arena-roll.js";
 
 /* ---------- Turn timer (server-riadený displej + auto-lock) ---------- */
 // server posiela zostávajúci čas (event `turn_timer` aj `state.timerMs`), takže displej sedí so serverom
@@ -33,7 +34,7 @@ export function stopTurnTimer() {
 // ešte nie, odpočet ostane - ukazuje, koľko času má ešte súper (bez tikania a bez auto-locku)
 export function tickTurnTimer(now) {
   const mine = state?.[me], opp = state?.[otherSlot()];
-  const active = !!serverTimerEndsAt && !playback.playing && !charRollActive() && !playback.gameOverShown && state?.phase === "playing"
+  const active = !!serverTimerEndsAt && !playback.playing && !charRollActive() && !arenaRollActive() && !playback.gameOverShown && state?.phase === "playing"
     && !isSpectator && mine?.char && opp?.char;
   const planning = active && !mine.locked;
   const waitingOpp = active && mine.locked && !opp.locked;

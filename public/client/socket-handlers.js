@@ -1,4 +1,4 @@
-// public/client/socket-handlers.js - herné udalosti zo servera: you_are, color_roll (animácia farebného kolesa), state
+// public/client/socket-handlers.js - herné udalosti zo servera: you_are, arena_roll, color_roll (animácia farebného kolesa), state
 // (snapshot / timeline / THE WORLD pauza), game_result, new_game, game_over, reset, spectator, turn_timer.
 // Každá udalosť má jediný handler; registrujú sa pri načítaní, pripojenie je asynchrónne.
 import { socket, hideRooms, rememberSpectate, forgetSpectate } from "/client/net.js";
@@ -21,6 +21,7 @@ import { renderHUD, costHtml, applySpecialSkin } from "/client/hud.js";
 import { fxAll } from "/client/fx-registry.js";
 import { renderArenaLayers } from "/client/arena-bg.js";
 import { applyPhaseUI, updateMatchScore } from "/client/phase-ui.js";
+import { syncSpectatorScreens } from "/client/spectator-curtain.js";
 import { hideDeathCenter, hideDeathBehind } from "/client/last-stand.js";
 import { positionActors } from "/client/placement.js";
 import { enterTimestopMode, tsOverlaySet } from "/client/the-world.js";
@@ -30,7 +31,8 @@ import { ghostCharAt } from "/client/ghost.js";
 import { sfx } from "/client/sound.js";
 import { syncMusic } from "/client/sound-map.js";
 import { startCharRoll, stopCharRoll } from "/client/char-roll.js";
-import { COLOR_ROLL_SPIN_MS, COLOR_ROLL_RESULT_MS, COLOR_ROLL_FADE_MS } from "/shared/timing.js";
+import { startArenaRoll, stopArenaRoll } from "/client/arena-roll.js";
+import { COLOR_ROLL_SPIN_MS, COLOR_ROLL_RESULT_MS, COLOR_ROLL_FADE_MS, ARENA_ROLL_MS } from "/shared/timing.js";
 
 /* ---------- Sockets ---------- */
 // you_are nesie slot (ľavá/pravá rola, fixná na celú sériu: host=p1) aj či som host
@@ -44,11 +46,16 @@ socket.on("you_are", (info) => {
   document.getElementById("spectator")?.classList.add("hidden");
 });
 
+/* ---------- Losovanie arény (lobby kocka) ---------- */
+// server arénu už vybral; overlay leží nad ruletou farieb a vidia ho hráči aj diváci (arena-roll.js)
+socket.on("arena_roll", (info) => { startArenaRoll(info); });
+
 /* ---------- Losovanie farieb (po configure_match) ---------- */
 // Server už osoby vylosoval na sloty (p1 = BIELY vľavo a začína každú hru, p2 = ČIERNY vpravo)
 // a poslal you_are - tu sa výsledok len ZINSCENUJE: strelka na yin-yang kruhu sa roztočí
 // a dobehne na polovici hráčovej farby (biela vľavo 270°, čierna vpravo 90°). Overlay leží
 // NAD char-selectom, takže výber postavy čaká, kým ruleta dobehne.
+let colorRollGen = 0; // odložené roztočenie (kocka) zahodí reset / nová ruleta
 socket.on("color_roll", (info) => {
   if (!colorRollEl || (me !== "p1" && me !== "p2")) return; // divák ruletu nepotrebuje
   // host si zvolil pevnú farbu → žiadna ruleta, char-select sa ukáže rovno (netreba nič skrývať)
@@ -58,10 +65,15 @@ socket.on("color_roll", (info) => {
   colorRollEl.style.opacity = "";
   crResultEl.classList.add("hidden");
   crResultEl.innerHTML = "";
+  crArrowEl.getAnimations().forEach(a => a.cancel());
+  // kocka: ruleta leží hneď pod losovaním arény (zakrýva plochu), roztočí sa až po ňom
+  const myGen = ++colorRollGen;
+  setTimeout(() => { if (myGen === colorRollGen) spinColorRoll(white); }, info?.afterArena ? ARENA_ROLL_MS : 0);
+});
+function spinColorRoll(white) {
   // 4 celé otáčky + dobeh na cieľovú farbu ± rozptyl (len vizuálny - výsledok je daný)
   sfx("ui.color_roll");
   const target = (white ? 270 : 90) + (Math.random() * 40 - 20);
-  crArrowEl.getAnimations().forEach(a => a.cancel());
   const spin = crArrowEl.animate(
     [{ transform: "rotate(0deg)" }, { transform: `rotate(${4 * 360 + target}deg)` }],
     { duration: COLOR_ROLL_SPIN_MS, easing: "cubic-bezier(.12,.68,.18,1)", fill: "forwards" }
@@ -79,7 +91,7 @@ socket.on("color_roll", (info) => {
       };
     }, COLOR_ROLL_RESULT_MS);
   };
-});
+}
 
 /* ---------- Losovanie postáv (lobby „RANDOM CHARACTERS“) ---------- */
 // server postavy / turnajový tím už pridelil; char_roll prišiel PRED stavom → overlay zakryje plochu
@@ -100,7 +112,10 @@ socket.on("spectator", (info) => {
 // úplný reset herného UI (plánovaná fronta, golden/Last Stand voľby, game-over stavy, figúry): server ho
 // pošle pri retry; volá sa aj pri návrate na room-browser - nová roomka nesmie zdediť ťahy z poslednej hry
 function resetGameUi() {
-  stopCharRoll();            // rozbehnuté losovanie postáv nesmie prežiť reset / odchod z roomky
+  stopCharRoll();            // rozbehnuté losovanie postáv / arény nesmie prežiť reset / odchod z roomky
+  stopArenaRoll();
+  colorRollGen++;            // ani odložené roztočenie rulety farieb
+  syncSpectatorScreens(null, false); // divácka opona / čakanie nesmie ostať visieť v room-browseri
   playback.playGen++;        // zruš prípadné bežiace prehrávanie
   playback.playing = false;
   hideConnError();

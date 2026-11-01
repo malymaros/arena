@@ -84,6 +84,9 @@ export const MOVE_DIRS = new Set(["up", "down", "left", "right"]);
 // koľko vyhratých hier treba na zisk série
 // tournament = ako bo5 (first-to-3), ale s prenosom HP magov medzi hrami (3 magovia/hráč)
 export const MATCH_FORMATS = { single: 1, bo3: 2, tournament: 3 };
+// arény lobby (config.arena: bridge = bez kľúča, "portal", "swamp"; "random" = kocka - server vylosuje jednu
+// z nich v startMatch a celá séria sa hrá na nej, docs/RANDOM_ARENA_PLAN.md)
+export const ARENA_KEYS = ["bridge", "portal", "swamp"];
 export const CHARS = ["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor", "soldier", "werewolf"];
 // tournament: každý hráč si pred hrou 1 naslepo draftne vlastný tím TEAM_SIZE postáv z celého poolu CHARS
 // (choose_team vo fáze team_select); tím je fixný na celú sériu a určuje kľúče mageHp/mageMana danej osoby.

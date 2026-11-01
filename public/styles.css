@@ -1158,6 +1158,26 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .cr-result .cr-black { color: #9aa0ab; text-shadow: 0 0 10px rgba(0,0,0,.9), 2px 2px 0 rgba(0,0,0,.7); }
 @keyframes cr-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+/* ========== Losovanie arény (lobby kocka, public/client/arena-roll.js) ========== */
+/* NEPRIEHĽADNÝ overlay NAD ruletou farieb (#color-roll 10001) - ide ako prvý; nadpis v štýle rulety (.cr-title) */
+.arena-roll {
+  position: fixed; inset: 0; z-index: 10002; background: #08090c;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+}
+.arena-roll.hidden { display: none; }
+.ar-row { display: flex; gap: 22px; }
+.ar-card { position: relative; width: 300px; height: 170px; box-shadow: 0 0 0 3px #000; border-radius: 3px; overflow: hidden;
+  transition: transform .25s, box-shadow .12s, opacity .4s, filter .4s; }
+.ar-card canvas { display: block; width: 100%; height: 100%; }
+.ar-card span { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 10px; color: #fff; text-shadow: 2px 2px 0 #000; }
+.ar-card.hop { box-shadow: 0 0 0 3px #000, 0 0 0 7px #ffb300, 0 0 28px rgba(255,179,0,.6); transform: scale(1.04); }
+.ar-card.lose { opacity: .25; filter: grayscale(1); transform: scale(.94); }
+.ar-card.win { box-shadow: 0 0 0 3px #000, 0 0 0 7px #ffb300, 0 0 50px rgba(255,179,0,.9); transform: scale(1.12); }
+.ar-name { min-height: 40px; color: #ffb300; font-size: 26px; letter-spacing: 3px; text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.5);
+  opacity: 0; transform: scale(.6); transition: opacity .3s, transform .3s cubic-bezier(.3,1.6,.6,1); }
+.ar-name.show { opacity: 1; transform: scale(1); }
+
 /* ========== Losovanie postáv (lobby „RANDOM CHARACTERS“, public/client/char-roll.js) ========== */
 /* NEPRIEHĽADNÝ overlay POD ruletou farieb (tá ide v hre 1 prvá) a NAD char-selectom/plochou - plocha s už
    pridelenými postavami sa odkryje až fade-outom. Mriežka hláv vo vlastnej palete, kurzory 1-2-3. */
@@ -1463,6 +1483,22 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   white-space: nowrap;
 }
 .spectator.hidden{ display: none; }
+/* nad čakaním na hosta (#lobby-wait 9999) a diváckou oponou - TAKE SEAT / LEAVE musia ostať dostupné */
+.spectator.over-screens{ z-index: 10000; }
+/* divácka opona (client/spectator-curtain.js): kým sa hra pripravuje, divák vidí len stav oboch strán */
+.spec-curtain{
+  position: fixed; inset: 0; z-index: 9999; background: #08090c;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif;
+}
+.spec-curtain.hidden{ display: none; }
+.sc-rows{ display: grid; grid-template-columns: auto auto auto; gap: 18px 28px; align-items: center; font-size: 16px; letter-spacing: 1px; }
+.sc-row{ display: contents; }
+.sc-row .sc-side{ color: #f1f1ec; text-shadow: 2px 2px 0 rgba(0,0,0,.7); }
+.sc-row[data-side="black"] .sc-side{ color: #9aa0ab; }
+.sc-row .sc-name{ color: #cfd2d6; }
+.sc-row .sc-state{ color: #8d9096; min-width: 220px; }
+.sc-row.ready .sc-state{ color: #7fd36b; }
 .spectator .spec-label { display: flex; align-items: center; gap: 10px; color: #b8ab92; }
 .spectator .spec-ico svg { display: block; width: 26px; height: auto; }
 .spec-btn {
@@ -1685,8 +1721,6 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.5); letter-spacing: 3px; }
 .lobby-sub{ font-size: 11px; color: #9aa; text-align: center; margin: 0 0 18px; letter-spacing: 1px; }
 .lobby-section{ margin-bottom: 18px; }
-/* dva prepínače v jednom riadku (TILE PREVIEW | RANDOM CHARACTERS) */
-.lobby-pair{ display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .lobby-label{ font-size: 10px; color: #cfd2d6; letter-spacing: 1px; margin-bottom: 8px; }
 .opt-row{ display: flex; flex-wrap: wrap; gap: 8px; }
 .opt{
@@ -1773,13 +1807,55 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .weight .w-ico.w-portal{ width: 22px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 2px #000, 0 0 6px var(--pc);
   background: radial-gradient(ellipse, #07020f 0 30%, var(--pc) 62%, var(--pc2) 72%); }
 .weight .w-ico.w-dmg2{ width: 32px; }
-/* „Per round" - dva ovály = pár portálov */
-.weight .w-ico.w-pair{ box-shadow: 0 0 0 2px #000, 0 0 6px var(--pc), 5px 4px 0 -1px var(--pc2), 5px 4px 0 1px #000; }
 .weight .w-ico svg{ display: block; width: 100%; height: 100%; }
-/* záložky TILES | PORTALS len na telefóne v portal realm (styles-mobile.css) */
-#lobby-wtabs, #lobby-sec-weights .wtabs-space{ display: none; }
-.wtabs .opt.bad{ color: #ff6b6b; box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #ff6b6b; }
 .weights-sum.bad{ color: #ff6b6b; }
+/* kocka = náhodná aréna (statická pixel 3D kocka, DICE_SVG v pix.js); zapnutá = zlaté pozadie a všetky tri
+   arény majú pokojný zlatý rám („v losovaní") - nič sa nehýbe */
+.arena-pick.dice{ grid-template-columns: 1fr 1fr 1fr 46px; }
+.dice-btn{ height: 38px; padding: 0; cursor: pointer; border: none; border-radius: 2px; background: #1c1d20; box-shadow: 0 0 0 2px #000;
+  display: flex; align-items: center; justify-content: center; }
+.dice-btn svg{ display: block; width: 30px; height: 30px; }
+.dice-btn:hover{ background: #26282c; }
+.dice-btn.active{ background: #ffb300; box-shadow: 0 0 0 2px #000, 0 0 0 4px #ffb300, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3); }
+.arena-pick.pool .arena-card{ box-shadow: 0 0 0 2px #000, 0 0 0 4px rgba(255,179,0,.55); }
+.arena-pick.pool .arena-card canvas{ opacity: .9; }
+/* ADVANCED SETTINGS (tlačidlo pod arénami) + štítok DEFAULT / CUSTOM */
+.adv-open{ width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; border: none; border-radius: 2px;
+  background: #1c1d20; color: #cfd2d6; box-shadow: 0 0 0 2px #000; font-family: inherit; font-size: 10px; letter-spacing: 1px;
+  text-align: left; white-space: nowrap; }
+.adv-open:hover{ background: #26282c; }
+.adv-open .gear{ font-size: 14px; }
+.adv-open .adv-sum{ margin-left: auto; }
+.adv-chip{ font-size: 7px; padding: 4px 6px; border-radius: 2px; background: #2a2b2e; color: #8d9096; letter-spacing: 1px; }
+.adv-chip.custom{ background: #3a2a00; color: #ffb300; }
+/* okno ADVANCED SETTINGS: pevná veľkosť pre všetky arény, záložky = karty arén (bodka = upravené, červený rám =
+   súčet ≠ 100 %), vľavo počty / náhľad, vpravo percentá, RESET a DONE vždy na tom istom mieste */
+.lobby-adv{ position: fixed; inset: 0; z-index: 10000; background: rgba(4,5,7,.82); overflow: auto; display: flex;
+  align-items: flex-start; justify-content: center; padding: calc(var(--app-h, 920px) * .06) 24px 24px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff; }
+.lobby-adv.hidden{ display: none; }
+.lobby-adv .lobby-card{ width: 660px; box-sizing: border-box; display: flex; flex-direction: column; }
+.adv-title{ margin: 0 0 16px; font-size: 16px; color: #ffb300; text-align: center; letter-spacing: 2px; text-shadow: 2px 2px 0 #7a1f00; }
+.adv-tabs{ margin-bottom: 20px; }
+.adv-tabs .arena-card .dot{ position: absolute; right: 5px; top: 5px; z-index: 1; width: 8px; height: 8px; background: #ffb300; box-shadow: 0 0 0 2px #000; display: none; }
+.adv-tabs .arena-card.custom .dot{ display: block; }
+.adv-tabs .arena-card.bad{ box-shadow: 0 0 0 2px #000, 0 0 0 4px #ff4d4d; }
+.adv-body{ height: 330px; }
+.adv-cols{ display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; height: 100%; }
+.adv-cols > div{ min-width: 0; }
+.lobby-adv .lobby-section{ margin-bottom: 16px; }
+.lobby-adv .weights{ grid-template-columns: 1fr; gap: 8px; }
+.lobby-adv .weight{ gap: 6px; white-space: nowrap; }
+.lobby-adv .weight input{ width: 46px; text-align: center; padding: 6px 4px; margin-left: 0; }
+.lobby-adv .weight .w-step:first-of-type{ margin-left: auto; }
+.lobby-adv .opt-row.tight .opt{ min-width: 0; padding-left: 4px; padding-right: 4px; }
+.adv-foot{ display: flex; gap: 10px; }
+.adv-reset{ flex: 1; padding: 14px 10px; cursor: pointer; border: none; border-radius: 2px; background: #1c1d20; color: #cfd2d6;
+  box-shadow: 0 0 0 2px #000; font-family: inherit; font-size: 9px; letter-spacing: 1px; }
+.adv-reset:hover{ background: #2b1d1d; color: #ffb0a0; }
+.adv-reset:disabled{ opacity: .35; cursor: default; background: #1c1d20; color: #cfd2d6; }
+.adv-done{ flex: 1; margin: 0; }
+.adv-saved{ text-align: center; font-size: 8px; color: #6f9a52; margin-top: 10px; height: 10px; letter-spacing: 1px; }
 .lobby-start{
   width: 100%; margin-top: 8px; padding: 16px; cursor: pointer; border: none; border-radius: 2px;
   background: #ffb300; color: #2a1c00; font-family: inherit; font-size: 14px; letter-spacing: 2px;

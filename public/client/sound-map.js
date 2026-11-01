@@ -4,6 +4,7 @@ import { sfx, setMusic } from "/client/sound.js";
 import { state, board } from "/client/session.js";
 import { eventsForFrame, newTracker, resetTracker } from "/sounds/events.js";
 import { charRollActive, onCharRollEnd } from "/client/char-roll.js";
+import { arenaRollActive, onArenaRollEnd } from "/client/arena-roll.js";
 
 const tracker = newTracker();
 
@@ -24,9 +25,9 @@ export function syncMusic(s, finalRound = false) {
   const phase = s?.phase;
   if (!phase) return;
   if (phase === "match_over") return; // hudbu stíši až game-over sekvencia (po dohraní poslednej timeline)
-  // náhodný výber postáv: postavy sú pridelené hneď, ale bojová hudba hrá až po rulete farieb a losovaní,
-  // keď sa ukáže hracia plocha (onCharRollEnd nižšie)
-  const inGame = phase === "playing" && s.p1?.char && s.p2?.char && !charRollActive();
+  // náhodný výber postáv / arény: výsledok je pridelený hneď, ale bojová hudba (podľa arény!) hrá až po
+  // animáciách losovania, keď sa ukáže hracia plocha (onCharRollEnd / onArenaRollEnd nižšie)
+  const inGame = phase === "playing" && s.p1?.char && s.p2?.char && !charRollActive() && !arenaRollActive();
   if (!inGame) setMusic("music.menu");
   else if (finalRound) setMusic("music.final", "music.battle");
   // Portal Realm má vlastnú bojovú hudbu (bez nej hrá bežná music.battle)
@@ -36,3 +37,4 @@ export function syncMusic(s, finalRound = false) {
   else setMusic("music.battle");
 }
 onCharRollEnd(() => syncMusic(state));
+onArenaRollEnd(() => syncMusic(state));

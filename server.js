@@ -10,6 +10,7 @@ import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { createRecordedEngine } from "./telemetry/recorder.js";
 import { createJsonlStore } from "./telemetry/store.js";
+import { ARENA_ROLL_MS, COLOR_ROLL_MS, charRollMs } from "./shared/timing.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -159,7 +160,7 @@ function createRoom(id) {
   const spectators = new Set();               // diváci tejto roomky (dostávajú nemaskovaný stav cez roomEmit)
 
   const engine = createRecordedEngine({
-    emit: (ev, payload) => roomEmit(ev, payload),
+    emit: (ev, payload) => { noteIntro(ev, payload); roomEmit(ev, payload); },
     emitState: (timeline) => emitStateMasked(timeline),
     emitYouAre: () => emitYouAre(),
     clearTurnTimer: () => clearTurnTimer(),
@@ -197,9 +198,52 @@ function emitStateMasked(timeline = null) {
     if (timeline) payload = { ...payload, timeline: redactTimelineFor(slotForPerson(person), timeline) };
     sock.emit("state", payload);
   }
-  // diváci tejto roomky - nemaskovaný stav
-  const specPayload = timeline ? { ...plain, timeline } : plain;
+  // diváci tejto roomky - nemaskovaný stav (počas prípravy hry za oponou)
+  const specPayload = spectatorView(timeline ? { ...plain, timeline } : plain);
   for (const s of spectators) { try { s.emit("state", specPayload); } catch {} }
+}
+
+/* ---- Divácka opona (docs/RANDOM_ARENA_PLAN.md §5) ---- */
+// Kým sa hra pripravuje (draft tímov, výber postáv, animácie losovania arény / farieb / postáv u hráčov),
+// divák nevidí plochu ani postavy - len stav oboch strán. Koniec animácií sa odvodí z tých istých udalostí,
+// ktoré dostanú klienti (arena_roll / color_roll / char_roll) a z tých istých dĺžok, o ktoré engine posúva
+// časovač ťahu. Čisto prezentácia servera - engine ani replay telemetrie sa to netýka.
+let introEndsAt = 0;
+let curtainTimer = null;
+function noteIntro(ev, p) {
+  const arena = p?.afterArena ? ARENA_ROLL_MS : 0, color = p?.afterColor ? COLOR_ROLL_MS : 0;
+  const ms = ev === "arena_roll" ? ARENA_ROLL_MS
+    : ev === "color_roll" ? (p?.animate ? arena + COLOR_ROLL_MS : arena)
+    : ev === "char_roll" ? arena + color + charRollMs() : 0;
+  if (!ms) return;
+  introEndsAt = Math.max(introEndsAt, Date.now() + ms);
+  // po dobehnutí animácií opona padne sama (ak už obaja majú postavu) - diváci dostanú čerstvý stav
+  if (curtainTimer) clearTimeout(curtainTimer);
+  curtainTimer = setTimeout(() => {
+    curtainTimer = null;
+    const view = spectatorView(snapshot());
+    for (const s of spectators) { try { s.emit("state", view); } catch {} }
+  }, introEndsAt - Date.now() + 50);
+}
+// stav strany pod oponou: drafting / choosing / drawing (náhodné postavy ešte bežia) / ready
+function curtainSide(g, slot) {
+  if (g.phase === "team_select") return g.roster?.[g.seats[slot]] ? "ready" : "drafting";
+  if (!g.players[slot]?.char) return "choosing";
+  // náhodné postavy: pridelené hneď, ale hráč ich ešte len losuje (animácia); ručný výber = hotovo
+  return g.config?.randomChars && Date.now() < introEndsAt ? "drawing" : "ready";
+}
+function curtainUp(g) {
+  if (g.phase === "team_select") return true;
+  if (g.phase !== "playing") return false;
+  return !g.players.p1.char || !g.players.p2.char || Date.now() < introEndsAt;
+}
+// snapshot pre diváka: pod oponou bez postáv a tímov (nič neprezradí skôr ako hráčom) + stav oboch strán
+function spectatorView(snap) {
+  const g = engine.game;
+  if (!curtainUp(g)) return snap;
+  const hide = (p) => p && { ...p, char: null, clone: null, trap: null };
+  return { ...snap, p1: hide(snap.p1), p2: hide(snap.p2), roster: null, mageDead: null, rosterHp: null, rosterMana: null,
+    curtain: { white: curtainSide(g, "p1"), black: curtainSide(g, "p2") } };
 }
 
 /* ---- Admin: tvrdý reset TEJTO roomky (odpojí oboch hráčov, zruší časovače) ---- */
@@ -357,7 +401,7 @@ function onTurnTimeout() {
     socket.data.spectating = true;
     socket.join(String(id));
     socket.emit("spectator", { roomId: id }); // roomId → klient sa po reloade vráti sledovať tú istú roomku
-    socket.emit("state", snapshot());
+    socket.emit("state", spectatorView(snapshot()));
     broadcastSpectators();
   }
 

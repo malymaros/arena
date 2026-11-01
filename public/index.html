@@ -438,85 +438,47 @@
       <h1 class="lobby-title">ARENA</h1>
       <p class="lobby-sub">Match setup</p>
 
-      <!-- aréna: tri samostatné formuláre so spoločným základom (každý si pamätá svoje hodnoty, client/lobby.js) -->
+      <!-- aréna: tri karty s náhľadom + kocka (náhodná aréna); karty vykresľuje client/lobby.js -->
       <div class="lobby-section" id="lobby-sec-arena">
         <div class="lobby-label">ARENA</div>
-        <div class="arena-pick" id="lobby-arena">
-          <button class="arena-card active" data-arena="bridge"><canvas width="320" height="180"></canvas><span>STONE BRIDGE</span></button>
-          <button class="arena-card" data-arena="portal"><canvas width="320" height="180"></canvas><span>PORTAL REALM</span></button>
-          <button class="arena-card" data-arena="swamp"><canvas width="320" height="180"></canvas><span>SHREK SWAMP</span></button>
-        </div>
+        <div class="arena-pick dice" id="lobby-arena"></div>
+      </div>
+
+      <!-- nastavenia jednotlivých arén (dlaždice / portály / itemy) sú v okne ADVANCED SETTINGS (#lobby-adv) -->
+      <div class="lobby-section" id="lobby-sec-adv">
+        <button class="adv-open" id="lobby-adv-open"><span class="gear">⚙</span>ADVANCED SETTINGS<span class="adv-sum" id="lobby-adv-sum"></span></button>
       </div>
 
       <div class="lobby-section" id="lobby-sec-format">
         <div class="lobby-label">FORMAT</div>
         <div class="opt-row" id="lobby-format">
           <button class="opt" data-val="single">Single</button>
-          <button class="opt active" data-val="bo3">Best of 3</button>
+          <button class="opt" data-val="bo3">Best of 3</button>
           <button class="opt" data-val="tournament">Tournament</button>
-        </div>
-      </div>
-
-      <div class="lobby-section" id="lobby-sec-tiles">
-        <div class="lobby-label">SPECIAL TILES PER ROUND</div>
-        <div class="opt-row" id="lobby-tiles-count">
-          <button class="opt active" data-val="1">1</button>
-          <button class="opt" data-val="2">2</button>
-          <button class="opt" data-val="3">3</button>
-        </div>
-      </div>
-
-      <!-- váhy dlaždíc (a v portal realm aj portálov) vykresľuje client/lobby.js; na telefóne v portal realm
-           záložky TILES | PORTALS (naraz jeden zoznam), prázdny riadok veľkosti nadpisu ich zarovná s FORMAT -->
-      <div id="lobby-sec-weights">
-        <div class="lobby-label wtabs-space" aria-hidden="true">&nbsp;</div>
-        <div class="opt-row wtabs" id="lobby-wtabs">
-          <button class="opt" data-tab="tiles">Tiles</button>
-          <button class="opt" data-tab="portals">Portals</button>
-        </div>
-        <div class="lobby-section" id="lobby-tile-section">
-          <div class="lobby-label">TILE CHANCE (must total 100%)</div>
-          <div class="weights" id="lobby-weights"></div>
-          <div class="weights-sum" id="lobby-weights-sum">Total: 100%</div>
-        </div>
-        <div class="lobby-section" id="lobby-portal-section">
-          <div class="lobby-label">PORTAL CHANCE (must total 100%)</div>
-          <div class="weights" id="lobby-portal-weights"></div>
-          <div class="weights-sum" id="lobby-portal-sum">Total: 100%</div>
         </div>
       </div>
 
       <div class="lobby-section" id="lobby-sec-color">
         <div class="lobby-label">YOUR COLOR</div>
         <div class="opt-row" id="lobby-color">
-          <button class="opt active" data-val="random">Random</button>
+          <button class="opt" data-val="random">Random</button>
           <button class="opt" data-val="white">⚪ White</button>
           <button class="opt" data-val="black">⚫ Black</button>
         </div>
       </div>
 
-      <!-- dva prepínače v jednom riadku: náhľad tiles na ďalšie kolo + náhodný výber postáv (default Off) -->
-      <div class="lobby-section lobby-pair" id="lobby-sec-preview">
-        <div id="lobby-preview-box">
-          <div class="lobby-label">TILE PREVIEW</div>
-          <div class="opt-row" id="lobby-preview">
-            <button class="opt active" data-val="on">On</button>
-            <button class="opt" data-val="off">Off</button>
-          </div>
-        </div>
-        <div>
-          <div class="lobby-label">RANDOM CHARACTERS</div>
-          <div class="opt-row" id="lobby-random">
-            <button class="opt" data-val="on">On</button>
-            <button class="opt active" data-val="off">Off</button>
-          </div>
+      <div class="lobby-section" id="lobby-sec-random">
+        <div class="lobby-label">RANDOM CHARACTERS</div>
+        <div class="opt-row" id="lobby-random">
+          <button class="opt" data-val="on">On</button>
+          <button class="opt" data-val="off">Off</button>
         </div>
       </div>
 
       <div class="lobby-section" id="lobby-sec-timer">
         <div class="lobby-label">TURN TIMER</div>
         <div class="opt-row" id="lobby-timer">
-          <button class="opt active" data-val="off">Off</button>
+          <button class="opt" data-val="off">Off</button>
           <button class="opt" data-val="30">30s</button>
           <button class="opt" data-val="60">60s</button>
           <button class="opt" data-val="120">120s</button>
@@ -525,6 +487,20 @@
       </div>
 
       <button id="lobby-start" class="lobby-start">START</button>
+    </div>
+  </div>
+
+  <!-- ADVANCED SETTINGS: okno s pevnou veľkosťou nad lobby, záložky = karty arén; obsah vykresľuje client/lobby.js -->
+  <div id="lobby-adv" class="lobby-adv hidden">
+    <div class="lobby-card">
+      <h2 class="adv-title">ADVANCED SETTINGS</h2>
+      <div class="arena-pick adv-tabs" id="lobby-adv-tabs"></div>
+      <div class="adv-body" id="lobby-adv-body"></div>
+      <div class="adv-foot">
+        <button class="adv-reset" id="lobby-adv-reset">RESET TO DEFAULT</button>
+        <button class="lobby-start adv-done" id="lobby-adv-done">DONE</button>
+      </div>
+      <div class="adv-saved" id="lobby-adv-saved"></div>
     </div>
   </div>
 

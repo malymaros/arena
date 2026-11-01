@@ -164,6 +164,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
           }
         }
         write({ t: "game_end", at: at(), g: gi(), winner: SIDE[w] ?? w, rounds: g.turn, starter: gameStarter,
+          arena: g.config?.arena || "bridge", ...(g.config?.randomArena ? { randomArena: true } : {}),
           chars: { white: g.players.p1.char, black: g.players.p2.char },
           random: !!(g.config?.randomChars && g.config.format !== "tournament"),
           final: { white: { hp: g.players.p1.hp, mana: g.players.p1.mana }, black: { hp: g.players.p2.hp, mana: g.players.p2.mana } },

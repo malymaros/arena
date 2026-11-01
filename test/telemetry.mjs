@@ -78,6 +78,12 @@ function playMatch(log, config, seed, opts = {}) {
 }
 
 const log = [];
+// pravidlá všetkých troch arén pre zápasy s kockou (lobby → ADVANCED SETTINGS)
+const DICE_ARENAS = {
+  bridge: { tilesPerRound: 2, tileWeights: BASE.tileWeights, tilePreview: true },
+  portal: { tilesPerRound: 1, tileWeights: { dmg: 90, ik: 10 }, tilePreview: true, portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 }, portalsPerRound: 2 },
+  swamp: { itemsPerRound: 2, itemWeights: { heal: 50, mana: 50 }, shrekPreview: true },
+};
 const scenarios = [
   ...Array.from({ length: 8 }, (_, i) => [{ format: "single" }, 100 + i, { chars: { p2: "jotaro" } }]),          // THE WORLD
   ...Array.from({ length: 4 }, (_, i) => [{ format: "single" }, 200 + i, { chars: { p1: "naruto", p2: "onre" } }]),
@@ -91,6 +97,8 @@ const scenarios = [
     portalWeights: { classic: 40, hp: 15, mana: 15, power: 15, nodef: 15 }, portalsPerRound: 1 + i }, 900 + i]),
   ...Array.from({ length: 3 }, (_, i) => [{ format: i ? "bo3" : "single", arena: "swamp" }, 950 + i]),           // Shrek Swamp
   ...Array.from({ length: 2 }, (_, i) => [{ format: "bo3" }, 1000 + i, { retryAt: 4 }]),                            // nedohraný
+  // kocka: aréna sa vylosuje v startMatch (replay ju musí vylosovať rovnako), všetky formáty
+  ...["single", "bo3", "tournament", "single"].map((format, i) => [{ format, randomChars: i === 1, arena: "random", arenas: DICE_ARENAS }, 1100 + i]),
 ];
 const t0 = performance.now();
 for (const [config, seed, opts] of scenarios) playMatch(log, config, seed, opts);
@@ -122,7 +130,12 @@ for (const [m, recs] of matches) {
     check(picks.length === 2 && picks.every(p => p.char === ge.chars[p.side]), `${m} g${ge.g}: pick záznamy nesedia s game_end`);
     check(picks.every(p => p.random === ge.random), `${m} g${ge.g}: pick random flag`);
     check(ge.lastHit !== null, `${m} g${ge.g}: game_end bez lastHit`);
+    // aréna hry: pri kocke vylosovaná (jedna z troch, príznak randomArena), inak tá z configu
+    if (cfg.arena === "random") check(["bridge", "portal", "swamp"].includes(ge.arena) && ge.randomArena === true, `${m} g${ge.g}: game_end aréna z kocky ${ge.arena}`);
+    else check(ge.arena === (cfg.arena || "bridge") && !("randomArena" in ge), `${m} g${ge.g}: game_end aréna ${ge.arena}`);
   }
+  // séria sa hrá celá na jednej aréne
+  check(new Set(recs.filter(r => r.t === "game_end").map(r => r.arena)).size <= 1, `${m}: hry série na rôznych arénach`);
   if (cfg.format === "tournament") {
     const teams = recs.filter(r => r.t === "team");
     check(teams.length === 2 && teams.every(t => t.random === !!cfg.randomChars && t.team.length === 3), `${m}: team záznamy`);

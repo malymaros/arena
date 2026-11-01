@@ -11,7 +11,7 @@ import { CHAR_META, SIDE_CHARS } from "/chars/index.js";
 import { sfx, resolveKey, entryFor, urlDuration } from "/client/sound.js";
 import { HIDDEN_GLITCH_CHARS } from "/client/char-select.js";
 import {
-  ROLL_TICKS, ROLL_TEAM_STAGGER, ROLL_LINGER_MS, ROLL_FADE_MS, rollTickMs, COLOR_ROLL_MS,
+  ROLL_TICKS, ROLL_TEAM_STAGGER, ROLL_LINGER_MS, ROLL_FADE_MS, rollTickMs, COLOR_ROLL_MS, ARENA_ROLL_MS,
 } from "/shared/timing.js";
 
 // poradie mriežky (zľava doprava, zhora nadol) - side-postavy podľa strany; null = budúca postava (stlmená, nedá sa vybrať)
@@ -105,7 +105,7 @@ function placeCursor(cur, idx) {
   cur.at = idx;
 }
 
-// info = { team, picks: { p1: [...], p2: [...] }, afterColor }
+// info = { team, picks: { p1: [...], p2: [...] }, afterColor, afterArena }
 export async function startCharRoll(info) {
   if (me !== "p1" && me !== "p2") return;              // divák nevidí nič až do začiatku hry
   const chars = info?.picks?.[me];
@@ -121,8 +121,9 @@ export async function startCharRoll(info) {
   active = true;
   startLoops();
 
-  // v hre 1 s losovaním farby beží najprv ruleta (leží NAD týmto overlayom); kurzory štartujú, až zmizne
-  if (info.afterColor) await wait(COLOR_ROLL_MS);
+  // v hre 1 beží najprv losovanie arény (kocka) a ruleta farieb (ležia NAD týmto overlayom); kurzory štartujú, až zmiznú
+  const before = (info.afterArena ? ARENA_ROLL_MS : 0) + (info.afterColor ? COLOR_ROLL_MS : 0);
+  if (before) await wait(before);
   if (myGen !== gen) return;
 
   const layout = LAYOUT[slot];

@@ -12,7 +12,7 @@ import {
   ACTION_TYPES, MOVE_DIRS, MATCH_FORMATS, CHARS, TEAM_SIZE, TIMER_OPTIONS,
   MOVE_DELAY_MS, SMALL_DELAY_MS, ACTION_GAP_MS, SPECIAL_BEAT_MS, SOLDIER_GRENADE_BLAST_MS, CHARGE_STEP_MS, PORTAL_SHOT_STEP_MS,
   MIRROR_BEAM_MS, TELEPORT_OUT_MS, TELEPORT_IN_MS, VAMP_TRAP_STRIKE_MS, QUICKDRAW_MS, PASS_MANA_COST,
-  charRollMs, COLOR_ROLL_MS, ITEMS_PER_ROUND, ITEM_WEIGHTS, PORTAL_MAX_PAIRS, PORTALS_PER_ROUND, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
+  charRollMs, COLOR_ROLL_MS, ARENA_ROLL_MS, ARENA_KEYS, ITEMS_PER_ROUND, ITEM_WEIGHTS, PORTAL_MAX_PAIRS, PORTALS_PER_ROUND, PORTAL_SHOT_RANGE, PORTAL_POWER_BONUS, PORTAL_TILE_WEIGHTS, PORTAL_WEIGHTS, PORTAL_TYPES,
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
@@ -1757,6 +1757,12 @@ function startMatch(config) {
   // deterministický priebeh zápasu: seed z háčika (headless simulácia) má prednosť pred env ARENA_SEED (testy)
   const seed = io.seed ?? ARENA_SEED;
   if (seed !== null) rand = seededRng(seed);
+  // kocka: aréna sa vylosuje PRVÝM volaním rand() zápasu (replay telemetrie ju vylosuje rovnako) a celá séria
+  // sa hrá na nej. Ďalej engine pracuje s configom vylosovanej arény - rovnaký tvar ako pri ručnom výbere,
+  // + randomArena (klient pred ruletou farieb zahrá losovanie arény). Bez kocky sa rand() navyše nevolá (goldeny).
+  if (config.arena === "random") {
+    config = { ...config.arenas[ARENA_KEYS[Math.floor(rand() * ARENA_KEYS.length)]], randomArena: true };
+  }
   game.config = config;
   game.arena = config.arena === "portal" ? "portal-realm" : config.arena === "swamp" ? "shrek-swamp" : "bridge"; // pozadie (klient ARENAS_CLIENT)
   // BIELY (p1, vľavo) začína hru 1 - náhodné je, KTO je biely: osoby A/B sa vylosujú na sloty
@@ -1785,17 +1791,20 @@ function startMatch(config) {
   // pripojení inak klient stihne vykresliť odkrytú plochu skôr, než ju overlay prekryje.
   //  1) you_are - sloty sa práve prelosovali, klient potrebuje aktuálny slot pre `me` (join-time you_are
   //     ešte mal default sloty a mohol byť nesprávny); color_roll ho číta.
-  //  2) color_roll - overlay sa zapne (zakryje predošlú obrazovku).
+  //  2) arena_roll (len kocka) + color_roll - overlaye sa zapnú (zakryjú predošlú obrazovku); ruleta farieb
+  //     aj losovanie postáv počkajú, kým dobehne losovanie arény (afterArena).
   //  3) state - char-select/plocha sa vykreslí UŽ POD overlayom.
   emitYouAre();
+  const afterArena = !!config.randomArena;
+  if (afterArena) roomEmit("arena_roll", { arena: config.arena || "bridge" });
   // ruleta jin-yang beží len keď farbu naozaj losujeme (random); pri pevnej voľbe hosta ju preskočíme
-  roomEmit("color_roll", { animate: config.colorPref === "random" });
+  roomEmit("color_roll", { animate: config.colorPref === "random", afterArena });
   if (config.format === "tournament" && config.randomChars) {
     // náhodný výber: tímy vylosuje server (bez draftu); klient ich zinscenuje (char_roll), potom
     // hráč vyberá štartovacieho maga z tímu ako zvyčajne (roster char-select)
     game.roster = { A: null, B: null };
     for (const slot of ["p1", "p2"]) game.roster[game.seats[slot]] = rollTeam(slot);
-    roomEmit("char_roll", { team: true, picks: { p1: rosterFor("p1"), p2: rosterFor("p2") }, afterColor: config.colorPref === "random" });
+    roomEmit("char_roll", { team: true, picks: { p1: rosterFor("p1"), p2: rosterFor("p2") }, afterColor: config.colorPref === "random", afterArena });
     finishTeamSelect();
   } else if (config.format === "tournament") {
     // slepý draft tímov: pred hrou 1 si každý vyberie TEAM_SIZE postáv z celého poolu (choose_team);
@@ -1853,9 +1862,11 @@ function startGame(gameIndex) {
       game.players[slot].char = rollChar(slot);
       deployReset(slot);
     }
+    // v hre 1 idú pred losovaním postáv ešte losovanie arény (kocka) a ruleta farieb
     const afterColor = gameIndex === 1 && game.config.colorPref === "random";
-    roomEmit("char_roll", { team: false, picks: { p1: [game.players.p1.char], p2: [game.players.p2.char] }, afterColor });
-    beginPlanningTimer(charRollMs() + (afterColor ? COLOR_ROLL_MS : 0));
+    const afterArena = gameIndex === 1 && !!game.config.randomArena;
+    roomEmit("char_roll", { team: false, picks: { p1: [game.players.p1.char], p2: [game.players.p2.char] }, afterColor, afterArena });
+    beginPlanningTimer(charRollMs() + (afterColor ? COLOR_ROLL_MS : 0) + (afterArena ? ARENA_ROLL_MS : 0));
   }
   emitStateMasked(); // char-select potrebuje per-osoba mageHp (tournament)
 }
@@ -1878,8 +1889,23 @@ function rollTeam(slot) {
   return team;
 }
 
-// očisti a zvaliduj nastavenia z lobby; pri nezmysle vráti null
+// očisti a zvaliduj nastavenia z lobby; pri nezmysle vráti null.
+// Kocka (arena "random"): raw.arenas = { bridge, portal, swamp } - nastavenia každej arény z ADVANCED SETTINGS;
+// každá sa overí ako samostatný config (zlý súčet v ktorejkoľvek = null) a startMatch z nich vylosuje jednu.
 function sanitizeConfig(raw) {
+  if (raw?.arena !== "random") return sanitizeArenaConfig(raw);
+  const arenas = {};
+  for (const key of ARENA_KEYS) {
+    const sub = sanitizeArenaConfig({ ...raw, ...(raw.arenas?.[key] || {}), arena: key === "bridge" ? undefined : key });
+    if (!sub) return null;
+    arenas[key] = sub;
+  }
+  const { format, timer, colorPref, randomChars } = arenas.bridge;
+  return { format, timer, colorPref, ...(randomChars ? { randomChars } : {}), arena: "random", arenas };
+}
+
+// config jednej arény (stone bridge = bez kľúča arena, portal realm / shrek swamp so svojimi kľúčmi)
+function sanitizeArenaConfig(raw) {
   if (!raw || typeof raw !== "object") return null;
   const format = MATCH_FORMATS[raw.format] ? raw.format : null;
   if (!format) return null;

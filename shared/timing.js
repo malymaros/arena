@@ -139,6 +139,16 @@ export const COLOR_ROLL_SPIN_MS   = 3400;
 export const COLOR_ROLL_RESULT_MS = 1700;
 export const COLOR_ROLL_FADE_MS   = 450;
 export const COLOR_ROLL_MS = COLOR_ROLL_SPIN_MS + COLOR_ROLL_RESULT_MS + COLOR_ROLL_FADE_MS;
+// losovanie arény (lobby kocka, docs/RANDOM_ARENA_PLAN.md, public/client/arena-roll.js) - ide PRED ruletou farieb:
+// zlatý rám skáče po 3 kartách arén (ARENA_ROLL_HOPS skokov, spomaľuje), posledný skok dôjde na vylosovanú,
+// chvíľu postojí, odhalí sa názov, výsledok drží a overlay zmizne. Pevná dĺžka - server o ňu posúva časovač ťahu.
+export const ARENA_ROLL_HOPS      = 12;
+export const ARENA_ROLL_HOLD_MS   = 350;
+export const ARENA_ROLL_RESULT_MS = 1500;
+export const ARENA_ROLL_FADE_MS   = 400;
+export const arenaRollHopMs = (i) => 70 + Math.pow(i / (ARENA_ROLL_HOPS - 1), 2.4) * 420; // i = 0..HOPS-1
+export const ARENA_ROLL_MS = Math.round(Array.from({ length: ARENA_ROLL_HOPS }, (_, i) => arenaRollHopMs(i)).reduce((a, b) => a + b, 0)
+  + ARENA_ROLL_HOLD_MS + ARENA_ROLL_RESULT_MS + ARENA_ROLL_FADE_MS);
 
 // Shrek Swamp (docs/SWAMP_PLAN.md): Shrekove framy - skok na očíslované políčko, rev, reakcie na zásah, smrť, smrad
 export const SHREK_JUMP_MS    = 550;  // skok (oblúk) na ďalšie políčko

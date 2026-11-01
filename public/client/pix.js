@@ -193,6 +193,29 @@ export function pixSvg(name) {
   });
   return `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
 }
+// kocka (lobby - náhodná aréna): 3D v šikmom pohľade zhora - predná stena 12×12 (päť ôk), vrch (jedno oko v strede)
+// a pravý bok v tieni (tri oká); 1/5/3 sú na skutočnej kocke susedné steny. Obrys len po vonkajšom okraji.
+export const DICE_SVG = (() => {
+  const S = 12, D = 5, W = S + D, g = Array.from({ length: W }, () => Array(W).fill(null));
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+    if (x < S && y >= D) g[y][x] = y === D || x === S - 1 ? "e" : "f";          // predok (hrany k vrchu / boku tmavšie)
+    else if (y < D && x >= D - y && x < D - y + S) g[y][x] = "t";               // vrch (rovnobežník)
+    else if (x >= S && y >= D - (x - S + 1) && y < D - (x - S + 1) + S) g[y][x] = "r"; // pravý bok
+  }
+  const dot = (x, y, w, h) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) g[y + j][x + i] = "p"; };
+  [[2, 2], [8, 2], [5, 5], [2, 8], [8, 8]].forEach(([x, y]) => dot(x, D + y, 2, 2));
+  dot(8, 2, 2, 1); dot(7, 3, 2, 1);
+  dot(15, 3, 1, 2); dot(14, 7, 1, 2); dot(13, 11, 1, 2);
+  const out = (x, y) => y < 0 || x < 0 || y >= W || x >= W || !g[y][x];
+  const pal = { f: "#efe6cf", t: "#fffbf1", r: "#b9a983", e: "#8d7d5c", p: "#1a1a1a", o: "#000" };
+  let rects = "";
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+    if (!g[y][x]) continue;
+    const c = out(x - 1, y) || out(x + 1, y) || out(x, y - 1) || out(x, y + 1) ? "o" : g[y][x];
+    rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${pal[c]}"/>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${W}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+})();
 // malá inline ikonka do cost riadkov - pixelizované emoji, hydratuje hydratePix()
 export const miniPix = (emoji) => `<span class="pix-ico mini" data-emoji="${emoji}"></span>`;
 // špeciálne políčka mapujú na ikony knižnice
