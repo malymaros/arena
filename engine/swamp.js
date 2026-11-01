@@ -159,17 +159,24 @@ function shrekSnapshot() {
     ...(E.game.config?.shrekPreview ? { next: s.next.map(c => [...c]) } : {}), done: s.done, stench: s.stench.map(c => [...c]) } : null;
 }
 
-// zásah hráča prostredím (rev, tackle, smrad) - ako dlaždica: ½ pri Last Stand/Hope (obrany rieši volajúci - guardOf).
+// poškodenie prostredím dopadá VŽDY po častiach 1 dmg (ako dvojitá dlaždica v Portal Realm): ½ pri Last Stand/Hope sa
+// ráta z každej časti zvlášť (⌊1/2⌋ = 0) - hráč v Last Hope na 1 HP mapu prežije. parts len pri raw > 1.
+function envParts(slot, raw) {
+  const parts = Array.from({ length: raw }, () => E.recvDmg(slot, 1));
+  return { d: parts.reduce((a, b) => a + b, 0), ...(raw > 1 ? { parts } : {}) };
+}
+
+// zásah hráča prostredím (rev, tackle, smrad) - ako dlaždica, po 1-dmg častiach (envParts; obrany rieši volajúci - guardOf).
 // Smrteľný zásah počas labyrintu prehrá rovnakú sekvenciu ako dlaždica (odhalenie pred, koniec labyrintu po).
 // byShrek: zásah Shrekovým útokom (rev, tackle) - Escanorovi znižuje pride ako zásah od súpera; smrad nie (dlaždica).
 function envHit(slot, raw, tl, byShrek = false) {
   const p = E.game.players[slot];
   if (p.hp <= 0) return;
-  const d = E.recvDmg(slot, raw);
+  const { d, parts } = envParts(slot, raw);
   const lethalInLab = d >= p.hp && (E.game.players.p1.labyrinth || E.game.players.p2.labyrinth);
   if (lethalInLab) E.revealLabyrinths(tl);
   p.hp = Math.max(0, p.hp - d);
-  E.pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d, shrek: true }], SMALL_DELAY_MS);
+  E.pushStateFrame(tl, [{ kind: "hit", target: slot, dmg: d, ...(parts ? { parts } : {}), shrek: true }], SMALL_DELAY_MS);
   if (byShrek && d > 0) E.notePrideHit(slot); // Escanor pride: Shrekov zásah sa ráta ako zásah od súpera
   if (lethalInLab) E.endLabyrinths(tl);
 }
@@ -178,7 +185,8 @@ function envHit(slot, raw, tl, byShrek = false) {
 function cloneCosmetic(slot, raw, tl) {
   const p = E.game.players[slot];
   if (!p.clone) return;
-  E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [p.clone.x, p.clone.y], dmg: E.recvDmg(slot, raw) }], SMALL_DELAY_MS);
+  const { d, parts } = envParts(slot, raw); // rovnaký rozpis ako majiteľ - iný float by prezradil, ktorý je pravý
+  E.pushStateFrame(tl, [{ kind: "clone_hit", target: slot, cell: [p.clone.x, p.clone.y], dmg: d, ...(parts ? { parts } : {}) }], SMALL_DELAY_MS);
 }
 
 // Obrana proti Shrekovi: nabitý štít/mirror kryje KAŽDÝ Shrekov rev/tackle (bežný skok 1-2-3 aj reakciu) a Shrek ju

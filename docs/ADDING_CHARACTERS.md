@@ -175,6 +175,7 @@ Toto je jadro dokumentu. Pri Narutovi sa väčšina iterácií točila práve tu
 
 ### Last Stand / Last Hope (buffnuté finálne kolo)
 - Škáluje dmg buff násobičom (`dealMul`: Last Stand ×2, Last Hope ×4)? Prijatý dmg cez `recvDmg` (½)?
+- Dmg od prostredia (dlaždica, aréna, NPC) vždy po častiach 1 dmg (`parts`), aby ½ dalo 0 a Last Hope na 1 HP prežil — jediná výnimka je IK (CLAUDE.md, „environment damage comes in 1-dmg parts“).
 - Ak je to summon — čo sa deje s entitou pri **Last Stand smrti** (démon zabije → vzkriesi)? Zaniká entita?
   Zrkadlí buff vizuály? (Naruto: klon zaniká pri smrti pred vzkriesením; buff dmg áno, zlaté vizuály nie.)
 - Vo finálnom kole je swap/golden zamknutý — dotýka sa to tvojej postavy?

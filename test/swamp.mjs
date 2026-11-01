@@ -116,6 +116,27 @@ console.log("Skoky a rev (veža)");
   const st = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, marks: [[0, 0], [2, 2], [1, 2]] }); g.players.p1.stone = 1; });
   st.round([{ type: "stoned" }, PASS, PASS], PASS3);
   check(st.game.players.p1.hp === 10, "R8: skamenený hráč v riadku revu nedostane dmg", String(st.game.players.p1.hp));
+
+  // rev dopadá po 1-dmg častiach (ako dvojitá dlaždica): ½ pri Last Stand/Hope z každej časti → ⌊1/2⌋ = 0
+  const ONE = [[0, 0], [2, 2], [1, 2]]; // len 1. skok trafí p1 (0,1)
+  const n3 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, hp: 5, marks: ONE }));
+  const h3 = fx(n3.round(PASS3, PASS3), "hit").filter(h => h.shrek && h.target === "p1");
+  check(n3.game.players.p1.hp === 7 && h3.length === 1 && J(h3[0].parts) === "[1,1,1]" && h3[0].dmg === 3,
+    "R9: rev za 3 = jeden zásah s rozpisom 1-1-1", J(h3));
+  const lh = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, hp: 5, marks: ONE }); Object.assign(g.players.p1, { hp: 1, lastHopeBuff: true }); });
+  lh.round(PASS3, PASS3);
+  check(lh.game.players.p1.hp === 1 && lh.game.phase === "playing", "R10: Last Hope na 1 HP prežije rev za 3 (0+0+0)", J([lh.game.players.p1.hp, lh.game.phase]));
+  const ls = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, hp: 10, marks: ONE }); g.players.p1.lastStandBuff = true; });
+  ls.round(PASS3, PASS3);
+  check(ls.game.players.p1.hp === 10, "R11: Last Stand dostane z revu za 2 nič (0+0)", String(ls.game.players.p1.hp));
+  // mirror buffnutého hráča odrazí do Shreka PLNÝ dmg revu (rozdeľuje sa len dmg, ktorý dopadne na hráča)
+  const lm = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, hp: 5, marks: [[3, 0], [2, 2], [1, 2]] }); g.players.p2.lastHopeBuff = true; g.players.p2.mana = 10; });
+  lm.round(PASS3, [{ type: "mirror" }, PASS, PASS]);
+  check(lm.game.shrek.hp === 2, "R12: mirror pri Last Hope odrazí do Shreka plné 3", String(lm.game.shrek.hp));
+  // Narutov klon v reve: rovnaký rozpis ako majiteľ
+  const nc = scenario("naruto", "lightning", (g) => { shrekSet(g, { x: 1, y: 1, hp: 5, marks: [[0, 2], [3, 0], [2, 0]] }); g.players.p1.y = 0; g.players.p1.clone = { x: 0, y: 2 }; });
+  const ch = fx(nc.round(PASS3, PASS3), "clone_hit")[0];
+  check(J(ch?.parts) === "[1,1,1]" && ch.dmg === 3, "R13: kozmetický zásah klona má rovnaký rozpis 1-1-1", J(ch));
 }
 
 /* ==================== Strela na spoločné políčko súpera a Shreka ==================== */
