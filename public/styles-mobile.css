@@ -319,12 +319,15 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 
 /* --- losovanie arény a divácka opona --- */
 .phone .arena-roll { gap: 60px; }
-.phone .ar-row { gap: 50px; }
-.phone .ar-card { width: 460px; height: 258px; }
+.phone .ar-window { --cw: 460px; --ch: 258px; --gap: 40px; --pad: 72px; }
+.phone .ar-mark::before, .phone .ar-mark::after { left: -24px; border-width: 24px; }
+.phone .ar-mark::before { border-top-width: 32px; top: calc(var(--pad) - 42px); }
+.phone .ar-mark::after { border-bottom-width: 32px; bottom: calc(var(--pad) - 42px); }
+.phone .ar-line { width: 4px; left: -2px; }
 .phone .ar-card span { font-size: 20px; }
 /* zlatý rám sa so zmenšenou stránkou stenčí - na telefóne hrubší */
 .phone .ar-card.hop { box-shadow: 0 0 0 5px #000, 0 0 0 14px #ffb300, 0 0 50px rgba(255,179,0,.6); }
-.phone .ar-card.win { box-shadow: 0 0 0 5px #000, 0 0 0 14px #ffb300, 0 0 80px rgba(255,179,0,.9); }
+.phone .ar-card.win { box-shadow: 0 0 0 5px #000, 0 0 0 14px #ffb300, 0 0 40px rgba(255,179,0,.85); }
 .phone .ar-name { font-size: 48px; }
 .phone .sc-rows { font-size: 34px; gap: 36px 48px; }
 .phone .sc-row .sc-state { min-width: 440px; }

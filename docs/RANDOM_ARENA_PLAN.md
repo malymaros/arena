@@ -1,7 +1,6 @@
 # Náhodná aréna, nové lobby a divácka opona — plán
 
-Stav: **implementované** (2026-11-01; testy `test/random-arena.mjs`, `test/spectator-curtain.mjs`, kocka v `test/telemetry.mjs`). Vizuálna predloha: `public/dev/random-arena.html` (PC / tablet /
-telefón prepínač v lište; nastavenia sa v nej naozaj ukladajú do prehliadača).
+Stav: **implementované** (2026-11-01; testy `test/random-arena.mjs`, `test/spectator-curtain.mjs`, kocka v `test/telemetry.mjs`). Dev predlohy lobby a animácie boli po schválení a implementácii odstránené (sú v git histórii).
 
 ## 1. Rozhodnutia vlastníka
 
@@ -14,7 +13,7 @@ telefón prepínač v lište; nastavenia sa v nej naozaj ukladajú do prehliada�
 | Telefón - lobby | Celá obrazovka, nadpis ARENA (bez „Match setup"), popis ARENA nad kartami, voľné miesto rovnomerne medzi riadkami (`align-content: space-evenly`); dva stĺpce: FORMAT / TURN TIMER, YOUR COLOR / RANDOM CHARACTERS. |
 | ADVANCED SETTINGS | Okno s pevnou veľkosťou, záložky = karty arén s obrázkom (bodka = upravené, červený rám = súčet ≠ 100 %), vľavo dlaždice/itemy (počet za kolo, náhľad, percentá), vpravo percentá; **Portal Realm: vpravo PORTALS PER ROUND (vedľa SPECIAL TILES PER ROUND) a pod tým PORTAL CHANCE**, vľavo TILE CHANCE. RESET TO DEFAULT (len otvorená aréna) + DONE (zablokované pri zlom súčte) vždy na rovnakom mieste. Telefón: okno uprostred so stmaveným lobby okolo. |
 | Ukladanie | Každá zmena sa hneď uloží do `localStorage` (výber arény/kocky, formát, farba, náhodné postavy, časovač + nastavenia všetkých 3 arén). Viazané na zariadenie/prehliadač (nie na hráča). Poškodené/neznáme hodnoty → default. |
-| Animácia losovania | Nadpis **ARENA** (štýl `.cr-title` rulety farieb), tri karty arén, zlatý rám skáče so spomaľovaním (~2.3 s, zvuk `ui.random_hop`), zastaví sa, ostatné zošednú, pod víťazom vyskočí názov (`ui.pick`), ~1.5 s drží, potom celý overlay zmizne (0.4 s). **Bez priblíženia** víťaznej karty. |
+| Animácia losovania | Nadpis **ARENA** (štýl `.cr-title` rulety farieb) a **posuvný pás** (zmena 2026-11-01, nahradil skákajúci rám): karty arén **vždy v poradí STONE BRIDGE → PORTAL REALM → SHREK SWAMP → …** prebiehajú okienkom (okraje do tmy) popod pevnú zlatú značku (trojuholníky + čiara); štart s PORTAL REALM pod značkou, pás spomaľuje (3 s, karta pod značkou svieti + `ui.random_hop`), zastaví sa kúsok vedľa stredu vylosovanej karty a dobehne pod značku, ostatné zošednú, pod okienkom vyskočí názov (`ui.pick`), ~1.5 s drží, overlay zmizne (0.4 s). Fázy `ARENA_ROLL_*` v `shared/timing.js`. |
 | Poradie | losovanie arény → ruleta farieb → výber / losovanie postáv (resp. turnajový draft). |
 | Diváci | Lobby: „Waiting for host to set up the match…". Losovanie arény vidia tiež. Potom **opona** (bod 5) až do skutočného začiatku hry - nič nevidia skôr ako hráči. |
 

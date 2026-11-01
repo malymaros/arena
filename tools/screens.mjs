@@ -294,11 +294,11 @@ try {
     await sleep(1000);
     await shot(dev, "19-intermission");
     await br.evaluate(`document.getElementById("intermission").classList.add("hidden")`);
-    // losovanie arény (kocka) - počas skákania a pri odhalení; potom divácka opona (stav oboch strán)
+    // losovanie arény (kocka) - počas behu pásu a pri odhalení; potom divácka opona (stav oboch strán)
     await br.evaluate(`(async () => { const { startArenaRoll } = await import("/client/arena-roll.js"); startArenaRoll({ arena: "swamp" }); })()`);
     await sleep(1200);
     await shot(dev, "20-arenaroll");
-    await sleep(2000); // odhalenie ~2.8 s od štartu, výsledok drží do ~4.3 s
+    await sleep(3400); // odhalenie ~4 s od štartu, výsledok drží do ~5.5 s
     await shot(dev, "20b-arenaroll-result");
     await br.evaluate(`(async () => { (await import("/client/arena-roll.js")).stopArenaRoll(); })()`);
     await br.evaluate(`(async () => { const s = await import("/client/session.js"); s.setSpectator(true);
