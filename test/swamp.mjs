@@ -457,6 +457,10 @@ console.log("Medúza skamení Shreka");
   check(fx(t1, "shrek_stoned").length === 2 && fx(t1, "shrek_unpetrify").length === 1 && J(fx(t1, "shrek_jump").map(j => j.n)) === "[3]",
     "M2: skamenený vynechá 2 skoky, potom odkamenie a skočí", J(fx(t1, "shrek_jump")));
   check(s1.game.shrek.stone === 0 && s1.game.shrek.x === 2 && s1.game.shrek.y === 2, "M3: koniec kola - odkamenený na 3. políčku", J(s1.game.shrek));
+  // klient kreslí sochu podľa stavu framu: socha drží až do frame-u odkamenenia (nie skôr)
+  const petAt = idx(t1, e => e.kind === "shrek_petrify"), unAt = idx(t1, e => e.kind === "shrek_unpetrify");
+  check(t1.slice(petAt, unAt).every(f => f.shrek.stone > 0) && t1[unAt].shrek.stone === 0,
+    "M3b: socha vo všetkých framoch od skamenenia po odkamenenie (aj pri 2. STONED)", J(t1.slice(petAt, unAt + 1).map(f => f.shrek.stone)));
   // skamenený dostane dmg, ale bez výkriku a reakcie
   const s2 = scenario("fire", "lightning", (g) => shrekSet(g, { x: 1, y: 1, stone: 2, marks: QUIET }));
   const t2 = s2.round([atk("right"), PASS, PASS], PASS3);

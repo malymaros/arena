@@ -264,8 +264,9 @@ function shrekStepEnd(k, tl, stoned) {
   if (!to) return;
   // skamenený: skok vynechá (políčko sa ráta ako odskákané); po STONE_ACTIONS vynechaných skokoch odkamenie
   if (s.stone > 0) {
-    s.stone--; s.done = k + 1;
-    E.pushStateFrame(tl, [{ kind: "shrek_stoned", cell: [...to] }], SMALL_DELAY_MS);
+    s.done = k + 1;
+    E.pushStateFrame(tl, [{ kind: "shrek_stoned", cell: [...to] }], SMALL_DELAY_MS); // frame ešte so sochou (klient kreslí stav framu)
+    s.stone--;
     if (s.stone === 0) E.pushStateFrame(tl, [{ kind: "shrek_unpetrify", cell: [s.x, s.y] }], SMALL_DELAY_MS);
     return;
   }
