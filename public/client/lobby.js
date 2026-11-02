@@ -178,6 +178,7 @@ function build() {
   });
 
   $("lobby").addEventListener("click", (e) => {
+    if (aiLocked(e.target)) return; // zamknutá voľba (AI roomka)
     const arena = e.target.closest("#lobby-arena [data-arena]");
     const opt = e.target.closest(".opt-row[id] .opt");
     if (arena) { settings.main.arena = arena.dataset.arena; save(); renderMain(); }
@@ -192,6 +193,7 @@ function build() {
   const adv = $("lobby-adv");
   adv.addEventListener("click", (e) => {
     const c = settings.arenas[tab];
+    if (aiLocked(e.target)) return; // zamknutá aréna (AI roomka)
     const t = e.target.closest("#lobby-adv-tabs [data-tab]");
     const o = e.target.closest(".opt[data-k]");
     const s = e.target.closest(".w-step");
@@ -214,13 +216,24 @@ function build() {
   });
 }
 
+/* ---------- AI roomka: zamknuté voľby ---------- */
+// ostatné arény, kocka a turnaj ostávajú viditeľné, len zamknuté (🔒, .ai-locked) - proti botovi zatiaľ nie sú
+const AI_LOCKED = '#lobby-arena [data-arena]:not([data-arena="bridge"]), #lobby-adv-tabs [data-tab]:not([data-tab="bridge"]), #lobby-format .opt[data-val="tournament"]';
+const aiLocked = (el) => vsAi && !!el?.closest?.(AI_LOCKED);
+function markAiLocked() {
+  document.querySelectorAll(AI_LOCKED).forEach(el => {
+    el.classList.toggle("ai-locked", vsAi);
+    if (vsAi) el.title = "Not available vs AI yet"; else if (el.title === "Not available vs AI yet") el.removeAttribute("title");
+  });
+}
+
 /* ---------- Lobby (host nastavuje zápas) ---------- */
 export function showLobby(s) {
   vsAi = !!s?.vsAi;
-  document.body.classList.toggle("lobby-vs-ai", vsAi); // CSS skryje nepodporované arény a turnaj
   if (vsAi) tab = "bridge";
   $("lobby").classList.remove("hidden");
   if (!built) { settings = loadSettings(); build(); }
+  markAiLocked();
   renderMain();
 }
 // lobby zmizlo (zápas sa začal / iná fáza) - okno ADVANCED nesmie ostať visieť

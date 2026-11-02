@@ -246,6 +246,7 @@
 .phone .rooms-card { width: min(1000px, calc(var(--app-w) - 80px)); padding: 36px 40px; gap: 24px; }
 .phone .rooms-title { font-size: 56px; }
 .phone .rooms-list { gap: 20px; }
+.phone .lobby .ai-locked::after, .phone .lobby-adv .ai-locked::after { font-size: 26px; } /* zámok nedostupnej voľby v AI roomke */
 .phone .room-card { padding: 22px 26px; }
 .phone .room-label { font-size: 26px; }
 .phone .room-btn { padding: 24px 36px; font-size: 24px; }

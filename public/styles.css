@@ -3080,10 +3080,14 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 /* hra proti AI botovi (docs/AI_PLAN.md) */
 .room-card.ai{ box-shadow: inset 0 0 0 2px #5b3a8e; }
 .room-card.ai .room-label{ color: #c9a8ff; }
-/* lobby AI roomky: len Stone Bridge (bez kocky a ostatných arén) a bez turnaja */
-body.lobby-vs-ai #lobby-arena [data-arena]:not([data-arena="bridge"]),
-body.lobby-vs-ai #lobby-adv-tabs [data-tab]:not([data-tab="bridge"]),
-body.lobby-vs-ai #lobby-format .opt[data-val="tournament"]{ display: none; }
+/* lobby AI roomky: voľby, ktoré proti botovi zatiaľ nie sú (ostatné arény, kocka, turnaj), ostávajú na mieste,
+   len zamknuté - rovnaký zámok ako pri zamknutých tlačidlách v hre (.btn.locked-*) */
+.ai-locked{ position: relative; cursor: not-allowed; }
+/* stmavenie prekrytím (nie filtrom - ten by zošedil aj zámok) */
+.ai-locked::before{ content: ""; position: absolute; inset: 0; background: rgba(8,10,14,.62); pointer-events: none; z-index: 1; }
+/* zámok v strede voľby (prekrytie textu je zámer; karty arén majú overflow hidden - mimo by sa orezal) */
+.ai-locked::after{ content: "🔒"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 16px; line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; z-index: 2; }
 .room-btn.spectate{ background: #6a6d75; color: #10141a; }
 .room-btn:hover{ filter: brightness(1.1); }
 .room-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
