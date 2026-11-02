@@ -9,6 +9,7 @@
         "golden": "node test/golden.mjs",
         "golden:update": "node test/golden.mjs --update",
         "sim": "node tools/simulate.mjs",
+        "ai:bench": "node tools/ai-bench.mjs",
         "sounds": "node tools/sounds-report.mjs",
         "sounds:windows": "node tools/sound-windows.mjs"
     },

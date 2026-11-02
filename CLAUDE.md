@@ -17,6 +17,7 @@ npm test         # integration tests — boots the server on :3996, drives 2 soc
 npm run golden          # golden-master: 64 seeded matches (48 stone bridge + 16 portal realm), timelines compared to test/golden/*.json (server on :3995)
 npm run golden:update   # rewrite the golden files - only for a deliberate behaviour change, explain it in the commit
 npm run sim             # headless random-bot matches straight on the engine (tools/simulate.mjs, ~1 ms/match; `node tools/simulate.mjs 30 --portal` = Portal Realm + portal invariants, `--swamp` = Shrek Swamp + Shrek invariants)
+npm run ai:bench        # AI bot phase A0 (docs/AI_PLAN.md): round simulation from an exported state (exportState/loadState, io.noFrames) must match the real engine bit-for-bit + ms per simulated round
 node tools/difftest.mjs # engine at HEAD vs working tree on identical bot matches - must be 0 diffs for a pure refactor
 node tools/browser-smoke.mjs [--compare] [--portal|--swamp]  # CLIENT smoke test: headless Chrome/Edge spectates seeded bot matches (+ char-select hovers, a tournament) at 8× time; fails on JS errors / 4xx; --compare also runs HEAD and diffs the set of loaded sprite files; --portal / --swamp plays every match in Portal Realm / Shrek Swamp
 node tools/perf-probe.mjs [--ref <commit>] [--base tmp/perf/x.json]  # CLIENT performance on an emulated phone (CPU 4×): scripted match incl. Last Stand demon + Last Hope, per-window main-thread %, FPS, slow frames, style/paint ms → tmp/perf/; plan + results in docs/PERF_PLAN.md

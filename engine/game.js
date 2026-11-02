@@ -3,7 +3,7 @@
 // svetom ide cez háčiky v `io` (emit, emitState, emitYouAre, časovač, mená osôb, plánovač medzihry) -
 // bez nich engine beží headless (testy/simulácie). Kód je zatiaľ presunutý 1:1 zo server.js closure.
 import {
-  FORCE_FIRST_STARTER, ARENA_SEED, seededRng, BOARD, START_POS, START_HP,
+  FORCE_FIRST_STARTER, ARENA_SEED, seededRng, cloneData, BOARD, START_POS, START_HP,
   START_MANA, MAX_MANA, BASIC_COST, BASIC_DMG_MAX, MELEE_COST, MELEE_DMG,
   MELEE_REPEAT, SPECIAL_COST, WOLF_DIRS, SIDE_CHARS, DIAG_DIRS, VAMP_TRAP_DMG,
   VAMP_TRAP_BONUS, STONE_ACTIONS, CLONE_DMG, RECHARGE_GAIN,
@@ -303,8 +303,8 @@ function inBounds(x, y, board = game.board) {
 }
 
 function pushStateFrame(timeline, effects = [], delayMs = SMALL_DELAY_MS) {
-  const snap = snapshot();
-  const frame = { ...snap, effects, delayMs };
+  // io.noFrames (simulácie AI bota): frame bez snapshotu - engine framy nikdy nečíta, len ich posiela von
+  const frame = io.noFrames ? { effects, delayMs } : { ...snapshot(), effects, delayMs };
   if (actTag) Object.defineProperty(frame, "act", { value: actTag }); // neenumerovateľný - neserializuje sa
   timeline.push(frame);
 }
@@ -1669,7 +1669,7 @@ function finishRound() {
     const swampFx = shrekRoundEnd();
     const nextTurn    = game.turn + 1;
     const nextStarter = game.starter === "p1" ? "p2" : "p1"; // preklop (hru mohol začínať aj p2)
-    tl.push({ ...snapshot(), turn: nextTurn, starter: nextStarter, effects: [...spawned.map(p => ({ kind: "portal_spawn", id: p.id })), ...swampFx], delayMs: 10 });
+    tl.push({ ...(io.noFrames ? {} : snapshot()), turn: nextTurn, starter: nextStarter, effects: [...spawned.map(p => ({ kind: "portal_spawn", id: p.id })), ...swampFx], delayMs: 10 });
     game.turn    = nextTurn;
     game.starter = nextStarter;
   }
@@ -2096,8 +2096,18 @@ function autoLock() {
     me.draft = { queue: out, golden: !!d?.golden, goldenMirror: !!d?.goldenMirror, goldenMana: !!d?.goldenMana, lastStand: !!d?.lastStand, lastHope: !!d?.lastHope };
   }
 
+  // AI bot (docs/AI_PLAN.md): hlboká kópia stavu a jej načítanie do iného (simulačného) enginu.
+  // Medzi kolami je game čisté dáta (roundCtx = null). rng = vlastná náhoda simulácie, NIE herný rand.
+  function exportState() { return cloneData(game); }
+  function loadState(state, rng = null) {
+    game = state;
+    if (rng) rand = rng;
+    actionSteps = null; actTag = null;
+  }
+
   return {
     get game() { return game; },
+    exportState, loadState,
     newGame, snapshot, snapshotFor, redactTimelineFor, slotForPerson, otherPerson, seriesSnapshot,
     sanitizeConfig, startMatch, autoLock, resolveTurn, validQueue, fillFromDraft,
     chooseTeam, chooseCharacter, lockIn, timestopActions, draftQueue,

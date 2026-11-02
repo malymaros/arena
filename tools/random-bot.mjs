@@ -19,7 +19,7 @@ const TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "special1", "shield_breaker"];
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
 
-function candidate(rng, board, stone, isStarter) {
+export function candidate(rng, board, stone, isStarter) {
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
   const q = Array.from({ length: Math.min(3, stone || 0) }, () => ({ type: "stoned" }));
   const pool = [...TYPES];

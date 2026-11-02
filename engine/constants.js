@@ -17,6 +17,15 @@ export function seededRng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+// hlboká kópia čistých dát (objekty, polia, primitíva) - stav hry pre simulácie AI bota; ~niekoľkokrát
+// rýchlejšia než structuredClone pri malých objektoch
+export function cloneData(v) {
+  if (v === null || typeof v !== "object") return v;
+  if (Array.isArray(v)) return v.map(cloneData);
+  const out = {};
+  for (const k in v) out[k] = cloneData(v[k]);
+  return out;
+}
 
 /* -------------------- Game constants -------------------- */
 // čísla balansu (HP/mana, ceny, dmg postáv, dlaždice, multiplikátory) - jediný zdroj je shared/balance.js,
