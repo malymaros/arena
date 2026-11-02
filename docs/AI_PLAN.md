@@ -3,7 +3,24 @@
 Stav: **schválené 2026-11-02.** A0 hotové (`exportState`/`loadState` + `io.noFrames`, `tools/ai-bench.mjs`: ~9 400
 simulovaných kôl/s na jadro). A1 hotové (`engine/ai/view.js` belief + determinizácie, `engine/ai/sim.js`, `test/ai-view.mjs`).
 A2 hotové (`candidates.js`, `eval.js`, `solve.js`, `bot.js` - maticová hra + double oracle, rozpočet v ms alebo
-deterministicky v počte simulácií; `tools/ai-vs.mjs`: 30/30 proti náhodnému botovi pri 1 500 simuláciách; `test/ai-bot.mjs`).
+deterministicky v počte simulácií; `tools/ai-vs.mjs`; `test/ai-bot.mjs`). A3 hotové (features per postava, `tools/ai-tune.mjs`;
+váhy ostali ručné - pozri „Merania"). A4 hotové (PLAY VS AI, `worker.js` + `seat.js`, `test/ai-room.mjs`). A5 hotové (`model.js`,
+`tools/scripted-bots.mjs`, `tools/ai-duel.mjs`).
+
+## Merania (2026-11-02, deterministický rozpočet `budgetSims`)
+
+| Test | Výsledok |
+|---|---|
+| bot vs náhodný bot | 30/30 (1 500 sim), 8/8 v `test/ai-bot.mjs` (600 sim) |
+| ladenie váh self-play (4 generácie, 3 200 hier, 35 tis. stavov) | naučené váhy v dueli 46,4 % ±2,8 proti ručným → **zamietnuté**, ostávajú ručné |
+| rozpočet 6 000 vs 1 500 sim / 1 500 vs 150 sim (bot vs bot) | 51,5 % / 50,6 % - medzi dvoma „rovnovážnymi" hráčmi viac výpočtu nepomáha (simultánne hádanie) |
+| bot vs exploit štýly (120 hier, 1 500 sim) | shieldy 73 %, turtle 79 %, aggro 78 %, greedy 64 % |
+| model súpera zap. vs vyp. | vs shieldy +4 b., ostatné ±1 b. (v šume); bot vs bot 49,5 % - neškodí |
+
+Zistenia: (1) self-play silu takmer nemeria - hra je z veľkej časti simultánne hádanie, rovnováha proti rovnováhe je ~50 %;
+(2) jednoduché vzory „útok smerom k súperovi" sú na doske 4×3 slušná stratégia a **spam specialov (greedy) je najsilnejší**
+z testovaných vzorov - podnet pre balans; (3) skutočnú silu ukážu až hry s ľuďmi (telemetria AI roomiek) - ďalší krok A6:
+ladenie hodnotenia a modelu súpera na hrách človek vs bot.
 
 Cieľ: jeden bot, ktorý hrá **čo najlepšie** a **nepodvádza** — rozhoduje len z toho, čo by na jeho mieste
 videl človek. Žiadne úrovne obtiažnosti.

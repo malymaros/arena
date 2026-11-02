@@ -58,6 +58,11 @@ function loadSettings() {
   return st;
 }
 let settings = null; // načíta sa pri prvom zobrazení lobby (showLobby)
+// roomka proti AI botovi (snapshot vsAi): len Stone Bridge a single / bo3 - uložené voľby sa neprepisujú,
+// len sa pre túto roomku čítajú obmedzene (main())
+let vsAi = false;
+const main = () => !vsAi ? settings.main
+  : { ...settings.main, arena: "bridge", format: settings.main.format === "tournament" ? "single" : settings.main.format };
 let savedFlash = 0;
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch {}
@@ -73,7 +78,7 @@ const isValid = (a) => {
   return a === "swamp" ? sum(c.items) === 100 : sum(c.tiles) === 100 && (a !== "portal" || sum(c.portals) === 100);
 };
 // arény, ktorých nastavenia sa pri štarte použijú (kocka = všetky tri)
-const arenasInPlay = () => settings.main.arena === "random" ? ARENA_KEYS : [settings.main.arena];
+const arenasInPlay = () => main().arena === "random" ? ARENA_KEYS : [main().arena];
 
 /* ---------- config pre server ---------- */
 // pravidlá jednej arény v tvare configu (bez kľúča arena) - rovnaké polia ako predtým pri ručnom výbere arény
@@ -86,7 +91,7 @@ function arenaRules(a) {
 }
 // stone bridge = bez kľúča arena; kocka = "random" + pravidlá všetkých troch arén (server jednu vylosuje)
 function matchConfig() {
-  const m = settings.main;
+  const m = main();
   const common = { format: m.format, timer: m.timer, colorPref: m.color, randomChars: m.randomChars === "on" };
   if (m.arena === "random") return { ...common, arena: "random", arenas: Object.fromEntries(ARENA_KEYS.map(a => [a, arenaRules(a)])) };
   return { ...common, ...(m.arena === "bridge" ? {} : { arena: m.arena }), ...arenaRules(m.arena) };
@@ -94,7 +99,7 @@ function matchConfig() {
 
 /* ---------- hlavné lobby ---------- */
 function renderMain() {
-  const m = settings.main, rnd = m.arena === "random";
+  const m = main(), rnd = m.arena === "random";
   $("lobby-arena").querySelectorAll("[data-arena]").forEach(c => c.classList.toggle("active", c.dataset.arena === m.arena));
   $("lobby-arena").classList.toggle("pool", rnd); // kocka: všetky tri arény sú „v losovaní"
   for (const [k, id] of Object.entries(MAIN_ROWS)) {
@@ -149,7 +154,7 @@ function renderAdv() {
   $("lobby-adv-done").disabled = !ARENA_KEYS.every(isValid); // zavrieť sa dá, až keď všetky súčty sedia
 }
 function openAdv() {
-  tab = settings.main.arena === "random" ? "bridge" : settings.main.arena;
+  tab = main().arena === "random" ? "bridge" : main().arena;
   $("lobby-adv").classList.remove("hidden");
   renderAdv();
 }
@@ -210,7 +215,10 @@ function build() {
 }
 
 /* ---------- Lobby (host nastavuje zápas) ---------- */
-export function showLobby() {
+export function showLobby(s) {
+  vsAi = !!s?.vsAi;
+  document.body.classList.toggle("lobby-vs-ai", vsAi); // CSS skryje nepodporované arény a turnaj
+  if (vsAi) tab = "bridge";
   $("lobby").classList.remove("hidden");
   if (!built) { settings = loadSettings(); build(); }
   renderMain();

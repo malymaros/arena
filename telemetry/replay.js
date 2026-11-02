@@ -61,7 +61,8 @@ export function normalize(r) {
 
 // porovná log so znova odvodenými záznamami - vracia prvý rozdiel alebo null
 export function diffReplay(recs, replayed) {
-  const a = recs.map(r => JSON.stringify(normalize(r)));
+  // { t: "ai" } = anotácia roomky proti AI botovi (strana bota), nie vstup ani fakt - replay ho neodvodzuje
+  const a = recs.filter(r => r.t !== "ai").map(r => JSON.stringify(normalize(r)));
   const b = replayed.map(r => JSON.stringify(normalize(r)));
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
     if (a[i] !== b[i]) return { index: i, logged: a[i] ?? null, replayed: b[i] ?? null };

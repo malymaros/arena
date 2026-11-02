@@ -10,6 +10,7 @@ import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { createRecordedEngine } from "./telemetry/recorder.js";
 import { createJsonlStore } from "./telemetry/store.js";
+import { createBotSeat } from "./engine/ai/seat.js";
 import { ARENA_ROLL_MS, COLOR_ROLL_MS, charRollMs } from "./shared/timing.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -129,6 +130,8 @@ const browsing = new Set();                 // sockety na room-browseri (ešte n
 const rooms = new Map();                    // id -> Room (objekt z createRoom)
 let nextRoomId = 1;                         // rastúci identifikátor roomiek
 const MAX_ROOMS = 2;                        // cap: max toľko roomiek naraz
+// AI bot (docs/AI_PLAN.md): čas na rozhodnutie kola; bot počíta vo worker vlákne, server nečaká
+const AI_BUDGET_MS = Math.max(200, Math.min(10000, Number(process.env.AI_BUDGET_MS) || 5000));
 
 // Validácia zobrazovaného mena: 1–8 znakov anglickej abecedy, nič iné (žiadne emoji/diakritika/medzery).
 function validateName(raw) {
@@ -146,7 +149,9 @@ function okAdmin(keyFromClient) {
 // Celý herný stav a logika žijú v closure jednej roomky. Funkcie referencujú `game`, `personSockets`,
 // `turnTimer`… lexikálne - každá roomka má vlastnú kópiu. Globálne konštanty (HP/mana/CHARS/*_MS…) a
 // pure helpery (validateName, okAdmin, rollTileType…) sa čítajú z module scope cez closure.
-function createRoom(id) {
+// ai = roomka proti AI botovi: bot sedí ako osoba B (virtuálny socket, engine/ai/seat.js)
+function createRoom(id, { ai = false } = {}) {
+  const botPerson = ai ? "B" : null;
   /* -------------------- Game state (per-room) -------------------- */
   // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
   // ktorá sa medzi hrami série prehadzuje (štartér danej hry vždy sedí v p1 = vľavo)
@@ -169,7 +174,8 @@ function createRoom(id) {
     timerRemainingMs: () => timerRemainingMs(),
     names: () => personNames,
     awaitingOpponent: () => pendingMatchConfig != null,
-  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta });
+    vsAi: () => ai,
+  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson });
   const { snapshot, snapshotFor, redactTimelineFor, slotForPerson, startMatch, newGame, sanitizeConfig } = engine;
 
   // per-room emit: nahrádza io.emit - pošle len hráčom A/B a divákom TEJTO roomky (nie cudzím)
@@ -311,11 +317,11 @@ function onTurnTimeout() {
     return !!personSockets[p] || (!!personIds[p] && Date.now() - personFreedAt[p] <= RECLAIM_GRACE_MS);
   }
   // obaja hráči preč (ani jeden nažive) → roomka je prázdna
-  function roomEmpty() { return !personAlive("A") && !personAlive("B"); }
+  function roomEmpty() { return ["A", "B"].filter(p => p !== botPerson).every(p => !personAlive(p)); } // bot sa nepočíta
   // riadok tejto roomky pre room-browser (počet hráčov, či sa dá pripojiť)
   function roomsRow() {
     const players = ["A", "B"].filter(personAlive).length;
-    return { id, players, max: 2, canJoin: players < 2, phase: engine.game.phase };
+    return { id, players, max: 2, canJoin: players < 2, phase: engine.game.phase, ...(ai ? { ai: true } : {}) };
   }
   // voľné miesto (nie je obsadené živým socketom ani grace-held tokenom)
   function isFree(p) { return !personSockets[p] && (!personIds[p] || Date.now() - personFreedAt[p] > RECLAIM_GRACE_MS); }
@@ -337,6 +343,7 @@ function onTurnTimeout() {
   // zruš túto roomku: vyčisti stav a časovače, odstráň z registra, diváci sa vrátia na room-browser
   function destroySelf() {
     engine.abort("abandoned");
+    if (botPerson) personSockets[botPerson]?.disconnect?.(); // ukonči worker bota
     clearTurnTimer();
     if (roomDestroyTimer) { clearTimeout(roomDestroyTimer); roomDestroyTimer = null; }
     personSockets.A = null; personSockets.B = null;
@@ -437,6 +444,12 @@ function onTurnTimeout() {
   function onConfigure(socket, raw) {
     if (socket.data.person !== "A") return;   // konfiguruje len host
     if (engine.game.phase !== "lobby") return;        // len pred začiatkom zápasu
+    // proti AI: zatiaľ len Stone Bridge, single / bo3 (bot nevie draftovať tím, arény ešte neladil)
+    if (ai && raw && typeof raw === "object") {
+      raw = { ...raw, format: raw.format === "bo3" ? "bo3" : "single" };
+      delete raw.arena; delete raw.arenas; delete raw.portalWeights; delete raw.portalsPerRound;
+      delete raw.itemsPerRound; delete raw.itemWeights; delete raw.shrekPreview;
+    }
     const config = sanitizeConfig(raw);
     if (!config) return;
     if (personAlive("B")) {
@@ -480,6 +493,36 @@ function onTurnTimeout() {
     broadcastRooms();              // ostatní na room-browseri vidia aktuálny počet hráčov
   }
 
+  /* -------------------- AI bot (osoba B v AI roomke) -------------------- */
+  // rozhodnutie z workera zahrá cez rovnaké príkazy enginu ako socket hráča; zastarané (iné kolo/hra) zahodí
+  function onBotDecision(d) {
+    const g = engine.game, person = botPerson;
+    if (!person || g.phase !== "playing" || (g.series?.gameIndex ?? 1) !== d.game) return;
+    if (d.kind === "character") { engine.chooseCharacter(person, d.char); return; }
+    if (d.kind === "timestop") {
+      let ok = false;
+      engine.timestopActions(person, d.queue, (r) => { ok = !!r?.ok; });
+      if (!ok && g.timestop?.mode === "waiting" && g.timestop.slot === slotForPerson(person))
+        engine.timestopActions(person, [{ type: "recharge" }, { type: "shield" }, { type: "move", dir: "up" }]);
+      return;
+    }
+    let ok = false;
+    engine.lockIn(person, d.queue, d.turn, (r) => { ok = !!r?.ok; });
+    const me = g.players[slotForPerson(person)];
+    if (!ok && g.turn === d.turn && !me.locked) {
+      // poistka (nemalo by nastať): platná fronta z kameňov + passov, nech hra nezamrzne
+      console.error("[ai] engine odmietol frontu bota:", JSON.stringify(d.queue));
+      const stone = Math.min(3, me.stone || 0);
+      engine.lockIn(person, Array.from({ length: 3 }, (_, i) => ({ type: i < stone ? "stoned" : "pass" })), d.turn);
+    }
+  }
+  let seatBot = null;
+  if (ai) {
+    const sock = createBotSeat({ seed: crypto.randomInt(2 ** 31), budgetMs: AI_BUDGET_MS, onDecision: (d) => onBotDecision(d) });
+    sock.data.pendingName = "AI";
+    seatBot = () => seat(sock, botPerson);
+  }
+
   // kontext pre bug report: zápas v telemetrii (replay), hra, kolo, fáza a strana hlásiaceho (bez identity)
   function bugContext(socket) {
     const g = engine.game;
@@ -490,7 +533,7 @@ function onTurnTimeout() {
   }
 
   return {
-    id, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset, bugContext,
+    id, ai, seatBot, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset, bugContext,
     isEmpty: roomEmpty, onConfigure, onChooseTeam, onChooseCharacter, onLockIn, onTimestopActions, onDraftQueue, onRetry, onDisconnect,
   };
 }
@@ -580,12 +623,13 @@ io.on("connection", (socket) => {
   broadcastRooms();
 
   // --- Room lifecycle (globálny routing) ---
-  socket.on("create_room", () => {
+  socket.on("create_room", (arg) => {
     if (socket.data.person || socket.data.roomId) return; // už niekde je
     if (rooms.size >= MAX_ROOMS) return;                  // limit počtu roomiek
-    const room = createRoom(nextRoomId++);
+    const room = createRoom(nextRoomId++, { ai: arg?.ai === true });
     rooms.set(room.id, room);
     room.seat(socket, "A"); // tvorca = host (osoba A) a nastaví parametre zápasu
+    if (room.ai) room.seatBot(); // súper = AI bot (osoba B)
     broadcastRooms();
   });
   socket.on("join_room", (arg) => {

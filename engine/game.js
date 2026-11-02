@@ -245,6 +245,8 @@ function snapshot() {
     names: { p1: io.names?.()?.[game.seats.p1] || null, p2: io.names?.()?.[game.seats.p2] || null },
     // host stlačil START, no 2. hráč ešte nie je → klient hosta ukáže „čakám na druhého hráča"
     awaitingOpponent: !!io.awaitingOpponent?.(),
+    // roomka proti AI botovi (docs/AI_PLAN.md) - lobby ponúkne len podporované nastavenia; kľúč len v AI roomke
+    ...(io.vsAi?.() ? { vsAi: true } : {}),
     // Jotaro THE WORLD: kým čaká na 3 zmrazené akcie, klient (obaja) vie prepnúť UI mód (neutrálne - len slot)
     timestop: (game.timestop && game.timestop.mode === "waiting") ? { slot: game.timestop.slot } : null,
     board: { ...game.board },

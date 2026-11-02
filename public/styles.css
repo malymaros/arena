@@ -3077,6 +3077,13 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 }
 .room-btn.create{ width: 100%; padding: 18px; font-size: 14px; }
 .room-btn.reset{ width: 100%; padding: 18px; font-size: 14px; background: #8e0000; color: #fff; }
+/* hra proti AI botovi (docs/AI_PLAN.md) */
+.room-btn.create.ai{ background: #5b3a8e; color: #fff; }
+.room-tag-ai{ margin-left: 8px; padding: 1px 6px; background: #5b3a8e; color: #fff; font-size: .8em; }
+/* lobby AI roomky: len Stone Bridge (bez kocky a ostatných arén) a bez turnaja */
+body.lobby-vs-ai #lobby-arena [data-arena]:not([data-arena="bridge"]),
+body.lobby-vs-ai #lobby-adv-tabs [data-tab]:not([data-tab="bridge"]),
+body.lobby-vs-ai #lobby-format .opt[data-val="tournament"]{ display: none; }
 .room-btn.spectate{ background: #6a6d75; color: #10141a; }
 .room-btn:hover{ filter: brightness(1.1); }
 .room-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }

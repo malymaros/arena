@@ -10,6 +10,7 @@ import { baseQueues, extraVariants, queueKey } from "./candidates.js";
 import { evaluate } from "./eval.js";
 import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
+import { createOpponentModel } from "./model.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "shield_breaker", "special1"];
@@ -17,7 +18,7 @@ const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left",
 
 // budgetMs = čas na rozhodnutie; budgetSims (voliteľné) = deterministický režim pre testy a self-play: „čas"
 // sa meria počtom simulácií (budgetSims simulácií = budgetMs), takže výsledok nezávisí od rýchlosti CPU
-export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, log = null } = {}) {
+export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, model = true, log = null } = {}) {
   const belief = createBelief();
   const rng = seededRng(seed);
   const sim = createSim(), tsSim = createSim();
@@ -128,16 +129,21 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const vMe = (q, o) => value(q, o), vOpp = (o, q) => -value(q, o);
     const left = () => deadline - now();
 
-    // rozpočet v dvojiciach front: ~15 % predvýber každej strany, ~15 % matica, zvyšok double oracle
+    // rozpočet v dvojiciach front: ~20 % predvýber každej strany, ~15 % matica, zvyšok double oracle
     const pairs = Math.max(200, left() * rate / D);
-    const NPROBE = 4;
-    const sampleN = clamp(Math.floor(pairs * 0.15 / NPROBE), 30, 4000);
     const K = clamp(Math.floor(Math.sqrt(pairs * 0.15)), 8, 40);
+    const sampleN = clamp(Math.floor(pairs * 0.14 / 2), 60, 6000);
 
-    // 1. sondy: malá rôznorodá vzorka súperových / mojich front; predvýber najlepších proti nim
-    const probesOpp = oppPool.slice(0, NPROBE), probesMe = myPool.slice(0, NPROBE);
-    const pm = prefilter(myPool.slice(0, sampleN), probesOpp, vMe, K, now() + left() * 0.2);
-    const po = prefilter(oppPool.slice(0, sampleN), probesMe, vOpp, K, now() + left() * 0.25);
+    // 1. predvýber v dvoch stupňoch: čo najviac front proti 2 sondám (hrubé sito), potom 3K najlepších
+    //    dôkladnejšie proti 6 sondám (prvé 2 sú už v cache) → K do matice
+    const probesOpp = oppPool.slice(0, 6), probesMe = myPool.slice(0, 6);
+    const stage = (pool, probes, score, share) => {
+      const a = prefilter(pool.slice(0, sampleN), probes.slice(0, 2), score, 3 * K, now() + left() * share);
+      const b = prefilter(a.top, probes, score, K, now() + left() * share);
+      return { top: b.top, all: [...b.all, ...a.all.slice(3 * K)] };
+    };
+    const pm = stage(myPool, probesOpp, vMe, 0.2);
+    const po = stage(oppPool, probesMe, vOpp, 0.25);
     // golden doplnky (predťah / golden mana / last stand / last hope) k najlepším základným frontám
     const withExtras = (top, slot) => {
       const out = [...top];
@@ -146,6 +152,17 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     };
     let R = withExtras(pm.top, me);
     const C = withExtras(po.top, opp);
+    // model súpera: fronty s jeho opakovanými vzormi typov akcií pridaj do matice, aj keď nie sú „rovnovážne"
+    const om = model ? createOpponentModel(belief.history) : null;
+    const useModel = !!om && om.observations >= 2 && om.weight > 0.05;
+    if (useModel) for (const pat of om.patterns()) {
+      let added = 0;
+      for (const q of oppPool) {
+        if (added >= 6) break;
+        if (q.map(a => a.type).join(" ") !== pat || C.includes(q)) continue;
+        C.push(q); added++;
+      }
+    }
     // pool pre najlepšie odpovede: ohodnotené (s doplnkami) a potom zvyšok neohodnotených
     const fullR = [...R, ...pm.all.slice(K), ...myPool.slice(sampleN)];
     const fullC = [...C, ...po.all.slice(K), ...oppPool.slice(sampleN)];
@@ -161,23 +178,42 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       return M;
     };
     let sol = solveMatrix(matrix());
-    // 3. double oracle: najlepšie odpovede z celého poolu, kým je čas
-    for (let it = 0; it < 30 && left() > 0; it++) {
+    // 3. double oracle: najlepšie odpovede z celého poolu, kým je čas (s modelom ostane rezerva na využitie)
+    const reserve = useModel ? (deadline - t0) * 0.15 : 0;
+    const doLeft = () => left() - reserve;
+    for (let it = 0; it < 30 && doLeft() > 0; it++) {
       let added = false;
       const colSup = C.map((c, j) => [c, sol.col[j]]).filter(([, p]) => p > 0.01);
-      const br = bestResponse(fullR, colSup, vMe, 1, sol.value + 0.005, now() + left() / 3);
+      const br = bestResponse(fullR, colSup, vMe, 1, sol.value + 0.005, now() + doLeft() / 3);
       if (br && !R.includes(br)) { R.push(br); added = true; }
       const rowSup = R.map((r, i) => [r, sol.row[i] ?? 0]).filter(([, p]) => p > 0.01);
-      const bo = bestResponse(fullC, rowSup, (o, r) => value(r, o), -1, sol.value - 0.005, now() + left() / 2);
+      const bo = bestResponse(fullC, rowSup, (o, r) => value(r, o), -1, sol.value - 0.005, now() + doLeft() / 2);
       if (bo && !C.includes(bo)) { C.push(bo); added = true; }
       if (!added) break;
       sol = solveMatrix(matrix());
     }
-    const i = sampleMix(sol.row, rng);
+    // 4. model súpera: predpokladaná zmes = Nash posunutý k modelu; moja zmes = Nash posunutý k najlepšej
+    //    odpovedi na ňu - o váhu modelu (max 0.5), takže proti silnému hráčovi ostáva polovica rovnováhy
+    let mix = sol.row;
+    if (useModel && sol.col.length === C.length) {
+      const oppMana = s0.players[opp].mana;
+      const sc = C.map(c => om.score(c, oppMana)), tot = sc.reduce((a, b) => a + b, 0) || 1;
+      const lam = om.weight;
+      const qmix = C.map((c, j) => (1 - lam) * sol.col[j] + lam * sc[j] / tot);
+      const sup = C.map((c, j) => [c, qmix[j]]).filter(([, p]) => p > 0.005);
+      const br = bestResponse(fullR, sup, vMe, 1, -Infinity, deadline);
+      if (br) {
+        let bi = R.indexOf(br);
+        if (bi < 0) { R.push(br); bi = R.length - 1; }
+        mix = R.map((r, k) => (1 - lam) * (sol.row[k] ?? 0) + (k === bi ? lam : 0));
+      }
+    }
+    const i = sampleMix(mix, rng);
     const ms = now() - t0;
     if (ms > 50 && !budgetSims) rate = 0.7 * rate + 0.3 * ((stats.sims - sims0) / D / ms);
     log?.({ kind: "round", ms: Math.round(ms), R: R.length, C: C.length, pool: [myPool.length, oppPool.length], D,
-      value: +sol.value.toFixed(3), pick: queueKey(R[i]), p: +sol.row[i].toFixed(2), sims: stats.sims - sims0 });
+      value: +sol.value.toFixed(3), pick: queueKey(R[i]), p: +mix[i].toFixed(2), sims: stats.sims - sims0,
+      ...(useModel ? { model: om.observations } : {}) });
     return R[i];
   }
 

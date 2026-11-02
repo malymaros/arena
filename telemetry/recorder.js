@@ -97,6 +97,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
   const {
     sink = null, now = Date.now, newId = () => crypto.randomBytes(6).toString("hex"),
     seed: seedFn = () => ARENA_SEED ?? crypto.randomInt(2 ** 32), meta = {},
+    aiPerson = null, // roomka proti AI botovi: osoba bota → po rozsadení záznam { t: "ai", side } (len strana, nie osoba)
   } = opts;
   let m = null;        // id práve zapisovaného zápasu (null = nič sa nezapisuje)
   let seed = null;     // seed aktuálneho zápasu - engine si ho prečíta v startMatch (io.seed)
@@ -201,6 +202,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
     write({ t: "match_start", v: SCHEMA, ts: new Date(t0).toISOString(), ...meta, seed,
       forceFirst: FORCE_FIRST_STARTER || null, config: copy(config) });
     engine.startMatch(config);
+    if (aiPerson) write({ t: "ai", at: at(), side: sideOf(aiPerson) }); // replay neznámy typ ignoruje
   }
 
   function chooseTeam(person, keys) {

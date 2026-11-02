@@ -85,7 +85,7 @@ export function createBelief() {
     observeFrame({ ...root, effects: [] }, ctx);
     // pasca: súperova smrť / nová postava ju ruší; ak súper nie je upír, pasca nie je
     if (!VAMP.has(root[other(b.mySlot)]?.char)) b.oppTrap = false;
-    if (timeline && ctx.oppActions.length) b.history.push({ turn: b.view?.turn ?? null, actions: ctx.oppActions });
+    if (timeline && ctx.oppActions.length) b.history.push({ turn: b.view?.turn ?? null, mana: b.view?.[other(b.mySlot)]?.mana ?? null, actions: ctx.oppActions });
     b.view = root;
   };
   return b;

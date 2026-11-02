@@ -4,10 +4,12 @@
 //   --sims n     deterministický rozpočet: n simulácií na rozhodnutie (namiesto času)
 //   --vs random  bot (osoba B) proti náhodnému botovi (tools/random-bot.mjs) - cieľ ≥ 98 % výhier
 //   --vs bot     bot proti botu (rovnaké nastavenie, rôzne seedy) - sanity / ladenie
+//   --vs shieldy|aggro|turtle|greedy  bot proti predvídateľnému štýlu (tools/scripted-bots.mjs)
 import { createEngine } from "../engine/game.js";
 import { CHARS, SIDE_CHARS, seededRng } from "../engine/constants.js";
 import { createBot } from "../engine/ai/bot.js";
 import { botLock, botTimestop } from "./random-bot.mjs";
+import { scriptedLock } from "./scripted-bots.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (name, def) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : def; };
@@ -17,6 +19,7 @@ const SIMS = opt("--sims", null) ? Number(opt("--sims")) : null; // deterministi
 const VS = opt("--vs", "random");
 const CHARS_ARG = opt("--chars", null)?.split(",");
 const LOG = argv.includes("--log");
+const NO_MODEL = argv.includes("--no-model"); // bot bez modelu súpera (porovnanie A5)
 
 const poolFor = (slot) => [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
 
@@ -39,7 +42,7 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
     },
     emitYouAre: () => {},
   });
-  for (const person of ["A", "B"]) if (players[person] === "bot") bots[person] = createBot({ seed: seed * 31 + (person === "A" ? 1 : 2), budgetMs, budgetSims, log, ...(botOpts[person] || {}) });
+  for (const person of ["A", "B"]) if (players[person] === "bot") bots[person] = (botOpts[person]?.create || createBot)({ seed: seed * 31 + (person === "A" ? 1 : 2), budgetMs, budgetSims, log, ...(NO_MODEL ? { model: false } : {}), ...(botOpts[person] || {}) });
   engine.startMatch(engine.sanitizeConfig({
     format: "single", tilesPerRound: 2, timer: "off", tilePreview: true, colorPref: "random",
     tileWeights: { dmg: 50, heal: 10, mana: 10, ik: 10, power: 10, block: 10 },
@@ -75,6 +78,8 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
         let ok = false;
         if (d?.queue) engine.lockIn(person, d.queue, g.turn, (r) => { ok = !!r?.ok; });
         if (!ok) { log?.({ kind: "reject", person, queue: d?.queue }); botLock(engine, person, rng[person]); }
+      } else if (players[person]?.startsWith("script:")) {
+        if (!scriptedLock(engine, person, players[person].slice(7))) botLock(engine, person, rng[person]);
       } else botLock(engine, person, rng[person]);
       if (result) break;
     }
@@ -86,7 +91,7 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
 }
 
 if (process.argv[1]?.endsWith("ai-vs.mjs")) {
-  const players = VS === "bot" ? { A: "bot", B: "bot" } : { A: "random", B: "bot" };
+  const players = VS === "bot" ? { A: "bot", B: "bot" } : { A: VS === "random" ? "random" : "script:" + VS, B: "bot" };
   const t0 = performance.now();
   let wins = 0, done = 0, rounds = 0, sims = 0;
   const losses = [];
@@ -98,6 +103,6 @@ if (process.argv[1]?.endsWith("ai-vs.mjs")) {
     process.stdout.write(`\r${done}/${N}  B vyhral ${wins}  (${(100 * wins / done).toFixed(0)} %)   `);
   }
   const s = (performance.now() - t0) / 1000;
-  console.log(`\n${VS === "bot" ? "bot vs bot" : "bot (B) vs random (A)"}: B vyhral ${wins}/${N} (${(100 * wins / N).toFixed(1)} %), ${(rounds / N).toFixed(1)} kôl/zápas, ${s.toFixed(0)} s, ${Math.round(sims / s)} sim/s`);
+  console.log(`\n${VS === "bot" ? "bot vs bot" : `bot (B) vs ${VS} (A)`}: B vyhral ${wins}/${N} (${(100 * wins / N).toFixed(1)} %), ${(rounds / N).toFixed(1)} kôl/zápas, ${s.toFixed(0)} s, ${Math.round(sims / s)} sim/s`);
   if (losses.length && losses.length <= 15) console.log("Prehry / remízy B:\n  " + losses.join("\n  "));
 }
