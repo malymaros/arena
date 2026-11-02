@@ -29,7 +29,12 @@ try {
   const c = { rooms: null, slot: null, state: null, result: null, over: null, timelines: 0 };
   sock.on("rooms", (r) => { c.rooms = r; });
   sock.on("you_are", (s) => { c.slot = s.slot; });
-  sock.on("state", (s) => { c.state = s; if (s.timeline) c.timelines++; });
+  sock.on("state", (s) => {
+    c.state = s; if (s.timeline) c.timelines++;
+    // bot nesmie zamknúť skôr ako hráč (hráč nikdy nevidí „OPPONENT IS READY")
+    const opp = c.slot === "p1" ? "p2" : "p1";
+    if (s.phase === "playing" && c.slot && s[opp]?.locked && !s[c.slot]?.locked && !s.timeline) c.oppReadyFirst = true;
+  });
   sock.on("game_result", (r) => { c.result = r; });
   sock.on("game_over", (r) => { c.over = r; });
   if (!await until(() => c.rooms, 20000, "zoznam roomiek")) throw new Error("server nenaštartoval");
@@ -68,6 +73,7 @@ try {
   }
   if (c.result) pass(`zápas proti botovi dohraný za ${round} kôl (víťaz ${c.result.gameWinner})`);
   if (c.over) pass("game_over prišiel"); else fail("chýba game_over");
+  if (c.oppReadyFirst) fail("bot zamkol skôr ako hráč (OPPONENT IS READY)"); else pass("bot nikdy nezamkol skôr ako hráč");
   if (/\[ai\]/.test(serverErr)) fail("server hlási chybu bota: " + serverErr.split("\n").find(l => l.includes("[ai]")));
   else pass("bez chýb bota na serveri");
   // odchod hráča → roomka (aj s workerom bota) zanikne hneď - bot ju nedrží nažive

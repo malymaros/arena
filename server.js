@@ -310,6 +310,7 @@ function armTurnTimer(intendedMs) {
 function onTurnTimeout() {
   turnTimer = null;
   turnDeadline = null;
+  flushBotRound(); // AI roomka: podržaný ťah bota ide pred automatickým zamknutím (inak by ho prepísali passy)
   engine.autoLock();
 }
 
@@ -345,6 +346,7 @@ function onTurnTimeout() {
   // zruš túto roomku: vyčisti stav a časovače, odstráň z registra, diváci sa vrátia na room-browser
   function destroySelf() {
     engine.abort("abandoned");
+    if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null;
     if (botPerson) personSockets[botPerson]?.disconnect?.(); // ukonči worker bota
     clearTurnTimer();
     if (roomDestroyTimer) { clearTimeout(roomDestroyTimer); roomDestroyTimer = null; }
@@ -466,7 +468,10 @@ function onTurnTimeout() {
 
   function onChooseCharacter(socket, key) { engine.chooseCharacter(socket.data.person, key); }
 
-  function onLockIn(socket, queue, clientTurn, ack) { engine.lockIn(socket.data.person, queue, clientTurn, ack); }
+  function onLockIn(socket, queue, clientTurn, ack) {
+    engine.lockIn(socket.data.person, queue, clientTurn, ack);
+    if (botPending && socket.data.person !== botPerson) releaseBotRound(); // hráč zamkol → bot „dopremýšľa"
+  }
 
   function onTimestopActions(socket, queue, ack) { engine.timestopActions(socket.data.person, queue, ack); }
 
@@ -475,6 +480,7 @@ function onTurnTimeout() {
   function onRetry(socket) {
     if (!socket.data.person) return; // divák hru reštartovať nesmie
     clearTurnTimer();
+    if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null; // starý podržaný ťah bota
     newGame();
     roomEmit("reset");
     roomEmit("state", snapshot());
@@ -508,6 +514,25 @@ function onTurnTimeout() {
         engine.timestopActions(person, [{ type: "recharge" }, { type: "shield" }, { type: "move", dir: "up" }]);
       return;
     }
+    // ťah kola bot NEzamyká skôr ako hráč (hráč nikdy nevidí „OPPONENT IS READY" a bot mu nespúšťa odpočet
+    // quick-draw): rozhodnutie sa podrží a zahrá sa až po hráčovom zamknutí (releaseBotRound)
+    botPending = d;
+    const human = g.players[slotForPerson(person === "A" ? "B" : "A")];
+    if (human.locked) releaseBotRound();
+  }
+  // hráč zamkol: bot zamkne po krátkom náhodnom „dopremýšľaní" (0,6-1,5 s; náhodné, nezávislé od ťahu -
+  // dĺžka nesmie prezrádzať, čo bot hrá)
+  function releaseBotRound() {
+    if (botTimer) return;
+    botTimer = setTimeout(() => { botTimer = null; flushBotRound(); }, 600 + Math.random() * 900);
+  }
+  function flushBotRound() {
+    if (botTimer) { clearTimeout(botTimer); botTimer = null; }
+    const d = botPending;
+    botPending = null;
+    if (!d) return;
+    const g = engine.game, person = botPerson;
+    if (!person || g.phase !== "playing" || (g.series?.gameIndex ?? 1) !== d.game || g.turn !== d.turn) return;
     let ok = false;
     engine.lockIn(person, d.queue, d.turn, (r) => { ok = !!r?.ok; });
     const me = g.players[slotForPerson(person)];
@@ -518,6 +543,7 @@ function onTurnTimeout() {
       engine.lockIn(person, Array.from({ length: 3 }, (_, i) => ({ type: i < stone ? "stoned" : "pass" })), d.turn);
     }
   }
+  let botPending = null, botTimer = null; // podržaný ťah kola bota (čaká na hráčovo zamknutie)
   let seatBot = null;
   if (ai) {
     const sock = createBotSeat({ botOpts: { seed: crypto.randomInt(2 ** 31), budgetSims: AI_SIMS, budgetMs: 1000 }, onDecision: (d) => onBotDecision(d) });
