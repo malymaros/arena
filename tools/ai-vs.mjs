@@ -73,6 +73,9 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
     }
     rounds++;
     onRound?.(engine.exportState()); // ladenie (tools/ai-tune.mjs): úplný stav na začiatku kola
+    // čerstvý stav pred kolom (ako server): posledná timeline kola nesie ešte „locked" oboch - bot, ktorý
+    // rozhoduje prvý (osoba A), by inak čakal na odomknutie a fronta by sa nezahrala
+    for (const [person, b] of Object.entries(bots)) b.onState(engine.snapshotFor(person));
     for (const person of ["A", "B"]) {
       if (bots[person]) {
         const d = bots[person].decide();

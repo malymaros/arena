@@ -511,6 +511,9 @@ function onTurnTimeout() {
   function onBotDecision(d) {
     const g = engine.game, person = botPerson;
     if (!person || g.phase !== "playing" || (g.series?.gameIndex ?? 1) !== d.game) return;
+    // zdôvodnenie ťahu bota k zápasu (bug reporty z AI roomky: tools/bugs.mjs ho vypíše pri hlásení)
+    if (d.why) telemetry?.append({ t: "bot", ts: new Date().toISOString(), commit: telemetryMeta.commit, match: engine.matchId || null,
+      g: d.game, turn: d.turn, side: g.seats?.p1 === person ? "white" : "black", ...d.why });
     if (d.kind === "character") { engine.chooseCharacter(person, d.char); return; }
     if (d.kind === "timestop") {
       let ok = false;

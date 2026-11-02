@@ -42,6 +42,7 @@ Každý riadok je JSON s `t` (typ) a `m` (id zápasu). `at` = ms od začiatku z�
 |---|---|---|
 | `match_start` | `v` (verzia schémy), `ts` (ISO čas), `commit`, `dirty`, `balance` (sha1 `shared/balance.js`), `seed`, `forceFirst`, `config` (sanitizovaný config z lobby) | host spustil zápas |
 | `ai` | `side` (`white` / `black` - strana AI bota) | hneď po `match_start` v roomke proti AI botovi (PLAY VS AI, docs/AI_PLAN.md); replay ho ignoruje |
+| `bot` | `match`, `g`, `turn`, `side`, `pick`, `p`, `value`, `top` (zvažované fronty: `q`, `p`, `v`), `opp` (čakané súperove fronty), `deadly` (súperove fronty, po ktorých by bot zomrel), `model`, `commit` | pri každom ťahu kola AI bota - zdôvodnenie (zapisuje `server.js`, nie recorder; `tools/bugs.mjs` ho vypíše pri hlásení z AI roomky); replay ho ignoruje |
 | `team` | `side`, `team` (3 postavy v poradí draftu), `random` | turnaj: potvrdený tím (`random: true` = vylosoval server) |
 | `pick` | `g`, `side`, `char`, `random` | výber postavy pre hru (`random: true` = „Random characters“, vylosoval server) |
 | `lock` | `g`, `turn`, `side`, `q` (fronta presne ako prišla z klienta, vrátane golden / last stand / last hope / swap) | prijatý `lock_in` |

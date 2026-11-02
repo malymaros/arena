@@ -20,7 +20,7 @@ const COST = {
 const S1_COST = { jotaro: JOTARO_S1_COST, luffy: LUFFY_S1_COST };
 
 // varianty argumentov jednej akcie, ktoré engine pripustí (na začiatku fronty, zvyšok pass)
-function actionOptions(sim, state, slot, prefix, cells) {
+export function actionOptions(sim, state, slot, prefix, cells) {
   const fill = (a) => {
     const q = [...prefix, a];
     while (q.length < 3) q.push({ type: "pass" });
@@ -37,7 +37,7 @@ function actionOptions(sim, state, slot, prefix, cells) {
   return opts;
 }
 
-const actionCost = (a, char) => (a.type === "special1" ? (S1_COST[char] ?? 4) : (COST[a.type] ?? 0));
+export const actionCost = (a, char) => (a.type === "special1" ? (S1_COST[char] ?? 4) : (COST[a.type] ?? 0));
 
 // stačí mana na každú akciu v poradí? (golden predťah platí pred frontou)
 function affordable(q, mana, char, pre = 0) {

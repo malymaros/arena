@@ -14,7 +14,9 @@ váhy ostali ručné - pozri „Merania"). A4 hotové (stála AI roomka VS AI 0/
 | bot vs náhodný bot | 30/30 (1 500 sim), 8/8 v `test/ai-bot.mjs` (600 sim) |
 | ladenie váh self-play (4 generácie, 3 200 hier, 35 tis. stavov) | naučené váhy v dueli 46,4 % ±2,8 proti ručným → **zamietnuté**, ostávajú ručné |
 | rozpočet 6 000 vs 1 500 sim / 1 500 vs 150 sim (bot vs bot) | 51,5 % / 50,6 % - medzi dvoma „rovnovážnymi" hráčmi viac výpočtu nepomáha (simultánne hádanie) |
-| bot vs exploit štýly (120 hier, 1 500 sim) | shieldy 73 %, turtle 79 %, aggro 78 %, greedy 64 % |
+| bot vs exploit štýly (120 hier, 1 500 sim) | shieldy 73 %, turtle 79 %, aggro 78 %, greedy 64 % - **neplatné**, viď nižšie |
+| **oprava merania (2026-11-02):** `tools/ai-vs.mjs` nedával botovi ako osobe A čerstvý stav pred kolom (posledná timeline nesie „locked") → bot ako A nerozhodol a hral za neho náhodný bot; všetky duely so striedaním strán boli ~polovične náhodné | po oprave starý bot (80 hier): greedy 76 %, aggro 97,5 %, shieldy 95 %, turtle 96 % |
+| bot s taktikou kola (sekcia 9: `threat.js`, `plans.js`, nové features, citlivosť na smrť; 80 hier) | greedy **91 %**, aggro 100 %, shieldy 94 %, turtle 95 %; **nový vs starý 58,8 % ±7,6** (160 hier); čas ťahu +~10 % |
 | model súpera zap. vs vyp. | vs shieldy +4 b., ostatné ±1 b. (v šume); bot vs bot 49,5 % - neškodí |
 
 Zistenia: (1) self-play silu takmer nemeria - hra je z veľkej časti simultánne hádanie, rovnováha proti rovnováhe je ~50 %;
@@ -174,3 +176,76 @@ rozhoduje len o tom, ktoré úrovne sú **odomknuté** (silnejšie zariadenie = 
   budúce kolo (mana na obranu, súperova hrozba, ohlásené dlaždice / IK); (3) hľadanie cez 2 kolá (až tu začne výpočet
   zvyšovať silu); (4) definícia úrovní + ratingy; (5) engine v prehliadači (`process.env` v `engine/constants.js`),
   Web Workery, test výkonu, odomykanie.
+
+## 9. Ako hru hrá vlastník (zadanie pre hodnotenie a kandidátov, 2026-11-02)
+
+Zistenie: bot v kole ohodnotí len ~105 náhodných z 1 300–6 000 súperových front a do matice sa dostane 15–40 - rozumné
+súperove plány (sprint na heal, útek z dosahu) v nej často chýbajú. Hodnotenie pozerá len na bunku, kde kolo skončí.
+Vlastník hrá takto (zhrnutie jeho odpovedí - zdroj pravdy pre ďalšie úpravy `eval.js` / `candidates.js`):
+
+**Rozhoduje najbližšie kolo** (3 ťahy: čo súper môže / nemôže s manou, čo asi spraví). Z budúcnosti len políčka
+ďalšieho kola (dmg/IK/heal/mana/power) - ku koncu hry, keď je málo bezpečných buniek, je to dôležité.
+
+- **HP sa meria hrozbou, nie absolútne:** hodnota HP závisí od súperových útokov - proti specialu za 8 je 9 HP málo
+  a nevymení ho za manu; proti specialu za 5 je skok 5 → 6 HP veľký, 8 vs 9 proti 3 dmg skoro nič. Averzia k riziku
+  rastie s tým, ako blízko je súper k tomu, aby ma zabil („nevytvárať súperovi ľahkú cestu k výhre"); defenzíva je
+  spoľahlivejšia.
+- **Mana = možnosti a nečitateľnosť.** 5+ výborné (special, obrana, breaker - súper nevie, čo príde). Súper s 1 manou,
+  ktorý na mňa nedostrelí, nie je hrozba a v kole bude dobíjať. Mana políčko má obrovskú cenu pre hráča s malou manou.
+- **Začínať kolo je takmer vždy výhoda** (vyhnem sa útoku, súper háda smer), hlavne keď má súper málo many - aj s
+  manou na golden štít je pod tlakom (special, shield breaker, alebo nechám štít vyprchať a udriem neskoršou akciou,
+  hlavne s veľkým dosahom). Preto non-starter s 3 manou golden štít niekedy nezahrá a skúsi trafiť neskôr.
+- **Bunky:** najcennejšie sú tie, z ktorých útoky pokryjú čo najviac plochy (Medúza, Wanderer: stredný riadok - súper
+  to ale vie). Ďalej rozhoduje, či viem ohroziť súperovu bunku a bunky, kam sa môže presunúť.
+- **Zlá pozícia** = súper vie, že dostanem dmg (dmg políčko) alebo som premárnil príležitosť (mohol som ísť na mana
+  políčko, išiel som na prázdne). Ísť vedome na dmg políčko má zmysel len ako prekvapenie (napr. Minotaur v labyrinte:
+  súper vie, kde sú dmg políčka, preto tam nečaká útok); čím viac HP mám oproti súperovi, tým ochotnejšie riskujem.
+  Stáť na dmg políčku = súper vie, že sa musím pohnúť (čitateľnosť). **Výnimka Fire:** dmg políčko je preňho cieľ
+  (special ±1 riadok) - Fire s 5+ manou pri dmg políčkach tam pravdepodobne pôjde.
+- **Koniec hry (plná doska dmg):** hľadať miesto, kde vydržím najdlhšie a mám najviac pohybu toto aj ďalšie kolo;
+  nútený prechod cez dmg je zlý aj preto, že súper ľahšie číta moje zvyšné cesty. Málo HP + veľa dmg políčok, ďalšie
+  kolo asi neprežijem → zvážiť démona.
+- **Heal/mana políčka:** závisí od postavy (Lightning heal vždy - lieči do plna; Werewolf heal nechce - malé HP = vyšší
+  dmg) a od súperovho dmg (prah zásahov, viď HP). Súper čaká, že pôjdem na manu pri malej mane / na heal pri malom HP;
+  keď vie, že ho tam môžem potrestať, ide tam ~50 : 50.
+- **IK:** nedostať sa do situácie, odkiaľ sa nepohnem; súper na IK nepôjde; kto na IK stojí, musí sa hýbať.
+- **Súper bez many:** pohyb, dobitie, basic; prípadne dobitie na mana políčku. Keď stojí v mojom dosahu, väčšinou
+  najprv uhne a potom dobije, ale občas naopak (len najlogickejšie ťahy sa dajú čítať) - pri jeho malom HP skoro iste
+  skúsim zásah. **Súper s plnou manou:** agresívne kolo (mirror/breaker/specialy), hlavne keď mám ja málo many; alebo ma
+  nechá minúť manu na štít/mirror, sám si ju nechá a pripraví si ďalšie kolo (keď začína a ja mám ešte menej).
+- **Štít/mirror čakám** hlavne keď mám special s vysokým dmg a súper sa bojí zásahu (niekto aj proti basicu); čím je môj
+  zásah bližšie k smrteľnému, tým viac čakám mirror (spôsob, ako otočiť hru). Wanderer/Escanor obranu nehrajú radi
+  (stráca im výhodu: regen / pride).
+- **Postup v kole:** 1. ako mi súper vie dať dmg (hlavne čo je pre mňa koniec - melee, silný special), 2. pozícia,
+  ktorá mu zúži možnosti zásahu (ak ma odtiaľto vie trafiť len z jednej bunky, tam mierim alebo si na tú akciu
+  pripravím obranu), 3. ak čakám defenzívu, tipnúť kam uhne / kedy zahrá štít či mirror a potrestať to. Striedať
+  poradie (nehrať len najlogickejšie).
+- **Postavy:** Medúza - kontrola hry, petrify berie súperovi akcie, z toho dmg zadarmo; Naruto - rozdelenie pokryje
+  väčšiu plochu alebo dá 2× dmg; Minotaur - dostať do labyrintu a tam dávať dmg; Werewolf - brať golden manu (zníži si
+  HP → vyšší dmg), najnebezpečnejší pri 8 dmg; Luffy/Jotaro - opatrne s jednorazovým specialom (potom nevýhoda proti
+  démonovi). Démona hrať zriedka - vyvolávač má ~33 % (súper zvyčajne zablokuje štítom a mirrorom 2 z 3 akcií),
+  okrem špecifických pozícií.
+- **Chyby bota z hier:** útoky mimo dosky (zabitá mana) - opravené v `1715b00`.
+
+**Realizácia (2026-11-02):** `engine/ai/threat.js` - mapy zásahov postáv zistené sondami na engine (čo kto komu vie dať
+z ktorej bunky a za koľko many; status = 3 dmg; Soldier = súper na bunku vkročí), `reach` (pohyb / dash na budúce kolo).
+`eval.js` - nové features: `threat` (môj najväčší zásah na súpera po pohybe vs jeho na mňa, k HP), `lethal` (vie zabiť),
+`hits` (koľko zásahov najsilnejším útokom do smrti - HP podľa hrozby), `coverage` (koľko súperových únikových buniek
+pokryjem), `safe` (bezpečné bunky na dosah na ďalšie kolo - koniec hry), `pickup` (heal / mana / power podľa potreby
+a postavy), `manaOpt` (mana po prahoch 1/2/4/5), `starterPress`, dmg políčko = čitateľnosť (Fire výnimka).
+`plans.js` - rozumné plány oboch strán bez simulácie (vyvážený, zabijácky, obranný, útek, útočný, ekonomický), vždy
+na začiatku poolov, ako sondy predvýberu a v matici. `bot.js` `avoidDeath` - fronta, po ktorej ma súperov plán v matici
+zabije, sa nehrá, ak je bezpečná alternatíva proti súperovej zmesi najviac o 0,3 horšia. Zdôvodnenie každého ťahu
+(`why`) ide do telemetrie (`t: "bot"`) a `tools/bugs.mjs` ho vypíše pri hlásení z AI roomky.
+
+**Ďalej:** učenie zo skutočných zápasov (telemetria AI roomky: prehry/výhry bota → ladenie váh a modelu súpera, A6).
+- **Doplnenie k postavám:** Luffy/Jotaro nemajú mirror → slabšia obrana proti démonovi; Luffy so specialom je hrozba
+  pre vyvolávača (súper si dá Last Hope a veľkým dosahom ho zabije), Jotaro má THE WORLD ako druhý „štít" (ubráni 2 z 3).
+  Werewolf golden mana: nie automaticky - dáva zmysel, ak si HP neznecení príliš oproti tomu, čo mu vie dať súper (zároveň
+  si zvýši dmg); nikto ju takmer nikdy nehrá viac ako 2× za hru (3. použitie = 3 HP za 6 many po 1+2 HP). Escanor - nechať
+  rásť pride, potom zasiahnuť specialom. Soldier - tipnúť (alebo vynútiť) súperov presun a zabiť ho specialom; je to
+  všadeprítomná hrozba, defenzívni hráči sa preto proti nemu nehýbu, alebo len ako poslednú akciu, keď idú druhí.
+  Wanderer - držať tempo (pasívna mana), mirror v zálohe ako prekvapenie, hroziť vysokým specialom a čakať, že súper
+  bude hrať obranu. Lightning - ďaleko od súpera, chipovať dmg obrovským dosahom. Fire - dostať súpera specialom, hroziť
+  (alebo využiť) rozšírenie cez dmg políčko. Vampire/Onryō - asi najsilnejšie: nebáť sa mirroru, pasce kontrolujú
+  dosku, útočiť a držať iniciatívu.

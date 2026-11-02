@@ -11,6 +11,7 @@ import { evaluate } from "./eval.js";
 import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
 import { createOpponentModel } from "./model.js";
+import { seedPlans } from "./plans.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "shield_breaker", "special1"];
@@ -26,6 +27,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
   const now = budgetSims ? () => stats.sims * budgetMs / budgetSims : () => performance.now();
 
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
+  let lastWhy = null; // zdôvodnenie posledného ťahu kola (decide → why)
 
   // ---------- THE WORLD v simulácii: najlepšia z pár náhodných zmrazených trojíc (lacná politika) ----------
   function randomFrozen(char) {
@@ -121,10 +123,15 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const D = hasHidden(belief) ? 4 : 1;
     const states = Array.from({ length: D }, () => simState(belief, rng));
     const s0 = states[0];
-    const myPool = shuffle(baseQueues(sim, s0, me));
+    let myPool = shuffle(baseQueues(sim, s0, me));
     let oppPool = shuffle(baseQueues(sim, s0, opp));
     if (!myPool.length) return null;
     if (!oppPool.length) oppPool = [[{ type: "pass" }, { type: "pass" }, { type: "pass" }]];
+    // rozumné plány oboch strán (plans.js, „ako človek") idú na začiatok poolov - sú aj sondami predvýberu
+    // a vždy sa dostanú do matice: súperove zjavné hrozby (aj tie, čo ma zabijú) a moje odpovede na ne
+    const seedMe = seedPlans(s0, me, myPool).map(p => p.q), seedOpp = seedPlans(s0, opp, oppPool).map(p => p.q);
+    const front = (pool, seeds) => { const set = new Set(seeds); return [...seeds, ...pool.filter(q => !set.has(q))]; };
+    myPool = front(myPool, seedMe); oppPool = front(oppPool, seedOpp);
     const value = makeValue(states, me);
     const vMe = (q, o) => value(q, o), vOpp = (o, q) => -value(q, o);
     const left = () => deadline - now();
@@ -150,8 +157,9 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       for (const q of top.slice(0, Math.ceil(K / 4))) out.push(...extraVariants(sim, s0, slot, q));
       return out;
     };
-    let R = withExtras(pm.top, me);
-    const C = withExtras(po.top, opp);
+    const lead = (seeds, rest) => [...seeds, ...rest.filter(q => !seeds.includes(q))];
+    let R = lead(seedMe.slice(0, 8), withExtras(pm.top, me));
+    const C = lead(seedOpp.slice(0, 10), withExtras(po.top, opp));
     // model súpera: fronty s jeho opakovanými vzormi typov akcií pridaj do matice, aj keď nie sú „rovnovážne"
     const om = model ? createOpponentModel(belief.history) : null;
     const useModel = !!om && om.observations >= 2 && om.weight > 0.05;
@@ -208,13 +216,45 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
         mix = R.map((r, k) => (1 - lam) * (sol.row[k] ?? 0) + (k === bi ? lam : 0));
       }
     }
+    mix = avoidDeath(mix, R, C, sol.col, value);
     const i = sampleMix(mix, rng);
     const ms = now() - t0;
     if (ms > 50 && !budgetSims) rate = 0.7 * rate + 0.3 * ((stats.sims - sims0) / D / ms);
     log?.({ kind: "round", ms: Math.round(ms), R: R.length, C: C.length, pool: [myPool.length, oppPool.length], D,
       value: +sol.value.toFixed(3), pick: queueKey(R[i]), p: +mix[i].toFixed(2), sims: stats.sims - sims0,
       ...(useModel ? { model: om.observations } : {}) });
+    // zdôvodnenie ťahu (telemetria AI roomky → tools/bugs.mjs): čo bot zvažoval, čo čakal od súpera, čím by zomrel
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const vsOpp = (r) => C.reduce((acc, c, j) => acc + (sol.col[j] ?? 0) * value(r, c), 0);
+    lastWhy = {
+      value: r2(sol.value), pick: queueKey(R[i]), p: r2(mix[i]),
+      top: R.map((r, k) => ({ r, p: mix[k] ?? 0 })).filter(x => x.p > 0.01).sort((a, b) => b.p - a.p).slice(0, 4)
+        .map(x => ({ q: queueKey(x.r), p: r2(x.p), v: r2(vsOpp(x.r)) })),
+      opp: C.map((c, j) => ({ c, p: sol.col[j] ?? 0 })).filter(x => x.p > 0.01).sort((a, b) => b.p - a.p).slice(0, 4)
+        .map(x => ({ q: queueKey(x.c), p: r2(x.p) })),
+      deadly: C.filter(c => value(R[i], c) <= DEATH).slice(0, 3).map(queueKey),
+      model: useModel ? om.observations : 0,
+    };
     return R[i];
+  }
+
+  // ---------- citlivosť na smrť: fronta, po ktorej ma niektorý súperov plán v matici zabije, sa nehrá,
+  // ak existuje bezpečná (útočná či obranná) fronta, ktorá je proti súperovej zmesi najviac o MARGIN horšia;
+  // jej váha prejde na najlepšiu bezpečnú frontu ----------
+  const DEATH = -0.99, MARGIN = 0.3;
+  function avoidDeath(mix, R, C, col, value) {
+    const dies = R.map(r => C.some(c => value(r, c) <= DEATH));
+    if (!mix.some((p, k) => p > 0 && dies[k])) return mix;
+    const vs = R.map(r => C.reduce((s, c, j) => s + (col[j] ?? 0) * value(r, c), 0));
+    let best = -1;
+    for (let k = 0; k < R.length; k++) if (!dies[k] && (best < 0 || vs[k] > vs[best])) best = k;
+    if (best < 0) return mix;
+    const out = R.map((r, k) => mix[k] ?? 0);
+    for (let k = 0; k < R.length; k++) {
+      if (!dies[k] || !out[k] || vs[best] < vs[k] - MARGIN) continue;
+      out[best] += out[k]; out[k] = 0;
+    }
+    return out;
   }
 
   // ---------- THE WORLD (bot = Jotaro): súper je zmrazený → jednostranná optimalizácia ----------
@@ -257,7 +297,9 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     stats.decisions++;
     if (kind === "character") return { kind, char: decideCharacter() };
     if (kind === "timestop") return { kind, queue: decideTimestop() };
-    return { kind, queue: decideRound() };
+    lastWhy = null;
+    const queue = decideRound();
+    return { kind, queue, ...(lastWhy ? { why: lastWhy } : {}) };
   }
 
   return {
