@@ -3078,8 +3078,8 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .room-btn.create{ width: 100%; padding: 18px; font-size: 14px; }
 .room-btn.reset{ width: 100%; padding: 18px; font-size: 14px; background: #8e0000; color: #fff; }
 /* hra proti AI botovi (docs/AI_PLAN.md) */
-.room-btn.create.ai{ background: #5b3a8e; color: #fff; }
-.room-tag-ai{ margin-left: 8px; padding: 1px 6px; background: #5b3a8e; color: #fff; font-size: .8em; }
+.room-card.ai{ box-shadow: inset 0 0 0 2px #5b3a8e; }
+.room-card.ai .room-label{ color: #c9a8ff; }
 /* lobby AI roomky: len Stone Bridge (bez kocky a ostatných arén) a bez turnaja */
 body.lobby-vs-ai #lobby-arena [data-arena]:not([data-arena="bridge"]),
 body.lobby-vs-ai #lobby-adv-tabs [data-tab]:not([data-tab="bridge"]),

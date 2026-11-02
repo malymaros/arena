@@ -73,13 +73,15 @@ function renderRooms(info) {
   roomsListEl.innerHTML = "";
   // spätná kompat.: starý formát bol jeden objekt; nový je { rooms: [...], canCreate }
   const list = Array.isArray(info?.rooms) ? info.rooms : [];
-  // existujúce roomky → Join (voľné miesto) alebo Spectate (plná)
-  list.forEach((r, i) => {
+  // stála AI roomka (ak ju server má) ako prvá karta; existujúce roomky → Join (voľné miesto) alebo Spectate (plná)
+  [...(info?.aiRoom ? [info.aiRoom] : []), ...list].forEach((r, idx) => {
+    const i = info?.aiRoom ? idx : idx + 1;
     const card = document.createElement("div");
-    card.className = "room-card";
+    card.className = "room-card" + (r.ai ? " ai" : "");
     const label = document.createElement("div");
     label.className = "room-label";
-    label.innerHTML = `ROOM ${i + 1}${r.ai ? ' <span class="room-tag-ai">VS AI</span>' : ""} <span class="room-count">${r.players}/${r.max}</span>`;
+    label.innerHTML = r.ai ? `VS AI <span class="room-count">${r.players}/${r.max}</span>`
+      : `ROOM ${i} <span class="room-count">${r.players}/${r.max}</span>`;
     const b = document.createElement("button");
     if (r.canJoin) {
       b.className = "room-btn join";
@@ -101,12 +103,6 @@ function renderRooms(info) {
     b.textContent = "CREATE ROOM";
     b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
     roomsListEl.appendChild(b);
-    // roomka proti AI botovi (docs/AI_PLAN.md) - bot hneď sedí ako súper
-    const ai = document.createElement("button");
-    ai.className = "room-btn create ai";
-    ai.textContent = "PLAY VS AI";
-    ai.addEventListener("click", () => { ai.disabled = true; b.disabled = true; socket.emit("create_room", { ai: true }); });
-    roomsListEl.appendChild(ai);
   }
   // admin (prihlásený admin heslom): zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM)
   if (isAdmin() && list.length > 0) {
@@ -132,7 +128,7 @@ function respectateFrom(info) {
   try { id = sessionStorage.getItem(SPECTATE_KEY); } catch {}
   if (id == null) return false;
   forgetSpectate(); // „spectator" ho uloží znova; roomka zanikla → zoznam roomiek ako obvykle
-  const room = (info?.rooms || []).find(r => String(r.id) === id);
+  const room = [...(info?.rooms || []), ...(info?.aiRoom ? [info.aiRoom] : [])].find(r => String(r.id) === id);
   if (!room) return false;
   respectating = true;
   socket.emit("spectate_room", { roomId: room.id });

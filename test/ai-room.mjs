@@ -1,6 +1,7 @@
-// test/ai-room.mjs - AI roomka cez reálny server (docs/AI_PLAN.md, fáza A4): hráč vytvorí roomku proti botovi
-// (create_room { ai: true }), bot sedí ako osoba B, lobby povolí len Stone Bridge + single/bo3, hráč s botom
-// odohrá celý zápas (bot vyberá postavu aj fronty vo worker vlákne). Malý rozpočet bota (AI_SIMS).
+// test/ai-room.mjs - stála AI roomka cez reálny server (docs/AI_PLAN.md): v zozname je vždy (rooms snapshot
+// `aiRoom`, 0/1), hráč sa do nej pripojí ako host (bot sedí ako osoba B), druhý človek ju môže len sledovať,
+// lobby povolí len Stone Bridge + single/bo3, hráč s botom odohrá celý zápas a po jeho odchode je roomka
+// znova čistá 0/1. Malý rozpočet bota (AI_SIMS).
 import { spawn } from "child_process";
 import { io } from "socket.io-client";
 
@@ -19,7 +20,7 @@ async function until(fn, ms, what) {
 
 try {
   server = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ARENA_SEED: "3", AI_SIMS: "400" },
+    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ADMIN_KEY: "testadmin", ARENA_SEED: "3", AI_SIMS: "400" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stderr.on("data", d => { serverErr += d; });
@@ -39,13 +40,29 @@ try {
   sock.on("game_over", (r) => { c.over = r; });
   if (!await until(() => c.rooms, 20000, "zoznam roomiek")) throw new Error("server nenaštartoval");
 
-  sock.emit("create_room", { ai: true });
+  const ai0 = c.rooms.aiRoom;
+  if (ai0 && ai0.players === 0 && ai0.max === 1 && ai0.canJoin && c.rooms.rooms.length === 0) pass("stála AI roomka v zozname: 0/1, bežné roomky prázdne");
+  else fail(`zoznam roomiek: ${JSON.stringify(c.rooms)}`);
+  sock.emit("join_room", { roomId: ai0?.id });
   await until(() => c.state?.phase === "lobby", 10000, "lobby AI roomky");
+  // druhý človek: AI roomka je obsadená (1/1) - pripojiť sa nedá, sledovať áno
+  const sock2 = io(URL, { transports: ["websocket"], auth: { name: "watcher", pass: "testpass" } });
+  const c2 = { rooms: null, denied: null, spectator: null };
+  sock2.on("rooms", (r) => { c2.rooms = r; });
+  sock2.on("join_denied", (r) => { c2.denied = r; });
+  sock2.on("spectator", (r) => { c2.spectator = r; });
+  await until(() => c2.rooms?.aiRoom?.players === 1, 5000, "AI roomka obsadená 1/1");
+  if (c2.rooms?.aiRoom?.canJoin === false) pass("obsadená AI roomka: canJoin=false");
+  sock2.emit("join_room", { roomId: ai0?.id });
+  await until(() => c2.denied, 3000, "druhý hráč odmietnutý");
+  if (c2.denied) pass("druhý človek sa do AI roomky nepripojí");
+  sock2.emit("spectate_room", { roomId: ai0?.id });
+  if (await until(() => c2.spectator, 3000, "divák AI roomky")) pass("AI roomku sa dá sledovať");
   if (c.state?.vsAi === (c.slot === "p1" ? "p2" : "p1")) pass("snapshot nesie vsAi = slot bota"); else fail(`snapshot vsAi: ${c.state?.vsAi}`);
 
   // pokus o portal realm + turnaj → server vynúti Stone Bridge + single
   sock.emit("configure_match", { format: "tournament", arena: "portal", tilesPerRound: 1, timer: "off", tilePreview: true, colorPref: "white",
-    tileWeights: { dmg: 0, heal: 100, mana: 0, ik: 0, power: 0, block: 0 }, portalWeights: { classic: 100, hp: 0, mana: 0, power: 0, nodef: 0 } });
+    tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 }, portalWeights: { classic: 100, hp: 0, mana: 0, power: 0, nodef: 0 } });
   await until(() => c.state?.phase === "playing", 10000, "štart zápasu");
   if (c.state?.config?.format === "single" && !c.state?.config?.arena) pass("AI roomka: vynútený single na Stone Bridge");
   else fail(`AI roomka config: ${JSON.stringify(c.state?.config)}`);
@@ -60,7 +77,7 @@ try {
     [{ type: "special" }, { type: "recharge" }, { type: "shield" }],
   ];
   let round = 0;
-  while (!c.result && round < 40) {
+  while (!c.result && round < 80) {
     const turn = c.state.turn;
     const me = c.state[c.slot];
     const stone = Math.min(3, me?.stone || 0);
@@ -76,11 +93,37 @@ try {
   if (c.oppReadyFirst) fail("bot zamkol skôr ako hráč (OPPONENT IS READY)"); else pass("bot nikdy nezamkol skôr ako hráč");
   if (/\[ai\]/.test(serverErr)) fail("server hlási chybu bota: " + serverErr.split("\n").find(l => l.includes("[ai]")));
   else pass("bez chýb bota na serveri");
-  // odchod hráča → roomka (aj s workerom bota) zanikne hneď - bot ju nedrží nažive
+  // odchod hráča → AI roomka sa hneď vytvorí znova čistá (0/1, lobby)
   c.rooms = null;
   sock.emit("leave_room");
-  if (await until(() => c.rooms && c.rooms.rooms.length === 0, 5000, "AI roomka po odchode hráča zanikla")) pass("AI roomka po odchode hráča zanikla");
-  sock.close();
+  if (await until(() => c.rooms?.aiRoom?.players === 0 && c.rooms.aiRoom.canJoin && c.rooms.aiRoom.phase === "lobby", 5000, "AI roomka po odchode hráča znova 0/1"))
+    pass("AI roomka po odchode hráča znova čistá 0/1");
+  // admin: reset AI roomky (ako hocijakej inej) → zanikne a hneď je znova čistá 0/1; globálny reset ju tiež nechá
+  const adm = io(URL, { transports: ["websocket"], auth: { name: "admin", pass: "testadmin" } });
+  const ca = { rooms: null, reload: false };
+  adm.on("rooms", (r) => { ca.rooms = r; });
+  adm.on("force_reload", () => { ca.reload = true; });
+  await until(() => ca.rooms?.aiRoom, 5000, "admin vidí AI roomku");
+  const aiId = ca.rooms.aiRoom.id;
+  adm.emit("join_room", { roomId: aiId });
+  await wait(400);
+  c2.rooms = null;
+  adm.emit("admin_reset_room");
+  if (await until(() => ca.reload, 3000, "admin reset AI roomky (force_reload)")) pass("admin resetol AI roomku (force_reload)");
+  if (await until(() => c2.rooms?.aiRoom?.players === 0 && c2.rooms.aiRoom.canJoin, 5000, "AI roomka po admin resete znova 0/1")) pass("AI roomka po admin resete znova čistá 0/1");
+  adm.close();
+  const adm2 = io(URL, { transports: ["websocket"], auth: { name: "admin", pass: "testadmin" } });
+  const cb = { rooms: null };
+  adm2.on("rooms", (r) => { cb.rooms = r; });
+  await until(() => cb.rooms, 5000, "admin2 zoznam");
+  adm2.emit("admin_reset_all");
+  await wait(600);
+  const sock3 = io(URL, { transports: ["websocket"], auth: { name: "after", pass: "testpass" } });
+  const c3 = { rooms: null };
+  sock3.on("rooms", (r) => { c3.rooms = r; });
+  if (await until(() => c3.rooms?.aiRoom?.players === 0, 5000, "AI roomka po globálnom resete")) pass("globálny admin reset nechal stálu AI roomku (0/1)");
+  adm2.close(); sock3.close();
+  sock.close(); sock2.close();
 } catch (e) {
   fail(e.stack || String(e));
 } finally {

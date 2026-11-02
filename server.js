@@ -129,7 +129,10 @@ const RECLAIM_GRACE_MS = 60 * 1000;         // koľko sekúnd drží slot pre p�
 const browsing = new Set();                 // sockety na room-browseri (ešte neposadené v žiadnej roomke, nie diváci)
 const rooms = new Map();                    // id -> Room (objekt z createRoom)
 let nextRoomId = 1;                         // rastúci identifikátor roomiek
-const MAX_ROOMS = 2;                        // cap: max toľko roomiek naraz
+const MAX_ROOMS = 2;                        // cap: max toľko bežných roomiek naraz (stála AI roomka sa nepočíta)
+// stála AI roomka (docs/AI_PLAN.md): existuje vždy, hrá v nej najviac jeden človek proti botovi; po odchode hráča
+// alebo admin resete sa hneď vytvorí znova čistá. V zozname roomiek ide samostatne (rooms snapshot `aiRoom`).
+const AI_ROOM_ID = "ai";
 // AI bot (docs/AI_PLAN.md): pevný počet simulácií na ťah = pevná, predvídateľná sila nezávislá od rýchlosti
 // a záťaže servera (merania: viac výpočtu dnešnému botovi nepomáha). ~0,2 s na ťah na PC, ~1 s na e2-micro;
 // všetky AI roomky počítajú v jednom worker vlákne po jednom ťahu.
@@ -323,8 +326,9 @@ function onTurnTimeout() {
   function roomEmpty() { return ["A", "B"].filter(p => p !== botPerson).every(p => !personAlive(p)); } // bot sa nepočíta
   // riadok tejto roomky pre room-browser (počet hráčov, či sa dá pripojiť)
   function roomsRow() {
+    if (ai) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), phase: engine.game.phase, ai: true };
     const players = ["A", "B"].filter(personAlive).length;
-    return { id, players, max: 2, canJoin: players < 2, phase: engine.game.phase, ...(ai ? { ai: true } : {}) };
+    return { id, players, max: 2, canJoin: players < 2, phase: engine.game.phase };
   }
   // voľné miesto (nie je obsadené živým socketom ani grace-held tokenom)
   function isFree(p) { return !personSockets[p] && (!personIds[p] || Date.now() - personFreedAt[p] > RECLAIM_GRACE_MS); }
@@ -359,7 +363,8 @@ function onTurnTimeout() {
     for (const s of spectators) { try { s.data.roomId = null; s.data.spectating = false; s.leave(String(id)); browsing.add(s); } catch {} }
     spectators.clear();
     rooms.delete(id);
-    broadcastRooms();
+    if (ai) ensureAiRoom(); // stála AI roomka sa hneď vytvorí znova (čistá) - broadcastne aj zoznam
+    else broadcastRooms();
   }
   // ak host čaká (stlačil START pred príchodom súpera) a sú už obaja → spusti zápas (color roll)
   function maybeStartPending() {
@@ -571,8 +576,16 @@ function onTurnTimeout() {
 // zoznam roomiek pre room-browser + či sa dá vytvoriť nová (limit MAX_ROOMS)
 function roomsSnapshot() {
   const list = [];
-  for (const room of rooms.values()) list.push(room.roomsRow());
-  return { rooms: list, canCreate: rooms.size < MAX_ROOMS };
+  for (const room of rooms.values()) if (!room.ai) list.push(room.roomsRow());
+  return { rooms: list, canCreate: list.length < MAX_ROOMS, aiRoom: rooms.get(AI_ROOM_ID)?.roomsRow() || null };
+}
+// stála AI roomka: vytvor, ak chýba (štart servera, odchod hráča, admin reset); bot si v nej hneď sadne (osoba B)
+function ensureAiRoom() {
+  if (rooms.has(AI_ROOM_ID)) return;
+  const room = createRoom(AI_ROOM_ID, { ai: true });
+  rooms.set(room.id, room);
+  room.seatBot();
+  broadcastRooms();
 }
 // pošli aktuálny zoznam roomiek všetkým na room-browseri (nie posadeným hráčom ani divákom)
 function broadcastRooms() {
@@ -583,6 +596,7 @@ function broadcastRooms() {
 function forceResetAll() {
   for (const room of rooms.values()) room.forceReset();
   rooms.clear();
+  ensureAiRoom();
   for (const s of browsing) { try { s.emit("force_reload"); } catch {} } // reload aj pre ľudí na room-browseri
 }
 // admin reset: klient obnoví stránku; socket sa odpojí o chvíľu (emit musí odísť skôr než zatvorenie spojenia)
@@ -651,13 +665,12 @@ io.on("connection", (socket) => {
   broadcastRooms();
 
   // --- Room lifecycle (globálny routing) ---
-  socket.on("create_room", (arg) => {
+  socket.on("create_room", () => {
     if (socket.data.person || socket.data.roomId) return; // už niekde je
-    if (rooms.size >= MAX_ROOMS) return;                  // limit počtu roomiek
-    const room = createRoom(nextRoomId++, { ai: arg?.ai === true });
+    if (!roomsSnapshot().canCreate) return;               // limit počtu (bežných) roomiek
+    const room = createRoom(nextRoomId++);
     rooms.set(room.id, room);
     room.seat(socket, "A"); // tvorca = host (osoba A) a nastaví parametre zápasu
-    if (room.ai) room.seatBot(); // súper = AI bot (osoba B)
     broadcastRooms();
   });
   socket.on("join_room", (arg) => {
@@ -723,6 +736,7 @@ io.on("connection", (socket) => {
     if (!room) return;
     room.forceReset();         // odpojí hráčov + divákov, zruší časovače
     rooms.delete(room.id);     // vyradí roomku z registra
+    ensureAiRoom();            // stála AI roomka sa vytvorí znova čistá
     broadcastRooms();          // ostatní na room-browseri uvidia aktuálny zoznam
   });
 
@@ -732,6 +746,7 @@ io.on("connection", (socket) => {
   });
 });
 
+ensureAiRoom();
 httpServer.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
 });

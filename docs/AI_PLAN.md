@@ -4,7 +4,7 @@ Stav: **schválené 2026-11-02.** A0 hotové (`exportState`/`loadState` + `io.no
 simulovaných kôl/s na jadro). A1 hotové (`engine/ai/view.js` belief + determinizácie, `engine/ai/sim.js`, `test/ai-view.mjs`).
 A2 hotové (`candidates.js`, `eval.js`, `solve.js`, `bot.js` - maticová hra + double oracle, rozpočet v ms alebo
 deterministicky v počte simulácií; `tools/ai-vs.mjs`; `test/ai-bot.mjs`). A3 hotové (features per postava, `tools/ai-tune.mjs`;
-váhy ostali ručné - pozri „Merania"). A4 hotové (PLAY VS AI, `worker.js` + `seat.js`, `test/ai-room.mjs`). A5 hotové (`model.js`,
+váhy ostali ručné - pozri „Merania"). A4 hotové (stála AI roomka VS AI 0/1 - pôvodne tlačidlo PLAY VS AI, `worker.js` + `seat.js`, `test/ai-room.mjs`). A5 hotové (`model.js`,
 `tools/scripted-bots.mjs`, `tools/ai-duel.mjs`).
 
 ## Merania (2026-11-02, deterministický rozpočet `budgetSims`)
@@ -148,6 +148,10 @@ Hodnota stavu po kole z pohľadu bota (výhra/prehra = ±1, inak odhad pravdepod
 - ~~Čas na rozmýšľanie: až ~5 s~~ → **zmenené 2026-11-02:** pevný počet simulácií na ťah (`AI_SIMS`, default 1 500),
   nie čas. Merania ukázali, že viac výpočtu dnešnému botovi nepomáha; pevný rozpočet = pevná, predvídateľná sila
   a minimum CPU (~0,2 s/ťah na PC, ~1 s na e2-micro). Všetky AI roomky počítajú v **jednom** worker vlákne, ťah po ťahu.
+- **Stála AI roomka (2026-11-02):** namiesto tlačidla PLAY VS AI existuje vždy jedna roomka VS AI (0/1), hrá v nej naraz
+  len jeden človek, ostatní môžu sledovať; po odchode hráča / admin resete je hneď znova čistá. Admin ju resetuje ako
+  hocijakú inú. Bot **nikdy nezamkne kolo skôr ako hráč** (žiadne OPPONENT IS READY), dopremýšľa 0,6–1,5 s po ňom.
+- **Tvár bota** v jeho HUD namiesto portrétu (nálada z verejných udalostí); okno postavy na hover / podržanie ostáva.
 - **Šetrnosť:** hra nesmie nikdy sekať - ani server, ani zariadenie hráča. Maximalizovať silu na jednotku výpočtu.
 
 ## 8. Budúca predstava - úrovne botov (zapísané 2026-11-02, realizovať až keď bude opodstatnená)
