@@ -1,7 +1,7 @@
 # Ťažký AI bot — plán
 
-Stav: **schválené 2026-11-02, A0 hotové** (`exportState`/`loadState` + `io.noFrames` v engine, `tools/ai-bench.mjs`:
-1440 kôl bit-identických s hlavným enginom, ~0,1 ms na simulované kolo vrátane kópie stavu = ~9 400 kôl/s na jadro).
+Stav: **schválené 2026-11-02.** A0 hotové (`exportState`/`loadState` + `io.noFrames`, `tools/ai-bench.mjs`: ~9 400
+simulovaných kôl/s na jadro). A1 hotové (`engine/ai/view.js` belief + determinizácie, `engine/ai/sim.js`, `test/ai-view.mjs`).
 
 Cieľ: jeden bot, ktorý hrá **čo najlepšie** a **nepodvádza** — rozhoduje len z toho, čo by na jeho mieste
 videl človek. Žiadne úrovne obtiažnosti.
@@ -117,10 +117,12 @@ Hodnota stavu po kole z pohľadu bota (výhra/prehra = ±1, inak odhad pravdepod
 
 ## 7. Rozhodnutia vlastníka (2026-11-02)
 
-- **Naruto klon — ako človek:** snapshot obsahuje skutočnú polohu Naruta aj klonu, ale bot ju nesmie použiť.
-  Bot vidí dve nerozlíšiteľné figúry (sledovateľné len tak, ako ich vidí človek na doske) a skutočného Naruta
-  odhaduje determinizáciou. Pohľad bota preto prechádza ešte jednou vrstvou redakcie (`botView`), ktorá
-  dvojicu súperových figúr anonymizuje; fairness test pokrýva aj výmenu Naruto ↔ klon.
+- **Naruto klon — ako človek:** bot smie vedieť len to, čo vie pozorný človek. **Zistenie pri implementácii A1:**
+  klient klon nikdy „nestratí" — kým stojí na Narutovej bunke, je posunutý a polopriehľadný, a figúry sa vždy
+  plynulo kĺžu (nikdy neskočia ani nezmiznú na mieste), takže pozorný človek ich vždy dokáže sledovať a vie,
+  ktorá je skutočná (anonymizuje sa len vertikálny smer v logu akcií). Pozorný človek teda túto informáciu
+  má, a preto ju bot berie zo snapshotu bez ďalšej redakcie. Anonymizácia by z bota spravila slabšieho
+  hráča než pozorný človek, nie férovejšieho. V labyrinte klona súpera nevidí ani bot (redakcia servera).
 - **Rozsah v1: single na Stone Bridge.** Architektúra sa ale od začiatku navrhuje pre všetky formáty a arény
   (eval/kandidáti s háčikmi pre portály, Shreka, turnaj), ďalšie sa pridávajú postupne.
 - **Budúcnosť — arkáda:** hráč postupne porazí bota za každú postavu; keď porazí všetky, vyhral. Až po v1.
