@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Nálada bota — návrh</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<style>
+  /* DOČASNÁ návrhová stránka (docs/AI_PLAN.md) - nie je linkovaná z hry. Nálada AI bota v HUD súpera:
+     pixelová „obrazovková" hlava robota, ktorá reaguje na priebeh hry. Nič odtiaľto nejde do hry, kým
+     vlastník vizuál neschváli. */
+  :root { --bg: #0b0c10; --panel: #15171d; --line: #262a33; --txt: #dfe3ea; --dim: #8b92a0; --gold: #ffb300; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--txt); font: 13px/1.5 system-ui, sans-serif; }
+  .pix { font-family: "Press Start 2P", monospace; letter-spacing: 1px; }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header h1 { font: 15px "Press Start 2P", monospace; color: #c79bff; margin: 0; }
+  header p { margin: 0; color: var(--dim); }
+  main { padding: 20px; display: grid; gap: 22px; max-width: 1280px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; }
+  section > h2 { font: 11px "Press Start 2P", monospace; color: var(--gold); margin: 0 0 12px; }
+  .note { color: var(--dim); margin: 6px 0 0; }
+
+  /* ---------- scéna: výrez hernej obrazovky s HUD súpera ---------- */
+  .scene { position: relative; height: 380px; border-radius: 4px; overflow: hidden;
+    background: linear-gradient(#5d5650, #3f3a36 60%, #2b2826); box-shadow: inset 0 0 0 2px #000; }
+  .scene .round { position: absolute; top: 14px; left: 34%; transform: translateX(-50%); font: 28px "Press Start 2P", monospace;
+    color: var(--gold); text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.55); }
+  .scene .caption { position: absolute; left: 16px; bottom: 14px; right: 330px; min-height: 40px; padding: 10px 14px;
+    background: rgba(12,14,18,.75); box-shadow: 0 0 0 2px #000; font: 10px/1.7 "Press Start 2P", monospace; color: #e8e8e8; }
+  .scene .caption b { color: var(--gold); font-weight: 400; }
+  /* HUD súpera (vpravo hore) - zjednodušená kópia hry */
+  .hud { position: absolute; top: 18px; right: 18px; width: 260px; padding: 12px 14px 14px; border-radius: 10px;
+    background: rgba(0,0,0,.45); box-shadow: inset 0 0 0 2px #2b2e36; }
+  .hud .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); padding: 3px 8px; background: #2d2f36;
+    box-shadow: 0 0 0 2px #000; font: 9px "Press Start 2P", monospace; color: #e6e6e6; }
+  .hud .portrait { display: block; margin: 6px auto 6px; width: 110px; height: 110px; image-rendering: pixelated; }
+  .hud .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hud .stat .lab { font: 13px "Press Start 2P", monospace; margin-bottom: 6px; text-align: center; }
+  .hud .stat .lab.hp { color: #ff6b6b; } .hud .stat .lab.mp { color: #63b3ff; }
+  .hud .bar { height: 78px; box-shadow: 0 0 0 2px #000; background: #1a1a1a; position: relative; }
+  .hud .bar i { position: absolute; left: 0; right: 0; bottom: 0; transition: height .3s steps(5); }
+  .hud .bar.hp i { background: #e53935; } .hud .bar.mp i { background: #1e88e5; }
+
+  /* okienko s tvárou bota - variant A: pripnuté k vnútornej (ľavej) hrane HUD, hore */
+  .face-win { position: absolute; padding: 6px; background: #22252c; border-radius: 3px;
+    box-shadow: 0 0 0 2px #000, inset 0 2px 0 #3a3f4a, inset 0 -2px 0 #15171c; }
+  .face-win canvas { display: block; image-rendering: pixelated; }
+  .face-win .label { position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%); white-space: nowrap;
+    padding: 2px 5px; background: #000; font: 7px "Press Start 2P", monospace; color: #9aa3b2; }
+  .variant-a .face-win { top: 26px; right: 290px; }
+  .variant-a .face-win canvas { width: 96px; height: 96px; }
+  /* variant B: v hornom rohu HUD (menšie, cez okraj boxu) */
+  .variant-b .face-win { top: 4px; right: 214px; padding: 4px; }
+  .variant-b .face-win canvas { width: 64px; height: 64px; }
+  .variant-b .face-win .label { display: none; }
+
+  .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  button { font: 9px "Press Start 2P", monospace; color: #e8e8e8; background: #2a2e37; border: none; padding: 9px 11px;
+    box-shadow: 0 0 0 2px #000, inset 0 -3px 0 rgba(0,0,0,.35); cursor: pointer; }
+  button:hover { filter: brightness(1.15); }
+  button.on { background: #7c4dff; color: #fff; }
+  .moods button { min-width: 116px; }
+
+  /* galéria všetkých nálad */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .card { background: #101217; box-shadow: 0 0 0 2px #000; padding: 10px; text-align: center; }
+  .card canvas { width: 128px; height: 128px; image-rendering: pixelated; }
+  .card .n { font: 9px "Press Start 2P", monospace; color: var(--gold); margin-top: 6px; }
+  .card .d { color: var(--dim); font-size: 12px; margin-top: 4px; }
+
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--gold); font: 9px "Press Start 2P", monospace; }
+  td.m { white-space: nowrap; font-weight: 600; }
+  .phone-box { width: 420px; }
+  .phone-box .scene { height: 210px; }
+  .phone-box .hud { width: 150px; padding: 8px; }
+  .phone-box .hud .portrait { width: 56px; height: 56px; margin: 2px auto; }
+  .phone-box .hud .bar { height: 34px; }
+  .phone-box .hud .stat .lab { font-size: 8px; margin-bottom: 3px; }
+  .phone-box .variant-a .face-win { top: 18px; right: 176px; padding: 4px; }
+  .phone-box .variant-a .face-win canvas { width: 64px; height: 64px; }
+  .phone-box .scene .round { font-size: 14px; left: 18%; }
+  .phone-box .scene .caption { right: 180px; font-size: 7px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NÁLADA BOTA — NÁVRH</h1>
+  <p>Pixelová tvár AI v HUD súpera reaguje na priebeh hry. Návrhová stránka, v hre zatiaľ nie je.</p>
+</header>
+<main>
+  <section>
+    <h2>V HRE (DESKTOP)</h2>
+    <div class="tabs" id="variant-tabs">
+      <button class="on" data-v="a">VARIANT A · OKNO PRI HUD</button>
+      <button data-v="b">VARIANT B · V ROHU HUD</button>
+    </div>
+    <div class="scene variant-a" id="scene">
+      <div class="round">ROUND 3</div>
+      <div class="face-win"><canvas id="face-main" width="32" height="32"></canvas><span class="label">AI</span></div>
+      <div class="hud">
+        <span class="tag">AI</span>
+        <canvas class="portrait" id="portrait" width="128" height="128"></canvas>
+        <div class="stats">
+          <div class="stat"><div class="lab hp">♥ <span id="hp-num">10</span></div><div class="bar hp"><i id="hp-bar" style="height:100%"></i></div></div>
+          <div class="stat"><div class="lab mp">● <span id="mp-num">6</span></div><div class="bar mp"><i id="mp-bar" style="height:60%"></i></div></div>
+        </div>
+      </div>
+      <div class="caption" id="caption"><b>DEMO</b> · spusti demo zápasu alebo klikni na náladu</div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="demo">▶ DEMO ZÁPASU</button>
+      <div class="moods row" id="mood-buttons" style="gap:8px"></div>
+    </div>
+    <p class="note">Variant A: samostatné „monitorové" okienko pripnuté k vnútornej hrane HUD súpera - nezaberá miesto
+      odznakom Escanora / Vlkolaka vedľa portrétu. Variant B: menšie okienko v rohu HUD.</p>
+  </section>
+
+  <section>
+    <h2>NA TELEFÓNE</h2>
+    <div class="phone-box">
+      <div class="scene variant-a" style="height:210px">
+        <div class="round">ROUND 3</div>
+        <div class="face-win"><canvas id="face-phone" width="32" height="32"></canvas></div>
+        <div class="hud"><span class="tag">AI</span><canvas class="portrait" id="portrait2" width="128" height="128"></canvas>
+          <div class="stats"><div class="stat"><div class="lab hp">♥ 7</div><div class="bar hp"><i style="height:70%"></i></div></div>
+          <div class="stat"><div class="lab mp">● 4</div><div class="bar mp"><i style="height:40%"></i></div></div></div></div>
+      </div>
+    </div>
+    <p class="note">Na telefóne je okienko menšie (64 px), ten istý obsah.</p>
+  </section>
+
+  <section>
+    <h2>VŠETKY NÁLADY</h2>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <section>
+    <h2>KEDY SA NÁLADA MENÍ</h2>
+    <table>
+      <thead><tr><th>Udalosť v hre</th><th>Nálada</th><th>Ako dlho</th></tr></thead>
+      <tbody id="rules"></tbody>
+    </table>
+    <p class="note"><b>Férovosť:</b> nálada smie vychádzať len z toho, čo je verejné (efekty v timeline, HP, mana) a z botovho
+      odhadu celkovej pozície - <b>nikdy z ťahu, ktorý si bot práve vybral</b>, inak by tvár prezrádzala jeho plán
+      (napr. škodoradosť pred zahraním pasce). Počas plánovania kola preto bot len „premýšľa" alebo ukazuje náladu
+      z predošlého kola. Animácia beží len pri viditeľnom okne a mení iba pixely jedného malého canvasu (žiadne filtre
+      ani tiene v slučke - lite grafika nič nestráca).</p>
+  </section>
+</main>
+
+<script>
+/* ===================== pixelová tvár bota ===================== */
+// buffer 32×32: hlava-monitor (rám, anténa s LED), obrazovka 22×17 so scanlines; tvár = oči 5×5, obočie, ústa 12×4
+const SCR = { x: 5, y: 9, w: 22, h: 17 };
+const EYE_L = 3, EYE_R = 14, EYE_Y = 4, MOUTH_X = 5, MOUTH_Y = 11;
+const bm = (rows) => rows.map(r => [...r].map(c => c === "#" ? 2 : c === "+" ? 1 : 0));
+const EYES = {
+  dot:    bm([".....", ".###.", ".###.", ".###.", "....."]),
+  happy:  bm([".....", "..#..", ".#.#.", "#...#", "....."]),
+  wide:   bm([".###.", "#...#", "#.#.#", "#...#", ".###."]),
+  closed: bm([".....", ".....", "#####", ".....", "....."]),
+  narrow: bm([".....", ".....", "#####", ".###.", "....."]),
+  half:   bm([".....", ".....", "#####", "#####", "....."]),
+  down:   bm([".....", ".....", ".###.", "#####", ".###."]),
+  gtL:    bm(["##...", "..##.", "....#", "..##.", "##..."]),
+  ltR:    bm(["...##", ".##..", "#....", ".##..", "...##"]),
+  x:      bm(["#...#", ".#.#.", "..#..", ".#.#.", "#...#"]),
+  up:     bm([".###.", ".###.", ".....", ".....", "....."]),
+};
+const BROWS = { // [ľavé, pravé] 5×2
+  angry:   [bm(["##...", "..###"]), bm(["...##", "###.."])],
+  worried: [bm(["...##", "###.."]), bm(["##...", "..###"])],
+  frown:   [bm([".....", "#####"]), bm([".....", "#####"])],
+  raised:  [bm([".###.", "....."]), bm([".###.", "....."])],
+  smug:    [bm([".....", "....."]), bm([".###.", "#...#"])],
+};
+const MOUTHS = {
+  flat:   bm(["............", "..########..", "............", "............"]),
+  smile:  bm(["#..........#", ".#........#.", "..########..", "............"]),
+  open:   bm(["############", "#++++++++++#", ".#++++++++#.", "..########.."]),
+  frown:  bm(["............", "..########..", ".#........#.", "#..........#"]),
+  smirk:  bm(["...........#", "..........#.", "..########..", "............"]),
+  o:      bm(["....####....", "...#++++#...", "...#++++#...", "....####...."]),
+  teeth:  bm(["############", "#..#..#..#.#", "############", "............"]),
+  wavy:   bm(["............", ".##..##..##.", "#..##..##..#", "............"]),
+  dots:   bm(["............", "............", "............", "............"]),
+  wobble: bm(["............", "###..####..#", "...##....##.", "............"]),
+};
+// nálada: farba tváre (obrazovky), LED antény, tvary, efekty
+const MOODS = {
+  neutral:   { sk: "CALM",        d: "čaká, kolo je vyrovnané",          col: "#5ef2ff", led: "#3ddc84", eyes: ["dot", "dot"],      mouth: "flat" },
+  thinking:  { sk: "THINKING",     d: "počíta ťah (plánovanie kola)",     col: "#c59bff", led: "#c59bff", eyes: ["up", "up"],        mouth: "dots", fx: "think" },
+  happy:     { sk: "HAPPY",       d: "trafil, kolo mu vyšlo",            col: "#7dff7a", led: "#3ddc84", eyes: ["happy", "happy"],  mouth: "smile", fx: "bob" },
+  smug:      { sk: "SMUG",  d: "tvoj útok zablokoval / odrazil",   col: "#c9ff5a", led: "#3ddc84", eyes: ["half", "dot"],     mouth: "smirk", brows: "smug" },
+  frown:     { sk: "FROWN",     d: "kolo mu nevyšlo, stratil HP",      col: "#ffcf5e", led: "#ffb300", eyes: ["dot", "dot"],      mouth: "frown", brows: "frown" },
+  angry:     { sk: "ANGRY",         d: "dostal veľký zásah",               col: "#ff5a5a", led: "#ff3b3b", eyes: ["narrow", "narrow"], mouth: "teeth", brows: "angry", fx: "shake" },
+  surprised: { sk: "SURPRISED",  d: "nečakaný ťah (mirror, breaker…)",  col: "#ffe95e", led: "#ffe95e", eyes: ["wide", "wide"],    mouth: "o", brows: "raised", fx: "bang" },
+  worried:   { sk: "WORRIED",       d: "má málo HP, hrozí smrť",           col: "#9fc4ff", led: "#ffb300", eyes: ["dot", "dot"],      mouth: "wavy", brows: "worried", fx: "sweat" },
+  sad:       { sk: "SAD",       d: "stratil veľa, prehráva",           col: "#6aa8ff", led: "#6aa8ff", eyes: ["down", "down"],    mouth: "frown", brows: "worried", fx: "tear" },
+  laugh:     { sk: "LAUGH",       d: "vyhral hru",                       col: "#7dff7a", led: "#3ddc84", eyes: ["gtL", "ltR"],      mouth: "open", fx: "laugh" },
+  ko:        { sk: "K.O.",         d: "prehral hru",                      col: "#9aa0a8", led: "#555",    eyes: ["x", "x"],          mouth: "wobble", fx: "glitch" },
+};
+
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
+
+// jedna tvár = jeden 32×32 canvas; stav nálady + vlastné hodiny (žmurkanie, efekty)
+function makeFace(canvas) {
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(32, 32);
+  const st = { mood: "neutral", since: 0, nextBlink: 1500, blinkUntil: 0, flashUntil: 0, seed: Math.random() * 1000 };
+  function put(x, y, rgb, a = 255) {
+    if (x < 0 || y < 0 || x > 31 || y > 31) return;
+    const i = (y * 32 + x) * 4; img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2]; img.data[i + 3] = a;
+  }
+  function stamp(b, ox, oy, col, dim) {
+    b.forEach((row, y) => row.forEach((v, x) => { if (v) put(ox + x, oy + y, v === 2 ? col : dim); }));
+  }
+  function draw(t) {
+    const m = MOODS[st.mood], age = t - st.since;
+    img.data.fill(0);
+    const C = hexRgb(m.col), DIM = mix(C, [8, 14, 20], 0.65), BG = mix(C, [6, 10, 14], 0.9);
+    // posun celej hlavy (hnev = trasenie, smiech/radosť = poskakovanie)
+    let jx = 0, jy = 0;
+    if (m.fx === "shake" && age < 900) jx = Math.round(Math.sin(t / 25) * 1);
+    if (m.fx === "laugh") jy = (Math.floor(t / 160) % 2) ? -1 : 0;
+    if (m.fx === "bob") jy = (Math.floor(t / 450) % 2) ? -1 : 0;
+    // anténa + LED (bliká pri hneve / premýšľaní)
+    const metal = [74, 80, 92], metalHi = [118, 126, 140], metalLo = [40, 44, 52];
+    for (let y = 3; y <= 6; y++) put(15 + jx, y + jy, metal);
+    const ledOn = (m.fx === "shake" || m.fx === "think") ? Math.floor(t / 220) % 2 === 0 : true;
+    const L = hexRgb(ledOn ? m.led : "#2a2d33");
+    put(14 + jx, 1 + jy, L); put(15 + jx, 1 + jy, L); put(14 + jx, 2 + jy, L); put(15 + jx, 2 + jy, L);
+    // rám hlavy
+    for (let y = 6; y <= 29; y++) for (let x = 2; x <= 29; x++) {
+      const corner = (x === 2 || x === 29) && (y === 6 || y === 29);
+      if (corner) continue;
+      const edge = x === 2 || x === 29 || y === 6 || y === 29;
+      put(x + jx, y + jy, edge ? metalLo : (y === 7 ? metalHi : (y >= 27 ? metalLo : metal)));
+    }
+    // skrutky
+    [[4, 8], [27, 8], [4, 27], [27, 27]].forEach(([x, y]) => put(x + jx, y + jy, metalHi));
+    // obrazovka
+    const sx = SCR.x + jx, sy = SCR.y + jy;
+    for (let y = 0; y < SCR.h; y++) for (let x = 0; x < SCR.w; x++) {
+      const scan = y % 2 === 0 ? 1 : 0.82;
+      put(sx + x, sy + y, BG.map(v => Math.round(v * scan)));
+    }
+    // záblesk obrazovky (prekvapenie / zmena nálady)
+    if (t < st.flashUntil) for (let y = 0; y < SCR.h; y++) for (let x = 0; x < SCR.w; x++) put(sx + x, sy + y, mix(BG, C, 0.35));
+    // oči (žmurkanie: zatvorené na 120 ms každých 2-5 s; K.O. a smiech nežmurkajú)
+    if (t > st.nextBlink) { st.blinkUntil = t + 120; st.nextBlink = t + 2000 + Math.random() * 3000; }
+    const blink = t < st.blinkUntil && !["ko", "laugh", "happy"].includes(st.mood);
+    let ex = 0, ey = 0;
+    if (m.fx === "think") { const ph = Math.floor(t / 700) % 4; ex = [-1, 0, 1, 0][ph]; }
+    if (st.mood === "neutral") ex = Math.floor((t + st.seed) / 2600) % 3 === 1 ? 1 : 0; // ľahké pohľady do strán
+    const [eL, eR] = m.eyes;
+    stamp(EYES[blink ? "closed" : eL], sx + EYE_L + ex, sy + EYE_Y + ey, C, DIM);
+    stamp(EYES[blink ? "closed" : eR], sx + EYE_R + ex, sy + EYE_Y + ey, C, DIM);
+    if (m.brows) { const [bl, br] = BROWS[m.brows]; stamp(bl, sx + EYE_L, sy + EYE_Y - 3, C, DIM); stamp(br, sx + EYE_R, sy + EYE_Y - 3, C, DIM); }
+    // ústa (smiech: otvára/zatvára; premýšľanie: bodky 1-2-3)
+    let mouth = MOUTHS[m.mouth];
+    if (m.fx === "laugh" && Math.floor(t / 160) % 2) mouth = MOUTHS.smile;
+    stamp(mouth, sx + MOUTH_X, sy + MOUTH_Y, C, DIM);
+    if (m.fx === "think") { const n = Math.floor(t / 350) % 4; for (let k = 0; k < n; k++) { put(sx + 7 + k * 3, sy + 13, C); put(sx + 8 + k * 3, sy + 13, C); } }
+    // efekty: pot, slza, výkričník, glitch
+    if (m.fx === "sweat") { const dy = Math.floor(age / 180) % 6; put(sx + 20, sy + 1 + dy, [140, 200, 255]); put(sx + 20, sy + 2 + dy, [90, 160, 255]); }
+    if (m.fx === "tear") { const dy = Math.floor(age / 150) % 7; put(sx + EYE_L + 1, sy + EYE_Y + 5 + dy, [120, 180, 255]); }
+    if (m.fx === "bang" && age < 1400) { const c = hexRgb("#ffe95e"); for (let y = 0; y < 4; y++) put(29, y, c); put(29, 5, c); put(30, 0, c); put(30, 1, c); }
+    if (m.fx === "glitch") {
+      const r = Math.floor(t / 90);
+      for (let k = 0; k < 3; k++) { const yy = sy + ((r * 7 + k * 5) % SCR.h); const len = 4 + ((r + k) % 9); const x0 = sx + ((r * 3 + k * 11) % (SCR.w - len));
+        for (let x = 0; x < len; x++) put(x0 + x, yy, mix(BG, C, 0.5)); }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  return {
+    set(mood, t = performance.now()) { if (mood === st.mood) return; st.mood = mood; st.since = t; st.flashUntil = t + (mood === "surprised" ? 220 : 90); },
+    get mood() { return st.mood; },
+    draw,
+  };
+}
+
+/* ===================== portrét postavy v HUD (Medúza, P2) ===================== */
+function drawPortrait(cv) {
+  const im = new Image();
+  im.onload = () => {
+    const c = cv.getContext("2d"); c.imageSmoothingEnabled = false;
+    const f = im.height; // prvý štvorcový frame
+    c.save(); c.translate(cv.width, 0); c.scale(-1, 1); // p2 hľadí doľava
+    c.drawImage(im, 0, 0, f, f, 0, 0, cv.width, cv.height); c.restore();
+  };
+  im.src = "/assets/medusa/Medusa2/Idle.png";
+}
+drawPortrait(document.getElementById("portrait"));
+drawPortrait(document.getElementById("portrait2"));
+
+/* ===================== zapojenie stránky ===================== */
+const faces = [];
+const main = makeFace(document.getElementById("face-main")); faces.push(main);
+const phone = makeFace(document.getElementById("face-phone")); faces.push(phone);
+const gal = document.getElementById("gallery");
+for (const [k, m] of Object.entries(MOODS)) {
+  const card = document.createElement("div"); card.className = "card";
+  card.innerHTML = `<canvas width="32" height="32"></canvas><div class="n">${m.sk}</div><div class="d">${m.d}</div>`;
+  gal.appendChild(card);
+  const f = makeFace(card.querySelector("canvas")); f.set(k, 0); faces.push(f);
+}
+const btns = document.getElementById("mood-buttons");
+for (const [k, m] of Object.entries(MOODS)) {
+  const b = document.createElement("button"); b.textContent = m.sk; b.dataset.k = k;
+  b.onclick = () => { stopDemo(); setMood(k, `<b>${m.sk}</b> · ${m.d}`); };
+  btns.appendChild(b);
+}
+function setMood(k, caption) {
+  main.set(k); phone.set(k);
+  document.getElementById("caption").innerHTML = caption;
+  btns.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === k));
+}
+document.getElementById("variant-tabs").onclick = (e) => {
+  const b = e.target.closest("button[data-v]"); if (!b) return;
+  document.querySelectorAll("#variant-tabs button").forEach(x => x.classList.toggle("on", x === b));
+  const sc = document.getElementById("scene"); sc.classList.toggle("variant-a", b.dataset.v === "a"); sc.classList.toggle("variant-b", b.dataset.v === "b");
+};
+
+// pravidlá: udalosť → nálada (tabuľka aj demo)
+const RULES = [
+  ["Plánovanie kola (bot počíta ťah)", "thinking", "kým nezamkne"],
+  ["Bot zamkol, čaká na teba", "neutral", "do vyhodnotenia (nálada z predošlého kola, nie z ťahu!)"],
+  ["Bot ťa trafil (bez obrany)", "happy", "~2 s"],
+  ["Tvoj útok zablokoval štítom / odrazil mirrorom", "smug", "~2 s"],
+  ["Prekvapivý ťah: tvoj mirror odrazil jeho útok, breaker rozbil jeho obranu, padla jeho pasca naprázdno", "surprised", "~1,5 s, potom podľa výsledku"],
+  ["Stratil 1–4 HP", "frown", "~2 s"],
+  ["Stratil 5+ HP jedným zásahom (special, melee, IK)", "angry", "~2 s"],
+  ["Na konci kola má ≤ 3 HP alebo ho čaká doom (Last Stand)", "worried", "kým sa to nezmení"],
+  ["Odhad pozície bota je zlý (prehráva o veľa)", "sad", "medzi kolami"],
+  ["Vyhral hru", "laugh", "do konca obrazovky výsledku"],
+  ["Prehral hru", "ko", "do konca obrazovky výsledku"],
+];
+document.getElementById("rules").innerHTML = RULES.map(([ev, k, dur]) => `<tr><td>${ev}</td><td class="m">${MOODS[k].sk}</td><td>${dur}</td></tr>`).join("");
+
+// demo zápasu: postupnosť udalostí s HP/manou bota
+const DEMO = [
+  [1800, "thinking", "<b>KOLO 3</b> · bot premýšľa nad ťahom", 10, 6],
+  [1600, "neutral", "<b>BOT ZAMKOL</b> · čaká na tvoj ťah", 10, 6],
+  [2200, "smug", "<b>TVOJ ÚTOK</b> · zablokoval ho štítom", 10, 4],
+  [2200, "happy", "<b>BOT TRAFIL</b> · tvoja Fire −3 HP", 10, 3],
+  [1500, "surprised", "<b>MIRROR!</b> · tvoj mirror odrazil jeho special", 10, 0],
+  [2200, "angry", "<b>ODRAZ</b> · bot −5 HP", 5, 0],
+  [1800, "thinking", "<b>KOLO 4</b> · bot premýšľa", 5, 4],
+  [2200, "frown", "<b>TILE</b> · stojí na dmg dlaždici −1 HP, minul útok", 4, 3],
+  [2400, "worried", "<b>MÁLO HP</b> · bot má 3 HP", 3, 3],
+  [2200, "sad", "<b>PREHRÁVA</b> · tvoj melee −2 HP", 1, 3],
+  [3200, "ko", "<b>K.O.</b> · vyhral si hru", 0, 3],
+  [3200, "laugh", "<b>…alebo</b> · keď vyhrá bot", 4, 2],
+];
+let demoT = null;
+function stopDemo() { clearTimeout(demoT); demoT = null; document.getElementById("demo").textContent = "▶ DEMO ZÁPASU"; }
+function runDemo(i = 0) {
+  const [ms, k, cap, hp, mp] = DEMO[i % DEMO.length];
+  setMood(k, cap);
+  document.getElementById("hp-num").textContent = hp; document.getElementById("hp-bar").style.height = hp * 10 + "%";
+  document.getElementById("mp-num").textContent = mp; document.getElementById("mp-bar").style.height = mp * 10 + "%";
+  demoT = setTimeout(() => runDemo(i + 1), ms);
+}
+document.getElementById("demo").onclick = () => {
+  if (demoT) return stopDemo();
+  document.getElementById("demo").textContent = "■ STOP"; runDemo(0);
+};
+
+// slučka ~15 fps (pixel art nepotrebuje viac); kreslí len pri viditeľnej karte
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (document.hidden || t - last < 66) return;
+  last = t;
+  for (const f of faces) f.draw(t);
+}
+requestAnimationFrame(loop);
+runDemo(0); document.getElementById("demo").textContent = "■ STOP";
+</script>
+</body>
+</html>
