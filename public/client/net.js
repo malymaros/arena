@@ -80,7 +80,7 @@ function renderRooms(info) {
     card.className = "room-card" + (r.ai ? " ai" : "");
     const label = document.createElement("div");
     label.className = "room-label";
-    label.innerHTML = r.ai ? `VS AI <span class="room-count">${r.players}/${r.max}</span>`
+    label.innerHTML = r.ai ? `AI ROOM <span class="room-count">${r.players}/${r.max}</span>`
       : `ROOM ${i} <span class="room-count">${r.players}/${r.max}</span>`;
     const b = document.createElement("button");
     if (r.canJoin) {

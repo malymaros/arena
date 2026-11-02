@@ -3078,8 +3078,10 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .room-btn.create{ width: 100%; padding: 18px; font-size: 14px; }
 .room-btn.reset{ width: 100%; padding: 18px; font-size: 14px; background: #8e0000; color: #fff; }
 /* hra proti AI botovi (docs/AI_PLAN.md) */
-.room-card.ai{ box-shadow: inset 0 0 0 2px #5b3a8e; }
-.room-card.ai .room-label{ color: #c9a8ff; }
+/* stála AI roomka - farba pokojnej tváre bota (bot-face.js MOODS.neutral) */
+.room-card.ai{ box-shadow: inset 0 0 0 2px #5ef2ff; }
+.room-card.ai .room-count{ color: #5ef2ff; }
+.room-card.ai .room-btn{ background: #5ef2ff; color: #0b1a1e; }
 /* lobby AI roomky: voľby, ktoré proti botovi zatiaľ nie sú (ostatné arény, kocka, turnaj), ostávajú na mieste,
    len zamknuté - rovnaký zámok ako pri zamknutých tlačidlách v hre (.btn.locked-*) */
 .ai-locked{ position: relative; cursor: not-allowed; }
