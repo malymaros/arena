@@ -16,7 +16,7 @@
   ]
  },
  "attack.escanor": {
-  "med": 864,
+  "med": 432,
   "values": [
    432,
    864,
@@ -40,7 +40,7 @@
   ]
  },
  "attack.lightning": {
-  "med": 864,
+  "med": 1296,
   "values": [
    432,
    864,
@@ -64,7 +64,7 @@
   ]
  },
  "attack.minotaur": {
-  "med": 864,
+  "med": 432,
   "values": [
    432,
    864,
@@ -255,6 +255,12 @@
    1080
   ]
  },
+ "block.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "breaker": {
   "med": 560,
   "values": [
@@ -300,7 +306,8 @@
  "breaker.luffy": {
   "med": 560,
   "values": [
-   560
+   560,
+   1290
   ]
  },
  "breaker.medusa": {
@@ -483,13 +490,13 @@
    1620
   ]
  },
- "demon_attack.jotaro": {
+ "demon_attack.escanor": {
   "med": 1620,
   "values": [
    1620
   ]
  },
- "demon_attack.medusa": {
+ "demon_attack.jotaro": {
   "med": 1620,
   "values": [
    1620
@@ -519,12 +526,6 @@
    1620
   ]
  },
- "demon_attack.werewolf": {
-  "med": 1620,
-  "values": [
-   1620
-  ]
- },
  "demon_summon": {
   "med": 8020,
   "values": [
@@ -538,13 +539,13 @@
    9100
   ]
  },
- "demon_summon.jotaro": {
+ "demon_summon.escanor": {
   "med": 8020,
   "values": [
    8020
   ]
  },
- "demon_summon.medusa": {
+ "demon_summon.jotaro": {
   "med": 8020,
   "values": [
    8020
@@ -569,12 +570,6 @@
   ]
  },
  "demon_summon.wanderer": {
-  "med": 8020,
-  "values": [
-   8020
-  ]
- },
- "demon_summon.werewolf": {
   "med": 8020,
   "values": [
    8020
@@ -1542,7 +1537,7 @@
   ]
  },
  "last_stand_banish.naruto": {
-  "med": 5680,
+  "med": 4600,
   "values": [
    4600,
    5680
@@ -1993,6 +1988,12 @@
    460
   ]
  },
+ "mirror.medusa": {
+  "med": 460,
+  "values": [
+   460
+  ]
+ },
  "mirror.minotaur": {
   "med": 460,
   "values": [
@@ -2192,6 +2193,24 @@
   ]
  },
  "petrify.medusa": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "petrify.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "petrify.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "petrify.werewolf": {
   "med": 1080,
   "values": [
    1080
@@ -2490,6 +2509,24 @@
    1080
   ]
  },
+ "stoned.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "stoned.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "stoned.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "tile.dmg": {
   "med": 600,
   "values": [
@@ -2658,6 +2695,24 @@
    1080
   ]
  },
+ "unpetrify.soldier": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "unpetrify.wanderer": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
+ "unpetrify.werewolf": {
+  "med": 1080,
+  "values": [
+   1080
+  ]
+ },
  "vamp_charge": {
   "med": 1440,
   "values": [
@@ -2725,7 +2780,7 @@
   ]
  },
  "voice.attack.escanor": {
-  "med": 1080,
+  "med": 864,
   "values": [
    432,
    864,

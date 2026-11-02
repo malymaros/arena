@@ -14,6 +14,7 @@ export default {
     roundEnd(ctx, p) { p.moon = moonLevelFor(p.hp); },
   },
   special: {
+    validate: (ctx, a) => !!WOLF_DIRS[a.dir], // povinný smer (8 smerov)
     resolve(ctx, slot, tl, { dir }) {
       const { game } = ctx;
       const actor = game.players[slot];

@@ -8,6 +8,10 @@
 //   resolve(ctx, slot, tl, { dir, cell })  - vyhodnotenie (mana gate už prebehol v doSpecial); môže vrátiť
 //                                            PAUSE (Jotarov THE WORLD) - engine ho prepošle hore do kola
 //   validate(ctx, a, sim)                  - kontrola argumentov specialu pri lock_in (false = odmietnuť);
+//                                            sim = { x, y, worldUsed, labyrinth, foe } - stav v čase akcie (ghost).
+//                                            Special s povinným smerom/bunkou ho MUSÍ overiť, inak prejde bez
+//                                            argumentu a pri vykonaní sa len prečiarkne (NO EFFECT) - AI bot
+//                                            zisťuje tvar argumentov práve cez validQueue;
 //                                            sim = { x, y, worldUsed, foe } - GHOST stav v čase specialu,
 //                                            foe = viditeľný súper (null, ak je hráč v labyrinte)
 // a ak má kit.mirrorSlot "special1", aj special1: { args, resolve, validate? }:

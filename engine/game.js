@@ -503,7 +503,7 @@ function validQueue(queue, slot) {
       // argumenty specialu / Special 1 (cieľová bunka Vojaka/pasce/Luffyho ruky, smer Jotarovho Special 2)
       // overí postava; v labyrinte je súper skrytý → foe null (prekliaty Vojak smie trafiť stojaceho lovca)
       const def = a.type === "special" ? CHARACTERS[simChar]?.special : a.type === "special1" ? CHARACTERS[simChar]?.special1 : null;
-      if (def?.validate && !def.validate(ctx, a, { x: sx, y: sy, worldUsed: !!meP?.worldUsed, foe: meP?.labyrinth ? null : foe })) return false;
+      if (def?.validate && !def.validate(ctx, a, { x: sx, y: sy, worldUsed: !!meP?.worldUsed, labyrinth: !!meP?.labyrinth, foe: meP?.labyrinth ? null : foe })) return false;
     }
   }
   return true;

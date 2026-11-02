@@ -7,6 +7,8 @@ export default {
   key: "medusa",
   kit: { meleeDmg: MEDUSA_MELEE_DMG }, // melee chvostom aj na diagonálne susedné bunky (G.meleeCells) za nižší dmg
   special: {
+    // povinný smer - okrem labyrintu (stratená Medúza smer nevolí, zóna je len jej políčko)
+    validate: (ctx, a, { labyrinth }) => labyrinth || a.dir === "left" || a.dir === "right",
     resolve(ctx, slot, tl, { dir }) {
       const { game } = ctx;
       const actor = game.players[slot];

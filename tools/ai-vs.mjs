@@ -24,7 +24,7 @@ const NO_MODEL = argv.includes("--no-model"); // bot bez modelu súpera (porovna
 const poolFor = (slot) => [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
 
 // jeden zápas: hráči = { A: "bot"|"random", B: ... }; vráti víťaznú osobu a počet kôl
-export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS, chars = null, log = null, botOpts = {}, onRound = null } = {}) {
+export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS, chars = null, log = null, botOpts = {}, onRound = null, onTimeline = null } = {}) {
   const bots = {};
   let result = null;
   const engine = createEngine({
@@ -35,6 +35,7 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
       if (ev === "new_game") for (const b of Object.values(bots)) b.onNewGame(payload);
     },
     emitState: (tl) => {
+      if (tl) onTimeline?.(tl, engine.game); // analýzy (nezredigovaná timeline kola)
       for (const [person, b] of Object.entries(bots)) {
         const slot = engine.slotForPerson(person);
         b.onState({ ...engine.snapshotFor(person), ...(tl ? { timeline: engine.redactTimelineFor(slot, tl) } : {}) });

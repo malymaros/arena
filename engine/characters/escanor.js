@@ -21,6 +21,7 @@ export default {
     },
   },
   special: {
+    validate: (ctx, a) => a.dir === "left" || a.dir === "right", // povinný smer
     resolve(ctx, slot, tl, { dir }) {
       const { game } = ctx;
       const actor = game.players[slot];
