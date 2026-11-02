@@ -2,6 +2,7 @@
 // labyrint - siluety a hmla), klonov, ghostov, Last Stand/Hope žiary a aury, figúr z registra fx, časovač ťahu.
 // Slučka sa spustí pri načítaní modulu; prvý frame beží až po inicializácii client.js.
 import { actorP1, actorP2, cellToPx, TILE_W, TILE_H, hudCharP1, hudBoxP1, hudCharP2, hudBoxP2 } from "/client/dom.js";
+import { botSlot, drawBotFace } from "/client/bot-face.js";
 import { tickTurnTimer } from "/client/turn-timer.js";
 import { perf, perfFrame } from "/client/perf.js";
 import { setStyle } from "/client/style-cache.js";
@@ -301,6 +302,12 @@ export function raf() {
     if (inMaze) {
       cvs.classList.remove("wounded", "critical", "dead", "stoned", "alt-color");
       ctx.clearRect(0, 0, cvs.width, cvs.height);
+      return;
+    }
+    // AI roomka: v HUD bota je namiesto portrétu jeho tvár s náladou (okno postavy cez peek.js ostáva)
+    if (slot === botSlot()) {
+      cvs.classList.remove("wounded", "critical", "dead", "stoned", "alt-color");
+      drawBotFace(cvs, now);
       return;
     }
     const hp = st.hp ?? 10;

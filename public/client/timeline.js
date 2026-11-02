@@ -1,6 +1,7 @@
 // public/client/timeline.js - prehrávanie timeline zo servera: frame po frame (delayMs), mapovanie efektov na animácie
 // (pohyb, strely, zásahy, obrany, statusy, labyrint, Last Stand, THE WORLD pauza, choreografia z registra fx),
 // prechod medzi kolami, koniec hry (game-over sekvencia / medzihra série) a upratanie figúr.
+import { botFaceFrame, botFaceGameEnd } from "/client/bot-face.js";
 import { playback } from "/client/playback.js";
 import { actors } from "/client/actors.js";
 import { setAnim, NEW_ROUND_MS, resetActorFade, MOVE_MS, INVALID_MSG, POSE_TAIL_MS, fadeActor, INVALID_MSG_DEFAULT, peekFadeOut, clearPeekFade } from "/client/anim.js";
@@ -242,6 +243,7 @@ export function schedulePlayTimeline(timeline) {
       // koniec hry: ak séria pokračuje -> medzihra; ak je rozhodnutá -> game over
       const winner = playback.serverWinner || playback.serverGameResult?.gameWinner || computeWinnerFromState(state);
       if (winner) {
+        botFaceGameEnd(winner);
         clearRoundCursor();
         // banish/summon: démon ešte chvíľu drží, potom zmizne - stredový AJ ten za postavou
         // (koniec hry = žiadny démon na ploche, nech už jeho animácie dopadli akokoľvek)
@@ -303,6 +305,7 @@ export function schedulePlayTimeline(timeline) {
       state.starter = frame.starter;
     }
     renderHUD();
+    botFaceFrame(frame); // AI roomka: nálada bota podľa verejných efektov frame-u
 
     // run aj pri pohybe KLONA (actors.animState je zdieľaný - klon zrkadlí majiteľovu animáciu)
     const cloneMoved = (b, f) => !!(b?.clone && f?.clone && (b.clone.x !== f.clone.x || b.clone.y !== f.clone.y));

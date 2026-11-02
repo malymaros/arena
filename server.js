@@ -176,7 +176,7 @@ function createRoom(id, { ai = false } = {}) {
     timerRemainingMs: () => timerRemainingMs(),
     names: () => personNames,
     awaitingOpponent: () => pendingMatchConfig != null,
-    vsAi: () => ai,
+    vsAi: () => (ai ? slotForPerson(botPerson) : null), // slot bota (snapshot vsAi)
   }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson });
   const { snapshot, snapshotFor, redactTimelineFor, slotForPerson, startMatch, newGame, sanitizeConfig } = engine;
 

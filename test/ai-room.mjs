@@ -36,7 +36,7 @@ try {
 
   sock.emit("create_room", { ai: true });
   await until(() => c.state?.phase === "lobby", 10000, "lobby AI roomky");
-  if (c.state?.vsAi === true) pass("snapshot nesie vsAi"); else fail("snapshot bez vsAi");
+  if (c.state?.vsAi === (c.slot === "p1" ? "p2" : "p1")) pass("snapshot nesie vsAi = slot bota"); else fail(`snapshot vsAi: ${c.state?.vsAi}`);
 
   // pokus o portal realm + turnaj → server vynúti Stone Bridge + single
   sock.emit("configure_match", { format: "tournament", arena: "portal", tilesPerRound: 1, timer: "off", tilePreview: true, colorPref: "white",
