@@ -148,6 +148,28 @@ const P2_IDLE = [R, M("up"), ML];
   check(fx(tl, "mirror").length === 1, "Naruto stacknutý: nezhodný mirror - jeden lúč", JSON.stringify(fx(tl, "mirror")));
 }
 {
+  // Naruto útočí: breaker castuje aj klon (každá figúra 1× dmg) - rozbitý štít = 2× dmg v jednom údere
+  const sc = scenario("naruto", "fire", (g) => { g.players.p1.clone = { x: 0, y: 0 }; g.players.p2.shield = true; g.players.p1.mana = 5; });
+  const tl = sc.round([SB, R, M("up")], P2_IDLE);
+  const h = hitsOn(tl, "p2")[0];
+  check(h?.dmg === 2 * SHIELD_BREAKER_DMG && h?.parts?.length === 2 && sc.game.players.p1.mana === 5 - SHIELD_COST + 4,
+    "Naruto + klon: Shield Breaker do štítu = 2× dmg, mana raz", JSON.stringify([h, sc.game.players.p1.mana]));
+}
+{
+  // nezhodný mirror: odraz každej figúre zvlášť - Naruto dostane 1× dmg, klon zanikne
+  const sc = scenario("naruto", "fire", (g) => { g.players.p1.clone = { x: 0, y: 0 }; g.players.p2.mirror = true; });
+  const tl = sc.round([SB, R, M("up")], P2_IDLE);
+  check(hitsOn(tl, "p1").length === 1 && hitsOn(tl, "p1")[0].dmg === SHIELD_BREAKER_DMG && fx(tl, "mirror").length === 2
+    && fx(tl, "clone_die").some(e => e.target === "p1") && !hitsOn(tl, "p2").length,
+    "Naruto + klon: Shield Breaker do mirroru - Naruto 1× odraz, klon zanikne", JSON.stringify([...fx(tl, "mirror"), ...hitsOn(tl, "p1")]));
+}
+{
+  const sc = scenario("naruto", "fire", (g) => { g.players.p1.clone = { x: 0, y: 0 }; g.players.p2.shield = true; });
+  const tl = sc.round([MB, R, M("up")], P2_IDLE);
+  check(fx(tl, "block").length === 2 && !hitsOn(tl, "p2").length && !hitsOn(tl, "p1").length && !!sc.game.players.p1.clone,
+    "Naruto + klon: Mirror Breaker do štítu - oba zablokované, klon žije", JSON.stringify(fx(tl, "block")));
+}
+{
   // labyrint: Minotaur s maze buffom rozbije prekliatemu mirror - reveal pred lúčom, 2× dmg, labyrint končí
   const sc = scenario("minotaur", "lightning", (g) => {
     g.players.p1.mazeBuff = true; g.players.p2.mirror = true;

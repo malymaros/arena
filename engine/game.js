@@ -1257,9 +1257,14 @@ function doBreaker(slot, kind, tl) {
   pushStateFrame(tl, [{ kind: "breaker", from: slot, target: defSlot, what: kind, result, gold, ...cloneCell }],
     result === "break" ? BREAKER_BREAK_MS : BREAKER_SHORT_MS);
   if (result === "none") return;
-  // rozbitá obrana už nekryje nikoho → zásah zasiahne majiteľa aj klona (klon zásahom zaniká); nezhodná obrana
-  // kryje obe figúry, reaguje len majiteľ (inak by mirror odrazil dmg dvakrát)
-  const figs = result === "break" && o.clone ? [{ fig: "owner", raw }, { fig: "clone", raw }] : [{ fig: "owner", raw }];
+  // Naruto: breaker castuje aj jeho klon (vlastník 2026-11-03, ako basic strela) - každá figúra dá 1× dmg, spolu 2×;
+  // mana sa platí raz. Odraz od nezhodného mirroru sa vracia každej figúre zvlášť (Naruto 1× dmg, klon zanikne).
+  const casters = me.clone ? 2 : 1;
+  // rozbitá obrana už nekryje nikoho → zásah(y) zasiahnu majiteľa aj klona (klon zásahom zaniká); nezhodná
+  // obrana kryje obe figúry - reaguje majiteľ, klon len vizuálne (echo)
+  const figs = result === "break"
+    ? [...Array.from({ length: casters }, () => ({ fig: "owner", raw })), ...(o.clone ? [{ fig: "clone", raw }] : [])]
+    : [{ fig: "owner", raw }];
   if (result === "break") {
     if (kind === "shield") { o.shield = false; o.shieldGold = false; } else { o.mirror = false; o.mirrorGold = false; }
     // zmrazený Shield Breaker rozbije zachytený štít HNEĎ: zmrazené zásahy PRED ním štít zablokoval (zahodia sa),
@@ -1267,6 +1272,8 @@ function doBreaker(slot, kind, tl) {
     if (ts) { ts.foeShield = false; ts.foeShieldGold = false; ts.hits = []; }
   }
   resolveStrike(defSlot, figs, tl, { kind: "breaker", echoClone: result !== "break" }); // v zamrazení ho intercept len ohlási a zaráta
+  // nezhodná obrana: klonov breaker zvlášť - štít ho zablokuje, mirror ho odrazí do klona (klon zanikne)
+  if (result !== "break" && casters === 2 && me.clone) resolveStrike(defSlot, [{ fig: "owner", raw }], tl, { kind: "breaker", fromClone: true, echoClone: true });
 }
 
 // Special 1 (mirror slot - Jotaro, Luffy): vyhodnotenie deklaruje postava (engine/characters/<postava>.js,
