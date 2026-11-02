@@ -7,7 +7,8 @@ import { CHARS, SIDE_CHARS, seededRng, cloneData } from "../constants.js";
 import { createBelief, decisionKind, hasHidden, simState } from "./view.js";
 import { createSim } from "./sim.js";
 import { baseQueues, extraVariants, queueKey } from "./candidates.js";
-import { evaluate, DEFAULT_WEIGHTS } from "./eval.js";
+import { evaluate } from "./eval.js";
+import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
@@ -16,7 +17,7 @@ const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left",
 
 // budgetMs = čas na rozhodnutie; budgetSims (voliteľné) = deterministický režim pre testy a self-play: „čas"
 // sa meria počtom simulácií (budgetSims simulácií = budgetMs), takže výsledok nezávisí od rýchlosti CPU
-export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = DEFAULT_WEIGHTS, log = null } = {}) {
+export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, log = null } = {}) {
   const belief = createBelief();
   const rng = seededRng(seed);
   const sim = createSim(), tsSim = createSim();

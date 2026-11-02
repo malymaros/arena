@@ -21,7 +21,7 @@ const LOG = argv.includes("--log");
 const poolFor = (slot) => [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
 
 // jeden zápas: hráči = { A: "bot"|"random", B: ... }; vráti víťaznú osobu a počet kôl
-export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS, chars = null, log = null, botOpts = {} } = {}) {
+export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS, chars = null, log = null, botOpts = {}, onRound = null } = {}) {
   const bots = {};
   let result = null;
   const engine = createEngine({
@@ -68,6 +68,7 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
       continue;
     }
     rounds++;
+    onRound?.(engine.exportState()); // ladenie (tools/ai-tune.mjs): úplný stav na začiatku kola
     for (const person of ["A", "B"]) {
       if (bots[person]) {
         const d = bots[person].decide();
