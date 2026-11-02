@@ -46,9 +46,8 @@ export function renderGrid(s, effects = []) {
     // špeciálne tiles svietia cez tmu - slepý hráč ich musí vidieť (heal/mana zbiera, dmg/IK sa vyhýba)
     (s?.tiles || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
     (s?.iks || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
-    // preview na ďalšie kolo svieti cez tmu rovnako (server heal/mana spawny mimo fakľových buniek už zredigoval)
-    (s?.pending?.spawns || []).forEach(t => fogVisible.add(`${t.x},${t.y}`));
-    (s?.pending?.ikMoves || []).forEach(c => fogVisible.add(`${c.x},${c.y}`));
+    // preview na ďalšie kolo bunku NEOSVETĽUJE (vlastník 2026-11-03: bunka s náhľadom ostáva tmavá ako ostatné) -
+    // malá ikona náhľadu sa kreslí aj na tmavú bunku (server heal/mana spawny mimo fakľových buniek už zredigoval)
   }
   // Ariadnina niť - bunky s niťou (vlastná niť prekliateho; lovec vidí súperovu, server mu ju posiela)
   const threadSet = new Set();

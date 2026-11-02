@@ -128,8 +128,24 @@ const P2_IDLE = [R, M("up"), ML];
 {
   const sc = scenario("fire", "naruto", (g) => { g.players.p2.clone = { x: 2, y: 0 }; g.players.p2.mirror = true; });
   const tl = sc.round([SB, R, M("up")], P2_IDLE);
-  check(fx(tl, "mirror").length === 1 && hitsOn(tl, "p1")[0]?.dmg === SHIELD_BREAKER_DMG && !!sc.game.players.p2.clone,
-    "Naruto: nezhodný mirror odrazí raz (nie z klona), klon prežije", JSON.stringify(fx(tl, "mirror")));
+  // lúč odrazu ide vizuálne aj z klona (echo - inak by prezradil pravého Naruta), dmg dopadne len raz
+  const mir = fx(tl, "mirror");
+  check(mir.length === 2 && mir.some(e => e.echo && e.cell?.[0] === 2 && e.cell?.[1] === 0) && hitsOn(tl, "p1").length === 1
+    && hitsOn(tl, "p1")[0]?.dmg === SHIELD_BREAKER_DMG && !!sc.game.players.p2.clone,
+    "Naruto: nezhodný mirror - lúč z oboch figúr, odraz dopadne raz, klon prežije", JSON.stringify(mir));
+}
+{
+  const sc = scenario("fire", "naruto", (g) => { g.players.p2.clone = { x: 2, y: 0 }; g.players.p2.shield = true; });
+  const tl = sc.round([MB, R, M("up")], P2_IDLE);
+  const blk = fx(tl, "block");
+  check(blk.length === 2 && blk.some(e => e.cell?.[0] === 2 && e.cell?.[1] === 0) && !hitsOn(tl, "p2").length && !!sc.game.players.p2.clone,
+    "Naruto: nezhodný štít blokuje na oboch figúrach, klon prežije", JSON.stringify(blk));
+}
+{
+  // stacknutý klon reaguje s majiteľom ako jedna figúra - žiadne echo
+  const sc = scenario("fire", "naruto", (g) => { g.players.p2.clone = { x: g.players.p2.x, y: g.players.p2.y }; g.players.p2.mirror = true; });
+  const tl = sc.round([SB, R, M("up")], P2_IDLE);
+  check(fx(tl, "mirror").length === 1, "Naruto stacknutý: nezhodný mirror - jeden lúč", JSON.stringify(fx(tl, "mirror")));
 }
 {
   // labyrint: Minotaur s maze buffom rozbije prekliatemu mirror - reveal pred lúčom, 2× dmg, labyrint končí

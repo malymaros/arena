@@ -338,8 +338,21 @@ export function schedulePlayTimeline(timeline) {
       if (e.kind === "breaker" && (e.from === "p1" || e.from === "p2")) {
         shooters.add(e.from);
         const brk = e.result === "break";
-        spawnBreakerBeam(e.from, e.target, { kind: e.what, gold: !!e.gold, whiff: e.result === "none", react: !brk && e.result !== "none" })
-          .then(() => { if (brk) spawnFloat(e.target, e.what === "mirror" ? "MIRROR SHATTERED!" : "SHIELD BROKEN!", "breaker-float"); });
+        // Naruto: lúč ide z OBOCH útočníkových figúr a do OBOCH súperových (inak by prezradil pravého Naruta);
+        // dva páry = majiteľ→majiteľ a klon→klon, inak každý s každým. Stacknutý klon = tá istá figúra.
+        const figs = (sl) => {
+          const p = state?.[sl], out = [null];
+          if (p?.clone && p.clone.x != null && (p.clone.x !== p.x || p.clone.y !== p.y)) out.push([p.clone.x, p.clone.y]);
+          return out;
+        };
+        const src = figs(e.from), dst = figs(e.target);
+        const pairs = src.length === 2 && dst.length === 2 ? [[src[0], dst[0]], [src[1], dst[1]]]
+          : src.flatMap(f => dst.map(t => [f, t]));
+        const txt = e.what === "mirror" ? "MIRROR SHATTERED!" : "SHIELD BROKEN!";
+        pairs.forEach(([fromCell, toCell]) => {
+          spawnBreakerBeam(e.from, e.target, { kind: e.what, gold: !!e.gold, whiff: e.result === "none", react: !brk && e.result !== "none", fromCell, toCell })
+            .then(() => { if (brk) { if (toCell) spawnCellFloat(toCell, txt, "breaker-float"); else spawnFloat(e.target, txt, "breaker-float"); } });
+        });
       }
       if (e.kind === "dispel" && (e.target === "p1" || e.target === "p2")) {
         spawnShieldBlock(e.target, !!e.gold, null);

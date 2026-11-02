@@ -19,7 +19,7 @@ const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left",
 
 // budgetMs = čas na rozhodnutie; budgetSims (voliteľné) = deterministický režim pre testy a self-play: „čas"
 // sa meria počtom simulácií (budgetSims simulácií = budgetMs), takže výsledok nezávisí od rýchlosti CPU
-export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, model = true, log = null } = {}) {
+export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, model = true, log = null, debug = null } = {}) {
   const belief = createBelief();
   const rng = seededRng(seed);
   const sim = createSim(), tsSim = createSim();
@@ -229,6 +229,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       mix = R.map((r, k) => (k === bi ? 1 : 0));
     }
     const i = sampleMix(mix, rng);
+    debug?.({ R, C, sol, mix, value, s0, me, pick: i }); // tools/ai-explain.mjs - rozbor rozhodnutia
     const ms = now() - t0;
     if (ms > 50 && !budgetSims) rate = 0.7 * rate + 0.3 * ((stats.sims - sims0) / D / ms);
     log?.({ kind: "round", ms: Math.round(ms), R: R.length, C: C.length, pool: [myPool.length, oppPool.length], D,

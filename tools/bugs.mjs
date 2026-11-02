@@ -43,5 +43,6 @@ for (const b of bugs) {
     for (const o of r.opp || []) console.log(`      čakal od súpera ${o.q}  p=${o.p}`);
     if (r.deadly?.length) console.log(`      zomrel by na: ${r.deadly.join(" | ")}`);
   }
+  if (why.length) console.log(`   rozbor: node tools/ai-explain.mjs <dáta> --match ${b.match} --game ${why.at(-1).g ?? 1} --turn <kolo>`);
 }
 console.log(`\n${bugs.length} hlásení`);

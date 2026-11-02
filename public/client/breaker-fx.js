@@ -12,16 +12,17 @@ import { BREAKER_RAMP_MS, BREAKER_BREAK_MS, BREAKER_SHORT_MS } from "/shared/tim
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // stred tela figúry (rovnaký bod ako blok štítu v defense-fx.js) + bod ruky útočníka
-function bodyPt(slot) {
+// cell = bunka Narutovho klona (figúra bez vlastného slotu) - inak bunka hráča slotu
+function bodyPt(slot, cell = null) {
   const p = state?.[slot];
-  if (!p || p.x == null) return null;
+  if (!p || (cell ? false : p.x == null)) return null;
   const facing = computeFacing(state?.p1, state?.p2)[slot] || 1;
   const headDx = facing * ACTOR_W * ((HEAD_CX[p.char] ?? 0.5) - 0.5);
-  const { left, top } = cellToPx(p.x, p.y);
-  return { x: left + TILE_W / 2 + pairShift(slot) + headDx, y: top + TILE_H * 0.5, facing };
+  const { left, top } = cellToPx(cell ? cell[0] : p.x, cell ? cell[1] : p.y);
+  return { x: left + TILE_W / 2 + (cell ? 0 : pairShift(slot)) + headDx, y: top + TILE_H * 0.5, facing };
 }
-function handPt(slot) {
-  const b = bodyPt(slot);
+function handPt(slot, cell = null) {
+  const b = bodyPt(slot, cell);
   return b && { x: b.x + b.facing * TILE_W * 0.24, y: b.y - TILE_H * 0.06 };
 }
 
@@ -43,11 +44,12 @@ const CRACKS = [
   ["M44 88 L18 100", "M52 120 L76 108 L88 124", "M80 56 L88 30", "M12 70 L20 92"],
 ];
 
+// fromCell / toCell = lúč z / do Narutovho klona (zdieľaná obrana a breaker sú na oboch figúrach rovnaké)
 // opts: { kind: "shield"|"mirror" (typ breakera - určuje farbu lúča), gold (súperova obrana je golden - farba bariéry), whiff (súper bez obrany), react (zlá obrana - odraz/blok prehrá volajúci),
 // slow (násobok dĺžky, náhľad) }. Vráti Promise - resolve
 // v momente roztrieštenia (volajúci hneď pustí hit/float), resp. keď sa lúč pri whiffe rozplynie.
-export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold = false, whiff = false, react = false, slow = 1 } = {}) {
-  const a = handPt(fromSlot), d = bodyPt(toSlot);
+export async function spawnBreakerBeam(fromSlot, toSlot, { kind = "shield", gold = false, whiff = false, react = false, slow = 1, fromCell = null, toCell = null } = {}) {
+  const a = handPt(fromSlot, fromCell), d = bodyPt(toSlot, toCell);
   if (!a || !d) return;
   const RAMP = BREAKER_RAMP_MS * slow, HEAT = ((react ? BREAKER_SHORT_MS : BREAKER_BREAK_MS) - BREAKER_RAMP_MS) * slow;
   const dx = d.x - a.x, dy = d.y - a.y, len = Math.hypot(dx, dy);

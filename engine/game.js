@@ -1026,7 +1026,7 @@ function deployReset(slot) {
 //   reflectVoid: koniec portálu {x,y,side}, ktorým útok prišiel - zrkadlo odrazí, ale portál je už zavretý, lúč
 //                narazí do steny (`reflect_void`) a strelec nedostane nič (obranca tiež nie, zrkadlo sa minie)
 //   portalBonus: powerup aura obsiahnutá v raw (len na rozpis hit framu - zlatý „+N" float)
-function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone = false, pair = false, soak = false, defBreak = false, reflectVoid = null, portalBonus = 0 } = {}) {
+function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone = false, pair = false, soak = false, defBreak = false, reflectVoid = null, portalBonus = 0, echoClone = false } = {}) {
   const o = game.players[defSlot];
   const atkSlot = other(defSlot);
   const atk = game.players[atkSlot];
@@ -1035,6 +1035,10 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
   const cloneFig = o.clone ? figs.find(f => f.fig === "clone") || null : null;
   if (!hasOwner && !cloneFig) return;
   const cloneCell = cloneFig ? [o.clone.x, o.clone.y] : null;
+  // echoClone (breaker do nezhodnej obrany): zdieľaná obrana reaguje VIZUÁLNE aj na klonovi (blok / lúč odrazu
+  // z jeho bunky), dmg sa nezdvojí - inak by reakcia len na majiteľovi prezradila pravého Naruta
+  const echoCell = echoClone && !cloneFig && o.clone && hasOwner && (o.clone.x !== o.x || o.clone.y !== o.y)
+    ? [o.clone.x, o.clone.y] : null; // stacknutý klon reaguje spolu s majiteľom ako jedna figúra
   const stacked = !!(cloneFig && o.clone.x === o.x && o.clone.y === o.y);
   let soakAmt = soak && stacked ? CLONE_DMG : 0;
 
@@ -1062,6 +1066,7 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
     else {
       if (hasOwner) fx.push({ kind: "block", target: defSlot, gold });
       if (cloneFig) fx.push({ kind: "block", target: defSlot, cell: cloneCell, gold });
+      if (echoCell) fx.push({ kind: "block", target: defSlot, cell: echoCell, gold });
     }
     pushStateFrame(tl, fx, SMALL_DELAY_MS);
     if (hasOwner) endLabyrinths(tl);
@@ -1078,6 +1083,7 @@ function resolveStrike(defSlot, figs, tl, { kind = "basic", bonus = 0, fromClone
     else {
       if (hasOwner) beams.push({ kind: "mirror", target: defSlot, dmg: ownerFigs[0].raw, atk: kind, gold, ...dest });
       if (cloneFig) beams.push({ kind: "mirror", target: defSlot, cell: cloneCell, dmg: cloneFig.raw, atk: kind, gold, ...dest });
+      if (echoCell) beams.push({ kind: "mirror", target: defSlot, cell: echoCell, dmg: ownerFigs[0].raw, atk: kind, gold, echo: true, ...dest });
     }
     // Portal Realm: útok prišiel cez portál, ktorý sa po ňom zavrel → lúč letí k hrane a narazí do steny
     if (reflectVoid) beams.forEach(b => { b.void = { ...reflectVoid }; });
@@ -1260,7 +1266,7 @@ function doBreaker(slot, kind, tl) {
     // tie PO ňom dopadnú pri obnovení času plne (vyhodnotenie po poradí)
     if (ts) { ts.foeShield = false; ts.foeShieldGold = false; ts.hits = []; }
   }
-  resolveStrike(defSlot, figs, tl, { kind: "breaker" }); // v zamrazení ho intercept len ohlási a zaráta
+  resolveStrike(defSlot, figs, tl, { kind: "breaker", echoClone: result !== "break" }); // v zamrazení ho intercept len ohlási a zaráta
 }
 
 // Special 1 (mirror slot - Jotaro, Luffy): vyhodnotenie deklaruje postava (engine/characters/<postava>.js,
