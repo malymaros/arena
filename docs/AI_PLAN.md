@@ -2,6 +2,8 @@
 
 Stav: **schválené 2026-11-02.** A0 hotové (`exportState`/`loadState` + `io.noFrames`, `tools/ai-bench.mjs`: ~9 400
 simulovaných kôl/s na jadro). A1 hotové (`engine/ai/view.js` belief + determinizácie, `engine/ai/sim.js`, `test/ai-view.mjs`).
+A2 hotové (`candidates.js`, `eval.js`, `solve.js`, `bot.js` - maticová hra + double oracle, rozpočet v ms alebo
+deterministicky v počte simulácií; `tools/ai-vs.mjs`: 30/30 proti náhodnému botovi pri 1 500 simuláciách; `test/ai-bot.mjs`).
 
 Cieľ: jeden bot, ktorý hrá **čo najlepšie** a **nepodvádza** — rozhoduje len z toho, čo by na jeho mieste
 videl človek. Žiadne úrovne obtiažnosti.
