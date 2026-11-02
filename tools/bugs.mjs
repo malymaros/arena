@@ -31,6 +31,11 @@ for (const b of bugs) {
   if (b.match) console.log(`   zápas ${b.match}  hra ${b.g ?? "-"}  kolo ${b.turn ?? "-"}  (${b.phase})  commit ${b.commit}  → node tools/replay.mjs <dáta> --match ${b.match} --rounds`);
   console.log(`   ${b.text.replace(/\n/g, "\n   ")}`);
   for (const e of b.errors || []) console.log(`   JS chyba: ${e}`);
+  // staršie hlásenia z AI roomky po konci hry nemali zápas - priradí sa posledný zápas bota pred hlásením (podľa času)
+  if (!b.match && b.room === "ai") {
+    const last = botRecs.filter(r => r.ts && b.ts && r.ts <= b.ts).at(-1);
+    if (last) { b.match = last.match; b.g = last.g; b.turn = last.turn; console.log(`   zápas ${last.match} (priradený podľa času)  → node tools/replay.mjs <dáta> --match ${last.match} --rounds`); }
+  }
   const why = botRecs.filter(r => r.match && r.match === b.match && (r.g ?? 1) === (b.g ?? 1) && (b.turn == null || r.turn <= b.turn)).slice(-3);
   for (const r of why) {
     console.log(`   bot (${r.side}) kolo ${r.turn}: hral ${r.pick}  p=${r.p}  hodnota ${r.value}${r.model ? `  model súpera z ${r.model} kôl` : ""}`);

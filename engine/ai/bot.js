@@ -7,7 +7,7 @@ import { CHARS, SIDE_CHARS, seededRng, cloneData } from "../constants.js";
 import { createBelief, decisionKind, hasHidden, simState } from "./view.js";
 import { createSim } from "./sim.js";
 import { baseQueues, extraVariants, queueKey } from "./candidates.js";
-import { evaluate } from "./eval.js";
+import { evaluate, desperate } from "./eval.js";
 import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
 import { createOpponentModel } from "./model.js";
@@ -152,9 +152,13 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const pm = stage(myPool, probesOpp, vMe, 0.2);
     const po = stage(oppPool, probesMe, vOpp, 0.25);
     // golden doplnky (predťah / golden mana / last stand / last hope) k najlepším základným frontám
+    // démon (last_stand) len v zúfalej situácii - inak ho bot bral ako „poistku" (pevná hodnota doomu je
+    // pri pesimistickej rovnováhe lákavá už v 1. kole); súperovi ho nechávam, ak je zúfalý on
     const withExtras = (top, slot) => {
       const out = [...top];
-      for (const q of top.slice(0, Math.ceil(K / 4))) out.push(...extraVariants(sim, s0, slot, q));
+      const demonOk = desperate(s0, slot);
+      for (const q of top.slice(0, Math.ceil(K / 4)))
+        out.push(...extraVariants(sim, s0, slot, q).filter(v => demonOk || !v.some(a => a.type === "last_stand")));
       return out;
     };
     const lead = (seeds, rest) => [...seeds, ...rest.filter(q => !seeds.includes(q))];
@@ -217,6 +221,13 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       }
     }
     mix = avoidDeath(mix, R, C, sol.col, value);
+    // prehraté proti dokonalému súperovi (napr. kolo s démonom): hraj na šancu - fronta, ktorá vyhrá proti čo
+    // najviac súperovým možnostiam (priemer cez všetky jeho fronty v matici), nie náhodná z rovnakých prehier
+    if (sol.value <= -0.9 && C.length) {
+      let bi = 0, bv = -Infinity;
+      R.forEach((r, k) => { const v = C.reduce((acc, c) => acc + value(r, c), 0) / C.length; if (v > bv) { bv = v; bi = k; } });
+      mix = R.map((r, k) => (k === bi ? 1 : 0));
+    }
     const i = sampleMix(mix, rng);
     const ms = now() - t0;
     if (ms > 50 && !budgetSims) rate = 0.7 * rate + 0.3 * ((stats.sims - sims0) / D / ms);

@@ -564,7 +564,7 @@ function onTurnTimeout() {
     const g = engine.game;
     const person = personSockets.A === socket ? "A" : personSockets.B === socket ? "B" : null;
     const side = person ? (g.seats?.p1 === person ? "white" : g.seats?.p2 === person ? "black" : null) : (spectators.has(socket) ? "spectator" : null);
-    return { room: id, match: engine.matchId || null, g: g.series?.gameIndex ?? null, turn: g.turn ?? null, phase: g.phase,
+    return { room: id, match: engine.matchId || engine.lastMatchId || null, g: g.series?.gameIndex ?? null, turn: g.turn ?? null, phase: g.phase,
       arena: g.config?.arena || "bridge", side, chars: { white: g.players?.p1?.char || null, black: g.players?.p2?.char || null } };
   }
 

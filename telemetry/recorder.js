@@ -100,6 +100,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
     aiPerson = null, // roomka proti AI botovi: osoba bota → po rozsadení záznam { t: "ai", side } (len strana, nie osoba)
   } = opts;
   let m = null;        // id práve zapisovaného zápasu (null = nič sa nezapisuje)
+  let lastM = null;    // id posledného zápasu - bug report poslaný po konci hry naň ešte odkáže
   let seed = null;     // seed aktuálneho zápasu - engine si ho prečíta v startMatch (io.seed)
   let t0 = 0;
   let held = null;     // framy kola pozastaveného THE WORLD (čaká na pokračovanie)
@@ -199,6 +200,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
     t0 = now();
     held = null; lastSegs = null; gameStarter = null;
     m = sink ? newId() : null;
+    if (m) lastM = m;
     write({ t: "match_start", v: SCHEMA, ts: new Date(t0).toISOString(), ...meta, seed,
       forceFirst: FORCE_FIRST_STARTER || null, config: copy(config) });
     engine.startMatch(config);
@@ -269,5 +271,6 @@ export function createRecordedEngine(io = {}, opts = {}) {
   });
   // id práve zapisovaného zápasu (bug report naň odkáže; null = nič sa nezapisuje) - getter, Object.assign by ho zmrazil
   Object.defineProperty(api, "matchId", { get: () => m });
+  Object.defineProperty(api, "lastMatchId", { get: () => lastM });
   return api;
 }

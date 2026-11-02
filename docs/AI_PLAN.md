@@ -238,6 +238,14 @@ na začiatku poolov, ako sondy predvýberu a v matici. `bot.js` `avoidDeath` - f
 zabije, sa nehrá, ak je bezpečná alternatíva proti súperovej zmesi najviac o 0,3 horšia. Zdôvodnenie každého ťahu
 (`why`) ide do telemetrie (`t: "bot"`) a `tools/bugs.mjs` ho vypíše pri hlásení z AI roomky.
 
+**Z prvých hier vlastníka (2026-11-02, 6 hlásení):** bot volal démona (Last Stand) už v 1.-2. kole - doom má v eval pevnú
+hodnotu (−0,54) a pri pesimistickej rovnováhe vyzerala ako „poistka" lepšie než bežné fronty. Oprava: `last_stand` je
+kandidát len v zúfalej situácii (`desperate` v `eval.js`: HP ≤ 4 a nie viac ako súper, a súper ma budúce kolo vie
+zabiť alebo nemám kam uhnúť). Keď je rovnovážna hodnota ≤ −0,9 (prehraté proti dokonalému súperovi), bot hrá frontu
+s najlepším priemerom proti všetkým súperovým frontám v matici (hra na šancu). Kolo s démonom sa vyhodnocuje presne
+(výsledok je istý) - útok démonom bot zvažuje, ale proti súperovi s manou na štít/mirror mu často vychádza lepšie iné.
+Medúzin kameň má väčšiu váhu (`stone` −0,5). Hlásenie poslané po konci hry odkáže na posledný zápas (`lastMatchId`).
+
 **Ďalej:** učenie zo skutočných zápasov (telemetria AI roomky: prehry/výhry bota → ladenie váh a modelu súpera, A6).
 - **Doplnenie k postavám:** Luffy/Jotaro nemajú mirror → slabšia obrana proti démonovi; Luffy so specialom je hrozba
   pre vyvolávača (súper si dá Last Hope a veľkým dosahom ho zabije), Jotaro má THE WORLD ako druhý „štít" (ubráni 2 z 3).

@@ -91,6 +91,18 @@ function pickupValue(state, p, foeKit, cells) {
   return best;
 }
 
+// zúfalá situácia - až vtedy má zmysel vyvolať démona (Last Stand; vyvolávač vyhrá ~33 %, docs/AI_PLAN.md 9):
+// málo HP (najviac DESPERATE_HP a nie viac ako súper) a súper ma v budúcom kole vie zabiť, alebo už nemám kam uhnúť
+// pred dmg políčkami
+const DESPERATE_HP = 4;
+export function desperate(state, me) {
+  const op = other(me), a = state.players[me], b = state.players[op];
+  if (a.hp > b.hp || a.hp > DESPERATE_HP) return false;
+  if (hidden(a) || hidden(b) || !a.char || !b.char) return a.hp <= 3;
+  const A = sideView(state, me, a, b), B = sideView(state, op, b, a);
+  return B.onFoe >= a.hp || (A.safe <= 1 && a.hp <= 3);
+}
+
 const manaTiers = (m) => ((m >= 1) + (m >= 2) + (m >= 4) + (m >= 5)) / 4;
 
 function tactical(state, me) {
