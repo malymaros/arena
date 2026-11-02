@@ -1,6 +1,6 @@
 // test/ai-room.mjs - AI roomka cez reálny server (docs/AI_PLAN.md, fáza A4): hráč vytvorí roomku proti botovi
 // (create_room { ai: true }), bot sedí ako osoba B, lobby povolí len Stone Bridge + single/bo3, hráč s botom
-// odohrá celý zápas (bot vyberá postavu aj fronty vo worker vlákne). Malý rozpočet bota (AI_BUDGET_MS).
+// odohrá celý zápas (bot vyberá postavu aj fronty vo worker vlákne). Malý rozpočet bota (AI_SIMS).
 import { spawn } from "child_process";
 import { io } from "socket.io-client";
 
@@ -19,7 +19,7 @@ async function until(fn, ms, what) {
 
 try {
   server = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ARENA_SEED: "3", AI_BUDGET_MS: "300" },
+    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ARENA_SEED: "3", AI_SIMS: "400" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stderr.on("data", d => { serverErr += d; });

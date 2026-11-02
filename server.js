@@ -130,8 +130,10 @@ const browsing = new Set();                 // sockety na room-browseri (ešte n
 const rooms = new Map();                    // id -> Room (objekt z createRoom)
 let nextRoomId = 1;                         // rastúci identifikátor roomiek
 const MAX_ROOMS = 2;                        // cap: max toľko roomiek naraz
-// AI bot (docs/AI_PLAN.md): čas na rozhodnutie kola; bot počíta vo worker vlákne, server nečaká
-const AI_BUDGET_MS = Math.max(200, Math.min(10000, Number(process.env.AI_BUDGET_MS) || 5000));
+// AI bot (docs/AI_PLAN.md): pevný počet simulácií na ťah = pevná, predvídateľná sila nezávislá od rýchlosti
+// a záťaže servera (merania: viac výpočtu dnešnému botovi nepomáha). ~0,2 s na ťah na PC, ~1 s na e2-micro;
+// všetky AI roomky počítajú v jednom worker vlákne po jednom ťahu.
+const AI_SIMS = Math.max(100, Math.min(20000, Number(process.env.AI_SIMS) || 1500));
 
 // Validácia zobrazovaného mena: 1–8 znakov anglickej abecedy, nič iné (žiadne emoji/diakritika/medzery).
 function validateName(raw) {
@@ -518,7 +520,7 @@ function onTurnTimeout() {
   }
   let seatBot = null;
   if (ai) {
-    const sock = createBotSeat({ seed: crypto.randomInt(2 ** 31), budgetMs: AI_BUDGET_MS, onDecision: (d) => onBotDecision(d) });
+    const sock = createBotSeat({ botOpts: { seed: crypto.randomInt(2 ** 31), budgetSims: AI_SIMS, budgetMs: 1000 }, onDecision: (d) => onBotDecision(d) });
     sock.data.pendingName = "AI";
     seatBot = () => seat(sock, botPerson);
   }

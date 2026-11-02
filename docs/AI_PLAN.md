@@ -145,5 +145,28 @@ Hodnota stavu po kole z pohľadu bota (výhra/prehra = ±1, inak odhad pravdepod
 - **Rozsah v1: single na Stone Bridge.** Architektúra sa ale od začiatku navrhuje pre všetky formáty a arény
   (eval/kandidáti s háčikmi pre portály, Shreka, turnaj), ďalšie sa pridávajú postupne.
 - **Budúcnosť — arkáda:** hráč postupne porazí bota za každú postavu; keď porazí všetky, vyhral. Až po v1.
-- **Čas na rozmýšľanie: až ~5 s** na kolo (pri nastavenom kratšom časovači menej); bot počíta paralelne,
-  kým človek plánuje.
+- ~~Čas na rozmýšľanie: až ~5 s~~ → **zmenené 2026-11-02:** pevný počet simulácií na ťah (`AI_SIMS`, default 1 500),
+  nie čas. Merania ukázali, že viac výpočtu dnešnému botovi nepomáha; pevný rozpočet = pevná, predvídateľná sila
+  a minimum CPU (~0,2 s/ťah na PC, ~1 s na e2-micro). Všetky AI roomky počítajú v **jednom** worker vlákne, ťah po ťahu.
+- **Šetrnosť:** hra nesmie nikdy sekať - ani server, ani zariadenie hráča. Maximalizovať silu na jednotku výpočtu.
+
+## 8. Budúca predstava - úrovne botov (zapísané 2026-11-02, realizovať až keď bude opodstatnená)
+
+Predstava vlastníka: **Server bot** (šetrný, pevne definovaná sila, hráč vie, čo čakať) + **lokálne boty 1–3** bežiace
+v prehliadači hráča. Každá úroveň má **pevne definovanú a porovnateľnú silu** - rovnaká na každom zariadení; zariadenie
+rozhoduje len o tom, ktoré úrovne sú **odomknuté** (silnejšie zariadenie = viac úrovní, slabšie má vyššie zamknuté).
+
+- **Sila = algoritmus + pevný počet simulácií** (`budgetSims`, hĺbka 1 / 2 kolá), nie čas → rovnaký súper všade, na
+  pomalšom zariadení len dlhšie premýšľa.
+- **Odomknutie:** krátky test výkonu pri otvorení menu proti AI (~1 s vo Web Workeri); úroveň je dostupná, len ak ju
+  zariadenie zvládne v limite (napr. ≤ 5 s/ťah) s rezervou.
+- **Bez sekania:** výpočet len vo Web Workeroch (nikdy hlavné vlákno), najviac časť jadier (aspoň jedno voľné);
+  pri prehriatí / spomalení hráča upozorniť - nikdy potichu nemeniť silu.
+- **Porovnateľnosť:** každá úroveň zmeraná duelmi (rating, napr. Elo) a zobrazená v menu; každá úroveň musí byť
+  **merateľne silnejšia** než predošlá (inak nemá zmysel).
+- **Podvádzanie človeka** (prečítať ťah lokálneho bota cez devtools) vlastníkovi nevadí - nehrá sa o nič, podvodník
+  sa len ochudobní o zábavu. Bot sám nepodvádza nikdy.
+- **Predpoklady (poradie):** (1) spoľahlivé meranie - viac skriptovaných štýlov + exploiter; (2) hodnotenie pozná
+  budúce kolo (mana na obranu, súperova hrozba, ohlásené dlaždice / IK); (3) hľadanie cez 2 kolá (až tu začne výpočet
+  zvyšovať silu); (4) definícia úrovní + ratingy; (5) engine v prehliadači (`process.env` v `engine/constants.js`),
+  Web Workery, test výkonu, odomykanie.
