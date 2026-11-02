@@ -1,12 +1,15 @@
 // engine/ai/candidates.js - všetky rozumné fronty jedného hráča v danom stave (docs/AI_PLAN.md 3.2).
 // Postavy nepozná: tvar argumentov každej akcie (bez argumentu / smer / bunka) zistí cez engine validQueue,
 // takže nové postavy a akcie pokryje automaticky. Odfiltruje fronty, ktoré by si nemohli dovoliť manu
-// (akcia by sa prečiarkla - vždy horšia než tá istá fronta bez nej) a pass (stojí manu, nič nerobí).
+// (akcia by sa prečiarkla - vždy horšia než tá istá fronta bez nej), pass (stojí manu, nič nerobí) a akcie
+// „do steny" (pohyb / dash / útok / special mimo dosky - engine ich vykoná ako náraz bez účinku; pre človeka
+// vyzerajú hlúpo a útok či special pri tom minie manu). Náraz sa zisťuje simuláciou jednej akcie z danej bunky
+// (efekt wall_bump alebo offboard), výsledok sa cachuje podľa bunky a akcie.
 import {
   BASIC_COST, MELEE_COST, DASH_COST, RECHARGE_GAIN, SHIELD_COST, MIRROR_COST, SPECIAL_COST,
   GOLDEN_COST, GOLDEN_MIRROR_COST, DEMON_COST, JOTARO_S1_COST, LUFFY_S1_COST, MAX_MANA,
 } from "../../shared/balance.js";
-import { DEFENSE_SLOT } from "../constants.js";
+import { DEFENSE_SLOT, cloneData, seededRng } from "../constants.js";
 
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
 const TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "mirror", "special1", "shield_breaker", "mirror_breaker", "demon"];
@@ -49,6 +52,30 @@ function affordable(q, mana, char, pre = 0) {
   return true;
 }
 
+const keyOf = (a) => a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "");
+
+// sonda: jedna akcia z bunky (x, y) → { wall, x, y } (náraz do steny? kde figúra skončí); súper len čaká
+function makeProbe(sim, state, slot) {
+  const cache = new Map(), opp = slot === "p1" ? "p2" : "p1";
+  const oppStone = Math.min(3, state.players[opp].stone || 0);
+  const oppQ = Array.from({ length: 3 }, (_, i) => ({ type: i < oppStone ? "stoned" : "pass" }));
+  return (x, y, a) => {
+    const key = `${x},${y},${keyOf(a)}`;
+    if (cache.has(key)) return cache.get(key);
+    const st = cloneData(state), me = st.players[slot];
+    me.x = x; me.y = y; me.mana = MAX_MANA; me.stone = 0; me.clone = null; // len hlavná figúra
+    const res = sim.play(st, { [slot]: [a, { type: "pass" }, { type: "pass" }], [opp]: oppQ }, seededRng(1));
+    let out = { wall: false, x, y };
+    if (res) {
+      const wall = sim.lastTimeline().some(f => (f.effects || []).some(e => e.from === slot
+        && ((e.kind === "wall_bump" && !e.clone) || e.offboard)));
+      out = { wall, x: res.players[slot].x, y: res.players[slot].y };
+    }
+    cache.set(key, out);
+    return out;
+  };
+}
+
 // základné fronty (3 akcie, bez golden doplnkov)
 export function baseQueues(sim, state, slot) {
   const p = state.players[slot];
@@ -58,9 +85,10 @@ export function baseQueues(sim, state, slot) {
   const cells = [];
   for (let y = 0; y < state.board.h; y++) for (let x = 0; x < state.board.w; x++) cells.push({ x, y });
   const opts = actionOptions(sim, state, slot, prefix, cells);
+  const probe = makeProbe(sim, state, slot);
   const out = [];
   const free = 3 - stone;
-  const rec = (q, used) => {
+  const rec = (q, used, x, y) => {
     if (q.length === free) {
       const full = [...prefix, ...q];
       if (affordable(q, p.mana, p.char) && sim.valid(state, slot, full)) out.push(full);
@@ -68,11 +96,13 @@ export function baseQueues(sim, state, slot) {
     }
     for (const a of opts) {
       if (used.has(a.type) || (DEFENSE_SLOT[a.type] && used.has("def:" + DEFENSE_SLOT[a.type]))) continue;
+      const r = probe(x, y, a);
+      if (r.wall) continue; // akcia do steny z tejto bunky
       const u = new Set(used); u.add(a.type); if (DEFENSE_SLOT[a.type]) u.add("def:" + DEFENSE_SLOT[a.type]);
-      rec([...q, a], u);
+      rec([...q, a], u, r.x, r.y);
     }
   };
-  rec([], new Set());
+  rec([], new Set(), p.x, p.y);
   return out;
 }
 

@@ -1,13 +1,15 @@
 // engine/ai/sim.js - simulačný engine AI bota (docs/AI_PLAN.md): odohrá jedno kolo z daného vnútorného stavu
-// (view.simState) bez frame-ov a bez vonkajšieho sveta. Stav sa pred kolom skopíruje - vstup ostáva nedotknutý.
-// Sloty p1/p2 sedia v simulácii vždy na osobách A/B (simState: seats { p1: "A", p2: "B" }).
+// (view.simState) bez snapshotov vo frame-och a bez vonkajšieho sveta. Stav sa pred kolom skopíruje - vstup
+// ostáva nedotknutý. Sloty p1/p2 sedia v simulácii vždy na osobách A/B (simState: seats { p1: "A", p2: "B" }).
+// Frame-y kola (len efekty - io.noFrames) sú k dispozícii cez lastTimeline() (napr. rozpoznanie nárazu do steny).
 import { createEngine } from "../game.js";
 import { cloneData } from "../constants.js";
 
 const PERSON = { p1: "A", p2: "B" };
 
 export function createSim() {
-  const eng = createEngine({ noFrames: true, schedule: () => {} });
+  let tl = [];
+  const eng = createEngine({ noFrames: true, schedule: () => {}, emitState: (t) => { if (t) tl.push(...t); } });
 
   // platná fronta pre slot v danom stave? (stav sa nemení - validQueue je čistá kontrola)
   function valid(state, slot, queue) {
@@ -18,6 +20,7 @@ export function createSim() {
   // odohraj kolo: queues = { p1, p2 }; tsPolicy(state, slot) → 3 zmrazené akcie pri THE WORLD pauze.
   // Vráti nový stav po kole alebo null, ak engine niektorú frontu neprijal.
   function play(state, queues, rng, tsPolicy = null) {
+    tl = [];
     eng.loadState(cloneData(state), rng);
     let ok = 0;
     const ack = (r) => { if (r?.ok) ok++; };
@@ -34,5 +37,5 @@ export function createSim() {
     return eng.game;
   }
 
-  return { valid, play, engine: eng };
+  return { valid, play, lastTimeline: () => tl, engine: eng };
 }
