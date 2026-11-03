@@ -229,7 +229,7 @@ $("char").onchange = (ev) => { selChar = ev.target.value; renderAll(); };
 const GROUPS = [
   ["Hudba", k => k.startsWith("music.")], ["Koniec hry", k => k.startsWith("game.") || k === "death"],
   ["UI a kolo", k => k.startsWith("ui.") || k.startsWith("round.")], ["Specialy postáv", k => k.startsWith("special")],
-  ["Dlaždice", k => k.startsWith("tile")], ["Boj a mechaniky", () => true],
+  ["Dlaždice", k => k.startsWith("tile")], ["AI bot (nálady, intro)", k => k.startsWith("bot.")], ["Boj a mechaniky", () => true],
 ];
 function badge(k) {
   const e = effective(k);

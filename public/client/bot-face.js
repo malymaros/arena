@@ -6,6 +6,7 @@
 import { state } from "/client/session.js";
 import { playback } from "/client/playback.js";
 import { paintFox, foxBuffer } from "/client/bot-face-fox.js";
+import { sfx } from "/client/sound.js";
 
 // slot bota v AI roomke (snapshot vsAi) alebo null
 export const botSlot = () => (state?.vsAi === "p1" || state?.vsAi === "p2" ? state.vsAi : null);
@@ -85,10 +86,18 @@ function pulse(mood, ms, now = performance.now()) {
   face.transient = mood; face.until = now + ms;
 }
 // jeden frame prehrávanej timeline (volá timeline.js) - reakcie na verejné efekty
+// zvuk nálady (bot.<nálada>.<úroveň>, docs/SOUNDS.md); mock2 (rehot CHEATERA) má zvuk happy
+function moodSound(mood) { sfx(`bot.${mood === "mock2" ? "happy" : mood}`, { char: botLevel() }); }
 export function botFaceFrame(frame) {
   const b = botSlot();
   if (!b) return;
   const h = b === "p1" ? "p2" : "p1";
+  const until0 = face.until;
+  playFrame(frame, b, h);
+  // jeden zvuk za beat - len víťazná (najsilnejšia) reakcia frame-u
+  if (face.until !== until0 && face.transient) moodSound(face.transient);
+}
+function playFrame(frame, b, h) {
   for (const e of frame?.effects || []) {
     if (e.kind === "hit" && e.dmg > 0) {
       // CHEATER sa pri 5+ dmg rehoce (mock2), NORMAL / BABY majú len happy
@@ -116,9 +125,18 @@ function baseline() {
   return "neutral";
 }
 
+// stavové nálady so zvukom pri vstupe do stavu (premýšľa nad kolom, ≤ 3 HP / Last Stand, prehráva, koniec hry)
+const STATE_SOUND = new Set(["thinking", "worried", "sad", "laugh", "ko"]);
+let lastBase; // undefined = ešte nič (prvé vyhodnotenie po načítaní stránky nehrá)
+
 /* ---------- kreslenie do HUD canvasu ---------- */
 export function drawBotFace(cvs, now) {
-  const want = face.transient && now < face.until ? face.transient : baseline();
+  const base = baseline();
+  if (base !== lastBase) {
+    if (lastBase !== undefined && STATE_SOUND.has(base)) moodSound(base);
+    lastBase = base;
+  }
+  const want = face.transient && now < face.until ? face.transient : base;
   const lv = botLevel(), src = lv === "cheater" ? foxBuffer() : off;
   if (!(lv === "cheater" ? paintFox : lv === "baby" ? paintBaby : paintFace)(face, want, now, cvs.width)) return;
   const ctx = cvs.getContext("2d");

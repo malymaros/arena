@@ -165,7 +165,7 @@ export function sfx(key, { char = null, pan = 0, volume = 1, windowMs = null } =
   if (!urls.length) return;
   const i = Math.floor(Math.random() * urls.length);
   // jemná zmena výšky - opakované kroky neznejú ako stroj; nie pri znelkách/hudbe a stopách cez celú fázu (dlhé repliky)
-  const jitter = /^(game|round|music)\./.test(k) || PHASE_KEYS.has(k.split(".")[0]) ? 0 : 0.04;
+  const jitter = /^(game|round|music|bot)\./.test(k) || PHASE_KEYS.has(k.split(".")[0]) ? 0 : 0.04;
   return playUrl(urls[i], (e.vol ?? 1) * volume, { pan, rate: 1 + (Math.random() * 2 - 1) * jitter, windowMs, fit: e.fit || defaultFit(k), trim: e.trims?.[i],
     duck: !/^(ui|music)\./.test(k) }); // herné efekty stíšia hudbu (kliky v UI nie)
 }

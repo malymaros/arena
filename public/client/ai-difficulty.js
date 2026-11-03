@@ -4,9 +4,11 @@
 // za kolo, docs/AI_PLAN.md 8c; avatar líška, bot-face-fox.js); klik na kartu = onPick(level).
 // ✕, klik mimo okna alebo Escape = späť do room browsera. Hlavy kreslí bot-face.js (tie isté ako v hre).
 import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
+import { sfx } from "/client/sound.js";
 
 const SCALE = 4;
 let back = null, raf = 0, onPick = null, hover = null;
+let intro = null; // práve hrajúce intro hlavy (prejdenie na inú hlavu ho utne)
 const heads = []; // { cvs, level }
 
 function build() {
@@ -26,7 +28,12 @@ function build() {
     const level = card.dataset.level, cvs = card.querySelector("canvas");
     cvs.width = FIGURE_W * SCALE; cvs.height = FIGURE_H * SCALE;
     heads.push({ cvs, level });
-    card.addEventListener("mouseenter", () => { hover = level; });
+    card.addEventListener("mouseenter", () => {
+      hover = level;
+      // intro úrovne (bot.intro.<úroveň>, docs/SOUNDS.md) - predchádzajúce sa utne, nech sa hlasy neprekrývajú
+      intro?.then?.(h => h?.stop());
+      intro = sfx("bot.intro", { char: level });
+    });
     card.addEventListener("mouseleave", () => { if (hover === level) hover = null; });
     card.addEventListener("click", () => { const cb = onPick; close(); cb?.(level); });
   }

@@ -136,6 +136,14 @@ Niektoré udalosti majú okno cez celú fázu, nie len cez svoj frame (`PHASE_SP
 `last_stand_banish_kill`. Časy fáz sú `LS_*_MS` / `LH_*_MS` v `shared/timing.js` - zmena tam = `npm run sounds:windows`.
 Hlasitosť REAPER, Last Hope a FINAL ROUND nahrávok vyrovnáva `node tools/voice-loudness.mjs --write` (rovnako ako hlasy postáv).
 
+## AI bot (nálady a intro)
+
+Hlasy bota dodal vlastník (2026-11-03), `public/sounds/custom/bot/<úroveň>-<nálada>.mp3`. Kľúč `bot.<nálada>.<úroveň>` (úroveň normal | baby | cheater) sa hľadá rovnako ako kľúč postavy (`sfx("bot.happy", { char: level })`); spoločný `bot.<nálada>` je ticho.
+- `bot.intro` - hover na hlavu v okne CHOOSE DIFFICULTY (`ai-difficulty.js`; prejdenie na inú hlavu predchádzajúce intro utne);
+- reakcie (`bot-face.js` `botFaceFrame`): happy, smug, surprised, frown, angry - **jeden zvuk za beat**, víťazná (najsilnejšia) reakcia frame-u; CHEATERov rehot `mock2` hrá `happy`;
+- stavy (`drawBotFace`, pri vstupe do stavu): thinking (začiatok plánovania kola), worried, sad, laugh (výhra hry), ko (prehra hry).
+`vol` je nastavené podľa zmeranej hlasitosti nahrávky (hlavná časť ≈ −20 dB, o kúsok pod hlasmi postáv), `trim` odstrihne ticho na začiatku. Bez náhodnej zmeny výšky (`jitter`).
+
 ## Ako pridať novú udalosť (vývoj)
 
 1. Do `SOUNDS` v manifeste pridaj kľúč so `status: "default"` a poznámkou, kedy zaznie.
