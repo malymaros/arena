@@ -1,6 +1,6 @@
 // tools/ai-vs.mjs - zápasy AI bota (engine/ai/bot.js) priamo na engine (docs/AI_PLAN.md, meranie sily).
 // Bot dostáva rovnaké payloady ako klient na serveri (snapshotFor + redactTimelineFor, you_are, new_game).
-// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--level baby] [--vs random|bot] [--chars p1,p2] [--log] [--portal | --swamp]
+// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--level baby|cheater] [--vs random|bot] [--chars p1,p2] [--log] [--portal | --swamp]
 //   --sims n     deterministický rozpočet: n simulácií na rozhodnutie (namiesto času)
 //   --vs random  bot (osoba B) proti náhodnému botovi (tools/random-bot.mjs) - cieľ ≥ 98 % výhier
 //   --vs bot     bot proti botu (rovnaké nastavenie, rôzne seedy) - sanity / ladenie
@@ -53,7 +53,7 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
     ...(ARENA ? { arena: ARENA } : {}),
   }));
   for (const [person, b] of Object.entries(bots)) { b.onYouAre({ slot: engine.slotForPerson(person) }); b.onState(engine.snapshotFor(person)); }
-  const rng = { A: seededRng(seed * 2 + 11), B: seededRng(seed * 2 + 12) };
+  const rng = { A: seededRng(seed * 2 + 11), B: seededRng(seed * 2 + 12), spy: seededRng(seed * 2 + 13) };
   // postavy
   for (const person of ["A", "B"]) {
     const slot = engine.slotForPerson(person);
@@ -82,7 +82,13 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
     for (const [person, b] of Object.entries(bots)) b.onState(engine.snapshotFor(person));
     for (const person of ["A", "B"]) {
       if (bots[person]) {
-        const d = bots[person].decide();
+        // CHEATER (--level cheater, len B): uvidí jednu náhodnú akciu už zamknutej fronty A (ako na serveri)
+        const foe = g.players[engine.slotForPerson("A")];
+        const spy = person === "B" && LEVEL === "cheater" && foe.locked && foe.queue?.length
+          ? (() => { const idx = Math.floor(rng.spy() * foe.queue.length); return { idx, action: { ...foe.queue[idx] } }; })() : null;
+        // CHEATER ako na serveri: najprv bežné rozhodnutie (výpočet počas plánovania), potom dopočet s odhalenou akciou
+        let d = bots[person].decide();
+        if (spy) d = bots[person].decide({ spy }) || d;
         let ok = false;
         if (d?.queue) engine.lockIn(person, d.queue, g.turn, (r) => { ok = !!r?.ok; });
         if (!ok) { log?.({ kind: "reject", person, queue: d?.queue }); botLock(engine, person, rng[person]); }

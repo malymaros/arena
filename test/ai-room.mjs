@@ -142,6 +142,40 @@ try {
   c.rooms = null;
   sock.emit("leave_room");
   await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (normal)");
+  // CHEATER (docs/AI_PLAN.md 8c): meno CHEATER, bot zamyká až po hráčovi a jeho rozhodnutie nesie odhalenú akciu
+  // (telemetria bot.spy = slot + akcia z hráčovej fronty)
+  c.state = null; c.result = null; c.over = null; c.oppReadyFirst = false;
+  sock.emit("join_room", { roomId: c.rooms.aiRoom.id, level: "cheater" });
+  await until(() => c.state?.phase === "lobby", 5000, "lobby AI roomky (cheater)");
+  if (c.state?.aiLevel === "cheater" && botOf(c.state) === "CHEATER") pass("CHEATER: snapshot aiLevel=cheater, bot sa v HUD volá CHEATER");
+  else fail(`CHEATER snapshot: aiLevel=${c.state?.aiLevel} meno=${botOf(c.state)}`);
+  sock.emit("configure_match", { format: "single", tilesPerRound: 1, timer: "off", tilePreview: true, colorPref: "white",
+    tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 } });
+  await until(() => c.state?.phase === "playing", 10000, "štart zápasu (cheater)");
+  sock.emit("choose_character", "fire");
+  await until(() => c.state?.p1?.char && c.state?.p2?.char, 15000, "cheater si vybral postavu");
+  const cheatQ = [];
+  for (let r = 0; r < 3 && !c.result; r++) {
+    const turn = c.state.turn, stone = Math.min(3, c.state[c.slot]?.stone || 0);
+    const q = QUEUES[r % QUEUES.length].map((a, i) => (i < stone ? { type: "stoned" } : a));
+    cheatQ.push({ turn, q });
+    const before = c.timelines;
+    sock.emit("lock_in", q, turn, () => {});
+    if (!await until(() => c.timelines > before || c.result, 15000, `kolo ${r + 1} proti CHEATEROVI`)) break;
+    await wait(50);
+  }
+  if (c.oppReadyFirst) fail("CHEATER zamkol skôr ako hráč"); else pass("CHEATER zamyká až po hráčovi");
+  await wait(2600);
+  const recs2 = fs.readdirSync(TDIR).filter(f => f.endsWith(".jsonl")).flatMap(f => fs.readFileSync(path.join(TDIR, f), "utf8").split(/\r?\n/).filter(Boolean).map(l => JSON.parse(l)));
+  const key = (a) => a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "");
+  const lastMatch = [...recs2].reverse().find(r => r.t === "match_start")?.m;
+  const spies = recs2.filter(r => r.t === "bot" && r.spy && r.match === lastMatch);
+  const okSpy = spies.length > 0 && spies.every(b => { const q = cheatQ.find(x => x.turn === b.turn)?.q; return q && key(q[b.spy.slot - 1]) === b.spy.a; });
+  if (okSpy) pass(`CHEATER videl v každom kole jednu akciu hráča (${spies.map(b => `${b.turn}: ${b.spy.slot}. ${b.spy.a}`).join(", ")})`);
+  else fail("CHEATER spy v telemetrii: " + JSON.stringify(spies.map(b => ({ turn: b.turn, spy: b.spy }))));
+  c.rooms = null;
+  sock.emit("leave_room");
+  await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (cheater)");
   // admin: reset AI roomky (ako hocijakej inej) → zanikne a hneď je znova čistá 0/1; globálny reset ju tiež nechá
   const adm = io(URL, { transports: ["websocket"], auth: { name: "admin", pass: "testadmin" } });
   const ca = { rooms: null, reload: false };

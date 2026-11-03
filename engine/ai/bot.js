@@ -18,17 +18,27 @@ const other = (s) => (s === "p1" ? "p2" : "p1");
 // za obranu, max. odstup od najlepšej fronty, teplota softmaxu = BABY_T + BABY_T_LEAD × náskok HP (orezaná)
 // (babyTune v createBot ich prepíše - ladenie cez tools/ai-vs.mjs --baby "T=0.3,SPREAD=1")
 export const BABY = { NAIVE: 0.8, NAIVE_LEAD: 0.1, NAIVE_MIN: 0.3, NAIVE_MAX: 0.95, SLOP: 0.6, SLOP_LEAD: 0.1, SLOP_MIN: 0.2, SLOP_MAX: 0.9, TOP: 0.8, BUDGET: 0.15, MERCY: 0.7, MERCY_BEHIND: 0.35, DEF_PEN: 0.08, SPREAD: 0.45, T: 0.1, T_LEAD: 0.03, T_MIN: 0.05, T_MAX: 0.35 };
+// CHEATER (podvádzajúci bot, docs/AI_PLAN.md 8c): po hráčovom zamknutí vidí JEDNU náhodnú akciu jeho fronty
+// (typ + smer / bunka). Počas plánovania počíta ako NORMAL (plný rozpočet; tento ťah je zároveň záloha, keď
+// vyprší čas kola) a výpočet si odloží; po odhalení ho len dopočíta (refineRound, REFINE rozpočtu) - stĺpce
+// matice = súperove fronty s odhalenou akciou (aspoň MIN_COLS). Bez odloženého výpočtu: celé kolo so zúžením (SPY).
+export const CHEAT = { REFINE: 0.15, SPY: 0.3, MIN_COLS: 12 };
+// základné akcie fronty (bez golden predťahu / golden many / démona / Last Hope) - poradie = slot 1-3 (ako me.queue po lockIn)
+const EXTRA = new Set(["golden_shield", "golden_mirror", "golden_mana", "last_stand", "last_hope"]);
+export const baseActions = (q) => q.filter(a => !EXTRA.has(a.type));
+const actKey = (a) => a ? a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "") + (a.to ? ">" + a.to : "") : "";
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "shield_breaker", "special1"];
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
 
 // budgetMs = čas na rozhodnutie; budgetSims (voliteľné) = deterministický režim pre testy a self-play: „čas"
 // sa meria počtom simulácií (budgetSims simulácií = budgetMs), takže výsledok nezávisí od rýchlosti CPU
 // level = "normal" (plná sila) | "baby" (pre deti a úplných začiatočníkov, babyPick nižšie): rovnaké hodnotenie
-// front, len výber je mäkký, s menej simuláciami, bez modelu súpera a so skrytým vyrovnávaním hry
+// front, len výber je mäkký, s menej simuláciami, bez modelu súpera a so skrytým vyrovnávaním hry |
+// "cheater" (plná sila + jedna odhalená súperova akcia za kolo, decide({ spy }))
 export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, model = true, log = null, debug = null, level = "normal", babyTune = null } = {}) {
   const BB = { ...BABY, ...(babyTune || {}) };
   const base = { budgetMs, budgetSims, model };
-  let baby = false;
+  let baby = false, cheater = false;
   const belief = createBelief();
   const rng = seededRng(seed);
   const sim = createSim(), tsSim = createSim();
@@ -126,7 +136,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
 
   // obťažnosť (dá sa zmeniť aj po vytvorení - server ju nastaví, keď si hráč sadne do AI roomky)
   function setLevel(lv) {
-    baby = lv === "baby";
+    baby = lv === "baby"; cheater = lv === "cheater";
     model = baby ? false : base.model;
     budgetMs = base.budgetMs; budgetSims = base.budgetSims;
     if (baby) {
@@ -172,19 +182,26 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
   }
 
   // ---------- rozhodnutie kola ----------
-  function decideRound() {
-    const t0 = now(), deadline = t0 + budgetMs, sims0 = stats.sims;
+  // spy = { idx, action } - odhalená akcia súpera (len CHEATER); bez nej CHEATER počíta len záložný ťah
+  function decideRound(spy = null) {
+    const share = cheater && spy ? CHEAT.SPY : 1;
+    const t0 = now(), deadline = t0 + budgetMs * share, sims0 = stats.sims;
     const me = belief.mySlot, opp = other(me);
     const D = hasHidden(belief) ? 4 : 1;
     const states = Array.from({ length: D }, () => simState(belief, rng));
     const s0 = states[0];
     let myPool = shuffle(baseQueues(sim, s0, me));
     let oppPool = shuffle(baseQueues(sim, s0, opp));
+    // CHEATER: súper hrá len fronty, ktoré majú v odhalenom slote presne odhalenú akciu (žiadna nesedí = bez zúženia)
+    const fits = spy ? (q) => actKey(baseActions(q)[spy.idx]) === actKey(spy.action) : null;
+    let spied = false;
+    if (fits) { const f = oppPool.filter(fits); if (f.length) { oppPool = f; spied = true; } }
+    const keep = (qs) => (spied ? qs.filter(fits) : qs);
     if (!myPool.length) return null;
     if (!oppPool.length) oppPool = [[{ type: "pass" }, { type: "pass" }, { type: "pass" }]];
     // rozumné plány oboch strán (plans.js, „ako človek") idú na začiatok poolov - sú aj sondami predvýberu
     // a vždy sa dostanú do matice: súperove zjavné hrozby (aj tie, čo ma zabijú) a moje odpovede na ne
-    const seedMe = seedPlans(s0, me, myPool).map(p => p.q), seedOpp = seedPlans(s0, opp, oppPool).map(p => p.q);
+    const seedMe = seedPlans(s0, me, myPool).map(p => p.q), seedOpp = keep(seedPlans(s0, opp, oppPool).map(p => p.q));
     const front = (pool, seeds) => { const set = new Set(seeds); return [...seeds, ...pool.filter(q => !set.has(q))]; };
     myPool = front(myPool, seedMe); oppPool = front(oppPool, seedOpp);
     const value = makeValue(states, me);
@@ -218,9 +235,9 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     };
     const lead = (seeds, rest) => [...seeds, ...rest.filter(q => !seeds.includes(q))];
     // kolo s démonom: štandardné plány oboch strán (démon v 1./2./3. akcii, obrana kryjúca 2 z 3) vždy v matici
-    const doomMe = doomPlans(sim, s0, me, myPool), doomOpp = doomPlans(sim, s0, opp, oppPool);
+    const doomMe = doomPlans(sim, s0, me, myPool), doomOpp = keep(doomPlans(sim, s0, opp, oppPool));
     let R = lead([...doomMe, ...seedMe.slice(0, 8)], withExtras(pm.top, me));
-    const C = lead([...doomOpp, ...seedOpp.slice(0, 10)], withExtras(po.top, opp));
+    const C = keep(lead([...doomOpp, ...seedOpp.slice(0, 10)], withExtras(po.top, opp)));
     // model súpera: fronty s jeho opakovanými vzormi typov akcií pridaj do matice, aj keď nie sú „rovnovážne"
     const om = model ? createOpponentModel(belief.history) : null;
     const useModel = !!om && om.observations >= 2 && om.weight > 0.05;
@@ -234,7 +251,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     }
     // pool pre najlepšie odpovede: ohodnotené (s doplnkami) a potom zvyšok neohodnotených
     const fullR = [...R, ...pm.all.slice(K), ...myPool.slice(sampleN)];
-    const fullC = [...C, ...po.all.slice(K), ...oppPool.slice(sampleN)];
+    const fullC = keep([...C, ...po.all.slice(K), ...oppPool.slice(sampleN)]);
 
     // 2. maticová hra (stavba s kontrolou času - pri nedostatku orežem riadky)
     const matrix = () => {
@@ -309,9 +326,67 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
         .map(x => ({ q: queueKey(x.c), p: r2(x.p) })),
       deadly: C.filter(c => value(R[i], c) <= DEATH).slice(0, 3).map(queueKey),
       model: useModel ? om.observations : 0,
+      ...(spy ? { spy: { slot: spy.idx + 1, a: actKey(spy.action), used: spied } } : {}),
+    };
+    // CHEATER: výpočet z plánovania si odlož - po odhalení akcie z neho refineRound len vyškrtne súperove fronty
+    if (cheater && !spy) lastCtx = { key: roundKey(), value, vMe, R, fullR, C, oppRanked: [...po.all, ...oppPool.slice(sampleN)] };
+    return R[i];
+  }
+
+  // ---------- CHEATER: dopočet s odhalenou akciou nad výpočtom z plánovania ----------
+  // Matica, hodnoty dvojíc front (cache v `value`) aj zoradené súperove fronty ostali z plného výpočtu počas
+  // plánovania. Stĺpce = len súperove fronty s odhalenou akciou (doplnené z jeho zoradeného poolu na aspoň
+  // CHEAT.MIN_COLS), nová rovnováha + double oracle v krátkom čase CHEAT.REFINE. Bez kontextu → null.
+  function refineRound(spy) {
+    const ctx = lastCtx;
+    if (!ctx || ctx.key !== roundKey()) return null;
+    const t0 = now(), deadline = t0 + budgetMs * CHEAT.REFINE, sims0 = stats.sims;
+    const { value, vMe, fullR } = ctx;
+    const fits = (q) => actKey(baseActions(q)[spy.idx]) === actKey(spy.action);
+    const ranked = ctx.oppRanked.filter(fits);
+    const C = ctx.C.filter(fits);
+    for (const q of ranked) { if (C.length >= CHEAT.MIN_COLS) break; if (!C.includes(q)) C.push(q); }
+    if (!C.length) return null;
+    const fullC = [...C, ...ranked.filter(q => !C.includes(q))];
+    let R = [...ctx.R];
+    const matrix = () => {
+      const M = [];
+      for (const r of R) { M.push(C.map(c => value(r, c))); if (now() > deadline && M.length >= 4) break; }
+      R = R.slice(0, M.length);
+      return M;
+    };
+    let sol = solveMatrix(matrix());
+    const left = () => deadline - now();
+    for (let it = 0; it < 20 && left() > 0; it++) {
+      let added = false;
+      const colSup = C.map((c, j) => [c, sol.col[j]]).filter(([, p]) => p > 0.01);
+      const br = bestResponse(fullR, colSup, vMe, 1, sol.value + 0.005, now() + left() / 3);
+      if (br && !R.includes(br)) { R.push(br); added = true; }
+      const rowSup = R.map((r, k) => [r, sol.row[k] ?? 0]).filter(([, p]) => p > 0.01);
+      const bo = bestResponse(fullC, rowSup, (o, r) => value(r, o), -1, sol.value - 0.005, now() + left() / 2);
+      if (bo && !C.includes(bo)) { C.push(bo); added = true; }
+      if (!added) break;
+      sol = solveMatrix(matrix());
+    }
+    let mix = avoidDeath(sol.row, R, C, sol.col, value);
+    if (sol.value <= -0.9) {
+      let bi = 0, bv = -Infinity;
+      R.forEach((r, k) => { const v = C.reduce((acc, c) => acc + value(r, c), 0) / C.length; if (v > bv) { bv = v; bi = k; } });
+      mix = R.map((r, k) => (k === bi ? 1 : 0));
+    }
+    const i = sampleMix(mix, rng);
+    const r2 = (v) => Math.round(v * 100) / 100;
+    log?.({ kind: "spy", ms: Math.round(now() - t0), R: R.length, C: C.length, fits: ranked.length, value: +sol.value.toFixed(3), pick: queueKey(R[i]), sims: stats.sims - sims0 });
+    lastWhy = {
+      value: r2(sol.value), pick: queueKey(R[i]), p: r2(mix[i]),
+      opp: C.map((c, j) => ({ c, p: sol.col[j] ?? 0 })).filter(x => x.p > 0.01).sort((a, b) => b.p - a.p).slice(0, 4).map(x => ({ q: queueKey(x.c), p: r2(x.p) })),
+      deadly: C.filter(c => value(R[i], c) <= DEATH).slice(0, 3).map(queueKey),
+      spy: { slot: spy.idx + 1, a: actKey(spy.action), used: true, refine: true },
     };
     return R[i];
   }
+  let lastCtx = null;
+  const roundKey = () => `${belief.view?.series?.gameIndex ?? 1}:${belief.view?.turn}`;
 
   // ---------- Baby bot (docs/AI_PLAN.md, „Obťažnosť BABY"): z ohodnotených front vyberá mäkko (softmax hodnoty
   // proti súperovej rovnovážnej zmesi), obranu dáva zriedka (max 1 za kolo, penalizovaná - dieťa ho musí vedieť
@@ -402,14 +477,16 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     return pick(pool);
   }
 
-  function decide() {
+  function decide({ spy = null } = {}) {
     const kind = decisionKind(belief);
     if (!kind) return null;
     stats.decisions++;
     if (kind === "character") return { kind, char: decideCharacter() };
     if (kind === "timestop") return { kind, queue: decideTimestop() };
     lastWhy = null;
-    const queue = decideRound();
+    // CHEATER s odhalenou akciou: dopočet nad výpočtom z plánovania; keď ho niet, celé kolo znova so zúžením
+    const queue = cheater && spy ? (refineRound(spy) || decideRound(spy)) : decideRound(null);
+    if (cheater && spy) lastCtx = null;
     return { kind, queue, ...(lastWhy ? { why: lastWhy } : {}) };
   }
 

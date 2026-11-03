@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>CHEATER bot — návrh avatara</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<style>
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): avatar CHEATER bota = NORMAL monitor-hlava s líščími prvkami - schválený,
+     hlava sa kreslí tým istým kódom ako v hre (bot-face-fox.js); NORMAL / BABY = bot-face.js. */
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 700 18px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0 0 4px; color: #8b92a0; max-width: 1050px; }
+  main { padding: 20px; display: grid; gap: 30px; max-width: 1500px; }
+  h2 { font: 700 15px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  section > p { margin: 0 0 12px; color: #9aa1ad; max-width: 1050px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .cell { width: 196px; padding: 10px; background: #12141a; border: 1px solid #262a33; border-radius: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .pair { display: flex; gap: 8px; justify-content: center; }
+  .pair div { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .pair canvas { width: 88px; height: 94px; image-rendering: pixelated; background: #1d2027; box-shadow: 0 0 0 2px #000; }
+  .pair span { font: 7px "Press Start 2P", monospace; color: #6b7280; }
+  .cell b { font: 9px "Press Start 2P", monospace; color: #fff; text-align: center; }
+  .cell small { color: #8b92a0; text-align: center; line-height: 1.35; }
+  .demo { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-end; }
+  .demo-one { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .demo-one canvas { image-rendering: pixelated; background: #1d2027; box-shadow: 0 0 0 3px #000; }
+  .demo-one b { font: 10px "Press Start 2P", monospace; color: #ff8a3d; }
+  .demo-one .hud { width: 120px; height: 180px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .btns button { font: 10px "Press Start 2P", monospace; padding: 10px 12px; border: none; cursor: pointer; color: #000; box-shadow: 0 0 0 2px #000, inset 0 -3px 0 rgba(0,0,0,.3); }
+  .btns .deal { background: #7dff7a; } .btns .take { background: #ff7a5a; } .btns .big { background: #ff3b3b; color: #fff; }
+  .btns .blk { background: #5ef2ff; } .btns .win { background: #ffe95e; } .btns .lose { background: #9aa0a8; } .btns .plan { background: #c59bff; }
+  .btns .misc { background: #9fc4ff; }
+  .diff-stage { position: relative; padding: 40px; background: rgba(4,6,10,.9); display: flex; justify-content: center; border-radius: 6px; }
+  .diff-win { position: relative; padding: 30px 40px 34px; background: #15171d; font-family: "Press Start 2P", monospace;
+    box-shadow: 0 0 0 4px #000, inset 0 3px 0 #2c3039, inset 0 -3px 0 #0c0d11, 8px 8px 0 4px rgba(0,0,0,.5); }
+  .diff-title { margin: 0 0 26px; text-align: center; font-size: 24px; font-weight: 400; color: #ffb300; letter-spacing: 2px;
+    text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.55); }
+  .diff-cards { display: flex; gap: 28px; }
+  .diff-card { position: relative; width: 230px; padding: 18px 14px 22px; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 12px; font-family: inherit; color: #fff;
+    background: #1d2027; box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc-dim), inset 0 -6px 0 rgba(0,0,0,.35); transition: transform .1s; }
+  .diff-card canvas { width: 160px; height: 170px; image-rendering: pixelated; display: block; }
+  .diff-card .name { font-size: 20px; color: var(--acc); letter-spacing: 2px; text-shadow: 3px 3px 0 #000; }
+  .diff-card.baby { --acc: #ff8fc7; --acc-dim: #5a2c45; }
+  .diff-card.normal { --acc: #5ef2ff; --acc-dim: #1f4a52; }
+  .diff-card.cheater { --acc: #ff8a3d; --acc-dim: #5a2a10; }
+  .diff-card:hover { transform: translateY(-4px);
+    box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc), inset 0 -6px 0 rgba(0,0,0,.35), 0 0 22px 2px color-mix(in srgb, var(--acc) 45%, transparent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>CHEATER bot — avatar: NORMAL hlava + líška (schválený 2026-11-03, kreslí ho public/client/bot-face-fox.js)</h1>
+  <p>Tá istá monitor-hlava ako NORMAL (kov, obrazovka s riadkami, žmurkanie, záblesk pri zmene nálady, LED), ale líščia:
+     <b>uši s tmavými špičkami</b> (namiesto anténky, občas mykne uchom, pri zúrení sa trasú, pri smútku a prehre ich zvesí),
+     <b>zúžená brada s čiernym čumákom</b>, <b>chlpaté líca</b>, <b>prefíkané šikmé oči</b> a jedna oranžová farba obrazovky (zlosť červená, K.O. sivé).</p>
+  <p><b>Dostane dmg → zúri</b> (do 4 dmg vrčí, škrípe zubami, trasie sa, z uší para; 5+ dmg = záchvat: bliká načerveno, glitch, nadávky #!, silné trasenie).
+     <b>Dá ti dmg → posmieva sa</b> (jazyk vyplazený až z obrazovky, HA; 5+ dmg = rehot so slzami HA HA). Spúšťače sú tie isté verejné udalosti ako pri NORMAL.</p>
+</header>
+<main>
+  <section>
+    <h2>1. Nálady: NORMAL vs CHEATER</h2>
+    <p>Vľavo NORMAL z hry, vpravo CHEATER v tej istej situácii. Obe sa hýbu naživo (žmurkanie, pohľad, LED, poskakovanie).</p>
+    <div class="grid" id="grid"></div>
+  </section>
+  <section>
+    <h2>2. Živé demo (klikni na udalosť; po chvíli sa vráti do pokoja)</h2>
+    <div class="btns" id="btns"></div>
+    <div class="demo">
+      <div class="demo-one"><canvas id="big" width="256" height="272" style="width:256px;height:272px"></canvas><b>CHEATER</b></div>
+      <div class="demo-one"><canvas id="bigN" width="256" height="272" style="width:256px;height:272px"></canvas><b style="color:#5ef2ff">NORMAL</b></div>
+    </div>
+  </section>
+  <section>
+    <h2>3. Okno CHOOSE DIFFICULTY s treťou kartou</h2>
+    <p>Hover na kartu = poskakuje + posmešná tvár. Karty sú užšie (230 px), aby sa 3 zmestili aj na telefón.</p>
+    <div class="diff-stage">
+      <div class="diff-win">
+        <h2 class="diff-title">CHOOSE DIFFICULTY</h2>
+        <div class="diff-cards">
+          <button class="diff-card baby" data-l="baby"><canvas width="128" height="136"></canvas><div class="name">BABY</div></button>
+          <button class="diff-card normal" data-l="normal"><canvas width="128" height="136"></canvas><div class="name">NORMAL</div></button>
+          <button class="diff-card cheater" data-l="cheater"><canvas width="128" height="136"></canvas><div class="name">CHEATER</div></button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<script type="module">
+import { drawBotFigure } from "/client/bot-face.js";
+
+import { paintFox, foxBuffer } from "/client/bot-face-fox.js";
+const newFace = () => ({ mood: "", since: 0, flashUntil: 0, blinkUntil: 0, nextBlink: 1500 + Math.random() * 2000, twitchUntil: 0, nextTwitch: 1000 + Math.random() * 2000, twitchSide: 0 });
+// ako drawBotFigure: hlava sa jemne vznáša, hop = poskakuje
+function drawFig(cvs, f, mood, now, hop = false) {
+  f.lastKey = ""; // kreslí sa do zdieľaného bufferu - pri viacerých plátnach vždy prekresli
+  paintFox(f, mood, now, "dev");
+  const k = Math.max(1, Math.floor(cvs.width / 32));
+  const y = hop ? [2, 1, 0, 1][Math.floor(now / 120) % 4] : 1 + (Math.floor(now / 900) % 2);
+  const ctx = cvs.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, cvs.width, cvs.height);
+  ctx.drawImage(foxBuffer(), 0, 0, 32, 32, 0, y * k, 32 * k, 32 * k);
+}
+
+/* ===== stránka ===== */
+const LIST = [
+  ["neutral", "neutral", "POKOJ", "prefíkane pokukuje, myká uchom"],
+  ["thinking", "thinking", "PLÁNUJE KOLO", "krúti očami, kuje pikle"],
+  ["happy", "happy", "DAL TI DMG", "jazyk z obrazovky, HA"],
+  ["mock2", "happy", "DAL TI 5+ DMG", "rehot so slzami HA HA"],
+  ["smug", "smug", "ZABLOKOVAL / ODRAZIL", "samoľúbe obočie"],
+  ["frown", "frown", "DOSTAL DMG", "vrčí, škrípe zubami, para z uší"],
+  ["angry", "angry", "DOSTAL 5+ DMG", "záchvat: bliká, glitch, #!"],
+  ["surprised", "surprised", "ROZBITÁ OBRANA", "prekvapený"],
+  ["worried", "worried", "MÁLO HP / DÉMON", "potí sa"],
+  ["sad", "sad", "PREHRÁVA NA HP", "zaťaté zuby, zamračený, občas zafučí"],
+  ["laugh", "laugh", "VYHRAL", "tanček, jazyk, uši podskakujú, HA / EZ, iskry"],
+  ["ko", "ko", "PREHRAL", "K.O., glitch, uši dole"],
+];
+const draws = [];
+const grid = document.getElementById("grid");
+for (const [cm, nm, label, hint] of LIST) {
+  const el = document.createElement("div"); el.className = "cell";
+  el.innerHTML = `<div class="pair"><div><canvas width="88" height="94"></canvas><span>NORMAL</span></div><div><canvas width="88" height="94"></canvas><span>CHEATER</span></div></div><b>${label}</b><small>${hint}</small>`;
+  grid.appendChild(el);
+  const [cn, cc] = el.querySelectorAll("canvas");
+  cn.width = 32 * 2; cn.height = 34 * 2; cc.width = 32 * 2; cc.height = 34 * 2;
+  draws.push({ normal: cn, cheat: cc, f: newFace(), cm, nm });
+}
+const EVENTS = [
+  ["plan", "thinking", "thinking", "PLÁNUJE", 4000], ["deal", "happy", "happy", "DAL TI DMG", 2200], ["deal", "mock2", "happy", "DAL TI 5+", 3000],
+  ["take", "frown", "frown", "DOSTAL DMG", 2200], ["big", "angry", "angry", "DOSTAL 5+", 2600], ["blk", "smug", "smug", "BLOK / MIRROR", 2000],
+  ["misc", "surprised", "surprised", "ROZBITÁ OBRANA", 1500], ["misc", "worried", "worried", "MÁLO HP", 3000], ["misc", "sad", "sad", "PREHRÁVA", 3000],
+  ["win", "laugh", "laugh", "VYHRAL", 6000], ["lose", "ko", "ko", "PREHRAL", 6000],
+];
+const demo = { cm: "neutral", nm: "neutral", until: 0 };
+const bt = document.getElementById("btns");
+for (const [cls, cm, nm, label, ms] of EVENTS) {
+  const b = document.createElement("button"); b.className = cls; b.textContent = label;
+  b.onclick = () => { demo.cm = cm; demo.nm = nm; demo.until = performance.now() + ms; };
+  bt.appendChild(b);
+}
+const big = document.getElementById("big"), bigN = document.getElementById("bigN"), bigF = newFace();
+const cards = [...document.querySelectorAll(".diff-card")], cardF = newFace();
+let hover = null;
+for (const c of cards) { c.onmouseenter = () => { hover = c.dataset.l; }; c.onmouseleave = () => { if (hover === c.dataset.l) hover = null; }; }
+
+function loop(now) {
+  for (const d of draws) { drawBotFigure(d.normal, d.nm, now); drawFig(d.cheat, d.f, d.cm, now); }
+  const on = now < demo.until;
+  drawFig(big, bigF, on ? demo.cm : "neutral", now);
+  drawBotFigure(bigN, on ? demo.nm : "neutral", now);
+  for (const c of cards) {
+    const cvs = c.querySelector("canvas"), l = c.dataset.l, h = hover === l;
+    if (l === "cheater") drawFig(cvs, cardF, h ? "happy" : "neutral", now, h);
+    else drawBotFigure(cvs, h ? "happy" : "neutral", now, { hop: h, baby: l === "baby" });
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

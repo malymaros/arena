@@ -3271,8 +3271,8 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
   box-shadow: 0 0 0 4px #000, inset 0 3px 0 #2c3039, inset 0 -3px 0 #0c0d11, 8px 8px 0 4px rgba(0,0,0,.5); }
 .ai-diff-title{ margin: 0 0 26px; text-align: center; font-size: 24px; font-weight: 400; color: #ffb300; letter-spacing: 2px;
   text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.55); }
-.ai-diff-cards{ display: flex; gap: 34px; }
-.ai-diff-card{ position: relative; width: 270px; padding: 18px 14px 22px; border: none; cursor: pointer;
+.ai-diff-cards{ display: flex; gap: 28px; }
+.ai-diff-card{ position: relative; width: 230px; padding: 18px 14px 22px; border: none; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 12px; font-family: inherit; color: #fff;
   background: #1d2027; box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc-dim), inset 0 -6px 0 rgba(0,0,0,.35);
   transition: transform .1s; }
@@ -3280,6 +3280,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .ai-diff-name{ font-size: 20px; color: var(--acc); letter-spacing: 2px; text-shadow: 3px 3px 0 #000; }
 .ai-diff-card.baby{ --acc: #ff8fc7; --acc-dim: #5a2c45; }
 .ai-diff-card.normal{ --acc: #5ef2ff; --acc-dim: #1f4a52; }
+.ai-diff-card.cheater{ --acc: #ff8c1a; --acc-dim: #5a2a10; }
 .ai-diff-card:hover{ transform: translateY(-4px);
   box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc), inset 0 -6px 0 rgba(0,0,0,.35), 0 0 22px 2px color-mix(in srgb, var(--acc) 45%, transparent); }
 .ai-diff-card:active{ transform: translateY(2px); }

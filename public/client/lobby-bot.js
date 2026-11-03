@@ -1,7 +1,7 @@
 // public/client/lobby-bot.js - hra proti AI botovi z room browsera: hlava bota vpravo dole (nie karta v zozname
 // roomiek). Klik = sadneš si do stálej AI roomky (join_room); keď v nej už niekto hrá (max 1 hra s AI na server),
 // bot „premýšľa" a klik ťa pustí sledovať (spectate_room). Hlava je tá istá monitor-tvár ako v HUD (bot-face.js).
-// Voľný bot: klik najprv otvorí okno CHOOSE DIFFICULTY (ai-difficulty.js) - BABY / NORMAL; obsadený: v rohu je hlava
+// Voľný bot: klik najprv otvorí okno CHOOSE DIFFICULTY (ai-difficulty.js) - BABY / NORMAL / CHEATER; obsadený: v rohu je hlava
 // toho bota, proti ktorému sa práve hrá (aiRoom.level).
 import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
 import { openDifficulty, closeDifficulty } from "/client/ai-difficulty.js";
@@ -45,12 +45,12 @@ function loop(now) {
   if (!el || el.offsetParent === null) return; // room browser skrytý → nekresli
   const free = !!room?.canJoin;
   const mood = !free ? "thinking" : hover ? "happy" : "neutral";
-  drawBotFigure(cvs, mood, now, { hop: free && hover, baby: !free && room?.level === "baby" });
+  drawBotFigure(cvs, mood, now, { hop: free && hover, level: free ? "normal" : room?.level });
   raf = requestAnimationFrame(loop);
 }
 
 // net.js volá pri každom `rooms`: aiRoom = { players, max, canJoin, level, ... } alebo null (server AI roomku nemá);
-// pick(room, level) - level len pri vstupe ("baby" / "normal"), pri sledovaní undefined
+// pick(room, level) - level len pri vstupe ("baby" / "normal" / "cheater"), pri sledovaní undefined
 export function setLobbyBot(roomsEl, aiRoom, pick) {
   if (!roomsEl) return;
   if (!el) build(roomsEl);

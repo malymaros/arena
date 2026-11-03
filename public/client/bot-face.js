@@ -5,6 +5,7 @@
 // Okno postavy (peek.js) funguje ďalej - tvár sa kreslí do toho istého .hud-char canvasu.
 import { state } from "/client/session.js";
 import { playback } from "/client/playback.js";
+import { paintFox, foxBuffer } from "/client/bot-face-fox.js";
 
 // slot bota v AI roomke (snapshot vsAi) alebo null
 export const botSlot = () => (state?.vsAi === "p1" || state?.vsAi === "p2" ? state.vsAi : null);
@@ -78,7 +79,7 @@ function stamp(b, ox, oy, col, dim) { b.forEach((row, y) => row.forEach((v, x) =
 
 /* ---------- nálada ---------- */
 const face = { mood: "neutral", since: 0, flashUntil: 0, blinkUntil: 0, nextBlink: 2000, transient: null, until: 0, end: null, lastKey: "" };
-const PRIO = { angry: 5, surprised: 4, frown: 3, smug: 2, happy: 1 };
+const PRIO = { angry: 5, surprised: 4, frown: 3, smug: 2, mock2: 1.5, happy: 1 };
 function pulse(mood, ms, now = performance.now()) {
   if (face.transient && now < face.until && PRIO[face.transient] > PRIO[mood]) return; // silnejšia emócia z toho istého beatu
   face.transient = mood; face.until = now + ms;
@@ -90,7 +91,8 @@ export function botFaceFrame(frame) {
   const h = b === "p1" ? "p2" : "p1";
   for (const e of frame?.effects || []) {
     if (e.kind === "hit" && e.dmg > 0) {
-      if (e.target === h) pulse("happy", 2000);
+      // CHEATER sa pri 5+ dmg rehoce (mock2), NORMAL / BABY majú len happy
+      if (e.target === h) pulse(e.dmg >= 5 && botLevel() === "cheater" ? "mock2" : "happy", e.dmg >= 5 ? 3000 : 2000);
       else if (e.target === b) pulse(e.dmg >= 5 ? "angry" : "frown", 2200);
     } else if ((e.kind === "block" || e.kind === "mirror") && e.target === b) pulse("smug", 2000);
     else if (e.kind === "mirror" && e.target === h) pulse("surprised", 1500);
@@ -117,14 +119,15 @@ function baseline() {
 /* ---------- kreslenie do HUD canvasu ---------- */
 export function drawBotFace(cvs, now) {
   const want = face.transient && now < face.until ? face.transient : baseline();
-  if (!(botIsBaby() ? paintBaby : paintFace)(face, want, now, cvs.width)) return;
+  const lv = botLevel(), src = lv === "cheater" ? foxBuffer() : off;
+  if (!(lv === "cheater" ? paintFox : lv === "baby" ? paintBaby : paintFace)(face, want, now, cvs.width)) return;
   const ctx = cvs.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, cvs.width, cvs.height);
   // .hud-char má hornú tretinu orezanú (clip-path v styles.css - prázdny vzduch nad postavou): tvár ide do
   // viditeľnej spodnej časti, v celočíselnom zväčšení (rovnaké pixely)
   const k = Math.max(1, Math.floor((cvs.height * 2 / 3 - 4) / 32)), s = 32 * k;
-  ctx.drawImage(off, 0, 0, 32, 32, Math.round((cvs.width - s) / 2), cvs.height - s - 2, s, s);
+  ctx.drawImage(src, 0, 0, 32, 32, Math.round((cvs.width - s) / 2), cvs.height - s - 2, s, s);
 }
 
 // nakreslí hlavu (32×32) v nálade `want` do bufferu `off`; f = stav tváre (nálada, žmurkanie, záblesk).
@@ -254,7 +257,9 @@ function paintBaby(f, want, now, salt) {
   // anténka so srdiečkom (pri premýšľaní bliká)
   for (let y = 4; y <= 6; y++) put(15 + jx, y + jy, B_LO);
   const H = f.mood === "ko" ? [120, 120, 128] : (m.fx === "think" && Math.floor(now / 260) % 2) ? B_PINK_LO : B_PINK;
-  stamp(bb(["##.##", "#####", ".###.", "..#.."]), 13 + jx, jy, H, H);
+  // srdiečko siaha po horný okraj 32×32 bufferu - pri poskočení (jy = −1) by sa orezalo, ostane preto na mieste
+  // a skráti sa len stonka (anténka „pruží")
+  stamp(bb(["##.##", "#####", ".###.", "..#.."]), 13 + jx, Math.max(0, jy), H, H);
   // okrúhla hlava
   for (let y = 6; y <= 30; y++) for (let x = 1; x <= 30; x++) {
     if (!inHead(x, y)) continue;
@@ -301,25 +306,27 @@ function paintBaby(f, want, now, salt) {
   return true;
 }
 // obťažnosť bota v AI roomke (snapshot aiLevel)
-export const botIsBaby = () => state?.aiLevel === "baby";
+export const botLevel = () => state?.aiLevel || "normal";
+export const botIsBaby = () => botLevel() === "baby";
 
 /* ---------- hlava bota v room browseri (klik = hra proti AI, lobby-bot.js) ---------- */
 // plátno 32×34 umeleckých pixelov: len hlava (tá istá ako v HUD), pokojne sa vznáša; hop = poskakuje (hover)
 export const FIGURE_W = 32, FIGURE_H = 34;
-// baby = hlava Baby bota (obťažnosť BABY)
-export function drawBotFigure(cvs, mood, now, { hop = false, baby = false } = {}) {
+// baby = hlava Baby bota (obťažnosť BABY); level = "baby" / "cheater" / "normal" (prednosť pred baby)
+export function drawBotFigure(cvs, mood, now, { hop = false, baby = false, level = null } = {}) {
+  const lv = level || (baby ? "baby" : "normal");
   const k = Math.max(1, Math.floor(cvs.width / FIGURE_W));
   const y = hop ? [2, 1, 0, 1][Math.floor(now / 120) % 4] : 1 + (Math.floor(now / 900) % 2);
   // stav tváre per plátno (dev/rooms.html kreslí viac hláv naraz)
   const fc = cvs._botFace || (cvs._botFace = { mood: "neutral", since: 0, flashUntil: 0, blinkUntil: 0, nextBlink: 1500 + Math.random() * 2000, lastKey: "", figKey: "" });
   // paintFace kreslí do zdieľaného bufferu - pri viacerých plátnach ho treba prekresliť vždy, keď sa kreslí sem
   fc.lastKey = "";
-  (baby ? paintBaby : paintFace)(fc, mood, now, "fig");
+  (lv === "cheater" ? paintFox : lv === "baby" ? paintBaby : paintFace)(fc, mood, now, "fig");
   const key = fc.lastKey + ":" + y + ":" + cvs.width;
   if (key === fc.figKey) return;
   fc.figKey = key;
   const ctx = cvs.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, cvs.width, cvs.height);
-  ctx.drawImage(off, 0, 0, 32, 32, 0, y * k, 32 * k, 32 * k);
+  ctx.drawImage(lv === "cheater" ? foxBuffer() : off, 0, 0, 32, 32, 0, y * k, 32 * k, 32 * k);
 }

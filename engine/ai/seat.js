@@ -32,8 +32,10 @@ export function createBotSeat({ botOpts, onDecision }) {
     handshake: { auth: {} },
     emit(ev, payload) { if (alive && FORWARD.has(ev)) shared().postMessage({ room, ev, payload }); },
     join() {}, leave() {},
-    // obťažnosť bota ("normal" / "baby") - zmena pred zápasom (hráč si ju vybral pri vstupe do AI roomky)
+    // obťažnosť bota ("normal" / "baby" / "cheater") - zmena pred zápasom (hráč si ju vybral pri vstupe do AI roomky)
     setLevel(level) { if (alive) shared().postMessage({ room, ev: "level", payload: level }); },
+    // CHEATER: jedna akcia hráčovej zamknutej fronty { turn, game, idx, action } (server ju vyberie po lock_in)
+    spy(payload) { if (alive) shared().postMessage({ room, ev: "spy", payload }); },
     disconnect() {
       if (!alive) return;
       alive = false;

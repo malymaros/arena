@@ -162,6 +162,9 @@ const AI_ROOM_ID = "ai";
 // Všetky AI roomky počítajú v jednom worker vlákne po jednom ťahu.
 const AI_SIMS = process.env.AI_SIMS ? Math.max(100, Math.min(20000, Number(process.env.AI_SIMS) || 1500)) : null;
 const AI_THINK_MS = Math.max(500, Math.min(30000, Number(process.env.AI_THINK_MS) || 10000));
+// CHEATER: rozhodnutie s odhalenou akciou trvá CHEAT.SPY × AI_THINK_MS (+ čakanie na rozpracovaný záložný ťah) -
+// keby neprišlo do tohto času, zahrá sa záložný
+const SPY_GIVE_UP_MS = AI_THINK_MS + 8000;
 // THE WORLD bota: hráč čaká v zastavenom čase aspoň toľko (od chvíle, keď klient dohrá úvod THE WORLD),
 // kým bot „zadá" zmrazené akcie - inak pokračovacia timeline prišla skôr, ako klient prešiel do zmrazeného
 // režimu, prerušila úvod a zmrazené akcie vyzerali ako bežné akcie navyše
@@ -398,6 +401,7 @@ function onTurnTimeout() {
   function destroySelf() {
     engine.abort("abandoned");
     if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null; clearWorldTimer();
+    if (spyTimer) { clearTimeout(spyTimer); spyTimer = null; }
     if (botPerson) personSockets[botPerson]?.disconnect?.(); // ukonči worker bota
     clearTurnTimer();
     if (roomDestroyTimer) { clearTimeout(roomDestroyTimer); roomDestroyTimer = null; }
@@ -533,7 +537,9 @@ function onTurnTimeout() {
 
   function onLockIn(socket, queue, clientTurn, ack) {
     engine.lockIn(socket.data.person, queue, clientTurn, ack);
-    if (botPending && socket.data.person !== botPerson) releaseBotRound(); // hráč zamkol → bot „dopremýšľa"
+    if (!ai || socket.data.person === botPerson) return;
+    if (aiLevel === "cheater") { spyOnLock(); return; } // CHEATER: bot rozhodne až s jednou hráčovou akciou
+    if (botPending) releaseBotRound(); // hráč zamkol → bot „dopremýšľa"
   }
 
   function onTimestopActions(socket, queue, ack) { engine.timestopActions(socket.data.person, queue, ack); }
@@ -592,9 +598,30 @@ function onTurnTimeout() {
     // (hráč nikdy nevidí „OPPONENT IS READY" a bot mu nespúšťa odpočet
     // quick-draw): rozhodnutie sa podrží a zahrá sa až po hráčovom zamknutí (releaseBotRound)
     botPending = d;
+    // CHEATER: ťah bez odhalenej akcie je len záloha (zahrá ju flush pri vypršaní času), hrá sa až ťah so spy
+    const turnKey = `${d.game}:${d.turn}`;
+    if (aiLevel === "cheater" && !d.cheat && spyGaveUp !== turnKey) return;
+    if (d.cheat && spyTimer) { clearTimeout(spyTimer); spyTimer = null; }
     const human = g.players[slotForPerson(person === "A" ? "B" : "A")];
     if (human.locked) releaseBotRound();
   }
+  // CHEATER (docs/AI_PLAN.md 8c): hráč práve zamkol → botovi ide JEDNA náhodná akcia jeho fronty (bez golden
+  // doplnkov; typ + smer / bunka). Náhoda je mimo enginu (crypto) - hru nemení, replay telemetrie ju nepotrebuje
+  // (ťah bota je v logu ako jeho lock). Bot rozhodne znova a zamkne cez onBotDecision (d.cheat) + releaseBotRound.
+  function spyOnLock() {
+    const g = engine.game, human = g.players[slotForPerson(botPerson === "A" ? "B" : "A")];
+    if (g.phase !== "playing" || !human?.locked || !human.queue?.length || g.timestop) return;
+    const idx = crypto.randomInt(human.queue.length), game = g.series?.gameIndex ?? 1, turn = g.turn;
+    botSock?.spy({ turn, game, idx, action: { ...human.queue[idx] } });
+    // poistka: keby rozhodnutie so spy neprišlo (worker zlyhal), po čase sa zahrá záložný ťah - hra nezamrzne
+    if (spyTimer) clearTimeout(spyTimer);
+    spyTimer = setTimeout(() => {
+      spyTimer = null;
+      spyGaveUp = `${game}:${turn}`;
+      if (botPending?.turn === turn && botPending?.game === game) releaseBotRound();
+    }, SPY_GIVE_UP_MS);
+  }
+  let spyTimer = null, spyGaveUp = null;
   function playBotWorld(d) {
     const g = engine.game, person = botPerson;
     if (!person || g.phase !== "playing" || (g.series?.gameIndex ?? 1) !== d.game) return;
@@ -630,8 +657,8 @@ function onTurnTimeout() {
   let botPending = null, botTimer = null; // podržaný ťah kola bota (čaká na hráčovo zamknutie)
   let seatBot = null, botSock = null;
   function setAiLevel(level) {
-    aiLevel = level === "baby" ? "baby" : "normal";
-    personNames[botPerson] = aiLevel === "baby" ? "BABY" : "AI"; // meno bota v HUD
+    aiLevel = level === "baby" || level === "cheater" ? level : "normal";
+    personNames[botPerson] = { baby: "BABY", cheater: "CHEATER" }[aiLevel] || "AI"; // meno bota v HUD
     botSock?.setLevel(aiLevel);
   }
   if (ai) {

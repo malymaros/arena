@@ -201,6 +201,38 @@ Meranie (30 zápasov, `--sims 1500`): vs random 90 %, vs aggro 97 %, vs greedy 8
 skriptovaní súperi sú len hrubá náhrada dieťaťa; **silu doladiť podľa skutočného hrania** (`node tools/ai-vs.mjs 30
 --level baby --baby "SLOP=0.8,…"`). Testy: `test/ai-bot.mjs` (determinizmus BABY), `test/ai-room.mjs` (level, meno, aiRoom.level).
 
+## 8c. Obťažnosť CHEATER (implementovaná 2026-11-03)
+
+Rozhodnutie vlastníka (2026-11-03): tretia karta v okne CHOOSE DIFFICULTY, „čisto pre zábavu a challenge - dokáže hráč
+poraziť aj súpera, ktorý podvádza". **Výnimka z princípu „bot nepodvádza"** - platí len pre túto úroveň.
+
+Podvod: po hráčovom zamknutí kola server (`spyOnLock` v `server.js`) vyberie **jednu náhodnú akciu** z jeho zamknutej
+fronty (`me.queue` = 3 základné akcie bez golden doplnkov; náhoda cez `crypto` mimo enginu - hru nemení, replay
+telemetrie ju nepotrebuje, ťah bota je v logu ako jeho lock) a pošle ju botovi celú (typ + smer / bunka):
+`seat.spy` → worker `"spy"` → `bot.decide({ spy })`.
+
+Výpočet (`bot.js`, nápad vlastníka „využiť výpočet NORMAL a potom informáciu navyše"): počas plánovania CHEATER
+počíta presne ako NORMAL (plný `AI_THINK_MS`; tento ťah je zároveň záloha, keď vyprší čas kola) a výpočet si odloží
+(`lastCtx`: cache hodnôt dvojíc front, matica, zoradené súperove fronty). Po odhalení `refineRound` len vyškrtne
+súperove fronty, ktoré odhalenú akciu v tom slote nemajú (doplní z jeho zoradeného poolu na aspoň `CHEAT.MIN_COLS`),
+prepočíta rovnováhu a krátko (`CHEAT.REFINE` × rozpočet, ~1,5 s) dopočíta double oracle. Bez odloženého výpočtu
+→ celé kolo so zúžením (`CHEAT.SPY`). Server: ťah bez spy je pri CHEATEROVI len záloha (nezamyká), zamkne až ťah
+s `cheat: true` (+ 0,6-1,5 s ako vždy); poistka `SPY_GIVE_UP_MS` zahrá zálohu, keby dopočet neprišiel.
+Telemetria: záznam `bot` nesie `spy: { slot, a, used, refine }`.
+
+Sila (`node tools/ai-vs.mjs 100 --sims 1500 --vs bot --level cheater`, B = CHEATER proti NORMAL): **77 %** (NORMAL
+ako B na tých istých zápasoch 47 %), kratšie zápasy (6,1 vs 7,3 kola). Najsilnejší bot v hre.
+
+Avatar (`public/client/bot-face-fox.js`, schválený návrh `public/dev/cheater-face.html`): monitor-hlava NORMAL bota
+s líščími prvkami - uši s oranžovým vnútrom a tmavými špičkami namiesto anténky (občas mykne uchom), zúžená brada
+s čumákom, chlpaté líca, prefíkané šikmé oči (vo všetkých náladách okrem zúrenia / K.O.), LED na čele; obrazovka
+líščia oranžová, zlosť červená, K.O. sivé. Nálady = tie isté spúšťače ako NORMAL (`bot-face.js`) + `mock2`:
+dá dmg = posmech (jazyk z obrazovky, HA), 5+ dmg = rehot so slzami (HA HA); dostane dmg = vrčí, škrípe zubami,
+trasú sa mu uši, para z uší; 5+ = záchvat (rozpálený kov, bliká, glitch, nadávky #!); prehráva na HP = zamračený,
+zaťaté zuby, občas zafučí; výhra = tanček, jazyk, uši podskakujú, HA / EZ, iskry, obrazovka oranžová / zlatá.
+Meno v HUD **CHEATER**, snapshot `aiLevel: "cheater"`. Test: `test/ai-room.mjs` (meno, zamyká po hráčovi, spy
+v každom kole sedí s hráčovou frontou).
+
 ## 9. Ako hru hrá vlastník (zadanie pre hodnotenie a kandidátov, 2026-11-02)
 
 Zistenie: bot v kole ohodnotí len ~105 náhodných z 1 300–6 000 súperových front a do matice sa dostane 15–40 - rozumné
