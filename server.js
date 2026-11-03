@@ -11,6 +11,7 @@ import { fileURLToPath } from "url";
 import { createRecordedEngine } from "./telemetry/recorder.js";
 import { createJsonlStore } from "./telemetry/store.js";
 import { createBotSeat } from "./engine/ai/seat.js";
+import { matchConfigCustom } from "./shared/arena-defaults.js";
 import { ARENA_ROLL_MS, COLOR_ROLL_MS, charRollMs } from "./shared/timing.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -372,7 +373,9 @@ function onTurnTimeout() {
     const cfg = engine.game.phase === "lobby" ? pendingMatchConfig : engine.game.config;
     if (!cfg) return null;
     const color = cfg.colorPref === "white" ? "black" : cfg.colorPref === "black" ? "white" : "random";
-    return { arena: cfg.arena === "random" ? "random" : cfg.arena || "bridge", color, chars: cfg.randomChars ? "random" : "manual", timer: cfg.timer ?? "off" };
+    // custom = aréna má zmenené ADVANCED SETTINGS (hocičo, aj zákazy postáv) → oranžový štvorček na badge arény
+    return { arena: cfg.arena === "random" ? "random" : cfg.arena || "bridge", color, chars: cfg.randomChars ? "random" : "manual", timer: cfg.timer ?? "off",
+      ...(matchConfigCustom(cfg) ? { custom: true } : {}) };
   }
   // voľné miesto (nie je obsadené živým socketom ani grace-held tokenom)
   function isFree(p) { return !personSockets[p] && (!personIds[p] || Date.now() - personFreedAt[p] > RECLAIM_GRACE_MS); }

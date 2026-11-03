@@ -81,6 +81,15 @@ function isMageDead(key) {
   return !!charSelectHp && (charSelectHp[key] ?? 0) <= 0;
 }
 
+// BANNED CHARACTERS: zákazy vlastnej farby z configu zápasu (verejné; per aréna - po kocke už config vylosovanej
+// arény). Zakázaná karta: .banned (sivá, krížik, pás BANNED, postava stojí), nedá sa vybrať ani draftnúť.
+let bannedChars = [];
+export function updateCharSelectBans(s) {
+  bannedChars = (me === "p1" || me === "p2") ? (s?.config?.bans?.[me] || []) : [];
+  selEl.querySelectorAll(".char-card[data-char]").forEach(card => card.classList.toggle("banned", bannedChars.includes(card.dataset.char)));
+}
+export const isCharBanned = (key) => bannedChars.includes(key);
+
 // Hidden preview postavy (Luffy/Jotaro, previewCast v registri): bez hoveru Idle, po nadídení cast animácia
 // RAZ a potom slučka chvosta (loopFrom); obe kreslenia idú cez portraitFill.
 const previewHoverT0 = {}; // per-postava čas nadídenia (štart cast animácie)
@@ -128,7 +137,9 @@ function drawAbilityCaster(now) {
 
 function drawCharSelectFrame(now) {
   const canvases = selEl.querySelectorAll("canvas.char-canvas");
-  canvases.forEach((cvs) => {
+  // zakázaná postava (BANNED) stojí - kreslí sa stále prvý frame
+  canvases.forEach((cvs) => paintCard(cvs, isCharBanned(cvs.dataset.char) ? 0 : now));
+  function paintCard(cvs, now) {
     const key = cvs.dataset.char;
     const ctx = cvs.getContext("2d");
     if (CHAR_FX[key]?.drawCard?.(ctx, cvs, now)) return; // register fx (Escanor: vlastné WeakIdle/IntroStand)
@@ -166,7 +177,7 @@ function drawCharSelectFrame(now) {
     ensureSpriteMeta(dir, anim.file)
       .then(meta => drawSprite(ctx, meta, anim, now, cvs.width, cvs.height, portraitFill(key, 1.31), 0.98, true, offX, -52))
       .catch(() => { ctx.clearRect(0, 0, cvs.width, cvs.height); });
-  });
+  }
 
   drawAbilityCaster(now);
 
@@ -237,6 +248,7 @@ selEl.addEventListener("click", (e) => {
   if (!key) return; // placeholder "Coming soon" nie je voliteľný
   if (selEl.classList.contains("team-mode")) { toggleTeamPick(key); return; } // draft: klik = toggle výberu
   if (isMageDead(key)) return; // mŕtveho maga (tournament) sa nedá zvoliť
+  if (isCharBanned(key)) return; // zakázaná postava (BANNED CHARACTERS)
   socket.emit("choose_character", key);
 });
 
@@ -246,6 +258,7 @@ selEl.addEventListener("click", (e) => {
 function toggleTeamPick(key) {
   // side-postavu smie draftnúť len jej vlastná strana (p1 → countess; p2 → onre|jotaro); druhej strany je zakázaná
   if (SIDE_CHARS[key] && !sideCharBoundTo(key, me)) return;
+  if (isCharBanned(key)) return; // zakázanú postavu sa nedá draftnúť
   const i = teamPick.indexOf(key);
   if (i >= 0) teamPick.splice(i, 1);
   else if (teamPick.length < TEAM_SIZE) teamPick.push(key);

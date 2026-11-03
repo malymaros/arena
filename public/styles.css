@@ -1233,6 +1233,50 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 @keyframes rr-land { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
 .rr-cell.picked .rr-face { animation: rr-flash .6s ease-out; }
 @keyframes rr-flash { 0% { filter: brightness(2.4); } 100% { filter: brightness(1); } }
+
+/* ---------- BANNED CHARACTERS (ban-screen.js; návrh public/dev/ban-chars.html, variant E) ---------- */
+/* zakázaná postava: pixelový červený krížik (obrazovka zákazov, losovanie postáv, výber postáv) */
+.lobby-adv .ban-open{ flex: 1; min-width: 0; white-space: nowrap; }
+.lobby-adv .ban-open b{ color: #ff6b6b; font-weight: 400; }
+.ban-screen{ z-index: 10010; gap: 22px; }
+.ban-screen .bs-title{ font-size: 22px; color: #ffb300; letter-spacing: 3px; text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.55); }
+.ban-screen .rr-title{ margin-top: -12px; }
+.ban-screen .rr-cell{ cursor: pointer; }
+.ban-screen .rr-cell.future{ cursor: default; }
+.ban-screen .rr-cell:not(.future):not(.banned):hover .rr-face::after{ box-shadow: 0 0 0 2px #000, inset 0 0 0 4px #ffb300; }
+.rr-cell.banned .rr-face canvas{ filter: grayscale(1) brightness(.7) contrast(.8); opacity: .5; }
+.rr-cell.banned .rr-name{ color: #6b6f7a; text-decoration: line-through; animation: none; }
+.rr-cell.banned .rr-face{ animation: none; }
+.rr-cell.banned .rr-face::before{ content: ""; position: absolute; inset: 14%; z-index: 2; pointer-events: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23000' d='M0 0h3v1h1v1h2V1h1V0h3v3H9v1H8v2h1v1h1v3H7V9H6V8H4v1H3v1H0V7h1V6h1V4H1V3H0z'/%3E%3Cpath fill='%23e53935' d='M1 1h1v1h1v1h1v1h2V3h1V2h1V1h1v1H8v1H7v1H6v2h1v1h1v1h1v1H8V8H7V7H6V6H4v1H3v1H2v1H1V8h1V7h1V6h1V4H3V3H2V2H1z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.ban-screen .rr-cell.nope .rr-face{ animation: ban-nope .35s steps(4); }
+@keyframes ban-nope{ 0%, 100%{ transform: translateX(0); } 25%{ transform: translateX(-3px); } 75%{ transform: translateX(3px); } }
+.ban-screen .bs-msg{ min-height: 12px; margin-top: -8px; font-size: 11px; color: #ff6b6b; letter-spacing: 1px; }
+.ban-screen .bs-foot{ width: 496px; margin-top: -10px; align-items: stretch; } /* šírka mriežky (4 × 112 + 3 × 16) */
+.ban-screen .bs-foot .adv-done{ margin: 0; }
+/* CLEAR: pixel-art tlačidlo (zubaté rohy po 2 px, čierny obrys, svetlá horná / tmavá spodná hrana), rovnako veľké ako DONE */
+.ban-screen .bs-clear{ flex: 1; margin: 0; padding: 16px; cursor: pointer; border: none; border-radius: 0;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  font-family: inherit; font-size: 14px; letter-spacing: 2px; color: #e3e5ea; background: #3a3e47; text-shadow: 2px 2px 0 #000;
+  clip-path: polygon(0 2px, 2px 2px, 2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px),
+    calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px));
+  box-shadow: inset 0 0 0 2px #000, inset 0 5px 0 rgba(255,255,255,.16), inset 0 -6px 0 rgba(0,0,0,.4); }
+.ban-screen .bs-clear svg{ width: 14px; height: 14px; display: block; fill: #ff6a5a; filter: drop-shadow(2px 2px 0 #000); }
+.ban-screen .bs-clear:hover{ background: #4a2a2c; color: #ffd0c8; }
+.ban-screen .bs-clear:active{ transform: translateY(3px); }
+.ban-screen .bs-clear:disabled{ cursor: default; color: #6b6f7a; background: #23252b; transform: none; }
+.ban-screen .bs-clear:disabled svg{ fill: #4a4d55; }
+/* výber postáv: zakázaná karta - sivá, postava zošedne a nehýbe sa, krížik + pás BANNED, prečiarknuté meno, červený rám */
+.char-card.banned{ cursor: not-allowed; background: #2e3138; }
+.char-card.banned, .char-card.banned:hover, .char-card.banned.preselected{
+  box-shadow: 0 0 0 3px #b3261e, 0 0 0 5px #000, inset 0 -4px 0 rgba(0,0,0,.5) !important; }
+.char-card.banned:hover{ transform: none; }
+.char-card.banned .char-canvas{ filter: grayscale(1) brightness(.5); }
+.char-card.banned::before{ content: ""; position: absolute; inset: 26% 24% 36%; z-index: 3; pointer-events: none; opacity: .9;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23000' d='M0 0h3v1h1v1h2V1h1V0h3v3H9v1H8v2h1v1h1v3H7V9H6V8H4v1H3v1H0V7h1V6h1V4H1V3H0z'/%3E%3Cpath fill='%23e53935' d='M1 1h1v1h1v1h1v1h2V3h1V2h1V1h1v1H8v1H7v1H6v2h1v1h1v1h1v1H8V8H7V7H6V6H4v1H3v1H2v1H1V8h1V7h1V6h1V4H3V3H2V2H1z'/%3E%3C/svg%3E") center / contain no-repeat; image-rendering: pixelated; }
+.char-card.banned::after{ content: "BANNED"; position: absolute; left: 0; right: 0; bottom: 34px; z-index: 4; padding: 6px 0;
+  font: 12px "Press Start 2P", monospace; letter-spacing: 2px; color: #fff; background: #b3261e; text-shadow: 2px 2px 0 #000;
+  box-shadow: 0 2px 0 #000, 0 -2px 0 #000; }
+.char-card.banned .char-name{ background: #23252b !important; color: #8b92a0 !important; text-decoration: line-through; }
 .char-roll.done .rr-cell:not(.picked):not(.future) { opacity: .45; }
 /* výsledok = len meno postavy (turnaj: 3 mená v poradí 1-2-3), objaví sa pri potvrdení */
 .rr-result { display: flex; gap: 28px; justify-content: center; align-items: center; min-height: 40px; }
@@ -3149,6 +3193,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .room-tile .rt-badge.random{ background: conic-gradient(#3b3226 25%, #2a1f45 0 50%, #233019 0 75%, #2a1f45 0) 0 0 / 16px 16px; }
 .room-tile .rt-badge.none{ background: #121316; }
 .room-tile .rt-badge.none .rt-bname{ color: #3a3d45; text-shadow: none; }
+.room-tile .rt-custom{ position: absolute; right: 6px; top: 6px; z-index: 2; width: 8px; height: 8px; background: #ffb300; box-shadow: 0 0 0 2px #000; }
 .room-tile .rt-badge.setting .rt-bname{ color: #8af0b5; font-size: 8px; text-shadow: 2px 2px 0 #000; }
 /* tabuľka */
 .room-tile .rt-tbl{ display: grid; grid-template-columns: 1fr 60px 60px; gap: 5px 4px; align-items: center; font-size: 8px; }

@@ -1,6 +1,7 @@
 // public/client/lobby.js - lobby hosta (docs/RANDOM_ARENA_PLAN.md): aréna (STONE BRIDGE / PORTAL REALM / SHREK SWAMP
 // alebo kocka = náhodná aréna), ADVANCED SETTINGS (nastavenia každej arény: dlaždice / portály / itemy, počty za kolo,
-// náhľad - okno s pevnou veľkosťou, záložky = karty arén), formát, farba, náhodné postavy, časovač → configure_match.
+// náhľad, BANNED CHARACTERS - zákazy postáv per farba, obrazovka ban-screen.js - okno s pevnou veľkosťou, záložky =
+// karty arén), formát, farba, náhodné postavy, časovač → configure_match.
 // Všetko sa hneď ukladá do localStorage (per zariadenie / prehliadač) a pri ďalšom lobby sa obnoví; poškodené alebo
 // neznáme hodnoty padnú na default. Server konfiguráciu validuje/sanitizuje sám (súčty percent musia dať 100).
 import { socket } from "/client/net.js";
@@ -8,7 +9,10 @@ import { isTouch } from "/client/viewport.js";
 import { pixSvg, DICE_SVG } from "/client/pix.js";
 import { PORTAL_TYPES, PORTAL_ORDER, FLAME2_SVG } from "/client/portal-art.js";
 import { ARENA_KEYS, ARENA_NAMES, drawArenaThumb } from "/client/arena-thumbs.js";
-import { PORTAL_WEIGHTS, PORTAL_TILE_WEIGHTS, PORTALS_PER_ROUND, PORTAL_MAX_PAIRS, ITEM_WEIGHTS } from "/shared/balance.js";
+import { PORTAL_MAX_PAIRS } from "/shared/balance.js";
+import { DEF_ARENA, arenaRules as rulesOf } from "/shared/arena-defaults.js";
+import { LAYOUT } from "/client/char-roll.js";
+import { openBanScreen } from "/client/ban-screen.js";
 
 const STORE_KEY = "arena.lobby.v1"; // zmena tvaru uloženého stavu = nový kľúč (v2), starý sa ignoruje
 const TILE_DEF = {
@@ -18,13 +22,13 @@ const TILE_DEF = {
 };
 const ITEM_DEF = { heal: { label: "Heart", pix: "heart" }, mana: { label: "Mana", pix: "drop" } };
 
-// defaulty: spoločné voľby hlavného lobby + pravidlá arén (ADVANCED SETTINGS)
+// defaulty: spoločné voľby hlavného lobby + pravidlá arén (ADVANCED SETTINGS - shared/arena-defaults.js, server podľa
+// nich pozná CUSTOM arénu pre dlaždicu roomky)
 const DEF_MAIN = { arena: "bridge", format: "bo3", color: "random", randomChars: "off", timer: "off" };
-const DEF_ARENA = {
-  bridge: { count: 1, preview: "on", tiles: { dmg: 75, ik: 5, heal: 5, power: 5, mana: 5, block: 5 } },
-  portal: { count: 1, preview: "on", tiles: { ...PORTAL_TILE_WEIGHTS }, portals: { ...PORTAL_WEIGHTS }, perRound: PORTALS_PER_ROUND },
-  swamp:  { count: 1, preview: "on", items: { ...ITEM_WEIGHTS } },
-};
+// postavy, ktoré strana môže hrať (mriežka losovania / obrazovky zákazov); turnaj potrebuje TEAM_SIZE voľných
+const SIDES = ["p1", "p2"];
+const POOL = { p1: LAYOUT.p1.filter(Boolean), p2: LAYOUT.p2.filter(Boolean) };
+const TEAM_SIZE = 3;
 const MAIN_CHOICES = {
   arena: [...ARENA_KEYS, "random"], format: ["single", "bo3", "tournament"], color: ["random", "white", "black"],
   randomChars: ["on", "off"], timer: ["off", "30", "60", "120", "quickdraw"],
@@ -50,6 +54,11 @@ function loadSettings() {
     if ([1, 2, 3].includes(src.count)) dst.count = src.count;
     if (["on", "off"].includes(src.preview)) dst.preview = src.preview;
     if (a === "portal" && Number.isFinite(src.perRound)) dst.perRound = clampPairs(src.perRound);
+    // zákazy: len známe postavy strany, bez duplicít, aspoň 1 musí ostať (inak bez zákazov)
+    for (const sl of SIDES) {
+      const list = Array.isArray(src.bans?.[sl]) ? [...new Set(src.bans[sl])].filter(k => POOL[sl].includes(k)) : [];
+      dst.bans[sl] = list.length < POOL[sl].length ? list : [];
+    }
     for (const grp of ["tiles", "portals", "items"]) {
       if (!dst[grp]) continue;
       for (const k in dst[grp]) if (Number.isFinite(src[grp]?.[k])) dst[grp][k] = clampPct(src[grp][k]);
@@ -79,16 +88,13 @@ const isValid = (a) => {
 };
 // arény, ktorých nastavenia sa pri štarte použijú (kocka = všetky tri)
 const arenasInPlay = () => main().arena === "random" ? ARENA_KEYS : [main().arena];
+// zákazy nechajú niektorej farbe menej ako TEAM_SIZE postáv v niektorej z arén v hre (pri kocke stačí jedna) →
+// turnaj sa zamkne (zámok ako v AI roomke) a zvolený turnaj sa prepne na SINGLE
+const bansBlockTournament = () => arenasInPlay().some(a => SIDES.some(sl => POOL[sl].length - settings.arenas[a].bans[sl].length < TEAM_SIZE));
 
 /* ---------- config pre server ---------- */
-// pravidlá jednej arény v tvare configu (bez kľúča arena) - rovnaké polia ako predtým pri ručnom výbere arény
-function arenaRules(a) {
-  const c = settings.arenas[a], preview = c.preview === "on";
-  const rules = { tilesPerRound: c.count, tileWeights: { dmg: 0, heal: 0, mana: 0, ik: 0, power: 0, block: 0, ...(c.tiles || {}) }, tilePreview: preview };
-  if (a === "portal") return { ...rules, portalWeights: { ...c.portals }, portalsPerRound: c.perRound };
-  if (a === "swamp") return { ...rules, itemsPerRound: c.count, itemWeights: { ...c.items }, shrekPreview: preview };
-  return rules;
-}
+// pravidlá jednej arény v tvare configu (bez kľúča arena; zákazy len keď nejaké sú) - shared/arena-defaults.js
+const arenaRules = (a) => rulesOf(a, settings.arenas[a]);
 // stone bridge = bez kľúča arena; kocka = "random" + pravidlá všetkých troch arén (server jednu vylosuje)
 function matchConfig() {
   const m = main();
@@ -99,6 +105,7 @@ function matchConfig() {
 
 /* ---------- hlavné lobby ---------- */
 function renderMain() {
+  syncTournamentLock();
   const m = main(), rnd = m.arena === "random";
   $("lobby-arena").querySelectorAll("[data-arena]").forEach(c => c.classList.toggle("active", c.dataset.arena === m.arena));
   $("lobby-arena").classList.toggle("pool", rnd); // kocka: všetky tri arény sú „v losovaní"
@@ -133,8 +140,10 @@ function renderAdv() {
     c.classList.toggle("bad", !isValid(a));
   });
   const c = settings.arenas[tab], swamp = tab === "swamp", portal = tab === "portal";
-  // ľavý stĺpec vždy rovnako: počet za kolo + náhľad (+ dlaždice v portal realm); pravý = percentá (portal realm: portály)
-  let left = section(`${swamp ? "ITEMS" : "SPECIAL TILES"} PER ROUND`, optRow("count", [1, 2, 3], c.count))
+  // ľavý stĺpec vždy rovnako: zákazy postáv, počet za kolo + náhľad (+ dlaždice v portal realm); pravý = percentá
+  // (portal realm: portály). Zákazy: dve tlačidlá WHITE: n / BLACK: n (číslo červené, keď nie je 0) → obrazovka zákazov
+  const banBtn = (sl) => { const n = c.bans[sl].length; return `<button class="opt ban-open" data-ban="${sl}">${sl === "p1" ? "WHITE" : "BLACK"}: ${n ? `<b>${n}</b>` : "0"}</button>`; };
+  let left = section("BANNED CHARACTERS", `<div class="opt-row">${banBtn("p1")}${banBtn("p2")}</div>`) + section(`${swamp ? "ITEMS" : "SPECIAL TILES"} PER ROUND`, optRow("count", [1, 2, 3], c.count))
     + section(swamp ? "SHREK PREVIEW" : "TILE PREVIEW", optRow("preview", ["on", "off"], c.preview, ["On", "Off"]));
   let right;
   if (swamp) {
@@ -198,6 +207,8 @@ function build() {
     const o = e.target.closest(".opt[data-k]");
     const s = e.target.closest(".w-step");
     if (t) { tab = t.dataset.tab; renderAdv(); return; }
+    const b = e.target.closest("[data-ban]");
+    if (b) { openBanScreen(b.dataset.ban, c.bans[b.dataset.ban], () => { save(); renderAdv(); }); return; }
     if (o) c[o.dataset.k] = o.dataset.k === "preview" ? o.dataset.val : Number(o.dataset.val);
     else if (s) { e.preventDefault(); const g = c[s.dataset.g]; g[s.dataset.key] = clampPct(g[s.dataset.key] + Number(s.dataset.d)); }
     else if (e.target.closest("#lobby-adv-reset")) settings.arenas[tab] = copy(DEF_ARENA[tab]);
@@ -216,14 +227,20 @@ function build() {
   });
 }
 
-/* ---------- AI roomka: zamknuté voľby ---------- */
-// turnaj ostáva viditeľný, len zamknutý (🔒, .ai-locked) - proti botovi zatiaľ nie je (arény aj kocka áno)
+/* ---------- zamknutý turnaj: AI roomka alebo zákazy postáv ---------- */
+// turnaj ostáva viditeľný, len zamknutý (🔒, .ai-locked) - proti botovi zatiaľ nie je (arény aj kocka áno); zákazy
+// (BANNED CHARACTERS) ho zamknú, keď by niektorej farbe ostali menej ako 3 postavy - zvolený turnaj sa prepne na SINGLE
 const AI_LOCKED = '#lobby-format .opt[data-val="tournament"]';
-const aiLocked = (el) => vsAi && !!el?.closest?.(AI_LOCKED);
-function markAiLocked() {
+const LOCK_TITLES = ["Not available vs AI yet", "Not enough characters left (banned characters)"];
+let banLocked = false;
+const aiLocked = (el) => (vsAi || banLocked) && !!el?.closest?.(AI_LOCKED);
+function syncTournamentLock() {
+  banLocked = !!settings && bansBlockTournament();
+  if (banLocked && settings.main.format === "tournament") { settings.main.format = "single"; save(); }
+  const locked = vsAi || banLocked;
   document.querySelectorAll(AI_LOCKED).forEach(el => {
-    el.classList.toggle("ai-locked", vsAi);
-    if (vsAi) el.title = "Not available vs AI yet"; else if (el.title === "Not available vs AI yet") el.removeAttribute("title");
+    el.classList.toggle("ai-locked", locked);
+    if (locked) el.title = LOCK_TITLES[vsAi ? 0 : 1]; else if (LOCK_TITLES.includes(el.title)) el.removeAttribute("title");
   });
 }
 
@@ -232,7 +249,6 @@ export function showLobby(s) {
   vsAi = !!s?.vsAi;
   $("lobby").classList.remove("hidden");
   if (!built) { settings = loadSettings(); build(); }
-  markAiLocked();
   renderMain();
 }
 // lobby zmizlo (zápas sa začal / iná fáza) - okno ADVANCED nesmie ostať visieť

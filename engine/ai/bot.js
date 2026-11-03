@@ -397,7 +397,8 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
   // ---------- výber postavy (slepý, ako pre človeka) ----------
   function decideCharacter() {
     const me = belief.mySlot;
-    const pool = [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === me)];
+    const banned = belief.view?.config?.bans?.[me] || []; // BANNED CHARACTERS (verejné v configu)
+    const pool = [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === me)].filter(k => !banned.includes(k));
     return pick(pool);
   }
 

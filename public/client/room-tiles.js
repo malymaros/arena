@@ -26,11 +26,14 @@ const DASH = `<i class="rt-dash"></i>`;
 
 const timerText = (t) => (t === "off" ? "OFF" : t === "quickdraw" ? "60s AFTER LOCK" : `${Number(t) || 0}s`);
 
+// aréna so zmenenými ADVANCED SETTINGS (info.custom - hocičo, aj zákazy postáv): oranžový štvorček v rohu badge
+// (rovnaký ako na záložke arény v okne ADVANCED SETTINGS); bez ďalších podrobností
 function badge(info, setting) {
   if (setting) return `<span class="rt-badge none setting"><span class="rt-bname">SETTING UP…</span></span>`;
   if (!info) return `<span class="rt-badge none"><span class="rt-bname">• • •</span></span>`;
-  if (info.arena === "random") return `<span class="rt-badge random"><span class="rt-dice">${DICE_SVG}</span></span>`;
-  return `<span class="rt-badge" data-arena="${info.arena}"><canvas width="160" height="20"></canvas><span class="rt-bname">${ARENA_NAMES[info.arena] || ""}</span></span>`;
+  const dot = info.custom ? `<i class="rt-custom" title="Custom settings"></i>` : "";
+  if (info.arena === "random") return `<span class="rt-badge random"><span class="rt-dice">${DICE_SVG}</span>${dot}</span>`;
+  return `<span class="rt-badge" data-arena="${info.arena}"><canvas width="160" height="20"></canvas><span class="rt-bname">${ARENA_NAMES[info.arena] || ""}</span>${dot}</span>`;
 }
 
 // info = payload „rooms" ({ rooms: [{ id, slot, players, canJoin, phase, info }], slots }); pick(kind, slot, room)

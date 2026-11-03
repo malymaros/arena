@@ -14,15 +14,16 @@ import {
   ROLL_TICKS, ROLL_TEAM_STAGGER, ROLL_LINGER_MS, ROLL_FADE_MS, rollTickMs, COLOR_ROLL_MS, ARENA_ROLL_MS,
 } from "/shared/timing.js";
 
-// poradie mriežky (zľava doprava, zhora nadol) - side-postavy podľa strany; null = budúca postava (stlmená, nedá sa vybrať)
-const LAYOUT = {
+// poradie mriežky (zľava doprava, zhora nadol) - side-postavy podľa strany; null = budúca postava (stlmená, nedá sa vybrať);
+// tú istú mriežku používa obrazovka zákazov postáv (ban-screen.js) a lobby (pool postáv strany)
+export const LAYOUT = {
   p1: ["fire", "lightning", "wanderer", "countess", "medusa", "minotaur", "naruto", "luffy", "escanor", "soldier", "werewolf", null],
   p2: ["fire", "lightning", "wanderer", "onre",     "medusa", "minotaur", "naruto", "jotaro", "escanor", "soldier", "werewolf", null],
 };
 // skrátené mená len pre túto obrazovku (intro hlas ostáva celý)
 const SHORT_NAME = { lightning: "LIGHTNING", wanderer: "WANDERER" };
 // pixel font nemá veľké Ō → bez diakritiky (ONRYO), rovnako ako peek okno
-const rollName = (c) => SHORT_NAME[c] || (CHAR_META[c]?.name || c).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+export const rollName = (c) => SHORT_NAME[c] || (CHAR_META[c]?.name || c).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
 
 let rootEl = null, gridEl = null, resultEl = null, titleEl = null;
 let gen = 0;          // každé nové losovanie / zrušenie zahodí bežiace časovače staršieho
@@ -46,12 +47,13 @@ function build() {
   resultEl = rootEl.querySelector(".rr-result");
 }
 
-function renderGrid(slot) {
+// bans = zakázané postavy tejto farby (BANNED CHARACTERS) - krížik, nehýbu sa, kurzor ich preskakuje
+function renderGrid(slot, bans = []) {
   titleEl.className = "rr-title " + (slot === "p1" ? "white" : "black");
   titleEl.textContent = slot === "p1" ? "⚪ WHITE" : "⚫ BLACK";
   rootEl.classList.toggle("p2-side", slot === "p2");
   gridEl.innerHTML = LAYOUT[slot].map((c, i) => c
-    ? `<div class="rr-cell${SIDE_CHARS[c] ? " corrupt" : ""}" data-i="${i}"><div class="rr-face">${mageHeadHtml(c, usesAltColor(c, slot) ? "alt-color" : "", slot)}</div><div class="rr-name">${rollName(c)}</div></div>`
+    ? `<div class="rr-cell${SIDE_CHARS[c] ? " corrupt" : ""}${bans.includes(c) ? " banned" : ""}" data-i="${i}"><div class="rr-face">${mageHeadHtml(c, usesAltColor(c, slot) ? "alt-color" : "", slot)}</div><div class="rr-name">${rollName(c)}</div></div>`
     : `<div class="rr-cell future" data-i="${i}"><div class="rr-face"><span class="rr-q">???</span></div><div class="rr-name"></div></div>`).join("");
 }
 
@@ -59,7 +61,7 @@ function renderGrid(slot) {
 function startLoops() {
   const loop = (now) => {
     if (!active) { rafId = 0; return; }
-    gridEl.querySelectorAll("canvas.mage-head").forEach(cv => drawMageHeadAnim(cv, cv.dataset.char, now));
+    gridEl.querySelectorAll(".rr-cell:not(.banned) canvas.mage-head").forEach(cv => drawMageHeadAnim(cv, cv.dataset.char, now));
     rafId = requestAnimationFrame(loop);
   };
   if (!rafId) rafId = requestAnimationFrame(loop);
@@ -67,7 +69,7 @@ function startLoops() {
   clearInterval(glitchTimer);
   glitchTimer = setInterval(() => {
     if (!active) { clearInterval(glitchTimer); glitchTimer = 0; return; }
-    gridEl.querySelectorAll(".rr-cell.corrupt").forEach(cell => {
+    gridEl.querySelectorAll(".rr-cell.corrupt:not(.banned)").forEach(cell => {
       cell.classList.toggle("flash", Math.random() < 0.22);
       const nameEl = cell.querySelector(".rr-name");
       const real = nameEl.dataset.name || (nameEl.dataset.name = nameEl.textContent);
@@ -113,7 +115,9 @@ export async function startCharRoll(info) {
   build();
   const myGen = ++gen;
   const slot = me;
-  renderGrid(slot);
+  const bans = info?.bans?.[slot] || [];
+  renderGrid(slot, bans);
+  gridEl.querySelectorAll(".rr-cell.banned canvas.mage-head").forEach(cv => drawMageHeadAnim(cv, cv.dataset.char, 0)); // stoja
   resultEl.className = "rr-result" + (chars.length > 1 ? " team" : "");
   resultEl.innerHTML = chars.map(() => `<span class="rr-res-name" style="visibility:hidden">·</span>`).join("");
   rootEl.getAnimations().forEach(a => a.cancel());
@@ -129,7 +133,7 @@ export async function startCharRoll(info) {
   const layout = LAYOUT[slot];
   const targets = chars.map(c => layout.indexOf(c));
   if (targets.some(t => t < 0)) { stopCharRoll(); return; } // neznáma postava (nová verzia servera) - radšej nič
-  const valid = layout.map((c, i) => c ? i : -1).filter(i => i >= 0); // „???“ nikdy
+  const valid = layout.map((c, i) => c && !bans.includes(c) ? i : -1).filter(i => i >= 0); // „???“ ani zakázané nikdy
   const n = targets.length;
   // kedy ktorý kurzor dôjde na cieľ: turnaj postupne 1 → 2 → 3, posledný na ROLL_TICKS
   const landAt = targets.map((_, k) => ROLL_TICKS - (n - 1 - k) * ROLL_TEAM_STAGGER);
@@ -156,6 +160,7 @@ export async function startCharRoll(info) {
       const nextTargets = curs.filter(o => !o.landed && landAt[o.k] === tick + 1).map(o => o.target);
       let free = valid.filter(i => i !== c.at && !reserved.has(i) && !nextTargets.includes(i));
       if (!free.length) free = valid.filter(i => i !== c.at && !reserved.has(i));
+      if (!free.length) free = [c.at]; // po zákazoch ostala jediná postava - kurzor stojí na nej
       const nxt = pick(free);
       placeCursor(c, nxt); reserved.add(nxt);
     }

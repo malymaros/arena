@@ -192,6 +192,8 @@
   box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
 }
 #touch-pick.hidden { display: none; }
+/* v strede pásu je zakázaná postava: PICK je zablokovaný a hovorí prečo (BANNED) */
+#touch-pick.ban-locked { background: #3a3e47; color: #ff8a80; cursor: not-allowed; box-shadow: 0 0 0 2px #000, inset 0 -4px 0 rgba(0,0,0,.35); }
 /* označená karta musí byť jasne vidieť - ostatné karty stmavnú, označená sa zdvihne, zväčší a dostane biely rám
    so zlatou žiarou a zlatú menovku (statické, bez nekonečnej animácie) */
 .touch .char-cards:has(.char-card.touch-armed) .char-card:not(.touch-armed) { filter: brightness(.45) saturate(.5); }
@@ -257,6 +259,11 @@
 .phone .lobby-bot-bubble { font-size: 20px; padding: 16px 18px; }
 /* okno CHOOSE DIFFICULTY: na telefóne celé zväčšené (karty ostanú vedľa seba) */
 .phone .ai-diff-win { zoom: 1.5; }
+/* obrazovka zákazov postáv: na telefóne celá o niečo väčšia */
+.phone .ban-screen { zoom: 1.2; }
+.phone .ban-screen .bs-msg { font-size: 15px; }
+.phone .ban-screen .bs-clear { font-size: 18px; }
+.phone .ban-screen .bs-clear svg { width: 18px; height: 18px; }
 
 /* --- nastavenie zápasu (lobby hosta) na celú obrazovku: nadpis, arény + kocka, ADVANCED SETTINGS, dva stĺpce
    (FORMAT | TURN TIMER, YOUR COLOR | RANDOM CHARACTERS), START dole; voľné miesto sa rozdelí rovnomerne medzi riadky.

@@ -3,7 +3,7 @@
 import { isSpectator, isHost, me } from "/client/session.js";
 import { lobbyEl, hostWaitEl, lobbyWaitEl, teamWaitEl, selEl, crownsP1El, crownsP2El } from "/client/dom.js";
 import { showLobby, hideLobbyAdvanced } from "/client/lobby.js";
-import { updateCharSelectHp, resetCharSelectOpen, hiddenMode, setCharPage, charPage, syncTeamUi, startCharSelectPreview, stopCharSelectPreview } from "/client/char-select.js";
+import { updateCharSelectHp, updateCharSelectBans, resetCharSelectOpen, hiddenMode, setCharPage, charPage, syncTeamUi, startCharSelectPreview, stopCharSelectPreview } from "/client/char-select.js";
 import { hideDeathCenter } from "/client/last-stand.js";
 import { renderMageHeads } from "/client/hud.js";
 import { pixSvg } from "/client/pix.js";
@@ -45,6 +45,7 @@ export function applyPhaseUI(s) {
   const needChar = phase === "playing" && !isSpectator && me && !s?.[me]?.char;
   if (needChar || needTeam) {
     updateCharSelectHp(s); // tournament: HP magov + mŕtvi (musí byť pred preview loopom); v drafte null → bez statov
+    updateCharSelectBans(s); // BANNED CHARACTERS vlastnej farby
     selEl.classList.toggle("p2-side", me === "p2"); // hráč vpravo vidí svojich magov v alternatívnom vykreslení
     if (selEl.classList.contains("hidden")) resetCharSelectOpen(); // nové otvorenie - od stránky Mages (str. 1), čistý draft, bez easter-egg stránky
     if (!hiddenMode) setCharPage(charPage); // sync stránky/šípok/nadpisu - aj po Ctrl+F5; state update nesmie zhodiť otvorenú Hidden stránku

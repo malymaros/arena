@@ -239,7 +239,8 @@ function snapshot() {
     phase: game.phase,
     config: game.config ? { ...game.config, tileWeights: { ...game.config.tileWeights },
       ...(game.config.itemWeights ? { itemWeights: { ...game.config.itemWeights } } : {}),
-      ...(game.config.portalWeights ? { portalWeights: { ...game.config.portalWeights } } : {}) } : null,
+      ...(game.config.portalWeights ? { portalWeights: { ...game.config.portalWeights } } : {}),
+      ...(game.config.bans ? { bans: { p1: [...game.config.bans.p1], p2: [...game.config.bans.p2] } } : {}) } : null,
     series: seriesSnapshot(),
     // zobrazované mená hráčov per slot (verejné - netreba redigovať; labyrint mená nemaskuje)
     names: { p1: io.names?.()?.[game.seats.p1] || null, p2: io.names?.()?.[game.seats.p2] || null },
@@ -1823,7 +1824,8 @@ function startMatch(config) {
     // hráč vyberá štartovacieho maga z tímu ako zvyčajne (roster char-select)
     game.roster = { A: null, B: null };
     for (const slot of ["p1", "p2"]) game.roster[game.seats[slot]] = rollTeam(slot);
-    roomEmit("char_roll", { team: true, picks: { p1: rosterFor("p1"), p2: rosterFor("p2") }, afterColor: config.colorPref === "random", afterArena });
+    roomEmit("char_roll", { team: true, picks: { p1: rosterFor("p1"), p2: rosterFor("p2") }, afterColor: config.colorPref === "random", afterArena,
+      ...(config.bans ? { bans: config.bans } : {}) }); // zakázané hlavy majú v mriežke krížik (kurzor ich preskakuje)
     finishTeamSelect();
   } else if (config.format === "tournament") {
     // slepý draft tímov: pred hrou 1 si každý vyberie TEAM_SIZE postáv z celého poolu (choose_team);
@@ -1884,15 +1886,23 @@ function startGame(gameIndex) {
     // v hre 1 idú pred losovaním postáv ešte losovanie arény (kocka) a ruleta farieb
     const afterColor = gameIndex === 1 && game.config.colorPref === "random";
     const afterArena = gameIndex === 1 && !!game.config.randomArena;
-    roomEmit("char_roll", { team: false, picks: { p1: [game.players.p1.char], p2: [game.players.p2.char] }, afterColor, afterArena });
+    roomEmit("char_roll", { team: false, picks: { p1: [game.players.p1.char], p2: [game.players.p2.char] }, afterColor, afterArena,
+      ...(game.config.bans ? { bans: game.config.bans } : {}) });
     beginPlanningTimer(charRollMs() + (afterColor ? COLOR_ROLL_MS : 0) + (afterArena ? ARENA_ROLL_MS : 0));
   }
   emitStateMasked(); // char-select potrebuje per-osoba mageHp (tournament)
 }
 
-// pool náhodného výberu pre slot: bežné postavy + side-postavy viazané na túto stranu (ako mriežka losovania)
-function rollPool(slot) {
+// všetky postavy, ktoré môže strana hrať: bežné + side-postavy viazané na túto stranu (ako mriežka losovania)
+function slotPool(slot) {
   return [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
+}
+// zakázané postavy strany (ADVANCED SETTINGS → BANNED CHARACTERS, per aréna a farba; kľúč config.bans len keď nejaké sú)
+function bannedFor(slot) { return game.config?.bans?.[slot] || []; }
+function isBanned(slot, key) { return bannedFor(slot).includes(key); }
+// pool náhodného výberu pre slot: postavy strany bez zakázaných
+function rollPool(slot) {
+  return slotPool(slot).filter(k => !isBanned(slot, k));
 }
 function rollChar(slot) {
   const pool = rollPool(slot);
@@ -1919,6 +1929,9 @@ function sanitizeConfig(raw) {
     if (!sub) return null;
     arenas[key] = sub;
   }
+  // turnaj potrebuje aspoň TEAM_SIZE nezakázaných postáv pre každú farbu v KAŽDEJ aréne losovania - inak sa celý zápas
+  // hrá ako single (lobby turnaj zamkne a prepne na SINGLE; toto je poistka servera)
+  if (Object.values(arenas).some(c => c.format !== arenas.bridge.format)) for (const c of Object.values(arenas)) c.format = "single";
   const { format, timer, colorPref, randomChars } = arenas.bridge;
   return { format, timer, colorPref, ...(randomChars ? { randomChars } : {}), arena: "random", arenas };
 }
@@ -1962,10 +1975,24 @@ function sanitizeArenaConfig(raw) {
   const portalsPerRound = Math.max(1, Math.min(PORTAL_MAX_PAIRS, Math.round(Number(raw.portalsPerRound) || PORTALS_PER_ROUND)));
   // farba hosta (osoby A): white/black si host vyberie pevne, random = losuje sa (default)
   const colorPref = ["white", "black"].includes(raw.colorPref) ? raw.colorPref : "random";
+  // zákazy postáv per farba (ADVANCED SETTINGS → BANNED CHARACTERS): len postavy, ktoré tá strana môže hrať, bez
+  // duplicít; aspoň 1 postava musí ostať; turnaj potrebuje TEAM_SIZE voľných, inak sa hrá single
+  const bans = {};
+  let banned = 0;
+  for (const slot of ["p1", "p2"]) {
+    const pool = slotPool(slot);
+    const list = Array.isArray(raw.bans?.[slot]) ? [...new Set(raw.bans[slot].map(String))].filter(k => pool.includes(k)) : [];
+    if (list.length >= pool.length) return null;
+    bans[slot] = list; banned += list.length;
+  }
+  let fmt = format;
+  if (fmt === "tournament" && ["p1", "p2"].some(slot => slotPool(slot).length - bans[slot].length < TEAM_SIZE)) fmt = "single";
   // náhodný výber postáv (lobby „RANDOM CHARACTERS“) - default vypnutý; kľúč len keď je zapnutý
   // (snapshot nesie config - bez neho ostávajú golden timeline nezmenené)
-  return { format, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref,
+  return { format: fmt, tilesPerRound: perRound, tileWeights: weights, timer, tilePreview: !!raw.tilePreview, colorPref,
     ...(raw.randomChars === true ? { randomChars: true } : {}),
+    // zákazy: kľúč len keď nejaké sú (config bez nich ostáva rovnaký - goldeny)
+    ...(banned ? { bans } : {}),
     // aréna: kľúč len pre portal realm (stone bridge config ostáva bez zmeny - goldeny)
     ...(portal ? { arena: "portal", portalWeights, portalsPerRound } : {}),
     // bažina: náhľad Shrekových skokov na ďalšie kolo (lobby „SHREK PREVIEW", default zapnutý)
@@ -2016,6 +2043,7 @@ function autoLock() {
     // len známe postavy z poolu + PRÍPADNE vlastná side-postava (p1 → countess; p2 → onre|jotaro)
     const slot = slotForPerson(person);
     if (!team.every(k => CHARS.includes(k) || SIDE_CHARS[k] === slot)) return;
+    if (team.some(k => isBanned(slot, k))) return;   // zakázanú postavu sa nedá draftnúť
     game.roster[person] = team;
     if (game.roster.A && game.roster.B) finishTeamSelect();
     else emitStateMasked(); // súper uvidí rosterReady („opponent is ready"), nie samotný tím
@@ -2029,6 +2057,7 @@ function autoLock() {
     // pre svoju stranu; v turnaji len ak si ich hráč draftol do svojho rosteru (mageHp existuje len v turnaji)
     const sideOk = SIDE_CHARS[key] === slot && (!game.mageHp || rosterFor(slot).includes(key));
     if (!CHARS.includes(key) && !sideOk) return;
+    if (isBanned(slot, key)) return;                // zakázaná postava (BANNED CHARACTERS) sa nedá zvoliť
     const me = game.players[slot];
     if (me.char) return;                          // postava sa pre danú hru volí raz
     // tournament: mŕtveho maga (HP 0) sa nedá zvoliť; HP aj mana sa prenášajú z predošlej hry

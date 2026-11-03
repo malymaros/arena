@@ -352,7 +352,10 @@ function syncPickBar() {
   // bez diakritiky (ONRYŌ → ONRYO): pixel font nemá veľké Ō a náhradný znak by z nápisu trčal
   const name = (CHARS_BY_KEY[key]?.meta?.name || key).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   const team = selEl.classList.contains("team-mode");
-  pickBar.textContent = team ? `${card.classList.contains("picked") ? "REMOVE" : "ADD"} ${name}` : `PICK ${name}`;
+  // zakázaná postava (BANNED CHARACTERS): tlačidlo ostane, ale je zablokované a hovorí prečo
+  const banned = card.classList.contains("banned");
+  pickBar.classList.toggle("ban-locked", banned);
+  pickBar.textContent = banned ? "BANNED" : team ? `${card.classList.contains("picked") ? "REMOVE" : "ADD"} ${name}` : `PICK ${name}`;
   pickBar.classList.remove("hidden");
 }
 
