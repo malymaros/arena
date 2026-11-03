@@ -9,7 +9,7 @@ import {
   BASIC_COST, MELEE_COST, DASH_COST, RECHARGE_GAIN, SHIELD_COST, MIRROR_COST, SPECIAL_COST,
   GOLDEN_COST, GOLDEN_MIRROR_COST, DEMON_COST, JOTARO_S1_COST, LUFFY_S1_COST, MAX_MANA,
 } from "../../shared/balance.js";
-import { DEFENSE_SLOT, cloneData, seededRng } from "../constants.js";
+import { DEFENSE_SLOT, cloneData, seededRng, SIDE_CHARS, moonLevelFor } from "../constants.js";
 import { DIAG_DIRS, vampShotRoute } from "../../shared/geometry.js";
 
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
@@ -158,5 +158,39 @@ export function extraVariants(sim, state, slot, base) {
   return out;
 }
 
+// turnaj: fronty so swapom (docs/AI_PLAN.md 8d - swap je výnimka, len pár kandidátov navyše, nech sa šírka
+// prehľadávania nezahltí): (a) swap hneď na začiatku + dve akcie nového maga z jeho rozumných plánov (zlý matchup,
+// kombo nového maga - napr. Werewolf s nízkym HP a jeho charge), (b) dve akcie aktuálneho maga + swap na konci
+// (výmena pred ďalším kolom). Platnosť (labyrint, Last Stand, side-postavy, mŕtvi mágovia) overí validQueue.
+export function swapVariants(sim, state, slot, top, { first = 3, last = 2, plans = null } = {}) {
+  const p = state.players[slot];
+  if (!state.mageHp || !state.roster || (p.stone || 0) > 0 || SIDE_CHARS[p.char]) return [];
+  const person = state.seats[slot];
+  const bench = (state.roster[person] || []).filter(k => k !== p.char && !SIDE_CHARS[k] && (state.mageHp[person]?.[k] ?? 0) > 0);
+  const out = [], seen = new Set();
+  const add = (q) => { const k = queueKey(q); if (seen.has(k) || !sim.valid(state, slot, q)) return; seen.add(k); out.push(q); };
+  for (const to of bench) {
+    if (first > 0 && plans) {
+      // stav s novým magom na tej istej bunke (ako po doSwap: jeho HP/mana, čistý pride, mesiac podľa HP)
+      const st = cloneData(state), np = st.players[slot];
+      np.char = to; np.hp = state.mageHp[person][to]; np.mana = state.mageMana?.[person]?.[to] ?? np.mana;
+      np.pride = 0; np.moon = to === "werewolf" ? moonLevelFor(np.hp) : 0; np.clone = null; np.trap = null; np.worldUsed = false;
+      const pool = baseQueues(sim, st, slot);
+      let n = 0;
+      for (const { q } of plans(st, slot, pool, 1)) {
+        if (n >= first) break;
+        const before = out.length;
+        add([{ type: "swap", to }, q[0], q[1]]);
+        if (out.length > before) n++;
+      }
+    }
+    for (const q of top.slice(0, last)) {
+      const b = q.filter(a => a.type !== "golden_shield" && a.type !== "golden_mirror" && a.type !== "golden_mana" && a.type !== "last_stand" && a.type !== "last_hope");
+      if (b.length === 3 && !b.some(a => a.type === "swap")) add([b[0], b[1], { type: "swap", to }]);
+    }
+  }
+  return out;
+}
+
 // stabilný kľúč fronty (deduplikácia, model súpera)
-export const queueKey = (q) => q.map(a => a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "")).join(" ");
+export const queueKey = (q) => q.map(a => a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "") + (a.to ? ">" + a.to : "")).join(" ");

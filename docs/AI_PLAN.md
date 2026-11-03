@@ -233,6 +233,31 @@ zaťaté zuby, občas zafučí; výhra = tanček, jazyk, uši podskakujú, HA / 
 Meno v HUD **CHEATER**, snapshot `aiLevel: "cheater"`. Test: `test/ai-room.mjs` (meno, zamyká po hráčovi, spy
 v každom kole sedí s hráčovou frontou).
 
+## 8d. Turnaj proti botovi (implementovaný 2026-11-03)
+
+Stratégia vlastníka (2026-11-03), pre všetky úrovne (BABY smie swapovať, CHEATERovi môže prezradiť aj swap):
+
+1. **Draft** úplne náhodný (`decideTeam`; pool = `CHARS` + side-postavy svojej farby, bez zakázaných). Pri RANDOM
+   CHARACTERS tím losuje server, bot len vyberá maga.
+2. **Výber maga na hru** (`decideMage`, naslepo ako človek): overená stratégia nie je, zlé možnosti áno - nikdy mág
+   bez many (< cena štítu) do hry, ktorú otvára ako druhý. Inak hodnota štartového stavu proti každému súperovmu
+   živému magovi (eval hry × sila tímov po nej) - counter na súperove postavy, veľa many, keď ide prvý a súperovi
+   ostali mágovia s malou manou; mierny softmax, nech sa výber nedá prečítať.
+3. **Cieľ = výhra turnaja**, nie záchrana maga za každú cenu (`engine/ai/series.js`): hodnota stavu po kole =
+   P(výhra hry) z bežného eval × P(výhra turnaja) po výhre / prehre tejto hry podľa sily tímov, ktoré ostanú
+   (sigmoida rozdielu; mág = (HP + 0,35 × mana) / 13,5; živý mág má minimum `FLOOR` - 1 HP mág stále môže
+   specialom zastihnúť nepripraveného súpera; Werewolf minimum `WOLF` - s nízkym HP je tajná zbraň, moon charge 8 dmg).
+   Citlivosť na smrť (`avoidDeath`) a „istá výhra" BABY čítajú výsledok hry (`value.dead` / `value.kill`), nie hodnotu.
+4. **Risk podľa stavu série**: vedúci tím si cení HP, ktoré v kole stratí, viac (pomalé uberanie vyhovuje silnejšiemu),
+   prehrávajúci menej (musí dohnať) - `SERIES.RISK` × náskok tímov.
+5. **Swap len výnimočne** (zlý matchup, napr. Naruto proti Meduse; vysoko-dmg kombo nového maga): kandidáti navyše,
+   nezahlcujú šírku (`swapVariants`: swap na začiatku + 2 akcie z rozumných plánov nového maga, 2 akcie + swap na konci;
+   súperovi menej) a každý swap má penalizáciu `SERIES.SWAP_PEN`.
+
+Simulácia: `view.simState` doplní roster oboch strán + HP/manu lavičky (`rosterHp` / `rosterMana` sú verejné, vlastné
+`mageHp` / `mageMana`), takže engine v simulácii swap prijme a vykoná. Meranie: `node tools/ai-vs.mjs 20 --sims 600
+--format tournament [--vs bot]`. Test: `test/ai-bot.mjs` (turnaj proti náhodnému, žiadna odmietnutá fronta).
+
 ## 9. Ako hru hrá vlastník (zadanie pre hodnotenie a kandidátov, 2026-11-02)
 
 Zistenie: bot v kole ohodnotí len ~105 náhodných z 1 300–6 000 súperových front a do matice sa dostane 15–40 - rozumné

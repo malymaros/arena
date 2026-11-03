@@ -1,6 +1,7 @@
 // tools/ai-vs.mjs - zápasy AI bota (engine/ai/bot.js) priamo na engine (docs/AI_PLAN.md, meranie sily).
 // Bot dostáva rovnaké payloady ako klient na serveri (snapshotFor + redactTimelineFor, you_are, new_game).
-// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--level baby|cheater] [--level-a baby] [--vs random|bot] [--chars p1,p2] [--log] [--portal | --swamp]
+// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--level baby|cheater] [--level-a baby] [--vs random|bot] [--chars p1,p2] [--format single|bo3|tournament] [--log] [--portal | --swamp]
+//   --format     séria (bo3 / tournament: draft tímu, výber z rosteru, swapy, prenos HP/many) - výhra = výhra série
 //   --sims n     deterministický rozpočet: n simulácií na rozhodnutie (namiesto času)
 //   --vs random  bot (osoba B) proti náhodnému botovi (tools/random-bot.mjs) - cieľ ≥ 98 % výhier
 //   --vs bot     bot proti botu (rovnaké nastavenie, rôzne seedy) - sanity / ladenie
@@ -23,19 +24,21 @@ const BABY_TUNE = opt("--baby", null) ? Object.fromEntries(opt("--baby").split("
 const LEVEL = opt("--level", null); // úroveň bota B (baby / normal / cheater); s --vs bot hrá A normálny bot
 const LEVEL_A = opt("--level-a", null); // úroveň bota A pri --vs bot (baby / normal; CHEATER vidí len ako B)
 const NO_MODEL = argv.includes("--no-model");
+const FORMAT = opt("--format", "single");
 const ARENA = argv.includes("--portal") ? "portal" : argv.includes("--swamp") ? "swamp" : null; // aréna (bez voľby Stone Bridge) // bot bez modelu súpera (porovnanie A5)
 
 const poolFor = (slot) => [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
 
 // jeden zápas: hráči = { A: "bot"|"random", B: ... }; vráti víťaznú osobu a počet kôl
-export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS, chars = null, log = null, botOpts = {}, onRound = null, onTimeline = null } = {}) {
+export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS, chars = null, log = null, botOpts = {}, onRound = null, onTimeline = null, format = FORMAT } = {}) {
   const bots = {};
-  let result = null;
+  let result = null, final = null, games = 0;
+  const later = []; // séria: ďalšia hra (handleGameEnd → schedule) sa spustí, keď je táto dohraná
   const engine = createEngine({
     seed,
-    schedule: () => {},
+    schedule: format === "single" ? () => {} : (fn) => { later.push(fn); },
     emit: (ev, payload) => {
-      if (ev === "game_result") result = payload;
+      if (ev === "game_result") { result = payload; if (payload.matchOver) final = payload; }
       if (ev === "new_game") for (const b of Object.values(bots)) b.onNewGame(payload);
     },
     emitState: (tl) => {
@@ -49,22 +52,37 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
   });
   for (const person of ["A", "B"]) if (players[person] === "bot") bots[person] = (botOpts[person]?.create || createBot)({ seed: seed * 31 + (person === "A" ? 1 : 2), budgetMs, budgetSims, log, ...(NO_MODEL ? { model: false } : {}), ...(botOpts[person] || {}) });
   engine.startMatch(engine.sanitizeConfig({
-    format: "single", tilesPerRound: 2, timer: "off", tilePreview: true, colorPref: "random",
+    format, tilesPerRound: 2, timer: "off", tilePreview: true, colorPref: "random",
     tileWeights: ARENA === "portal" ? { dmg: 90, ik: 10 } : { dmg: 50, heal: 10, mana: 10, ik: 10, power: 10, block: 10 },
     ...(ARENA ? { arena: ARENA } : {}),
   }));
   for (const [person, b] of Object.entries(bots)) { b.onYouAre({ slot: engine.slotForPerson(person) }); b.onState(engine.snapshotFor(person)); }
   const rng = { A: seededRng(seed * 2 + 11), B: seededRng(seed * 2 + 12), spy: seededRng(seed * 2 + 13) };
-  // postavy
-  for (const person of ["A", "B"]) {
+  // turnaj: draft tímu (bot sám, náhodný hráč náhodne)
+  if (format === "tournament") for (const person of ["A", "B"]) {
     const slot = engine.slotForPerson(person);
-    let ch = chars?.[slot];
-    if (!ch && bots[person]) ch = bots[person].decide()?.char;
-    if (!ch) { const pool = poolFor(slot); ch = pool[Math.floor(rng[person]() * pool.length)]; }
-    engine.chooseCharacter(person, ch);
+    let team = bots[person]?.decide()?.team;
+    if (!team) { const pool = poolFor(slot); team = []; while (team.length < 3) team.push(pool.splice(Math.floor(rng[person]() * pool.length), 1)[0]); }
+    engine.chooseTeam(person, team);
   }
   let rounds = 0;
-  while (!result && rounds < 80) {
+  for (;;) {
+  games++;
+  result = null;
+  // postavy (turnaj: z vlastného rosteru, len živí mágovia)
+  for (const person of ["A", "B"]) {
+    const slot = engine.slotForPerson(person);
+    let ch = format === "tournament" ? null : chars?.[slot];
+    if (!ch && bots[person]) ch = bots[person].decide()?.char;
+    if (!ch) {
+      const g = engine.game;
+      const pool = g.mageHp ? g.roster[person].filter(k => g.mageHp[person][k] > 0) : poolFor(slot);
+      ch = pool[Math.floor(rng[person]() * pool.length)];
+    }
+    engine.chooseCharacter(person, ch);
+  }
+  const roundCap = rounds + 80;
+  while (!result && rounds < roundCap) {
     const g = engine.game;
     if (g.timestop?.mode === "waiting") {
       const person = g.seats[g.timestop.slot];
@@ -99,8 +117,12 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
       if (result) break;
     }
   }
-  const winSlot = result?.gameWinner;
-  return { winner: winSlot === "p1" || winSlot === "p2" ? engine.game.seats[winSlot] : null, rounds,
+  if (format === "single" || final || !result || games > 9) break;
+  while (later.length) later.shift()();
+  for (const [person, b] of Object.entries(bots)) b.onState(engine.snapshotFor(person));
+  }
+  const winSlot = (format === "single" ? result : final)?.gameWinner;
+  return { winner: winSlot === "p1" || winSlot === "p2" ? engine.game.seats[winSlot] : null, rounds, games,
     chars: { A: engine.game.players[engine.slotForPerson("A")].char, B: engine.game.players[engine.slotForPerson("B")].char },
     sims: Object.values(bots).reduce((a, b) => a + b.stats.sims, 0) };
 }

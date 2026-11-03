@@ -3,10 +3,12 @@
 // Kolo = maticová hra: kandidáti oboch strán (candidates.js), hodnota dvojice front = priemer eval po
 // simulovanom kole cez determinizácie skrytého stavu, rovnováha regret matchingom, rozšírenie sád
 // najlepšími odpoveďami (double oracle), kým nevyprší čas. Fronta sa vyžrebuje z rovnovážnej zmesi.
-import { CHARS, SIDE_CHARS, seededRng, cloneData } from "../constants.js";
+import { CHARS, SIDE_CHARS, TEAM_SIZE, seededRng, cloneData, moonLevelFor } from "../constants.js";
+import { SHIELD_COST } from "../../shared/balance.js";
 import { createBelief, decisionKind, hasHidden, simState } from "./view.js";
 import { createSim } from "./sim.js";
-import { baseQueues, extraVariants, queueKey, affordable, dominatedShot } from "./candidates.js";
+import { baseQueues, extraVariants, swapVariants, queueKey, affordable, dominatedShot } from "./candidates.js";
+import { isTournament, seriesValue, teamLead, swapCount, SERIES } from "./series.js";
 import { evaluate, desperate } from "./eval.js";
 import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
@@ -112,23 +114,39 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
   }
 
   // ---------- hodnota dvojice front (priemer cez determinizácie), s cache ----------
+  // turnaj (series.js): hodnota = odhad P(výhra turnaja) - hra × sila tímov po nej, sklon k riziku podľa náskoku
+  // tímov, penalizácia swapu; value.dead / value.kill = moja / súperova smrť v hre (v turnaji hodnota prehry
+  // nie je −1, citlivosť na smrť a „istá výhra" BABY sa preto čítajú z výsledku hry, nie z hodnoty)
   function makeValue(states, me) {
-    const opp = other(me), cache = new Map();
-    return function value(qm, qo) {
+    const opp = other(me), cache = new Map(), outcome = new Map();
+    const tour = isTournament(states[0]);
+    const lead = tour ? teamLead(states[0], me) : 0, hp0 = states[0].players[me].hp;
+    function value(qm, qo) {
       const key = queueKey(qm) + "|" + queueKey(qo);
       const hit = cache.get(key);
       if (hit !== undefined) return hit;
-      let s = 0, n = 0;
+      let s = 0, n = 0, g = 0;
       for (let i = 0; i < states.length; i++) {
         const res = sim.play(states[i], { [me]: qm, [opp]: qo }, seededRng(i * 7919 + 17), tsPolicy);
         stats.sims++;
         if (!res) continue;
-        s += evaluate(res, me, weights); n++;
+        const e = evaluate(res, me, weights);
+        if (tour) {
+          const a = res.players[me].hp, b = res.players[opp].hp;
+          g += b <= 0 && a > 0 ? 1 : a <= 0 && b > 0 ? -1 : 0;
+          s += seriesValue(res, me, e, lead, hp0);
+        } else s += e;
+        n++;
       }
-      const v = n ? s / n : 0;
+      let v = n ? s / n : 0;
+      if (tour) { v += SERIES.SWAP_PEN * (swapCount(qo) - swapCount(qm)); outcome.set(key, n ? g / n : 0); }
       cache.set(key, v);
       return v;
-    };
+    }
+    const game = (qm, qo) => { value(qm, qo); return outcome.get(queueKey(qm) + "|" + queueKey(qo)) ?? 0; };
+    value.dead = tour ? (qm, qo) => game(qm, qo) <= DEATH : (qm, qo) => value(qm, qo) <= DEATH;
+    value.kill = tour ? (qm, qo) => game(qm, qo) >= -DEATH : (qm, qo) => value(qm, qo) >= -DEATH;
+    return value;
   }
 
   // rýchlosť simulácie (dvojíc front za ms pri D = 1) - priebežne meraná, určuje veľkosť vzoriek
@@ -238,6 +256,11 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const doomMe = doomPlans(sim, s0, me, myPool), doomOpp = keep(doomPlans(sim, s0, opp, oppPool));
     let R = lead([...doomMe, ...seedMe.slice(0, 8)], withExtras(pm.top, me));
     const C = keep(lead([...doomOpp, ...seedOpp.slice(0, 10)], withExtras(po.top, opp)));
+    // turnaj: pár front so swapom navyše (výnimka - zlý matchup / kombo nového maga), súperovi menej
+    if (isTournament(s0)) {
+      for (const q of swapVariants(sim, s0, me, pm.top, { plans: seedPlans })) if (!R.includes(q)) R.push(q);
+      for (const q of keep(swapVariants(sim, s0, opp, po.top, { first: 2, last: 1, plans: seedPlans }))) if (!C.includes(q)) C.push(q);
+    }
     // model súpera: fronty s jeho opakovanými vzormi typov akcií pridaj do matice, aj keď nie sú „rovnovážne"
     const om = model ? createOpponentModel(belief.history) : null;
     const useModel = !!om && om.observations >= 2 && om.weight > 0.05;
@@ -324,7 +347,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
         .map(x => ({ q: queueKey(x.r), p: r2(x.p), v: r2(vsOpp(x.r)) })),
       opp: C.map((c, j) => ({ c, p: sol.col[j] ?? 0 })).filter(x => x.p > 0.01).sort((a, b) => b.p - a.p).slice(0, 4)
         .map(x => ({ q: queueKey(x.c), p: r2(x.p) })),
-      deadly: C.filter(c => value(R[i], c) <= DEATH).slice(0, 3).map(queueKey),
+      deadly: C.filter(c => value.dead(R[i], c)).slice(0, 3).map(queueKey),
       model: useModel ? om.observations : 0,
       ...(spy ? { spy: { slot: spy.idx + 1, a: actKey(spy.action), used: spied } } : {}),
     };
@@ -380,7 +403,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     lastWhy = {
       value: r2(sol.value), pick: queueKey(R[i]), p: r2(mix[i]),
       opp: C.map((c, j) => ({ c, p: sol.col[j] ?? 0 })).filter(x => x.p > 0.01).sort((a, b) => b.p - a.p).slice(0, 4).map(x => ({ q: queueKey(x.c), p: r2(x.p) })),
-      deadly: C.filter(c => value(R[i], c) <= DEATH).slice(0, 3).map(queueKey),
+      deadly: C.filter(c => value.dead(R[i], c)).slice(0, 3).map(queueKey),
       spy: { slot: spy.idx + 1, a: actKey(spy.action), used: true, refine: true },
     };
     return R[i];
@@ -410,7 +433,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     let ok = R.map((r, k) => k).filter(k => allowed(R[k]));
     if (!ok.length) ok = R.map((r, k) => k);
     // istá výhra (zabije aspoň v polovici súperových možností) - s pravdepodobnosťou ju prehliadne
-    const kills = (k) => C.filter(c => value(R[k], c) >= 0.99).length >= C.length / 2;
+    const kills = (k) => C.filter(c => value.kill(R[k], c)).length >= C.length / 2;
     if (rng() < (lead >= 0 ? BB.MERCY : BB.MERCY_BEHIND)) { const rest = ok.filter(k => !kills(k)); if (rest.length) ok = rest; }
     const score = (k) => vs[k] - BB.DEF_PEN * defs(R[k]);
     const best = Math.max(...ok.map(score));
@@ -427,7 +450,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
   // jej váha prejde na najlepšiu bezpečnú frontu ----------
   const DEATH = -0.99, MARGIN = 0.3;
   function avoidDeath(mix, R, C, col, value) {
-    const dies = R.map(r => C.some(c => value(r, c) <= DEATH));
+    const dies = R.map(r => C.some(c => value.dead(r, c)));
     if (!mix.some((p, k) => p > 0 && dies[k])) return mix;
     const vs = R.map(r => C.reduce((s, c, j) => s + (col[j] ?? 0) * value(r, c), 0));
     let best = -1;
@@ -472,9 +495,61 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
   // ---------- výber postavy (slepý, ako pre človeka) ----------
   function decideCharacter() {
     const me = belief.mySlot;
-    const banned = belief.view?.config?.bans?.[me] || []; // BANNED CHARACTERS (verejné v configu)
-    const pool = [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === me)].filter(k => !banned.includes(k));
-    return pick(pool);
+    if (belief.view?.config?.format === "tournament" && belief.view.roster?.[me]) return decideMage();
+    return pick(charPool());
+  }
+  // postavy, ktoré smiem hrať (moja strana, bez zakázaných - BANNED CHARACTERS sú verejné v configu)
+  function charPool() {
+    const me = belief.mySlot;
+    const banned = belief.view?.config?.bans?.[me] || [];
+    return [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === me)].filter(k => !banned.includes(k));
+  }
+  // turnajový draft: úplne náhodný tím (vlastník 2026-11-03)
+  function decideTeam() {
+    const pool = charPool(), team = [];
+    while (team.length < TEAM_SIZE && pool.length) team.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+    return team;
+  }
+  // turnaj: ktorého maga nasadiť do hry (naslepo - súperov výber nevidím). Overená stratégia nie je (vlastník),
+  // zlé možnosti áno: mág bez many do hry, ktorú otváram ako druhý (nemá ani na štít). Inak hodnota štartového
+  // stavu proti každému súperovmu živému magovi (eval hry × sila tímov po nej - series.js): counter na súperove
+  // postavy, veľa many, keď idem prvý a súperovi ostali mágovia s malou manou; čo najlepšia lavička.
+  // Mierna náhoda (softmax), nech sa výber nedá prečítať.
+  function decideMage() {
+    const v = belief.view, me = belief.mySlot, opp = other(me);
+    const banned = v.config?.bans?.[me] || [];
+    const myHp = v.mageHp || v.rosterHp?.[me] || {}, myMana = v.mageMana || v.rosterMana?.[me] || {};
+    let alive = v.roster[me].filter(k => (myHp[k] ?? 0) > 0 && !banned.includes(k));
+    if (alive.length <= 1) return alive[0] ?? v.roster[me][0];
+    const gameIndex = v.series?.gameIndex ?? 1;
+    const starter = gameIndex % 2 === 1 ? "p1" : "p2";
+    if (starter !== me) {
+      const ok = alive.filter(k => (myMana[k] ?? 0) >= SHIELD_COST);
+      if (ok.length) alive = ok;
+    }
+    const foes = (v.roster[opp] || []).filter(k => (v.rosterHp?.[opp]?.[k] ?? 0) > 0);
+    const deploy = (p, k, hp, mana) => {
+      p.char = k; p.hp = hp; p.mana = mana; p.pride = 0; p.moon = k === "werewolf" ? moonLevelFor(hp) : 0;
+      p.worldUsed = false; p.clone = null; p.trap = null;
+    };
+    const score = alive.map(k => {
+      let s = 0;
+      for (const f of foes.length ? foes : [null]) {
+        const st = simState(belief, rng);
+        st.starter = starter; st.turn = 1;
+        deploy(st.players[me], k, myHp[k], myMana[k] ?? 0);
+        if (f) {
+          deploy(st.players[opp], f, v.rosterHp[opp][f], v.rosterMana?.[opp]?.[f] ?? 5);
+        }
+        s += seriesValue(st, me, f ? evaluate(st, me, weights) : 0);
+      }
+      return s / (foes.length || 1);
+    });
+    const best = Math.max(...score), T = 0.04;
+    const w = score.map(x => Math.exp((x - best) / T)), tot = w.reduce((a, b) => a + b, 0);
+    let r = rng() * tot;
+    for (let i = 0; i < alive.length; i++) { r -= w[i]; if (r <= 0) return alive[i]; }
+    return alive[alive.length - 1];
   }
 
   function decide({ spy = null } = {}) {
@@ -482,6 +557,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     if (!kind) return null;
     stats.decisions++;
     if (kind === "character") return { kind, char: decideCharacter() };
+    if (kind === "team") return { kind, team: decideTeam() };
     if (kind === "timestop") return { kind, queue: decideTimestop() };
     lastWhy = null;
     // CHEATER s odhalenou akciou: dopočet nad výpočtom z plánovania; keď ho niet, celé kolo znova so zúžením

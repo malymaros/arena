@@ -64,11 +64,11 @@ try {
   if (await until(() => c2.spectator, 3000, "divák AI roomky")) pass("AI roomku sa dá sledovať");
   if (c.state?.vsAi === (c.slot === "p1" ? "p2" : "p1")) pass("snapshot nesie vsAi = slot bota"); else fail(`snapshot vsAi: ${c.state?.vsAi}`);
 
-  // portal realm + turnaj → server vynúti single, aréna ostane (bot hrá všetky arény, turnaj zatiaľ nie)
-  sock.emit("configure_match", { format: "tournament", arena: "portal", tilesPerRound: 1, timer: "off", tilePreview: true, colorPref: "white",
+  // portal realm single (bot hrá všetky arény; turnaj nižšie)
+  sock.emit("configure_match", { format: "single", arena: "portal", tilesPerRound: 1, timer: "off", tilePreview: true, colorPref: "white",
     tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 }, portalWeights: { classic: 100, hp: 0, mana: 0, power: 0, nodef: 0 } });
   await until(() => c.state?.phase === "playing", 10000, "štart zápasu");
-  if (c.state?.config?.format === "single" && c.state?.config?.arena === "portal") pass("AI roomka: vynútený single, Portal Realm ostal");
+  if (c.state?.config?.format === "single" && c.state?.config?.arena === "portal") pass("AI roomka: single na Portal Realm");
   else fail(`AI roomka config: ${JSON.stringify(c.state?.config)}`);
 
   sock.emit("choose_character", "fire");
@@ -176,6 +176,32 @@ try {
   c.rooms = null;
   sock.emit("leave_room");
   await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (cheater)");
+  // turnaj (docs/AI_PLAN.md 8d): server ho nevynúti na single, bot draftuje tím a vyberie maga zo svojho rosteru
+  c.state = null; c.result = null; c.over = null;
+  sock.emit("join_room", { roomId: c.rooms.aiRoom.id });
+  await until(() => c.state?.phase === "lobby", 5000, "lobby AI roomky (turnaj)");
+  sock.emit("configure_match", { format: "tournament", tilesPerRound: 1, timer: "off", tilePreview: true, colorPref: "white",
+    tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 } });
+  if (await until(() => c.state?.phase === "team_select", 10000, "turnaj: draft tímu")) pass("AI roomka: turnaj povolený (team_select)");
+  const botSlot = c.slot === "p1" ? "p2" : "p1";
+  if (await until(() => c.state?.rosterReady?.[botSlot], 15000, "bot potvrdil tím")) pass("bot potvrdil tím v drafte");
+  sock.emit("choose_team", ["fire", "lightning", "wanderer"]);
+  await until(() => c.state?.phase === "playing" && c.state?.roster?.[botSlot], 10000, "turnaj: hra 1");
+  const botTeam = c.state?.roster?.[botSlot] || [];
+  if (botTeam.length === 3 && new Set(botTeam).size === 3) pass(`bot draftol tím: ${botTeam.join(", ")}`); else fail("tím bota: " + JSON.stringify(botTeam));
+  sock.emit("choose_character", "fire");
+  if (await until(() => c.state?.p1?.char && c.state?.p2?.char, 15000, "bot si vybral maga")) {
+    const ch = c.state[botSlot].char;
+    if (botTeam.includes(ch)) pass(`bot nasadil maga zo svojho rosteru: ${ch}`); else fail(`bot nasadil ${ch} mimo rosteru`);
+  }
+  {
+    const turn = c.state.turn, before = c.timelines;
+    sock.emit("lock_in", QUEUES[0], turn, () => {});
+    if (await until(() => c.timelines > before || c.result, 15000, "turnaj: 1. kolo")) pass("turnaj: bot odohral kolo");
+  }
+  c.rooms = null;
+  sock.emit("leave_room");
+  await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (turnaj)");
   // admin: reset AI roomky (ako hocijakej inej) → zanikne a hneď je znova čistá 0/1; globálny reset ju tiež nechá
   const adm = io(URL, { transports: ["websocket"], auth: { name: "admin", pass: "testadmin" } });
   const ca = { rooms: null, reload: false };

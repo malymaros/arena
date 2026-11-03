@@ -67,11 +67,8 @@ function loadSettings() {
   return st;
 }
 let settings = null; // načíta sa pri prvom zobrazení lobby (showLobby)
-// roomka proti AI botovi (snapshot vsAi): všetky arény, len single / bo3 (turnaj bot zatiaľ nevie) - uložené voľby
-// sa neprepisujú, len sa pre túto roomku čítajú obmedzene (main())
-let vsAi = false;
-const main = () => !vsAi ? settings.main
-  : { ...settings.main, format: settings.main.format === "tournament" ? "single" : settings.main.format };
+// hlavné voľby lobby (proti AI botovi platia všetky - arény, kocka aj turnaj, docs/AI_PLAN.md 8d)
+const main = () => settings.main;
 let savedFlash = 0;
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch {}
@@ -227,26 +224,24 @@ function build() {
   });
 }
 
-/* ---------- zamknutý turnaj: AI roomka alebo zákazy postáv ---------- */
-// turnaj ostáva viditeľný, len zamknutý (🔒, .ai-locked) - proti botovi zatiaľ nie je (arény aj kocka áno); zákazy
-// (BANNED CHARACTERS) ho zamknú, keď by niektorej farbe ostali menej ako 3 postavy - zvolený turnaj sa prepne na SINGLE
+/* ---------- zamknutý turnaj: zákazy postáv ---------- */
+// turnaj ostáva viditeľný, len zamknutý (🔒, .ai-locked): zákazy (BANNED CHARACTERS) ho zamknú, keď by niektorej
+// farbe ostali menej ako 3 postavy - zvolený turnaj sa prepne na SINGLE
 const AI_LOCKED = '#lobby-format .opt[data-val="tournament"]';
-const LOCK_TITLES = ["Not available vs AI yet", "Not enough characters left (banned characters)"];
+const LOCK_TITLE = "Not enough characters left (banned characters)";
 let banLocked = false;
-const aiLocked = (el) => (vsAi || banLocked) && !!el?.closest?.(AI_LOCKED);
+const aiLocked = (el) => banLocked && !!el?.closest?.(AI_LOCKED);
 function syncTournamentLock() {
   banLocked = !!settings && bansBlockTournament();
   if (banLocked && settings.main.format === "tournament") { settings.main.format = "single"; save(); }
-  const locked = vsAi || banLocked;
   document.querySelectorAll(AI_LOCKED).forEach(el => {
-    el.classList.toggle("ai-locked", locked);
-    if (locked) el.title = LOCK_TITLES[vsAi ? 0 : 1]; else if (LOCK_TITLES.includes(el.title)) el.removeAttribute("title");
+    el.classList.toggle("ai-locked", banLocked);
+    if (banLocked) el.title = LOCK_TITLE; else if (el.title === LOCK_TITLE) el.removeAttribute("title");
   });
 }
 
 /* ---------- Lobby (host nastavuje zápas) ---------- */
-export function showLobby(s) {
-  vsAi = !!s?.vsAi;
+export function showLobby() {
   $("lobby").classList.remove("hidden");
   if (!built) { settings = loadSettings(); build(); }
   renderMain();

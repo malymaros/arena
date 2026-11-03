@@ -17,7 +17,7 @@ function decideLater(room) {
     if (rooms.get(room) !== r) return; // roomka medzitým zanikla
     const v = r.bot.belief.view;
     if (!v) return;
-    const key = `${v.series?.gameIndex}:${v.turn}:${v.timestop ? "ts" : ""}:${v[r.bot.belief.mySlot]?.char ? "" : "char"}`;
+    const key = `${v.phase === "team_select" ? "team:" : ""}${v.series?.gameIndex}:${v.turn}:${v.timestop ? "ts" : ""}:${v[r.bot.belief.mySlot]?.char ? "" : "char"}`;
     const post = (d, extra = {}) => parentPort.postMessage({ room, ...d, ...extra, turn: v.turn, game: v.series?.gameIndex ?? 1 });
     // bežné rozhodnutie (pri CHEATEROVI aj výpočet, ktorý po odhalení len dopočíta; zahrá sa, keď vyprší čas)
     if (!r.decided.has(key)) {

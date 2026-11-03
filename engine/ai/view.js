@@ -109,7 +109,10 @@ export function createBelief() {
 // rozhoduje bot teraz? (bežné plánovanie kola alebo jeho THE WORLD zmrazené akcie)
 export function decisionKind(b) {
   const v = b.view;
-  if (!v || !b.mySlot || v.phase !== "playing") return null;
+  if (!v || !b.mySlot) return null;
+  // turnajový draft: tím ešte nepotvrdený (rosterReady je verejné, vlastný roster vidím)
+  if (v.phase === "team_select") return v.rosterReady?.[b.mySlot] || v.roster?.[b.mySlot] ? null : "team";
+  if (v.phase !== "playing") return null;
   if (!v.p1?.char || !v.p2?.char) return v[b.mySlot]?.char ? null : "character";
   if (v.timestop) return v.timestop.slot === b.mySlot ? "timestop" : null;
   if (v[b.mySlot].locked || v.myLock) return null;
@@ -181,7 +184,30 @@ export function simState(b, rng) {
     seats: { p1: "A", p2: "B" },
     seriesWins: { A: 0, B: 0 },
     series: { gameIndex: 1, needed: 1, format: "single" },
-    roster: null, mageHp: null, mageMana: null,
+    ...tournamentState(v, me),
     roundCtx: null, timestop: null,
   };
+}
+
+// turnaj: roster oboch strán (verejný po drafte) + uložené HP/mana mágov na lavičke (rosterHp / rosterMana sú
+// verejné; súperova mana počas labyrintu nie - odhad START_MANA). Osoby v simulácii: p1 = A, p2 = B (seats).
+// Bez toho engine v simulácii neprijme swap a eval nevidí lavičku.
+export function tournamentState(v, me) {
+  if (v.config?.format !== "tournament" || !v.roster?.p1 || !v.roster?.p2) return { roster: null, mageHp: null, mageMana: null };
+  const PERSON = { p1: "A", p2: "B" };
+  const roster = {}, mageHp = {}, mageMana = {};
+  for (const s of ["p1", "p2"]) {
+    const keys = [...v.roster[s]], hp = {}, mana = {};
+    const srcHp = (s === me && v.mageHp) || v.rosterHp?.[s] || {};
+    const srcMana = (s === me && v.mageMana) || v.rosterMana?.[s] || {};
+    for (const k of keys) {
+      hp[k] = srcHp[k] ?? 0;
+      mana[k] = srcMana[k] ?? START_MANA;
+    }
+    // práve nasadený mág: živé hodnoty (uložené sa zapisujú až pri swape / konci hry)
+    const cur = v[s]?.char;
+    if (cur && cur in hp) { hp[cur] = v[s].hp; if (v[s].mana !== null && v[s].mana !== undefined) mana[cur] = v[s].mana; }
+    roster[PERSON[s]] = keys; mageHp[PERSON[s]] = hp; mageMana[PERSON[s]] = mana;
+  }
+  return { roster, mageHp, mageMana };
 }

@@ -518,8 +518,7 @@ function onTurnTimeout() {
   function onConfigure(socket, raw) {
     if (socket.data.person !== "A") return;   // konfiguruje len host
     if (engine.game.phase !== "lobby") return;        // len pred začiatkom zápasu
-    // proti AI: všetky arény (aj kocka), len single / bo3 - turnaj bot zatiaľ nevie (draft tímu, swap)
-    if (ai && raw && typeof raw === "object") raw = { ...raw, format: raw.format === "bo3" ? "bo3" : "single" };
+    // proti AI: všetky arény (aj kocka) aj všetky formáty vrátane turnaja (bot draftuje tím a swapuje - docs/AI_PLAN.md 8d)
     const config = sanitizeConfig(raw);
     if (!config) return;
     if (personAlive("B")) {
@@ -583,6 +582,8 @@ function onTurnTimeout() {
   // rozhodnutie z workera zahrá cez rovnaké príkazy enginu ako socket hráča; zastarané (iné kolo/hra) zahodí
   function onBotDecision(d) {
     const g = engine.game, person = botPerson;
+    // turnajový draft (náhodný tím) - pred hernou fázou
+    if (d.kind === "team") { if (person && g.phase === "team_select") engine.chooseTeam(person, d.team); return; }
     if (!person || g.phase !== "playing" || (g.series?.gameIndex ?? 1) !== d.game) return;
     // zdôvodnenie ťahu bota k zápasu (bug reporty z AI roomky: tools/bugs.mjs ho vypíše pri hlásení)
     if (d.why) telemetry?.append({ t: "bot", ts: new Date().toISOString(), commit: telemetryMeta.commit, match: engine.matchId || null,

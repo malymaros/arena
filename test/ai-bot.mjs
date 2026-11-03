@@ -30,6 +30,20 @@ let wins = 0;
 for (let i = 0; i < N; i++) if (playMatch(7000 + i, { A: "random", B: "bot" }, { budgetSims: 600, budgetMs: 100 }).winner === "B") wins++;
 if (wins < N - 1) fail(`bot vyhral len ${wins}/${N} proti náhodnému botovi`);
 
-console.log(`ai-bot: ${picks[0].length} rozhodnutí deterministických, proti náhodnému ${wins}/${N}`);
+// 3. turnaj (docs/AI_PLAN.md 8d): bot draftuje tím, vyberá maga z rosteru, každú frontu (aj so swapom) engine
+//    prijme, zápas sa dohrá a bot porazí náhodného
+let tWins = 0, tGames = 0, rejects = 0;
+const T = 2;
+for (let i = 0; i < T; i++) {
+  const r = playMatch(7100 + i, { A: "random", B: "bot" }, { budgetSims: 300, budgetMs: 100, format: "tournament",
+    log: (e) => { if (e.kind === "reject" && e.person === "B") rejects++; } });
+  if (r.winner === "B") tWins++;
+  tGames += r.games;
+}
+if (rejects) fail(`turnaj: engine odmietol ${rejects} front bota`);
+if (tGames < 3 * T) fail(`turnaj: len ${tGames} hier v ${T} zápasoch (first-to-3)`);
+if (tWins < T) fail(`turnaj: bot vyhral len ${tWins}/${T} proti náhodnému`);
+
+console.log(`ai-bot: ${picks[0].length} rozhodnutí deterministických, proti náhodnému ${wins}/${N}, turnaj ${tWins}/${T} (${tGames} hier)`);
 if (fails) process.exit(1);
 console.log("ai-bot: OK");
