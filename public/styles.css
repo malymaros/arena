@@ -1886,6 +1886,23 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   letter-spacing: 1px; text-shadow: 2px 2px 0 rgba(0,0,0,.6); line-height: 1.8;
 }
 .lobby-wait.hidden{ display: none; }
+.wait-box{ display: flex; flex-direction: column; align-items: center; gap: 34px; }
+/* ✕ LEAVE ROOM pred zápasom (retry.js [data-leave-room]) - tlmené, aby nesúperilo so START */
+.room-leave{
+  padding: 12px 22px; cursor: pointer; border: none; border-radius: 2px; font-family: inherit; font-size: 11px;
+  letter-spacing: 2px; background: #2b2e35; color: #d9dbe0;
+  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.12), inset 0 -4px 0 rgba(0,0,0,.3);
+}
+.room-leave:hover{ background: #3a3e47; }
+.room-leave:active{ transform: translateY(3px); }
+/* lobby hosta: odchod z roomky = len ✕ v pravom hornom rohu okna (rovnaký ako ✕ v menu) */
+#lobby > .lobby-card{ position: relative; }
+.lobby-leave{ position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; padding: 0; cursor: pointer; border: none; border-radius: 0;
+  font-family: inherit; font-size: 14px; color: #f2e6c9; background: #3a2f25;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a3a, inset -2px -2px 0 #1c1610; }
+.lobby-leave:hover{ background: #4a3c2f; }
+.lobby-leave:active{ transform: translateY(2px); }
+.lobby-wait.spec .room-leave{ display: none; }
 
 /* ---------- Intermission (medzi hrami série) ---------- */
 .intermission{
@@ -3076,7 +3093,6 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
   background: #ffb300; box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3);
 }
 .room-btn.create{ width: 100%; padding: 18px; font-size: 14px; }
-.room-btn.reset{ width: 100%; padding: 18px; font-size: 14px; background: #8e0000; color: #fff; }
 /* hra proti AI botovi (docs/AI_PLAN.md) */
 /* stála AI roomka - farba pokojnej tváre bota (bot-face.js MOODS.neutral) */
 .room-card.ai{ box-shadow: inset 0 0 0 2px #5ef2ff; }
@@ -3090,6 +3106,109 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 /* zámok v strede voľby (prekrytie textu je zámer; karty arén majú overflow hidden - mimo by sa orezal) */
 .ai-locked::after{ content: "🔒"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   font-size: 16px; line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; z-index: 2; }
+/* dlaždice roomiek (room-tiles.js): pixel-art, vo všetkých stavoch rovnako veľké -
+   badge arény, tabuľka MANUAL | RANDOM (COLOR, CHARACTER, TIMER), tlačidlo CREATE / JOIN / SPECTATE */
+.rooms-card:has(.room-grid){ width: auto; }
+/* okno so zoznamom roomiek na PC / tablete o 50 % väčšie (celé naraz - pixely a pomery ostávajú); telefón má vlastné */
+html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
+.room-grid{ display: grid; grid-template-columns: repeat(2, 268px); gap: 22px; justify-content: center; }
+/* zubaté rohy po 4 px (pixel-art) */
+.room-tile, .room-tile .rt-badge, .room-tile .rt-cta{ --n: 4px; clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0,
+  calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n), 100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)),
+  calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
+.room-btn.room-tile{
+  --face: #23252b; --acc: #3a3d45;
+  display: flex; flex-direction: column; gap: 12px; width: 268px; box-sizing: border-box; padding: 16px 16px 18px;
+  color: #cfd2d6; background: var(--face); letter-spacing: 1px; text-align: left; border-radius: 0;
+  /* plochý jednofarebný rám po pixeloch: tenký čierny obrys + farba stavu (bez 3D hrán) */
+  box-shadow: inset 0 0 0 2px #000, inset 0 0 0 6px var(--acc);
+}
+.room-btn.room-tile.create{ --face: #17181c; --acc: #ffb300; } /* farba nadpisu ARENA */
+.room-btn.room-tile.join{ --acc: #3ddc84; }
+.room-btn.room-tile.spectate{ --acc: #7a7d86; }
+/* staré .room-btn.create/.spectate (CREATE ROOM, SPECTATE) majú vlastné pozadie/šírku - dlaždica ich prebije */
+.room-btn.room-tile.create, .room-btn.room-tile.join, .room-btn.room-tile.spectate{ background: var(--face); width: 268px; padding: 16px 16px 18px; font-size: inherit; }
+.room-btn.room-tile:hover{ filter: brightness(1.12); }
+.room-btn.room-tile:active{ transform: translateY(2px); }
+/* badge arény (rovnako široký pre arénu aj kocku) */
+.room-tile .rt-badge{ position: relative; display: block; height: 40px; flex: none; overflow: hidden; background: #101114; }
+.room-tile .rt-badge canvas{ position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.room-tile .rt-badge::after{ content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px rgba(255,255,255,.18), inset 0 -6px 0 2px rgba(0,0,0,.25); }
+.room-tile .rt-bname{ position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-size: 10px;
+  color: #fff; letter-spacing: 2px; text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 2px 0 #000; }
+.room-tile .rt-dice{ position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; transform: translate(-50%, -50%); }
+.room-tile .rt-dice svg{ width: 100%; height: 100%; display: block; }
+/* náhodná aréna: pixelová šachovnica z farieb troch arén + kocka */
+.room-tile .rt-badge.random{ background: conic-gradient(#3b3226 25%, #2a1f45 0 50%, #233019 0 75%, #2a1f45 0) 0 0 / 16px 16px; }
+.room-tile .rt-badge.none{ background: #121316; }
+.room-tile .rt-badge.none .rt-bname{ color: #3a3d45; text-shadow: none; }
+.room-tile .rt-badge.setting .rt-bname{ color: #8af0b5; font-size: 8px; text-shadow: 2px 2px 0 #000; }
+/* tabuľka */
+.room-tile .rt-tbl{ display: grid; grid-template-columns: 1fr 60px 60px; gap: 5px 4px; align-items: center; font-size: 8px; }
+.room-tile .rt-h{ color: #8b92a0; text-align: center; font-size: 6px; letter-spacing: 1px; }
+.room-tile .rt-k{ color: #e3e5ea; text-shadow: 2px 2px 0 #000; }
+.room-tile .rt-c, .room-tile .rt-tv{ display: flex; justify-content: center; align-items: center; height: 22px; background: #15161a;
+  box-shadow: inset 0 0 0 2px #000, inset 2px 2px 0 2px #0c0d10, inset -2px -2px 0 2px #2a2c33; }
+.room-tile .rt-tv{ grid-column: 2 / span 2; gap: 8px; font-size: 8px; color: #ffcf66; text-shadow: 2px 2px 0 #000; white-space: nowrap; }
+.room-tile .rt-tv.long{ font-size: 6px; letter-spacing: 0; gap: 5px; }
+.room-tile .rt-tbl.dim .rt-k, .room-tile .rt-tbl.dim .rt-h{ color: #3e4149; text-shadow: none; }
+.room-tile .rt-ico{ display: block; width: 14px; height: 14px; }
+.room-tile .rt-ico.no{ width: 10px; height: 10px; }
+.room-tile .rt-ico.tok{ width: 16px; height: 16px; }
+.room-tile .rt-dash{ display: block; width: 10px; height: 2px; background: #2e3138; }
+/* tlačidlo s pixelovým reliéfom */
+.room-tile .rt-cta{ display: block; text-align: center; padding: 12px 0 13px; font-size: 11px; letter-spacing: 2px; color: #2a1c00; background: #ffb300;
+  box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #ffd36a, inset 0 -4px 0 2px #b97f00; text-shadow: 1px 1px 0 rgba(255,255,255,.3); }
+.room-btn.room-tile.join .rt-cta{ background: #3ddc84; color: #06200f; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #8af0b5, inset 0 -4px 0 2px #1f8f52; }
+.room-btn.room-tile.spectate .rt-cta{ background: #7a7d86; color: #10141a; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #a3a6ae, inset 0 -4px 0 2px #4d5058; }
+/* MAINTENANCE BREAK (maintenance.js): bežný hráč počas údržby vidí len hlavu bota s neutrálnou tvárou a žltou bublinou */
+.maint-screen{
+  position: fixed; inset: 0; z-index: 10001; background: #000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #cfd2d6; letter-spacing: 2px;
+}
+.maint-screen.hidden{ display: none; }
+.maint-bubble{
+  position: relative; background: #ffcf66; color: #2a1c00; font-size: 22px; padding: 18px 26px; letter-spacing: 3px; margin-bottom: 6px;
+  box-shadow: 0 0 0 4px #000, inset 0 4px 0 #ffe7a8, inset 0 -6px 0 #c48a1c, 8px 8px 0 4px rgba(0,0,0,.5);
+}
+.maint-bubble::after{ content: ""; position: absolute; left: calc(50% - 11px); bottom: -20px; width: 22px; height: 20px;
+  background: #ffcf66; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.maint-head{ width: 192px; height: 204px; image-rendering: pixelated; filter: drop-shadow(0 0 18px rgba(94,242,255,.22)); }
+.maint-sub{ font-size: 12px; color: #8b92a0; }
+.maint-admin{ position: absolute; right: 24px; bottom: 20px; background: none; border: none; cursor: pointer; padding: 6px;
+  font-family: inherit; font-size: 10px; letter-spacing: 1px; color: #5a5e66; text-decoration: underline; }
+.maint-admin:hover{ color: #9aa; }
+/* hlava AI bota vpravo dole v room browseri (lobby-bot.js) - klik = hra proti AI / sledovanie */
+.lobby-bot{
+  position: absolute; right: 28px; bottom: 20px; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; color: #fff;
+}
+.lobby-bot.hidden{ display: none; }
+.lobby-bot-figure{ width: 160px; height: 170px; image-rendering: pixelated; display: block;
+  filter: drop-shadow(0 0 10px rgba(94,242,255,.25)); transition: transform .12s; }
+.lobby-bot.hover .lobby-bot-figure{ transform: translateY(-3px); filter: drop-shadow(0 0 14px rgba(125,255,122,.45)); }
+.lobby-bot.pressed .lobby-bot-figure{ transform: translateY(3px); }
+.lobby-bot.busy .lobby-bot-figure{ filter: drop-shadow(0 0 10px rgba(197,155,255,.3)); }
+/* pixelová bublina nad hlavou, chvostík mieri na monitor */
+.lobby-bot-bubble{
+  position: relative;
+  background: #fff; color: #0b1a1e; font-size: 11px; letter-spacing: 1px; white-space: nowrap;
+  padding: 10px 12px; box-shadow: 0 0 0 3px #000, 4px 4px 0 3px rgba(0,0,0,.45);
+  animation: lobby-bot-bubble 2.4s ease-in-out infinite;
+}
+.lobby-bot-bubble::after{
+  content: ""; position: absolute; left: calc(50% - 6px); bottom: -11px; width: 12px; height: 12px;
+  background: #fff; box-shadow: 3px 3px 0 0 #000; clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.lobby-bot.hover .lobby-bot-bubble{ background: #7dff7a; }
+.lobby-bot.hover .lobby-bot-bubble::after{ background: #7dff7a; }
+.lobby-bot.busy .lobby-bot-bubble{ background: #c59bff; }
+.lobby-bot.busy .lobby-bot-bubble::after{ background: #c59bff; }
+@keyframes lobby-bot-bubble{ 0%, 100%{ transform: translateY(0); } 50%{ transform: translateY(-4px); } }
+.perf-lite .lobby-bot-bubble{ animation: none; }
 .room-btn.spectate{ background: #6a6d75; color: #10141a; }
 .room-btn:hover{ filter: brightness(1.1); }
 .room-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
@@ -3208,6 +3327,13 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 .menu-item.report:hover { background: #8e6c10; }
 .menu-item.menu-data { background: #2f5a1f; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #4f8a35, inset -2px -2px 0 #16290e; }
 .menu-item.menu-data:hover { background: #3a6e26; }
+/* admin: MAINTENANCE BREAK - vypnutá zlatohnedá, zapnutá červená; stav ON/OFF vpravo */
+.menu-item.maint { background: #6a4a08; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #b07c12, inset -2px -2px 0 #2e2003; }
+.menu-item.maint:hover { background: #7d5809; }
+.menu-item.maint.on { background: #8e1d1d; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #c03a3a, inset -2px -2px 0 #3a0909; }
+.menu-item.maint.on:hover { background: #a02424; }
+.menu-item .maint-state { margin-left: auto; font-size: 10px; padding: 4px 8px; background: #000; color: #8a7f6a; }
+.menu-item.maint.on .maint-state { color: #ff8a7a; }
 /* admin: prepínač ADMIN v hlavičke vľavo od ✕ (rovnako vysoký) - vypnutý tmavý, zapnutý červený */
 .ui-modal .menu-admin { height: 40px; flex: none; margin: 0 12px 0 auto; padding: 0 14px; font-size: 10px; letter-spacing: 2px; background: #1c1610; color: #8a7f6a;
   box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #000; }

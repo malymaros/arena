@@ -250,7 +250,11 @@
 .phone .room-card { padding: 22px 26px; }
 .phone .room-label { font-size: 26px; }
 .phone .room-btn { padding: 24px 36px; font-size: 24px; }
-.phone .room-btn.create, .phone .room-btn.reset { padding: 28px; font-size: 26px; }
+/* dlaždice roomiek na telefóne: rovnaký pixel-art, celé zväčšené (zoom drží pixely ostré a pomery presné) */
+.phone .room-grid { zoom: 1.6; }
+.phone .lobby-bot { right: 40px; bottom: 30px; gap: 10px; }
+.phone .lobby-bot-figure { width: 224px; height: 238px; }
+.phone .lobby-bot-bubble { font-size: 20px; padding: 16px 18px; }
 
 /* --- nastavenie zápasu (lobby hosta) na celú obrazovku: nadpis, arény + kocka, ADVANCED SETTINGS, dva stĺpce
    (FORMAT | TURN TIMER, YOUR COLOR | RANDOM CHARACTERS), START dole; voľné miesto sa rozdelí rovnomerne medzi riadky.
@@ -286,6 +290,10 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 .phone .adv-open .gear { font-size: 28px; }
 .phone .adv-chip { font-size: 15px; padding: 8px 11px; }
 .phone .lobby-start { grid-area: start; margin: 0; padding: 28px; font-size: 38px; }
+/* ✕ (odchod z roomky) v pravom hornom rohu lobby - mriežka lobby ostáva nedotknutá */
+.phone .lobby-leave { top: 24px; right: 40px; width: 64px; height: 64px; font-size: 26px; }
+.phone .room-leave { font-size: 20px; padding: 18px 24px; }
+.phone .wait-box { gap: 48px; }
 
 /* --- ADVANCED SETTINGS: okno uprostred (lobby stmavené okolo), pevná veľkosť - telo medzi záložkami a tlačidlami --- */
 .phone .lobby-adv { padding: 0; align-items: center; background: rgba(4,5,7,.78); }
@@ -455,3 +463,8 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 /* telefón: okno postavy (client/peek.js) - náhľad v rovnakej veľkosti ako vo výbere postáv */
 .phone #peek.peek-char { padding: 22px 30px 16px; }
 .phone #peek.peek-char .pk-name { font-size: 26px; margin-bottom: 8px; }
+/* MAINTENANCE BREAK na telefóne - väčšia bublina a hlava */
+.phone .maint-bubble { font-size: 40px; padding: 30px 40px; }
+.phone .maint-head { width: 288px; height: 306px; }
+.phone .maint-sub { font-size: 22px; }
+.phone .maint-admin { font-size: 18px; right: 40px; bottom: 30px; }

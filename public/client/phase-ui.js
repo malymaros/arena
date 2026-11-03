@@ -16,6 +16,7 @@ export function applyPhaseUI(s) {
   const controls = document.querySelector(".controls-row");
 
   // lobby: host vidí nastavenia; po START ak súper nie je → „čakám na druhého hráča"; druhý hráč aj divák čakajú na hosta
+  lobbyWaitEl.classList.toggle("spec", !!isSpectator); // divák má vlastnú lištu SPECTATING · LEAVE
   if (phase === "lobby" && isSpectator) {
     lobbyEl.classList.add("hidden"); hostWaitEl?.classList.add("hidden"); lobbyWaitEl.classList.remove("hidden");
   } else if (phase === "lobby") {

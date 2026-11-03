@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- public/dev/devices.html - náhľad hry na rôznych zariadeniach priamo na PC: hra v rámčeku presnej veľkosti
+     zariadenia, rozloženie vynútené cez ?device= (public/client/viewport.js). Myš funguje ako prst (klik = ťuk). -->
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arena – zariadenia</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0c0e; color: #ddd; font: 13px/1.4 system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 14px; min-height: 100vh; box-sizing: border-box; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .bar button { background: #1c1d20; color: #ddd; border: 1px solid #333; border-radius: 6px; padding: 8px 12px; cursor: pointer; font: inherit; }
+  .bar button.on { background: #ffb300; color: #1a1200; border-color: #ffb300; font-weight: 600; }
+  .bar .sep { width: 1px; height: 24px; background: #333; margin: 0 4px; }
+  .frame { border: 10px solid #222; border-radius: 22px; box-shadow: 0 10px 40px rgba(0,0,0,.6); background: #000; overflow: hidden; }
+  .frame.pc { border-radius: 6px; border-width: 4px; }
+  iframe { display: block; border: 0; }
+  .hint { color: #888; }
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<div class="frame" id="frame"><iframe id="game" title="Arena"></iframe></div>
+<div class="hint" id="hint"></div>
+<script>
+  const DEVICES = [
+    { key: "android", label: "Android 915×412", device: "phone", w: 915, h: 412 },
+    { key: "iphone", label: "iPhone 844×390", device: "phone", w: 844, h: 390 },
+    { key: "small", label: "Malý telefón 667×375", device: "phone", w: 667, h: 375 },
+    { key: "ipad", label: "iPad 1180×820", device: "tablet", w: 1180, h: 820 },
+    { key: "tablet", label: "Tablet 1024×768", device: "tablet", w: 1024, h: 768 },
+    { key: "pc", label: "PC 1600×900", device: "pc", w: 1600, h: 900 },
+  ];
+  const bar = document.getElementById("bar"), frame = document.getElementById("frame"), game = document.getElementById("game");
+  let cur = null, portrait = false;
+  function show(key) {
+    const d = DEVICES.find(x => x.key === key) || DEVICES[0];
+    cur = d.key;
+    const w = portrait && d.device !== "pc" ? d.h : d.w, h = portrait && d.device !== "pc" ? d.w : d.h;
+    // väčší rámček než okno sa zmenší celý (rovnaké pomery)
+    const k = Math.min(1, (innerWidth - 60) / (w + 20), (innerHeight - 130) / (h + 20));
+    game.style.width = w + "px"; game.style.height = h + "px";
+    frame.style.transform = k < 1 ? `scale(${k})` : ""; frame.style.transformOrigin = "top center";
+    frame.className = "frame" + (d.device === "pc" ? " pc" : "");
+    const src = "/?device=" + d.device;
+    if (game.getAttribute("src") !== src) game.setAttribute("src", src);
+    try { localStorage.setItem("arena.devices", JSON.stringify({ key: cur, portrait })); } catch {}
+    render();
+    document.getElementById("hint").textContent = `${w}×${h}${k < 1 ? `, zmenšené na ${Math.round(k * 100)} % (okno je menšie)` : ""} · myš = prst`;
+  }
+  function render() {
+    bar.innerHTML = "";
+    for (const d of DEVICES) {
+      const b = document.createElement("button");
+      b.textContent = d.label; b.className = d.key === cur ? "on" : "";
+      b.onclick = () => show(d.key);
+      bar.appendChild(b);
+    }
+    bar.appendChild(Object.assign(document.createElement("span"), { className: "sep" }));
+    const r = document.createElement("button");
+    r.textContent = portrait ? "↻ Na výšku" : "↻ Na šírku"; r.className = portrait ? "on" : "";
+    r.onclick = () => { portrait = !portrait; show(cur); };
+    bar.appendChild(r);
+  }
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("arena.devices") || "null"); } catch {}
+  portrait = !!saved?.portrait;
+  show(saved?.key || "android");
+  addEventListener("resize", () => show(cur));
+</script>
+</body>
+</html>

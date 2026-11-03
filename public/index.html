@@ -487,6 +487,7 @@
       </div>
 
       <button id="lobby-start" class="lobby-start">START</button>
+      <button class="lobby-leave" data-leave-room title="Leave room" aria-label="Leave room">✕</button>
     </div>
   </div>
 
@@ -505,10 +506,12 @@
   </div>
 
   <!-- Druhý hráč čaká, kým host nastaví zápas -->
-  <div id="lobby-wait" class="lobby-wait hidden">Waiting for host to set up the match…</div>
+  <div id="lobby-wait" class="lobby-wait hidden"><div class="wait-box"><div>Waiting for host to set up the match…</div>
+    <button class="room-leave" data-leave-room>✕ LEAVE ROOM</button></div></div>
 
   <!-- Host stlačil START, no druhý hráč ešte nie je v roomke -->
-  <div id="host-wait" class="lobby-wait hidden">Waiting for the second player…</div>
+  <div id="host-wait" class="lobby-wait hidden"><div class="wait-box"><div>Waiting for the second player…</div>
+    <button class="room-leave" data-leave-room>✕ LEAVE ROOM</button></div></div>
 
   <!-- Turnajový draft: tím potvrdený, čaká sa na súperov výber -->
   <div id="team-wait" class="lobby-wait hidden">TEAM LOCKED<br />Waiting for opponent's team…</div>

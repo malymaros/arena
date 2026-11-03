@@ -11,3 +11,10 @@ export function setAdmin(v) {
   listeners.forEach(f => f(admin));
 }
 export const onAdminChange = (f) => { listeners.add(f); };
+// MAINTENANCE BREAK - stav vidí len admin (session.maintenance); prepínač v menu ☰ → ADMIN
+let maintenance = false;
+export const isMaintenance = () => maintenance;
+export function setMaintenanceFlag(v) {
+  maintenance = !!v;
+  listeners.forEach(f => f(admin));
+}

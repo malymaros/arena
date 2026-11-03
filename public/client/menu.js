@@ -5,7 +5,7 @@
 // prepínač ADMIN (zapnutý = červený, admin položky namiesto bežných - menu sa tak vojde aj na telefón bez rolovania;
 // bežný hráč prepínač nevidí). Položky majú pixel ikonky (menu-icons.js); REPORT BUG je žltý, DOWNLOAD DATA zelený. GRAPHICS prepína úspornú grafiku LITE ↔ FULL (perf.js; kým hráč neklikne, platí auto). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
 import { socket } from "/client/net.js";
-import { isAdmin, onAdminChange } from "/client/admin-state.js";
+import { isAdmin, onAdminChange, isMaintenance } from "/client/admin-state.js";
 import { canFullscreen, toggleFullscreen } from "/client/viewport.js";
 import { openSoundWindow } from "/client/sound-ui.js";
 import { openBugWindow } from "/client/bug-report.js";
@@ -58,7 +58,12 @@ function render() {
     + item("bug", "bug", "REPORT BUG", "report");
   if (!admin) { panel.innerHTML = head + main; return; }
   // admin: obe strany v jednej bunke mriežky, neaktívna je neviditeľná - okno má stále rovnakú veľkosť a neskáče
+  // MAINTENANCE BREAK zap/vyp (zapnutie = RESET ALL ROOMS, ostatní vidia len obrazovku údržby)
+  const maint = isMaintenance();
+  const maintItem = `<button type="button" class="menu-item maint${maint ? " on" : ""}" data-act="maintenance"><span class="ico-box">${menuIcon(maint ? "lock" : "unlock")}</span>`
+    + `<span class="menu-lbl">MAINTENANCE</span><span class="maint-state">${maint ? "ON" : "OFF"}</span></button>`;
   const adminItems = item("data", "download", "DOWNLOAD DATA", "menu-data")
+    + maintItem
     + (inRoom() ? item("reset-room", "resetRoom", "RESET THIS ROOM", "danger") : "")
     + item("reset-all", "resetAll", "RESET ALL ROOMS", "danger");
   panel.innerHTML = `${head}<div class="menu-pages">
@@ -96,6 +101,11 @@ panel.addEventListener("click", (ev) => {
       a.remove();
     });
     closeMenu(); return;
+  }
+  if (act === "maintenance") {
+    const on = !isMaintenance();
+    if (on && !confirm("Zapnúť MAINTENANCE BREAK? Všetky roomky sa zrušia, hráči budú vyhodení a hrať budú môcť len admini.")) return;
+    socket.emit("admin_maintenance", on); closeMenu(); return;
   }
   if (act === "reset-room") {
     if (!confirm("Zrušiť TÚTO roomku a odpojiť jej hráčov aj divákov?")) return;

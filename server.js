@@ -127,6 +127,27 @@ function takeDataToken(token) {
 // osobami A/B, časovačmi a emitmi (roomEmit). Globálne ostáva len register roomiek + room-browser.
 const RECLAIM_GRACE_MS = 60 * 1000;         // koľko sekúnd drží slot pre pôvodného hráča po výpadku
 const browsing = new Set();                 // sockety na room-browseri (ešte neposadené v žiadnej roomke, nie diváci)
+// MAINTENANCE BREAK: hrať môže len ten, kto sa prihlásil admin heslom; ostatní vidia len hlavu bota s bublinou
+// (klient public/client/maintenance.js). Zapnutie = RESET ALL ROOMS (všetkých vyhodí, klienti sa obnovia a bežní hráči
+// po pripojení vidia len obrazovku údržby). Zapína/vypína admin v menu ☰;
+// MAINTENANCE=1 = server štartuje v údržbe (produkcia - po každom nasadení je hra zavretá, kým ju admin neotvorí).
+let maintenance = process.env.MAINTENANCE === "1";
+const maintWaiting = new Set();             // sockety, ktorým sa ukazuje obrazovka údržby
+const maintBlocked = (socket) => maintenance && !socket.data.isAdmin;
+// socket bez roomky: room-browser, alebo počas údržby obrazovka údržby
+function toBrowser(socket) {
+  if (maintBlocked(socket)) { browsing.delete(socket); maintWaiting.add(socket); socket.emit("maintenance", { on: true }); return; }
+  maintWaiting.delete(socket);
+  browsing.add(socket);
+  socket.emit("rooms", roomsSnapshot());
+}
+function setMaintenance(on) {
+  maintenance = !!on;
+  for (const s of io.sockets.sockets.values()) if (s.data.isAdmin) s.emit("session", { admin: true, maintenance });
+  if (maintenance) forceResetAll(); // všetky roomky preč + force_reload → po pripojení obrazovka údržby
+  else { for (const s of [...maintWaiting]) toBrowser(s); broadcastRooms(); } // čakajúci rovno do room-browsera
+  console.log(`maintenance ${maintenance ? "ON" : "OFF"}`);
+}
 const rooms = new Map();                    // id -> Room (objekt z createRoom)
 let nextRoomId = 1;                         // rastúci identifikátor roomiek
 const MAX_ROOMS = 2;                        // cap: max toľko bežných roomiek naraz (stála AI roomka sa nepočíta)
@@ -140,6 +161,10 @@ const AI_ROOM_ID = "ai";
 // Všetky AI roomky počítajú v jednom worker vlákne po jednom ťahu.
 const AI_SIMS = process.env.AI_SIMS ? Math.max(100, Math.min(20000, Number(process.env.AI_SIMS) || 1500)) : null;
 const AI_THINK_MS = Math.max(500, Math.min(30000, Number(process.env.AI_THINK_MS) || 10000));
+// THE WORLD bota: hráč čaká v zastavenom čase aspoň toľko (od chvíle, keď klient dohrá úvod THE WORLD),
+// kým bot „zadá" zmrazené akcie - inak pokračovacia timeline prišla skôr, ako klient prešiel do zmrazeného
+// režimu, prerušila úvod a zmrazené akcie vyzerali ako bežné akcie navyše
+const AI_WORLD_WAIT_MS = 5000;
 
 // Validácia zobrazovaného mena: 1–8 znakov anglickej abecedy, nič iné (žiadne emoji/diakritika/medzery).
 function validateName(raw) {
@@ -158,7 +183,7 @@ function okAdmin(keyFromClient) {
 // `turnTimer`… lexikálne - každá roomka má vlastnú kópiu. Globálne konštanty (HP/mana/CHARS/*_MS…) a
 // pure helpery (validateName, okAdmin, rollTileType…) sa čítajú z module scope cez closure.
 // ai = roomka proti AI botovi: bot sedí ako osoba B (virtuálny socket, engine/ai/seat.js)
-function createRoom(id, { ai = false } = {}) {
+function createRoom(id, { ai = false, slot = null } = {}) {
   const botPerson = ai ? "B" : null;
   /* -------------------- Game state (per-room) -------------------- */
   // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
@@ -174,7 +199,7 @@ function createRoom(id, { ai = false } = {}) {
 
   const engine = createRecordedEngine({
     emit: (ev, payload) => { noteIntro(ev, payload); roomEmit(ev, payload); },
-    emitState: (timeline) => emitStateMasked(timeline),
+    emitState: (timeline) => { noteWorldPause(timeline); emitStateMasked(timeline); },
     emitYouAre: () => emitYouAre(),
     clearTurnTimer: () => clearTurnTimer(),
     beginPlanningTimer: (extraMs) => beginPlanningTimer(extraMs),
@@ -331,7 +356,19 @@ function onTurnTimeout() {
   function roomsRow() {
     if (ai) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), phase: engine.game.phase, ai: true };
     const players = ["A", "B"].filter(personAlive).length;
-    return { id, players, max: 2, canJoin: players < 2, phase: engine.game.phase };
+    // slot = pevné miesto v room-browseri (ROOM 1…MAX_ROOMS, číslo sa nemení, kým roomka žije); mená sediacich hráčov
+    // names = [host, druhý hráč] po stranách (prázdne miesto = null) - room browser ich píše vedľa štvorčekov
+    const names = ["A", "B"].map(p => (personAlive(p) ? personNames[p] || null : null));
+    return { id, slot, players, max: 2, canJoin: players < 2, phase: engine.game.phase, names, info: roomInfo() };
+  }
+  // nastavenia zápasu pre dlaždicu v room-browseri (public/client/room-tiles.js): známe, keď host stlačil START
+  // (čaká na súpera - pendingMatchConfig) alebo zápas beží (game.config); kým host nastavuje, null = SETTING UP…
+  // color = farba, ktorú dostane ten, kto sa pripojí (host si vybral bielu → pripájajúci čierna)
+  function roomInfo() {
+    const cfg = engine.game.phase === "lobby" ? pendingMatchConfig : engine.game.config;
+    if (!cfg) return null;
+    const color = cfg.colorPref === "white" ? "black" : cfg.colorPref === "black" ? "white" : "random";
+    return { arena: cfg.arena === "random" ? "random" : cfg.arena || "bridge", color, chars: cfg.randomChars ? "random" : "manual", timer: cfg.timer ?? "off" };
   }
   // voľné miesto (nie je obsadené živým socketom ani grace-held tokenom)
   function isFree(p) { return !personSockets[p] && (!personIds[p] || Date.now() - personFreedAt[p] > RECLAIM_GRACE_MS); }
@@ -353,7 +390,7 @@ function onTurnTimeout() {
   // zruš túto roomku: vyčisti stav a časovače, odstráň z registra, diváci sa vrátia na room-browser
   function destroySelf() {
     engine.abort("abandoned");
-    if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null;
+    if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null; clearWorldTimer();
     if (botPerson) personSockets[botPerson]?.disconnect?.(); // ukonči worker bota
     clearTurnTimer();
     if (roomDestroyTimer) { clearTimeout(roomDestroyTimer); roomDestroyTimer = null; }
@@ -363,7 +400,7 @@ function onTurnTimeout() {
     personFreedAt.A = 0; personFreedAt.B = 0;
     pendingMatchConfig = null;
     // prípadní diváci → späť na room-browser
-    for (const s of spectators) { try { s.data.roomId = null; s.data.spectating = false; s.leave(String(id)); browsing.add(s); } catch {} }
+    for (const s of spectators) { try { s.data.roomId = null; s.data.spectating = false; s.leave(String(id)); toBrowser(s); } catch {} }
     spectators.clear();
     rooms.delete(id);
     if (ai) ensureAiRoom(); // stála AI roomka sa hneď vytvorí znova (čistá) - broadcastne aj zoznam
@@ -442,12 +479,24 @@ function onTurnTimeout() {
       personIds[p] = null; personFreedAt[p] = 0; personNames[p] = null; // dobrovoľný odchod → bez grace
       socket.data.person = null;
       clearTurnTimer();
+      if (p === "A" && engine.game.phase === "lobby") {
+        pendingMatchConfig = null; // START hosta, ktorý odišiel, už neplatí
+        // druhý hráč čakal na hosta → stane sa hostom on (inak by čakal na nikoho); zápas ešte nezačal, nič iné
+        // sa na osobu neviaže
+        const sb = personSockets.B;
+        if (!ai && sb && personAlive("B")) {
+          personSockets.A = sb; personIds.A = personIds.B; personNames.A = personNames.B; personFreedAt.A = 0;
+          personSockets.B = null; personIds.B = null; personNames.B = null; personFreedAt.B = 0;
+          sb.data.person = "A";
+          emitYouAre();
+          emitStateMasked();
+        }
+      }
     }
     socket.data.roomId = null;
     socket.data.spectating = false;
     socket.leave(String(id));
-    browsing.add(socket);
-    socket.emit("rooms", roomsSnapshot());
+    toBrowser(socket); // room-browser, počas údržby obrazovka údržby
     if (roomEmpty()) destroySelf(); else { broadcastRooms(); broadcastSpectators(); } // ak ostal sám nikto → zruš; inak uprav počet
   }
 
@@ -470,6 +519,7 @@ function onTurnTimeout() {
       pendingMatchConfig = config;              // súper ešte nie je → zapamätaj config a čakaj naňho
       socket.emit("state", snapshotFor("A"));   // host uvidí „čakám na druhého hráča" (awaitingOpponent)
     }
+    broadcastRooms(); // dlaždica roomky v room-browseri ukáže nastavenia zápasu (namiesto SETTING UP…)
   }
 
   function onChooseTeam(socket, keys) { engine.chooseTeam(socket.data.person, keys); }
@@ -488,7 +538,7 @@ function onTurnTimeout() {
   function onRetry(socket) {
     if (!socket.data.person) return; // divák hru reštartovať nesmie
     clearTurnTimer();
-    if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null; // starý podržaný ťah bota
+    if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null; clearWorldTimer(); // starý podržaný ťah bota
     newGame();
     roomEmit("reset");
     roomEmit("state", snapshot());
@@ -510,6 +560,15 @@ function onTurnTimeout() {
   }
 
   /* -------------------- AI bot (osoba B v AI roomke) -------------------- */
+  // čiastočná timeline THE WORLD (končí timestop_wait): klient ju prehráva súčet delayMs (+ rezerva na úvod
+  // kola, napr. premenu Escanora) - až potom začne zmrazený čas; od tej chvíle bot čaká AI_WORLD_WAIT_MS
+  let worldReadyAt = 0, worldTimer = null;
+  function noteWorldPause(timeline) {
+    if (!ai || !Array.isArray(timeline) || engine.game.timestop?.mode !== "waiting") return;
+    const playMs = timeline.reduce((acc, f) => acc + (f.delayMs ?? 600), 0);
+    worldReadyAt = Date.now() + playMs + 1500 + AI_WORLD_WAIT_MS;
+  }
+  function clearWorldTimer() { if (worldTimer) { clearTimeout(worldTimer); worldTimer = null; } }
   // rozhodnutie z workera zahrá cez rovnaké príkazy enginu ako socket hráča; zastarané (iné kolo/hra) zahodí
   function onBotDecision(d) {
     const g = engine.game, person = botPerson;
@@ -519,17 +578,26 @@ function onTurnTimeout() {
       g: d.game, turn: d.turn, side: g.seats?.p1 === person ? "white" : "black", ...d.why });
     if (d.kind === "character") { engine.chooseCharacter(person, d.char); return; }
     if (d.kind === "timestop") {
-      let ok = false;
-      engine.timestopActions(person, d.queue, (r) => { ok = !!r?.ok; });
-      if (!ok && g.timestop?.mode === "waiting" && g.timestop.slot === slotForPerson(person))
-        engine.timestopActions(person, [{ type: "recharge" }, { type: "shield" }, { type: "move", dir: "up" }]);
+      const wait = worldReadyAt - Date.now();
+      if (wait > 0) { clearWorldTimer(); worldTimer = setTimeout(() => { worldTimer = null; playBotWorld(d); }, wait); return; }
+      playBotWorld(d);
       return;
     }
-    // ťah kola bot NEzamyká skôr ako hráč (hráč nikdy nevidí „OPPONENT IS READY" a bot mu nespúšťa odpočet
+    // ťah kola bot NEzamyká skôr ako hráč
+    // (hráč nikdy nevidí „OPPONENT IS READY" a bot mu nespúšťa odpočet
     // quick-draw): rozhodnutie sa podrží a zahrá sa až po hráčovom zamknutí (releaseBotRound)
     botPending = d;
     const human = g.players[slotForPerson(person === "A" ? "B" : "A")];
     if (human.locked) releaseBotRound();
+  }
+  function playBotWorld(d) {
+    const g = engine.game, person = botPerson;
+    if (!person || g.phase !== "playing" || (g.series?.gameIndex ?? 1) !== d.game) return;
+    if (g.timestop?.mode !== "waiting" || g.timestop.slot !== slotForPerson(person)) return;
+    let ok = false;
+    engine.timestopActions(person, d.queue, (r) => { ok = !!r?.ok; });
+    if (!ok && g.timestop?.mode === "waiting" && g.timestop.slot === slotForPerson(person))
+      engine.timestopActions(person, [{ type: "recharge" }, { type: "shield" }, { type: "move", dir: "up" }]);
   }
   // hráč zamkol: bot zamkne po krátkom náhodnom „dopremýšľaní" (0,6-1,5 s; náhodné, nezávislé od ťahu -
   // dĺžka nesmie prezrádzať, čo bot hrá)
@@ -572,7 +640,7 @@ function onTurnTimeout() {
   }
 
   return {
-    id, ai, seatBot, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset, bugContext,
+    id, ai, slot, seatBot, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset, bugContext,
     isEmpty: roomEmpty, onConfigure, onChooseTeam, onChooseCharacter, onLockIn, onTimestopActions, onDraftQueue, onRetry, onDisconnect,
   };
 }
@@ -583,7 +651,8 @@ function onTurnTimeout() {
 function roomsSnapshot() {
   const list = [];
   for (const room of rooms.values()) if (!room.ai) list.push(room.roomsRow());
-  return { rooms: list, canCreate: list.length < MAX_ROOMS, aiRoom: rooms.get(AI_ROOM_ID)?.roomsRow() || null };
+  list.sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
+  return { rooms: list, slots: MAX_ROOMS, canCreate: list.length < MAX_ROOMS, aiRoom: rooms.get(AI_ROOM_ID)?.roomsRow() || null };
 }
 // stála AI roomka: vytvor, ak chýba (štart servera, odchod hráča, admin reset); bot si v nej hneď sadne (osoba B)
 function ensureAiRoom() {
@@ -653,7 +722,7 @@ io.on("connection", (socket) => {
   // admin = prihlásený admin heslom; počíta sa z handshake pri každom pripojení (aj pri connectionStateRecovery,
   // kde sa middleware preskočí) a klient podľa toho ukáže admin sekciu menu / reset tlačidlá
   socket.data.isAdmin = okAdmin(socket.handshake.auth?.pass);
-  socket.emit("session", { admin: socket.data.isAdmin });
+  socket.emit("session", { admin: socket.data.isAdmin, ...(socket.data.isAdmin ? { maintenance } : {}) });
 
   // reclaim naprieč roomkami: token už patrí hráčovi v niektorej žijúcej roomke → vráť ho rovno na miesto
   let placed = false;
@@ -663,35 +732,39 @@ io.on("connection", (socket) => {
       if (p) { room.seat(socket, p); placed = true; break; }
     }
   }
-  if (!placed) {
-    // nový príchod → room-browser (create/join/spectate); miesto sa pridelí až explicitne
-    browsing.add(socket);
-    socket.emit("rooms", roomsSnapshot());
-  }
+  // nový príchod → room-browser (create/join/spectate), počas údržby (bežný hráč) obrazovka údržby
+  if (!placed) toBrowser(socket);
   broadcastRooms();
 
   // --- Room lifecycle (globálny routing) ---
-  socket.on("create_room", () => {
+  // arg.slot (voliteľné) = klik na prázdnu dlaždicu ROOM n; obsadený/neplatný slot → najnižší voľný
+  socket.on("create_room", (arg) => {
     if (socket.data.person || socket.data.roomId) return; // už niekde je
+    if (maintBlocked(socket)) return;                    // údržba: nové roomky len admin
     if (!roomsSnapshot().canCreate) return;               // limit počtu (bežných) roomiek
-    const room = createRoom(nextRoomId++);
+    const used = new Set([...rooms.values()].filter(r => !r.ai).map(r => r.slot));
+    const free = Array.from({ length: MAX_ROOMS }, (_, i) => i + 1).filter(n => !used.has(n));
+    const slot = free.includes(arg?.slot) ? arg.slot : free[0];
+    const room = createRoom(nextRoomId++, { slot });
     rooms.set(room.id, room);
     room.seat(socket, "A"); // tvorca = host (osoba A) a nastaví parametre zápasu
     broadcastRooms();
   });
   socket.on("join_room", (arg) => {
     if (socket.data.person || socket.data.roomId) return;
+    if (maintBlocked(socket)) return;
     const room = rooms.get(arg?.roomId);
     if (!room) return;
     room.join(socket);
   });
   socket.on("spectate_room", (arg) => {
     if (socket.data.person || socket.data.roomId) return;
+    if (maintBlocked(socket)) return;
     const room = rooms.get(arg?.roomId);
     if (!room) return;
     room.spectate(socket);
   });
-  socket.on("take_seat", () => { if (socket.data.spectating) roomForSocket(socket)?.takeSeat(socket); });
+  socket.on("take_seat", () => { if (socket.data.spectating && !maintBlocked(socket)) roomForSocket(socket)?.takeSeat(socket); });
   socket.on("leave_room", () => { roomForSocket(socket)?.leave(socket); });
 
   // --- Herné eventy (dispatch do roomky socketu) ---
@@ -705,6 +778,8 @@ io.on("connection", (socket) => {
 
   // --- admin reset cez socket - len socket prihlásený admin heslom; globálny (všetky roomky)
   socket.on("admin_reset_all", () => { if (socket.data.isAdmin) forceResetAll(); });
+  // admin: MAINTENANCE BREAK zap/vyp (menu ☰ → ADMIN)
+  socket.on("admin_maintenance", (on) => { if (socket.data.isAdmin) setMaintenance(on); });
 
   // admin: jednorazový token na stiahnutie dát (/admin/data?token=…), platí 60 s
   socket.on("admin_data_token", (ack) => {
@@ -748,6 +823,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     browsing.delete(socket);
+    maintWaiting.delete(socket);
     roomForSocket(socket)?.onDisconnect(socket);
   });
 });

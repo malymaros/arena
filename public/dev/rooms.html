@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Room browser — stavy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* Návrhová stránka (nie je linkovaná z hry): všetky stavy room browsera naraz. Dlaždice kreslí ten istý
+     modul ako hra (client/room-tiles.js), hlavu bota bot-face.js, štýly sú z /styles.css - čo je tu, je aj v hre. */
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header h1 { font: 15px "Press Start 2P", monospace; color: #ffb300; margin: 0; }
+  header p { margin: 0; color: #8b92a0; }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 22px; padding: 20px; }
+  figure { margin: 0; }
+  figcaption { margin: 0 0 8px; color: #cfd2d6; font-weight: 600; }
+  figcaption small { display: block; color: #8b92a0; font-weight: 400; }
+  /* jedna „obrazovka" 1280×720 zmenšená na šírku stĺpca */
+  .screen { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #262a33; border-radius: 6px; background: #000; }
+  .screen .inner { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+  .screen .rooms { position: absolute; }
+  .screen .lobby-bot { cursor: default; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ROOM BROWSER</h1>
+  <p>Všetky stavy naraz (PC). Mobil: <a href="/dev/devices.html" style="color:#5ef2ff">/dev/devices.html</a>. Dlaždice a hlava bota sú ten istý kód ako v hre; klik tu nič nerobí.</p>
+</header>
+<div class="scenes" id="scenes"></div>
+<script type="module">
+  import { buildRoomGrid } from "/client/room-tiles.js";
+  import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
+
+  // info = nastavenia zápasu (server roomInfo); null = host ešte nastavuje (SETTING UP…)
+  const R = (slot, players, phase, info) => ({ id: slot, slot, players, max: 2, canJoin: players < 2, phase, info });
+  const I = (arena, color, chars, timer) => ({ arena, color, chars, timer });
+  const AI_FREE = { players: 0, max: 1, canJoin: true }, AI_BUSY = { players: 1, max: 1, canJoin: false };
+  const SCENES = [
+    { t: "Prázdny server", d: "nikto nehrá - obe roomky voľné (CREATE), bot voľný", rooms: [], ai: AI_FREE },
+    { t: "Host nastavuje zápas", d: "vľavo je host v lobby - SETTING UP…, pripojiť sa dá", rooms: [R(1, 1, "lobby", null)], ai: AI_FREE },
+    { t: "Host čaká na súpera", d: "stone bridge, pripojený bude čierny, postavy sa vyberajú, 60s", rooms: [R(1, 1, "lobby", I("bridge", "black", "manual", 60))], ai: AI_FREE },
+    { t: "Čaká + hrá sa", d: "vľavo náhodná aréna a farba, vpravo beží zápas v portáloch", rooms: [R(1, 1, "lobby", I("random", "random", "random", "off")), R(2, 2, "playing", I("portal", "white", "random", "quickdraw"))], ai: AI_FREE },
+    { t: "Obe roomky hrajú", d: "dá sa len sledovať (divák vidí ✓ zvolená / losovaná farba)", rooms: [R(1, 2, "playing", I("swamp", "black", "manual", 30)), R(2, 2, "playing", I("bridge", "random", "manual", 120))], ai: AI_FREE },
+    { t: "Všetko obsadené", d: "obe roomky hrajú a niekto hrá s botom", rooms: [R(1, 2, "playing", I("swamp", "black", "manual", 30)), R(2, 2, "playing", I("bridge", "random", "manual", 120))], ai: AI_BUSY },
+    { t: "Dvaja v lobby", d: "druhý hráč sa pripojil, host ešte nastavuje - SPECTATE", rooms: [R(2, 2, "lobby", null)], ai: AI_FREE },
+    { t: "Po zápase ostal jeden hráč", d: "druhý odišiel z game over - JOIN", rooms: [R(1, 1, "match_over", I("portal", "white", "manual", "off"))], ai: AI_FREE },
+    { t: "Hover na bota (voľný)", d: "po najazdení myšou: úsmev, poskakuje, LET'S DUEL!", rooms: [], ai: AI_FREE, hover: true },
+    { t: "Hover na bota (obsadený)", d: "klik = sledovať zápas s botom", rooms: [R(1, 1, "lobby", I("bridge", "white", "manual", 60))], ai: AI_BUSY, hover: true },
+  ];
+
+  const heads = [];
+  const host = document.getElementById("scenes");
+  for (const sc of SCENES) {
+    const fig = document.createElement("figure");
+    fig.innerHTML = `<figcaption>${sc.t}<small>${sc.d}</small></figcaption>`;
+    const screen = document.createElement("div"); screen.className = "screen";
+    const inner = document.createElement("div"); inner.className = "inner";
+    const rooms = document.createElement("div"); rooms.className = "rooms";
+    rooms.innerHTML = `<div class="rooms-card"><h1 class="rooms-title">ARENA</h1><div class="rooms-list"></div></div>`;
+    rooms.querySelector(".rooms-list").appendChild(buildRoomGrid({ rooms: sc.rooms, slots: 2 }, () => {}));
+    // hlava bota - rovnaké triedy/texty ako client/lobby-bot.js
+    const free = sc.ai.canJoin;
+    const bot = document.createElement("div");
+    bot.className = "lobby-bot" + (free ? "" : " busy") + (sc.hover ? " hover" : "");
+    const bubble = free ? (sc.hover ? "LET'S DUEL!" : "PLAY VS AI") : (sc.hover ? "WATCH THE MATCH" : "BUSY… IN A MATCH");
+    bot.innerHTML = `<div class="lobby-bot-bubble">${bubble}</div><canvas class="lobby-bot-figure" width="${FIGURE_W * 4}" height="${FIGURE_H * 4}"></canvas>`;
+    rooms.appendChild(bot);
+    heads.push({ cvs: bot.querySelector("canvas"), mood: !free ? "thinking" : sc.hover ? "happy" : "neutral", hop: free && sc.hover });
+    inner.appendChild(rooms); screen.appendChild(inner); fig.appendChild(screen); host.appendChild(fig);
+    const fit = () => { inner.style.transform = `scale(${screen.clientWidth / 1280})`; };
+    new ResizeObserver(fit).observe(screen); fit();
+  }
+  const loop = (now) => { for (const h of heads) drawBotFigure(h.cvs, h.mood, now, { hop: h.hop }); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>

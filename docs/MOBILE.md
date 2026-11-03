@@ -40,7 +40,7 @@ len telefónne rozloženie a zväčšenia kvôli malému displeju sú `.phone`. 
   stránky, server hráča vráti na miesto - záchrana pri zaseknutí, v nainštalovanej appke niet iného refreshu),
   celá obrazovka, **SOUND**, sekcia **ADMIN** (reset tejto roomky / všetkých).
 - **Admin = prihlásenie admin heslom** (`ADMIN_KEY` na serveri, nie v repe) namiesto hesla hráča. `?admin=1` zrušené;
-  na webe ostáva rohové tlačidlo „Reset this room" a „RESET ROOMS" v zozname roomiek - len pre admina.
+  admin resetuje roomky len cez menu ☰ → ADMIN (rohové tlačidlo ani „RESET ROOMS" v zozname roomiek už nie sú).
 - **Zvukové okno** (`client/sound-ui.js`): MUTE + MASTER/MUSIC/SFX - široké posuvníky s veľkým jazdcom a tlačidlá −/+
   po 10 %; na dotyku vo veľkosti displeja.
 - Menu a okná sa na dotyku kreslia v skutočnej veľkosti displeja (`--ui-k` = 1 / --app-scale), nezmenšujú sa s hrou.

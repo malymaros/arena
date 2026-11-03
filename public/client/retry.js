@@ -11,3 +11,9 @@ document.getElementById("leave-room")?.addEventListener("click", () => {
   forgetSpectate();
   socket.emit("leave_room");
 });
+// ✕ LEAVE ROOM pred zápasom (lobby hosta, čakanie na súpera / na hosta): odíde z roomky späť na room-browser.
+// Odchod hosta, keď už druhý hráč čaká, ho server spraví novým hostom (nezostane čakať na nikoho).
+document.querySelectorAll("[data-leave-room]").forEach(b => b.addEventListener("click", () => {
+  forgetSpectate();
+  socket.emit("leave_room");
+}));

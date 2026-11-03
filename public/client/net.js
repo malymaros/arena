@@ -1,8 +1,11 @@
 // public/client/net.js - pripojenie: Socket.IO socket (io = globál zo /socket.io/socket.io.js), prihlásenie
-// (meno + heslo, brána pred socket.connect) a room browser (create / join / spectate, admin RESET ROOMS).
+// (meno + heslo, brána pred socket.connect) a room browser (create / join / spectate; admin reset len cez menu ☰).
 // client.js registruje herné handlery na exportovaný `socket` v tom istom tasku - pripojenie je asynchrónne,
 // takže žiadna udalosť neprepadne.
-import { isAdmin, setAdmin } from "/client/admin-state.js";
+import { setAdmin, setMaintenanceFlag } from "/client/admin-state.js";
+import { showMaintenance, hideMaintenance } from "/client/maintenance.js";
+import { setLobbyBot } from "/client/lobby-bot.js";
+import { buildRoomGrid } from "/client/room-tiles.js";
 
 // trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
 // (inak by sa vrátený hráč stal divákom a server by prestal brať jeho lock_in)
@@ -18,7 +21,13 @@ try {
 // Všetky socket.on(...) handlery sa registrujú normálne aj na nepripojený socket.
 export const socket = io({ auth: { id: arenaId }, autoConnect: false });
 // admin = prihlásený admin heslom (server to pošle hneď po pripojení, ešte pred "rooms")
-socket.on("session", (s) => setAdmin(s?.admin));
+socket.on("session", (s) => { setMaintenanceFlag(s?.maintenance); setAdmin(s?.admin); });
+// MAINTENANCE BREAK: server pustí bežného hráča len na obrazovku údržby (hlava bota); po vypnutí príde „rooms"
+socket.on("maintenance", () => {
+  document.getElementById("login")?.classList.add("hidden");
+  roomsEl?.classList.add("hidden");
+  showMaintenance();
+});
 
 /* ---------- Prihlásenie (meno + heslo) - brána pred pripojením ---------- */
 (function initLogin() {
@@ -71,52 +80,14 @@ export function hideRooms() { roomsEl?.classList.add("hidden"); }
 function renderRooms(info) {
   if (!roomsListEl) return;
   roomsListEl.innerHTML = "";
-  // spätná kompat.: starý formát bol jeden objekt; nový je { rooms: [...], canCreate }
-  const list = Array.isArray(info?.rooms) ? info.rooms : [];
-  // stála AI roomka (ak ju server má) ako prvá karta; existujúce roomky → Join (voľné miesto) alebo Spectate (plná)
-  [...(info?.aiRoom ? [info.aiRoom] : []), ...list].forEach((r, idx) => {
-    const i = info?.aiRoom ? idx : idx + 1;
-    const card = document.createElement("div");
-    card.className = "room-card" + (r.ai ? " ai" : "");
-    const label = document.createElement("div");
-    label.className = "room-label";
-    label.innerHTML = r.ai ? `AI <span class="room-count">${r.players}/${r.max}</span>`
-      : `ROOM ${i} <span class="room-count">${r.players}/${r.max}</span>`;
-    const b = document.createElement("button");
-    if (r.canJoin) {
-      b.className = "room-btn join";
-      b.textContent = "JOIN";
-      b.addEventListener("click", () => { b.disabled = true; socket.emit("join_room", { roomId: r.id }); });
-    } else {
-      b.className = "room-btn spectate";
-      b.textContent = "SPECTATE";
-      b.addEventListener("click", () => { b.disabled = true; socket.emit("spectate_room", { roomId: r.id }); });
-    }
-    card.appendChild(label);
-    card.appendChild(b);
-    roomsListEl.appendChild(card);
-  });
-  // vytvor novú roomku (staneš sa hostom a nastavíš parametre) - ak sa ešte dá (limit)
-  if (info?.canCreate) {
-    const b = document.createElement("button");
-    b.className = "room-btn create";
-    b.textContent = "CREATE ROOM";
-    b.addEventListener("click", () => { b.disabled = true; socket.emit("create_room"); });
-    roomsListEl.appendChild(b);
-  }
-  // admin (prihlásený admin heslom): zruš VŠETKY roomky (rovnaký typ buttonu ako CREATE ROOM)
-  if (isAdmin() && list.length > 0) {
-    const rb = document.createElement("button");
-    rb.className = "room-btn reset";
-    rb.textContent = "RESET ROOMS";
-    rb.title = "Zruší VŠETKY roomky a odpojí všetkých hráčov aj divákov";
-    rb.addEventListener("click", () => {
-      if (!confirm("Zrušiť VŠETKY roomky a odpojiť všetkých hráčov aj divákov?")) return;
-      rb.disabled = true;
-      socket.emit("admin_reset_all");
-    });
-    roomsListEl.appendChild(rb);
-  }
+  // stála AI roomka nie je v zozname - hrá sa cez postavičku bota vpravo dole (lobby-bot.js): voľná → sadneš si,
+  // obsadená (max 1 hra s AI na server) → sleduješ
+  setLobbyBot(roomsEl, info?.aiRoom || null, (r) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id }));
+  // pevné dlaždice ROOM 1…N (room-tiles.js): prázdna → CREATE, čaká na súpera → JOIN, plná → SPECTATE
+  roomsListEl.appendChild(buildRoomGrid(info, (kind, slot, r) => {
+    if (kind === "create") socket.emit("create_room", { slot });
+    else socket.emit(kind === "join" ? "join_room" : "spectate_room", { roomId: r.id });
+  }));
 }
 // divák: roomka, ktorú sledujem (sessionStorage) - po RELOAD GAME / výpadku spojenia sa do nej vrátim sledovať
 const SPECTATE_KEY = "arenaSpectate";
@@ -134,7 +105,7 @@ function respectateFrom(info) {
   socket.emit("spectate_room", { roomId: room.id });
   return true;
 }
-function showRooms(info) { renderRooms(info); roomsEl?.classList.remove("hidden"); }
+function showRooms(info) { hideMaintenance(); renderRooms(info); roomsEl?.classList.remove("hidden"); }
 socket.on("rooms", (info) => {
   document.getElementById("login")?.classList.add("hidden");
   // browsing socket nedostáva state → herné obrazovky (viditeľné by default) treba schovať, nech neprebliknú spod room-browsera

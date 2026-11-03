@@ -15,13 +15,17 @@ export const PHONE_DESIGN_H = 830;
 const root = document.documentElement;
 let scale = 1, appW = DESIGN_W, appH = DESIGN_H;
 /** Dotykové zariadenie (mobil, tablet). */
-export const isTouch = window.matchMedia("(pointer: coarse)").matches;
+// ?device=phone|tablet|pc vynúti druh zariadenia (náhľad mobilu na PC - public/dev/devices.html ukáže hru v rámčeku
+// veľkosti telefónu); bez parametra sa zisťuje z prehliadača
+const FORCED = new URLSearchParams(location.search).get("device");
+const forced = FORCED === "phone" || FORCED === "tablet" || FORCED === "pc" ? FORCED : null;
+export const isTouch = forced ? forced !== "pc" : window.matchMedia("(pointer: coarse)").matches;
 root.classList.toggle("touch", isTouch);
 /** Telefón - kratšia strana fyzického displeja ≤ 500 CSS px (nezávisí od otočenia). Tablet je HYBRID (rozhodnutie
  *  majiteľa 2026-10-23): rozloženie, HUD, vlajka a pomery ako na PC, ale dotykové UI z telefónu - lišta tlačidiel,
  *  štítok nad tlačidlom, front 1-2-3, pás postáv a lobby. To platí pre každý dotyk (isTouch / CSS .touch);
  *  len zväčšenia kvôli malému displeju a telefónne rozloženie sú .phone. */
-export const isPhone = isTouch && Math.min(screen.width, screen.height) <= 500;
+export const isPhone = forced ? forced === "phone" : isTouch && Math.min(screen.width, screen.height) <= 500;
 root.classList.toggle("phone", isPhone);
 
 function fit() {

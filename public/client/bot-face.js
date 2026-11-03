@@ -116,18 +116,31 @@ function baseline() {
 
 /* ---------- kreslenie do HUD canvasu ---------- */
 export function drawBotFace(cvs, now) {
-  ensureBuf();
   const want = face.transient && now < face.until ? face.transient : baseline();
-  if (want !== face.mood) {
-    face.mood = want; face.since = now; face.flashUntil = now + (want === "surprised" ? 220 : 90);
+  if (!paintFace(face, want, now, cvs.width)) return;
+  const ctx = cvs.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  // .hud-char má hornú tretinu orezanú (clip-path v styles.css - prázdny vzduch nad postavou): tvár ide do
+  // viditeľnej spodnej časti, v celočíselnom zväčšení (rovnaké pixely)
+  const k = Math.max(1, Math.floor((cvs.height * 2 / 3 - 4) / 32)), s = 32 * k;
+  ctx.drawImage(off, 0, 0, 32, 32, Math.round((cvs.width - s) / 2), cvs.height - s - 2, s, s);
+}
+
+// nakreslí hlavu (32×32) v nálade `want` do bufferu `off`; f = stav tváre (nálada, žmurkanie, záblesk).
+// Vráti false, keď sa obrázok od minula nezmenil (netreba prekresľovať).
+function paintFace(f, want, now, salt) {
+  ensureBuf();
+  if (want !== f.mood) {
+    f.mood = want; f.since = now; f.flashUntil = now + (want === "surprised" ? 220 : 90);
   }
-  const m = MOODS[face.mood], age = now - face.since;
+  const m = MOODS[f.mood], age = now - f.since;
   const tick = Math.floor(now / 66); // ~15 fps - pixel art viac nepotrebuje
-  if (now > face.nextBlink) { face.blinkUntil = now + 120; face.nextBlink = now + 2000 + Math.random() * 3000; }
-  const blink = now < face.blinkUntil && !["ko", "laugh", "happy"].includes(face.mood);
-  const key = `${face.mood}:${tick}:${blink}:${cvs.width}`;
-  if (key === face.lastKey) return; // ten istý obrázok - nekresli znova
-  face.lastKey = key;
+  if (now > f.nextBlink) { f.blinkUntil = now + 120; f.nextBlink = now + 2000 + Math.random() * 3000; }
+  const blink = now < f.blinkUntil && !["ko", "laugh", "happy"].includes(f.mood);
+  const key = `${f.mood}:${tick}:${blink}:${salt}`;
+  if (key === f.lastKey) return false; // ten istý obrázok - nekresli znova
+  f.lastKey = key;
 
   img.data.fill(0);
   const C = hexRgb(m.col), DIM = mix(C, [8, 14, 20], 0.65), BG = mix(C, [6, 10, 14], 0.9);
@@ -146,13 +159,13 @@ export function drawBotFace(cvs, now) {
   }
   [[4, 8], [27, 8], [4, 27], [27, 27]].forEach(([x, y]) => put(x + jx, y + jy, METAL_HI));
   const sx = SCR.x + jx, sy = SCR.y + jy;
-  const flash = now < face.flashUntil;
+  const flash = now < f.flashUntil;
   for (let y = 0; y < SCR.h; y++) for (let x = 0; x < SCR.w; x++) {
     put(sx + x, sy + y, flash ? mix(BG, C, 0.35) : BG.map(v => Math.round(v * (y % 2 ? 0.82 : 1))));
   }
   let ex = 0;
   if (m.fx === "think") ex = [-1, 0, 1, 0][Math.floor(now / 700) % 4];
-  if (face.mood === "neutral") ex = Math.floor(now / 2600) % 3 === 1 ? 1 : 0;
+  if (f.mood === "neutral") ex = Math.floor(now / 2600) % 3 === 1 ? 1 : 0;
   const [eL, eR] = m.eyes;
   stamp(EYES[blink ? "closed" : eL], sx + EYE_L + ex, sy + EYE_Y, C, DIM);
   stamp(EYES[blink ? "closed" : eR], sx + EYE_R + ex, sy + EYE_Y, C, DIM);
@@ -170,11 +183,25 @@ export function drawBotFace(cvs, now) {
     }
   }
   octx.putImageData(img, 0, 0);
+  return true;
+}
+
+/* ---------- hlava bota v room browseri (klik = hra proti AI, lobby-bot.js) ---------- */
+// plátno 32×34 umeleckých pixelov: len hlava (tá istá ako v HUD), pokojne sa vznáša; hop = poskakuje (hover)
+export const FIGURE_W = 32, FIGURE_H = 34;
+export function drawBotFigure(cvs, mood, now, { hop = false } = {}) {
+  const k = Math.max(1, Math.floor(cvs.width / FIGURE_W));
+  const y = hop ? [2, 1, 0, 1][Math.floor(now / 120) % 4] : 1 + (Math.floor(now / 900) % 2);
+  // stav tváre per plátno (dev/rooms.html kreslí viac hláv naraz)
+  const fc = cvs._botFace || (cvs._botFace = { mood: "neutral", since: 0, flashUntil: 0, blinkUntil: 0, nextBlink: 1500 + Math.random() * 2000, lastKey: "", figKey: "" });
+  // paintFace kreslí do zdieľaného bufferu - pri viacerých plátnach ho treba prekresliť vždy, keď sa kreslí sem
+  fc.lastKey = "";
+  paintFace(fc, mood, now, "fig");
+  const key = fc.lastKey + ":" + y + ":" + cvs.width;
+  if (key === fc.figKey) return;
+  fc.figKey = key;
   const ctx = cvs.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, cvs.width, cvs.height);
-  // .hud-char má hornú tretinu orezanú (clip-path v styles.css - prázdny vzduch nad postavou): tvár ide do
-  // viditeľnej spodnej časti, v celočíselnom zväčšení (rovnaké pixely)
-  const k = Math.max(1, Math.floor((cvs.height * 2 / 3 - 4) / 32)), s = 32 * k;
-  ctx.drawImage(off, 0, 0, 32, 32, Math.round((cvs.width - s) / 2), cvs.height - s - 2, s, s);
+  ctx.drawImage(off, 0, 0, 32, 32, 0, y * k, 32 * k, 32 * k);
 }
