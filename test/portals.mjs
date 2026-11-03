@@ -367,12 +367,12 @@ for (const type of ["hp", "mana"]) {
   check(ri >= 0 && ri < ci && sc.game.players.p2.labyrinth === false, "S17: zásah cez portál odhalí labyrint pred letom", J([ri, ci]));
 }
 {
-  // strela zastavená klonom-návnadou (bez obrany) letí ďalej ako dym a portál ešte spáli
+  // strela na klonovi-návnade skončí (vlastník 2026-11-03) - portál za ním ostane otvorený
   const A = P("A", "classic", [3, 1, "right"], [0, 0, "left"]);
   const sc = scenario("fire", "naruto", (g) => { g.players.p1.x = 1; g.players.p1.y = 1; const p2 = g.players.p2; p2.x = 2; p2.y = 2; p2.clone = { x: 2, y: 1 }; g.portals = [A]; });
   const tl = sc.round([atk("right"), R, S], PASS3);
   check(!sc.game.players.p2.clone && sc.game.players.p2.hp === 10, "S18: návnada zožerie strelu");
-  check(closedIds(tl).includes("A") && !hasEnds(sc.game, A), "S18: dym letí ďalej a portál ešte spáli");
+  check(!closedIds(tl).includes("A") && hasEnds(sc.game, A), "S18: strela skončila na návnade, portál za ňou ostal");
 }
 
 /* ==================== Charge, Escanor, Luffy ==================== */

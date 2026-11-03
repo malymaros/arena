@@ -190,5 +190,21 @@ for (const [buff, hp, wantHp] of [["lastHopeBuff", 1, 1], ["lastStandBuff", 10, 
   check(e.snapshot().myLock === undefined, "RELOAD: verejný snapshot (divák) bez myLock");
 }
 
+/* ---- Klon-návnada zastaví strelu (vlastník 2026-11-03): strela na nej skončí, Naruto za ňou nedostane nič;
+   aj prekliaty strelec v labyrinte - strela skončí na klonovi, labyrint pokračuje (zásah návnady ho nezruší) ---- */
+for (const cursed of [false, true]) {
+  const sc = scenario("fire", "naruto", (g) => {
+    g.players.p1.x = 0; g.players.p1.y = 1;
+    g.players.p2.x = 2; g.players.p2.y = 1; g.players.p2.clone = { x: 1, y: 1 }; // A1 strelec, A2 klon, A3 Naruto
+    if (cursed) { g.players.p1.labyrinth = true; g.players.p1.thread = [[0, 1]]; }
+  });
+  const tl = sc.round([{ type: "attack", dir: "right" }, R, S], [R, { type: "move", dir: "up" }, ML]);
+  const cells = fx(tl, "charge").filter(e => e.from === "p1").map(e => e.cell.join(","));
+  const tag = cursed ? "v labyrinte" : "mimo labyrintu";
+  check(JSON.stringify(cells) === JSON.stringify(["1,1"]), `NÁVNADA ${tag}: strela skončila na klonovi`, JSON.stringify(cells));
+  check(!sc.game.players.p2.clone && sc.game.players.p2.hp === 10, `NÁVNADA ${tag}: klon zomrel, Naruto bez dmg`, `hp=${sc.game.players.p2.hp}`);
+  if (cursed) check(sc.game.players.p1.labyrinth === true && !fx(tl, "labyrinth_end").length, "NÁVNADA v labyrinte: labyrint pokračuje");
+}
+
 console.log(failures ? `\n${failures} ENGINE SCENÁROV ZLYHALO` : "\nENGINE SCENÁRE PREŠLI");
 process.exit(failures ? 1 : 0);

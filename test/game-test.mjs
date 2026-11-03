@@ -1141,7 +1141,7 @@ async function main() {
   check(t46last.p1.mana === 5, "T46: special stál 5 many (6−5+4=5)", `mana=${t46last.p1.mana}`);
   invariantCheck(tl, "T46");
 
-  /* ---------- Test 47: klon absorbuje strelu (bait) a zmizne; strela preletí naprázdno ďalej ---------- */
+  /* ---------- Test 47: klon absorbuje strelu (bait) a zmizne; strela na ňom skončí ---------- */
   // stav z T46: p1 (0,0), klon (0,2), p2 (3,2). Kolo 2: klon sa posunie na (1,2), kolo 3: p2 strieľa doľava
   tl = await playRound(c1, c2, [M("right"), R, S], [R, ML, S]);       // klon → (1,2)
   tl = await playRound(c1, c2, [R, S, M("down")], [A("left"), R, S]); // strela v rade 2 trafí klona na (1,2)
@@ -1149,9 +1149,9 @@ async function main() {
   check(sumEffects(tl).hits.filter(h => h.target === "p1").length === 0, "T47: Naruto nedostal žiadny dmg (klon strelu zožral)");
   check(tl[tl.length - 1].p1.clone === null, "T47: klon je preč zo stavu");
   check(tl[tl.length - 1].p1.hp === 10, "T47: p1 HP netknuté", `hp=${tl[tl.length - 1].p1.hp}`);
-  // strela po zabití klona letí naprázdno až po okraj (dym) — charge efekt aj v bunke ZA klonom (0,2)
+  // strela na klonovi-návnade skončí (vlastník 2026-11-03; predtým letela ďalej ako dym) - žiadny charge ZA klonom (0,2)
   const t47charges = fxOf(tl, "charge").filter(e => e.from === "p2").map(e => e.cell);
-  check(t47charges.some(c => c[0] === 0 && c[1] === 2), "T47: strela preletela cez klona po okraj", `cells=${JSON.stringify(t47charges)}`);
+  check(!t47charges.some(c => c[0] === 0 && c[1] === 2) && t47charges.some(c => c[0] === 1 && c[1] === 2), "T47: strela skončila na klonovi (1,2)", `cells=${JSON.stringify(t47charges)}`);
   invariantCheck(tl, "T47");
 
   /* ---------- Test 48: klonov útok dáva ROVNAKÝ dmg ako Naruto (falloff podľa vlastnej vzdialenosti) ---------- */

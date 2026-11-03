@@ -645,8 +645,9 @@ function doBasic(slot, dir, tl) {
   // strely: majiteľ + prípadný klon. Klon zrkadlí smer VERTIKÁLNE (up<->down), horizontálne rovnako
   // (rovnako ako pohyb); klonova strela dáva ROVNAKÝ dmg ako Naruto (falloff + rovnaké buffy). Každá
   // strela nesie vlastný delta `d` a `dir`, aby klonova vertikála letela opačne.
-  // Terče v dráhe: SÚPEROV KLON-návnada (mimo majiteľovej bunky) strelu zožerie a letí ďalej dym; keď
-  // klon STOJÍ NA majiteľovej bunke, pohltí len CLONE_DMG a zvyšok prejde na Naruta.
+  // Terče v dráhe: SÚPEROV KLON-návnada (mimo majiteľovej bunky) strelu zožerie a strela na ňom SKONČÍ (vlastník
+  // 2026-11-03 - predtým letela ďalej ako dym; aj v labyrinte: prekliaty strelec si domyslí, že zničil klona,
+  // labyrint to nezruší); keď klon STOJÍ NA majiteľovej bunke, pohltí len CLONE_DMG a zvyšok prejde na Naruta.
   const cloneDir = CLONE_DIR[dir];
   const cloneDelta = [delta[0], -delta[1]];
   // Vampire/Onryō/Jotaro/Luffy: strela letí po lomenej diagonálnej dráhe (route) s odrazom; ostatní priamo.
@@ -654,8 +655,8 @@ function doBasic(slot, dir, tl) {
   // Portal Realm: rovné strely letia cez portály (dolet PORTAL_SHOT_RANGE spolu, pár sa po prelete zatvorí);
   // passes/power/defBreak = prejdené portály a aury (powerup +2, Def-breaker), diagonálne (route) portály ignorujú
   const pr = isPortalRealm();
-  const shots = [{ x: me.x, y: me.y, dist: 0, clone: false, d: delta, dir, done: false, spent: false, route, passes: [], power: 0, defBreak: false }];
-  if (me.clone) shots.push({ x: me.clone.x, y: me.clone.y, dist: 0, clone: true, d: cloneDelta, dir: cloneDir, done: false, spent: false, route: null, passes: [], power: 0, defBreak: false });
+  const shots = [{ x: me.x, y: me.y, dist: 0, clone: false, d: delta, dir, done: false, route, passes: [], power: 0, defBreak: false }];
+  if (me.clone) shots.push({ x: me.clone.x, y: me.clone.y, dist: 0, clone: true, d: cloneDelta, dir: cloneDir, done: false, route: null, passes: [], power: 0, defBreak: false });
 
   // jeden krok strely; vráti prejdený portál (Portal Realm) alebo null; nemožný krok nastaví done
   const advance = (s, closed) => {
@@ -674,8 +675,8 @@ function doBasic(slot, dir, tl) {
       if (!st.portal) return null;
       s.dir = st.dir; s.d = G.DIR4[st.dir];
       s.passes.push(st.portal);
-      if (!s.spent && st.portal.type === "power") s.power += PORTAL_POWER_BONUS;
-      if (!s.spent && st.portal.type === "nodef") s.defBreak = true;
+      if (st.portal.type === "power") s.power += PORTAL_POWER_BONUS;
+      if (st.portal.type === "nodef") s.defBreak = true;
       return st.portal;
     }
     s.x += s.d[0]; s.y += s.d[1]; s.dist++;
@@ -705,11 +706,10 @@ function doBasic(slot, dir, tl) {
         const p = advance(s, closed);
         if (s.done) continue;
         if (p) stepUsed.push(p.id);
-        if (s.spent) continue;
         // Shrek Swamp: živý Shrek zastaví strelu (súper/jeho klon na tom istom políčku má prednosť)
         if (shrekAt(s.x, s.y) && !(op && op.x === s.x && op.y === s.y) && !(op?.clone && op.clone.x === s.x && op.clone.y === s.y)) { s.done = true; continue; }
         const decoy = op?.clone && op.clone.x === s.x && op.clone.y === s.y && !(op.x === s.x && op.y === s.y);
-        if (decoy) { s.spent = true; if (op.shield || op.mirror) s.done = true; continue; } // klon-návnada strelu zožerie
+        if (decoy) { s.done = true; continue; } // klon-návnada strelu zožerie a strela na ňom skončí
         if (op && op.x === s.x && op.y === s.y) { found = true; break; }
         if (ownAt(s)) s.done = true;
       }
@@ -733,11 +733,10 @@ function doBasic(slot, dir, tl) {
       if (passed) { chargeFx.portal = passed; stepUsed.push(passed.id); }
       if (s.power || s.defBreak) chargeFx.aura = { power: s.power, defBreak: s.defBreak };
       fx.push(chargeFx);
-      if (s.spent) continue; // už minutá na klona-návnadu - letí len vizuálne
       const cloneHere  = op?.clone && op.clone.x === s.x && op.clone.y === s.y;
       const playerHere = op && op.x === s.x && op.y === s.y;
       if (cloneHere && playerHere) { s.done = true; hits.push({ target: "stacked", shot: s }); }
-      else if (cloneHere)         { hits.push({ target: "clone", shot: s }); }
+      else if (cloneHere)         { s.done = true; hits.push({ target: "clone", shot: s }); } // návnada: strela tu skončí
       else if (playerHere)        { s.done = true; hits.push({ target: "player", shot: s }); }
       // na bunke so súperovou figúrou dostanú zásah AJ ostatné figúry na nej (strela tam končí):
       // Portal Realm - vlastná figúra strelca (strela sa cez portál vrátila), Shrek Swamp - Shrek
@@ -753,8 +752,8 @@ function doBasic(slot, dir, tl) {
     // Keď let končí zásahom súpera (player/stacked), vlož prázdny frame: ten na klientovi stiahne granát
     // (spustí odpočet výbuchu - výbuch nabehne CHARGE_STEP_MS po ňom) a jeho delayMs = CHARGE_STEP_MS +
     // SOLDIER_GRENADE_BLAST_MS posunie hit frame tak, aby červené políčko a „-HP" padli AŽ po nábehu výbuchu.
-    // Netýka sa preletu cez klona-návnadu (granát letí ďalej).
-    if (me.char === "soldier" && hits.some(h => h.target === "player" || h.target === "stacked")) {
+    // To isté pri klonovi-návnade (granát na ňom vybuchne).
+    if (me.char === "soldier" && hits.some(h => h.target === "player" || h.target === "stacked" || h.target === "clone")) {
       pushStateFrame(tl, [], CHARGE_STEP_MS + SOLDIER_GRENADE_BLAST_MS);
     }
     // klonova strela dáva ROVNAKÝ dmg ako Naruto: falloff podľa VLASTNEJ vzdialenosti klona
@@ -784,10 +783,8 @@ function doBasic(slot, dir, tl) {
         if (h.target === "stacked") {
           // stacknutý pár: obrana kryje pár ako jednu postavu; bez nej klon pohltí CLONE_DMG a zvyšok prejde na Naruta
           strikeCell(opS, "stacked", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, bonus: pBonus, ...portalOpts(h) });
-        } else if (h.target === "clone") { // clone (návnada mimo majiteľovej bunky)
-          const defended = op.shield || op.mirror; // obrana strelu zastaví (block/odraz), inak preletí cez dym
+        } else if (h.target === "clone") { // clone (návnada mimo majiteľovej bunky) - strela na nej skončila
           strikeCell(opS, "clone", rawOf(h), tl, { kind: "basic", fromClone: h.shot.clone, ...portalOpts(h) });
-          if (!h.shot.done) { if (defended && !portalOpts(h).defBreak) h.shot.done = true; else h.shot.spent = true; }
         }
       }
     };

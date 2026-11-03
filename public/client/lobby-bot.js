@@ -5,10 +5,12 @@
 // toho bota, proti ktorému sa práve hrá (aiRoom.level).
 import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
 import { openDifficulty, closeDifficulty } from "/client/ai-difficulty.js";
+import { sfx } from "/client/sound.js";
 
 const SCALE = 4; // umelecký pixel → px plátna (CSS ho na telefóne zväčší, image-rendering: pixelated)
 let el = null, cvs = null, bubble = null;
 let room = null, hover = false, busyClick = false, raf = 0;
+let intro = null; // intro NORMAL bota pri prejdení na voľnú hlavu (nové prejdenie predchádzajúce utne)
 let onPick = null;
 
 function build(roomsEl) {
@@ -22,7 +24,10 @@ function build(roomsEl) {
   cvs.className = "lobby-bot-figure";
   cvs.width = FIGURE_W * SCALE; cvs.height = FIGURE_H * SCALE;
   el.append(bubble, cvs); // obsadenosť ukazuje tvár + bublina (bez popisu AI 0/1)
-  el.addEventListener("mouseenter", () => { hover = true; sync(); });
+  el.addEventListener("mouseenter", () => {
+    hover = true; sync();
+    if (room?.canJoin) { intro?.then?.(h => h?.stop()); intro = sfx("bot.intro", { char: "normal" }); }
+  });
   el.addEventListener("mouseleave", () => { hover = false; sync(); });
   el.addEventListener("click", () => {
     if (!room || busyClick) return;
