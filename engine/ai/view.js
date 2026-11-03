@@ -7,7 +7,7 @@
 import { cloneData, MAX_MANA, START_MANA } from "../constants.js";
 import {
   BASIC_COST, MELEE_COST, DASH_COST, RECHARGE_GAIN, SHIELD_COST, MIRROR_COST, SPECIAL_COST, PASS_MANA_COST,
-  GOLDEN_COST, GOLDEN_MIRROR_COST, GOLDEN_MANA_GAIN,
+  GOLDEN_COST, GOLDEN_MIRROR_COST, GOLDEN_MANA_GAIN, DEMON_COST,
 } from "../../shared/balance.js";
 
 const VAMP = new Set(["countess", "onre"]);
@@ -16,7 +16,10 @@ const COST = {
   move: 0, dash: DASH_COST, recharge: -RECHARGE_GAIN, attack: BASIC_COST, melee: MELEE_COST, special: SPECIAL_COST,
   special1: 4, shield: SHIELD_COST, mirror: MIRROR_COST, shield_breaker: SHIELD_COST, mirror_breaker: MIRROR_COST,
   pass: PASS_MANA_COST, golden_shield: GOLDEN_COST, golden_mirror: GOLDEN_MIRROR_COST, golden_mana: -GOLDEN_MANA_GAIN,
+  demon: DEMON_COST,
 };
+// Last Stand / Last Hope naplnia manu na 10 (engine/laststand.js) - odhad je potom istý
+const MANA_FILL = new Set(["last_stand", "last_hope"]);
 const other = (s) => (s === "p1" ? "p2" : "p1");
 const clampMana = (m) => Math.max(0, Math.min(MAX_MANA, m));
 
@@ -28,12 +31,13 @@ export function createBelief() {
     oppTrap: false,          // súper (Vampire/Onryō) má položenú pascu na neznámej bunke
     lastOpp: null,           // { x, y, mana } - posledné známe hodnoty súpera (pre labyrint)
     oppManaEst: null,        // odhad skrytej many súpera
+    oppManaExact: false,     // odhad je istý (mana videná / naplnená Last Stand/Hope, odvtedy len akcie so známou cenou)
     history: [],             // odhalené fronty súpera po kolách (model súpera, fáza A5)
   };
 
   function resetGame() {
     b.mazeBuff = { p1: false, p2: false };
-    b.oppTrap = false; b.lastOpp = null; b.oppManaEst = null;
+    b.oppTrap = false; b.lastOpp = null; b.oppManaEst = null; b.oppManaExact = false;
   }
 
   // jeden frame timeline / root snapshot z pohľadu bota
@@ -48,10 +52,14 @@ export function createBelief() {
           const t = e.action?.type;
           // pasca padne, len ak cast nebol prečiarknutý (mana) ani skamenený - to človek vidí
           if (t === "special" && VAMP.has(f[opp]?.char ?? b.view?.[opp]?.char)) ctx.trapPending = true;
-          if (b.oppManaEst !== null && t in COST) b.oppManaEst = clampMana(b.oppManaEst - COST[t]);
+          ctx.oppManaPrev = b.oppManaEst; // prečiarknutá akcia manu nemení - odhad sa vráti
+          if (MANA_FILL.has(t)) { b.oppManaEst = MAX_MANA; b.oppManaExact = true; }
+          else if (b.oppManaEst !== null && t in COST) b.oppManaEst = clampMana(b.oppManaEst - COST[t]);
+          else if (!(t in COST)) b.oppManaExact = false; // neznáma akcia („?" v labyrinte)
         }
       } else if ((e.kind === "invalid" || e.kind === "stoned") && e.target === opp) {
         ctx.trapPending = false;
+        if (e.kind === "invalid" && ctx.oppManaPrev !== undefined) b.oppManaEst = ctx.oppManaPrev;
       } else if (e.kind === "labyrinth") {
         // maze buff má len ten, kto labyrint zaklial PRIAMO (odraz mirrorom buff nedáva)
         b.mazeBuff[other(e.target)] = ctx.lastFrom === other(e.target);
@@ -63,7 +71,7 @@ export function createBelief() {
     }
     const o = f[opp];
     if (o && o.x !== null && o.x !== undefined) b.lastOpp = { x: o.x, y: o.y, mana: o.mana ?? b.lastOpp?.mana ?? START_MANA };
-    if (o && o.mana !== null && o.mana !== undefined) b.oppManaEst = o.mana;
+    if (o && o.mana !== null && o.mana !== undefined) { b.oppManaEst = o.mana; b.oppManaExact = true; }
     if (o && (o.hp ?? 1) <= 0) b.oppTrap = false; // pasca zaniká smrťou castera
   }
 
@@ -145,7 +153,7 @@ export function simState(b, rng) {
   }
   if (o.mana === null || o.mana === undefined) {
     const est = b.oppManaEst ?? b.lastOpp?.mana ?? START_MANA;
-    o.mana = clampMana(est + Math.floor(rng() * 5) - 2);
+    o.mana = b.oppManaExact && b.oppManaEst !== null ? b.oppManaEst : clampMana(est + Math.floor(rng() * 5) - 2);
   }
   if (b.oppTrap && !o.trap) o.trap = pick(cells);
   // Shrek Swamp bez preview: skoky na ďalšie kolo nie sú verejné → 3 rôzne náhodné bunky

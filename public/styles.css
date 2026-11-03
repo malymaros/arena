@@ -2046,6 +2046,7 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
     transition: filter .5s ease;
   }
   .hud-p2 .hud-char{ transform: scaleX(-1); } /* P2 pozerá doľava */
+  .hud-p2 .hud-char.bot-face{ transform: none; } /* tvár bota (AI roomka) sa nezrkadlí - nápisy HA/EZ */
 
   /* Escanor: pride indikátor (ikona pride.png + číslo) vľavo od postavy, rozsah abilitky (minimapka) vpravo */
   /* vertikálne vycentrované na stred Escanorovho tela (~68px od vrchu widgetu); left = rovnaký odstup od okraja ako minimapka (.pride-range right: 40px) */
@@ -3251,7 +3252,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
   animation: lobby-bot-bubble 2.4s ease-in-out infinite;
 }
 .lobby-bot-bubble::after{
-  content: ""; position: absolute; left: calc(50% - 17px); bottom: -11px; width: 12px; height: 12px; /* hrot (pravý dolný roh) mieri na anténku */
+  content: ""; position: absolute; left: calc(50% - 39px); bottom: -11px; width: 12px; height: 12px; /* hrot (pravý dolný roh) mieri na anténku */
   background: #fff; box-shadow: 3px 3px 0 0 #000; clip-path: polygon(0 0, 100% 0, 100% 100%);
 }
 .lobby-bot.hover .lobby-bot-bubble{ background: #7dff7a; }

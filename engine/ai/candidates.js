@@ -111,10 +111,17 @@ export function baseQueues(sim, state, slot) {
   const probe = makeProbe(sim, state, slot);
   const out = [];
   const free = 3 - stone;
+  // final kolo (súper v Last Stande): Last Hope naplní manu na 10 - fronta, ktorú si hráč zaplatí len s ňou
+  // (napr. shield + mirror pri 1 mane), ide do poolu rovno s last_hope na začiatku, inak by ju nikto nezvážil
+  const hopeOk = !p.lastStandBuff && !!state.players[slot === "p1" ? "p2" : "p1"].lastStandBuff && p.mana < MAX_MANA;
   const rec = (q, used, x, y) => {
     if (q.length === free) {
       const full = [...prefix, ...q];
-      if (affordable(q, p.mana, p.char) && sim.valid(state, slot, full)) out.push(full);
+      if (affordable(q, p.mana, p.char)) { if (sim.valid(state, slot, full)) out.push(full); }
+      else if (hopeOk && affordable(q, MAX_MANA, p.char)) {
+        const hq = [{ type: "last_hope" }, ...full];
+        if (sim.valid(state, slot, hq)) out.push(hq);
+      }
       return;
     }
     for (const a of opts) {

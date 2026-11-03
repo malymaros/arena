@@ -305,7 +305,9 @@ export function raf() {
       return;
     }
     // AI roomka: v HUD bota je namiesto portrétu jeho tvár s náladou (okno postavy cez peek.js ostáva)
-    if (slot === botSlot()) {
+    const isBot = slot === botSlot();
+    cvs.classList.toggle("bot-face", isBot); // tvár bota sa nezrkadlí ani na p2 (nápisy HA/EZ by boli obrátené)
+    if (isBot) {
       cvs.classList.remove("wounded", "critical", "dead", "stoned", "alt-color");
       drawBotFace(cvs, now);
       return;
