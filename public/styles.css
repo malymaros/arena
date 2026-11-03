@@ -956,6 +956,24 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .q-badge.opt.mine.q-slot{ border-color: rgba(212,160,23,.55); } /* moje extra = tlmené zlaté */
 /* prázdne povinné sloty jemne pulzujú = „nastav ma" (číslo ①②③) */
 .q-badge.main.mine.q-slot{ font-weight: 900; font-size: 26px; line-height: 1; }
+/* CHEATER videl túto moju akciu (queue.js setCheaterSpy; schválený návrh public/dev/cheater-spy.html, variant A):
+   polopriehľadné neónovo blikajúce oranžové pozadie + líščie uši z horných rohov; bliká len opacity (aj perf-lite) */
+.q-badge.spied{ position: relative; overflow: visible; }
+.q-badge.spied .spy-cover{
+  position: absolute; inset: 0; pointer-events: none;
+  background: rgba(255,122,20,.5);
+  box-shadow: inset 0 0 0 2px #ff8a1e, inset 0 0 10px rgba(255,190,110,.9), 0 0 0 1px #000, 0 0 14px 2px rgba(255,130,30,.8);
+  animation: spy-neon 1.1s steps(1, end) infinite, spy-in .35s steps(3, end) both;
+}
+.q-badge.spied .spy-ears{
+  position: absolute; left: 0; right: 0; bottom: calc(100% - 2px); height: 16px; pointer-events: none;
+  display: flex; justify-content: space-between;
+  animation: spy-neon 1.1s steps(1, end) infinite, spy-in .35s steps(3, end) both;
+  filter: drop-shadow(0 0 3px rgba(255,140,40,.9));
+}
+.q-badge.spied .spy-ears svg{ width: 16px; height: 16px; display: block; }
+@keyframes spy-neon { 0% { opacity: 1; } 55% { opacity: .55; } 70% { opacity: 1; } 85% { opacity: .75; } }
+@keyframes spy-in { 0% { opacity: 0; transform: translateY(4px); } 100% { opacity: 1; transform: none; } }
 .q-badge.main.mine.q-slot:not(.revealed){ animation: q-prompt 1.4s ease-in-out infinite; }
 @keyframes q-prompt{
   0%, 100% { border-color: rgba(255,213,79,.4);  box-shadow: none; }

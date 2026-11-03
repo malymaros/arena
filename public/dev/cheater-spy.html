@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>CHEATER — odhalená akcia</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): po LOCK IN proti CHEATER botovi zažiari na oranžovo tá moja akcia,
+     ktorú bot videl - polopriehľadné neónovo blikajúce oranžové pozadie a navrchu líščie uši v tej istej oranžovej.
+     Badge lišty sú skutočné triedy z hry (styles.css). */
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; overflow-x: hidden; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 700 18px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0 0 4px; color: #8b92a0; max-width: 1050px; }
+  main { padding: 20px; display: grid; gap: 34px; max-width: 1300px; }
+  h2 { font: 700 15px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  section > p { margin: 0 0 14px; color: #9aa1ad; max-width: 1050px; }
+  .bar { display: inline-flex; padding: 22px 18px 22px; background: rgba(10,12,18,.85); box-shadow: 0 0 0 2px #000; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 26px; align-items: center; }
+  .ctl { display: flex; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+  .ctl button { font: 10px "Press Start 2P", monospace; padding: 10px 12px; border: none; cursor: pointer; color: #000; background: #ffb300;
+    box-shadow: 0 0 0 2px #000, inset 0 -3px 0 rgba(0,0,0,.3); }
+  .ctl button.sec { background: #9aa0a8; }
+  .lbl { font: 8px "Press Start 2P", monospace; color: #6b7280; margin-top: 8px; text-align: center; }
+  .big { padding: 50px 30px 40px; }
+  .big .q-badge.main { transform: scale(2); margin: 0 30px; }
+
+  /* ===== návrh: odhalená akcia ===== */
+  .q-badge.spied { position: relative; overflow: visible; }
+  /* neónové oranžové pozadie: polopriehľadné, bliká len opacity (perf-lite ok) */
+  .q-badge.spied .spy-cover {
+    position: absolute; inset: 0; pointer-events: none;
+    background: rgba(255,122,20,.5);
+    box-shadow: inset 0 0 0 2px #ff8a1e, inset 0 0 10px rgba(255,190,110,.9), 0 0 0 1px #000, 0 0 14px 2px rgba(255,130,30,.8);
+    animation: spy-neon 1.1s steps(1, end) infinite, spy-in .35s steps(3, end) both;
+  }
+  /* líščie uši nad obdĺžnikom - tá istá oranžová, blikajú spolu s ním */
+  .q-badge.spied .spy-ears {
+    position: absolute; left: 0; right: 0; bottom: calc(100% - 2px); height: 16px; pointer-events: none;
+    display: flex; justify-content: space-between; padding: 0;
+    animation: spy-neon 1.1s steps(1, end) infinite, spy-in .35s steps(3, end) both;
+    filter: drop-shadow(0 0 3px rgba(255,140,40,.9));
+  }
+  .q-badge.spied .spy-ears svg { width: 16px; height: 16px; image-rendering: pixelated; display: block; }
+  .vB .q-badge.spied .spy-ears { height: 11px; }
+  .vB .q-badge.spied .spy-ears svg { width: 11px; height: 11px; }
+  @keyframes spy-neon { 0% { opacity: 1; } 55% { opacity: .55; } 70% { opacity: 1; } 85% { opacity: .75; } }
+  @keyframes spy-in { 0% { opacity: 0; transform: translateY(4px); } 100% { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>CHEATER — ktorú akciu videl</h1>
+  <p>Po LOCK IN proti CHEATER botovi zažiari jedna z mojich akcií: polopriehľadné neónovo blikajúce oranžové pozadie
+     a navrchu líščie uši v tej istej oranžovej. Ostane tak celé kolo (aj počas prehrávania), zmizne s novým kolom.</p>
+  <p>Lišta je z ozajstných tried hry. Tlačidlom LOCK IN si prehráš náhodné odhalenie.</p>
+</header>
+<main>
+  <section>
+    <h2>A — väčšie uši</h2>
+    <p>Uši 16 px, vyrastajú z rohov obdĺžnika, s tmavším vnútrom.</p>
+    <div class="ctl"><button data-lock="a">LOCK IN</button><button class="sec" data-reset="a">RESET</button></div>
+    <div class="row">
+      <div><div class="bar"><div class="queue" id="qa"></div></div><div class="lbl">PC</div></div>
+      <div><div class="bar big"><div class="queue" id="qa2"></div></div><div class="lbl">ZVÄČŠENÉ 2×</div></div>
+    </div>
+  </section>
+  <section class="vB">
+    <h2>B — menšie uši</h2>
+    <p>Uši 11 px - nenápadnejšie.</p>
+    <div class="ctl"><button data-lock="b">LOCK IN</button><button class="sec" data-reset="b">RESET</button></div>
+    <div class="row">
+      <div><div class="bar"><div class="queue" id="qb"></div></div><div class="lbl">PC</div></div>
+      <div><div class="bar big"><div class="queue" id="qb2"></div></div><div class="lbl">ZVÄČŠENÉ 2×</div></div>
+    </div>
+  </section>
+</main>
+<script type="module">
+  // jedno ucho (7×6 pixelov): oranžový obrys, tmavšie oranžové vnútro; pravé = zrkadlo
+  const EAR = ["#.......", "##......", "#+#.....", "#++#....", "#+++#...", "#++++#..", "#+++++#.", "########"];
+  function earSvg(flip) {
+    const px = [];
+    EAR.forEach((row, y) => [...row].forEach((c, x) => {
+      if (c === ".") return;
+      const xx = flip ? 7 - x : x;
+      px.push(`<rect x="${xx}" y="${y}" width="1" height="1" fill="${c === "#" ? "#ff8a1e" : "#b8500c"}"/>`);
+    }));
+    return `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${px.join("")}</svg>`;
+  }
+  const MY = [{ cls: "attack", text: "🏹→" }, { cls: "shield", text: "🛡️" }, { cls: "special", text: "✨←" }];
+  function bar(el) {
+    el.innerHTML = "";
+    const add = (cls, text) => { const b = document.createElement("div"); b.className = "q-badge " + cls; b.textContent = text; el.appendChild(b); return b; };
+    const div = () => { const d = document.createElement("div"); d.className = "q-divider"; el.appendChild(d); };
+    add("opp opt q-slot", "").innerHTML = '<span class="g-ico dim">🛡️</span>';
+    div();
+    const mine = [];
+    for (let i = 0; i < 3; i++) { mine.push(add(`mine main ${MY[i].cls}`, MY[i].text)); add("opp main q-slot", String(i + 1)); }
+    div();
+    add("mine opt q-slot", "").innerHTML = '<span class="g-ico dim">🙏</span>';
+    add("opp opt q-slot", "").innerHTML = '<span class="g-ico dim">🙏</span>';
+    return mine;
+  }
+  const bars = { a: [bar(qa), bar(qa2)], b: [bar(qb), bar(qb2)] };
+  function spy(k, idx) {
+    for (const mine of bars[k]) {
+      mine.forEach(b => { b.classList.remove("spied"); b.querySelector(".spy-cover")?.remove(); b.querySelector(".spy-ears")?.remove(); });
+      if (idx == null) continue;
+      const b = mine[idx];
+      b.classList.add("spied");
+      b.title = "CHEATER saw this action";
+      const c = document.createElement("span"); c.className = "spy-cover"; b.appendChild(c);
+      const e = document.createElement("span"); e.className = "spy-ears"; e.innerHTML = earSvg(false) + earSvg(true); b.appendChild(e);
+    }
+  }
+  document.querySelectorAll("[data-lock]").forEach(btn => btn.onclick = () => spy(btn.dataset.lock, Math.floor(Math.random() * 3)));
+  document.querySelectorAll("[data-reset]").forEach(btn => btn.onclick = () => spy(btn.dataset.reset, null));
+  spy("a", 1); spy("b", 1);
+</script>
+</body>
+</html>

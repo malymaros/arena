@@ -17,6 +17,19 @@ import { renderMageHeads } from "/client/hud.js";
 import { socket } from "/client/net.js";
 import { isTouch } from "/client/viewport.js";
 
+/* ---------- CHEATER: ktorú moju akciu videl (docs/AI_PLAN.md 8c, schválený návrh public/dev/cheater-spy.html) ---------- */
+// server po locku pošle cheater_spy { turn, game, idx } - akcia idx mojej fronty dostane blikajúce oranžové pozadie
+// a líščie uši; platí len v tom kole a hre (nové kolo ju zruší samo)
+let cheaterSpy = null;
+export function setCheaterSpy(s) { cheaterSpy = s; renderQueue(); }
+const spiedNow = (idx) => !!cheaterSpy && cheaterSpy.idx === idx && cheaterSpy.turn === state?.turn
+  && cheaterSpy.game === (state?.series?.gameIndex ?? 1);
+// ucho 8×8 px: oranžový obrys, tmavšie vnútro (pravé = zrkadlo)
+const EAR = ["#.......", "##......", "#+#.....", "#++#....", "#+++#...", "#++++#..", "#+++++#.", "########"];
+const earSvg = (flip) => `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${EAR.flatMap((row, y) => [...row].map((c, x) =>
+  c === "." ? "" : `<rect x="${flip ? 7 - x : x}" y="${y}" width="1" height="1" fill="${c === "#" ? "#ff8a1e" : "#b8500c"}"/>`)).join("")}</svg>`;
+const SPY_HTML = `<span class="spy-cover"></span><span class="spy-ears">${earSvg(false)}${earSvg(true)}</span>`;
+
 /* ---------- Queue + Lock ---------- */
 // ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove); ownerSlot kvôli alt-color hláv p2
 function actionBadgeView(a, ownerSlot) {
@@ -226,6 +239,11 @@ export function renderQueue() {
       if (v.cls) el.classList.add(v.cls);
       if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text;
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
+      if (b.kind === "act" && spiedNow(b.idx)) {
+        el.classList.add("spied");
+        el.insertAdjacentHTML("beforeend", SPY_HTML);
+        el.title = "CHEATER saw this action";
+      }
       // akcia podľa plánu nebude mať efekt → žltý ⚠ v rohu + dôvod v tooltipe
       const warn = b.kind === "act" ? warnings[b.idx]
         : (filled.type === "golden_mirror" && foeMirrorImmune()) ? MIRROR_IMMUNE_WARN : null;

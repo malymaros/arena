@@ -14,7 +14,7 @@ import { actors, resetPoses } from "/client/actors.js";
 import { stopTurnTimer, tlog, setServerTimer } from "/client/turn-timer.js";
 import { clearActionLogs } from "/client/action-log.js";
 import { planning, resetPlanning } from "/client/planning.js";
-import { renderQueue } from "/client/queue.js";
+import { renderQueue, setCheaterSpy } from "/client/queue.js";
 import { clearActors, schedulePlayTimeline } from "/client/timeline.js";
 import { renderGrid } from "/client/grid.js";
 import { renderHUD, costHtml, applySpecialSkin } from "/client/hud.js";
@@ -261,6 +261,8 @@ socket.on("game_over", ({ winner }) => {
 
 // výsledok jednej hry série - vyhodnotí sa až na konci prehrávania timeline
 socket.on("game_result", (r) => { playback.serverGameResult = r; });
+// CHEATER (AI roomka): ktorú moju akciu bot videl - lišta kola ju zvýrazní
+socket.on("cheater_spy", (s) => { setCheaterSpy(s); });
 
 // medzi hrami série: resetuj UI kola (skóre ostáva), char-select pre ďalšiu hru riadi nasledujúci state
 socket.on("new_game", () => {

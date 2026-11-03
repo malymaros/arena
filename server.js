@@ -442,6 +442,8 @@ function onTurnTimeout() {
     socket.join(String(id));
     socket.emit("you_are", { slot: slotForPerson(p), isHost: p === "A" });
     socket.emit("state", snapshotFor(p)); // počas char-selectu maskuje súperov pick
+    // CHEATER: odhalená akcia aktuálneho kola (reload počas kola) - klient ju ukáže, len ak kolo sedí
+    if (lastSpy && ai && p !== botPerson) socket.emit("cheater_spy", lastSpy);
     if (p === "B") maybeStartPending(); // 2. hráč dorazil → ak host čakal, spusti zápas
     broadcastSpectators();
   }
@@ -614,6 +616,10 @@ function onTurnTimeout() {
     if (g.phase !== "playing" || !human?.locked || !human.queue?.length || g.timestop) return;
     const idx = crypto.randomInt(human.queue.length), game = g.series?.gameIndex ?? 1, turn = g.turn;
     botSock?.spy({ turn, game, idx, action: { ...human.queue[idx] } });
+    // hráč vidí, ktorú jeho akciu CHEATER videl (lišta kola ju zvýrazní na oranžovo s líščími ušami) - len on,
+    // nie diváci; po reloade v tom istom kole sa pošle znova (seat)
+    lastSpy = { turn, game, idx };
+    personSockets[botPerson === "A" ? "B" : "A"]?.emit("cheater_spy", lastSpy);
     // poistka: keby rozhodnutie so spy neprišlo (worker zlyhal), po čase sa zahrá záložný ťah - hra nezamrzne
     if (spyTimer) clearTimeout(spyTimer);
     spyTimer = setTimeout(() => {
@@ -622,7 +628,7 @@ function onTurnTimeout() {
       if (botPending?.turn === turn && botPending?.game === game) releaseBotRound();
     }, SPY_GIVE_UP_MS);
   }
-  let spyTimer = null, spyGaveUp = null;
+  let spyTimer = null, spyGaveUp = null, lastSpy = null;
   function playBotWorld(d) {
     const g = engine.game, person = botPerson;
     if (!person || g.phase !== "playing" || (g.series?.gameIndex ?? 1) !== d.game) return;

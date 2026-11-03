@@ -219,6 +219,10 @@ prepočíta rovnováhu a krátko (`CHEAT.REFINE` × rozpočet, ~1,5 s) dopočít
 → celé kolo so zúžením (`CHEAT.SPY`). Server: ťah bez spy je pri CHEATEROVI len záloha (nezamyká), zamkne až ťah
 s `cheat: true` (+ 0,6-1,5 s ako vždy); poistka `SPY_GIVE_UP_MS` zahrá zálohu, keby dopočet neprišiel.
 Telemetria: záznam `bot` nesie `spy: { slot, a, used, refine }`.
+Hráč vidí, ktorú akciu CHEATER videl (vlastník 2026-11-03, schválený návrh `public/dev/cheater-spy.html`, variant A): server mu
+po odhalení pošle `cheater_spy { turn, game, idx }` (len jemu, nie divákom; po reloade v kole znova) a lišta kola tú akciu
+zvýrazní - polopriehľadné neónovo blikajúce oranžové pozadie a líščie uši z horných rohov (`queue.js` `setCheaterSpy`,
+`.q-badge.spied` v `styles.css`); nové kolo zvýraznenie zruší.
 
 Sila (`node tools/ai-vs.mjs 100 --sims 1500 --vs bot --level cheater`, B = CHEATER proti NORMAL): **77 %** (NORMAL
 ako B na tých istých zápasoch 47 %), kratšie zápasy (6,1 vs 7,3 kola). Najsilnejší bot v hre.

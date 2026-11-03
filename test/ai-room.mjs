@@ -42,6 +42,7 @@ try {
   });
   sock.on("game_result", (r) => { c.result = r; });
   sock.on("game_over", (r) => { c.over = r; });
+  sock.on("cheater_spy", (r) => { (c.spyMsgs ||= []).push(r); });
   if (!await until(() => c.rooms, 20000, "zoznam roomiek")) throw new Error("server nenaštartoval");
 
   const ai0 = c.rooms.aiRoom;
@@ -173,6 +174,10 @@ try {
   const okSpy = spies.length > 0 && spies.every(b => { const q = cheatQ.find(x => x.turn === b.turn)?.q; return q && key(q[b.spy.slot - 1]) === b.spy.a; });
   if (okSpy) pass(`CHEATER videl v každom kole jednu akciu hráča (${spies.map(b => `${b.turn}: ${b.spy.slot}. ${b.spy.a}`).join(", ")})`);
   else fail("CHEATER spy v telemetrii: " + JSON.stringify(spies.map(b => ({ turn: b.turn, spy: b.spy }))));
+  // hráč dostal cheater_spy s tou istou akciou, akú videl bot (lišta kola ju zvýrazní)
+  const msgs = c.spyMsgs || [];
+  if (spies.length && spies.every(b => msgs.some(m => m.turn === b.turn && m.idx === b.spy.slot - 1))) pass(`hráč vidí, ktorú akciu CHEATER videl (${msgs.length}× cheater_spy)`);
+  else fail("cheater_spy hráčovi: " + JSON.stringify(msgs));
   c.rooms = null;
   sock.emit("leave_room");
   await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (cheater)");
