@@ -180,6 +180,27 @@ rozhoduje len o tom, ktoré úrovne sú **odomknuté** (silnejšie zariadenie = 
   zvyšovať silu); (4) definícia úrovní + ratingy; (5) engine v prehliadači (`process.env` v `engine/constants.js`),
   Web Workery, test výkonu, odomykanie.
 
+## 8b. Obťažnosť BABY (implementovaná 2026-11-03)
+
+Rozhodnutia vlastníka (2026-11-03): **2 úrovne - NORMAL (doterajší bot) a BABY** (deti a úplní začiatočníci), jedna
+AI roomka. Klik na voľnú hlavu bota v room browseri otvorí okno **CHOOSE DIFFICULTY** (`public/client/ai-difficulty.js`;
+vľavo BABY, vpravo NORMAL, bez popiskov) → `join_room { roomId, level }`; obsadený bot = sledovanie bez okna, v rohu
+je hlava toho bota, proti ktorému sa hrá (`aiRoom.level`). Server: `aiLevel` roomky (nastaví ho `join` pred zápasom,
+nová roomka = normal), meno bota v HUD **BABY** / **AI**, snapshot `aiLevel` (len v AI roomke), telemetria `ai.level`,
+bot ho dostane cez `seat.setLevel` → `bot.setLevel`. Avatar BABY (`bot-face.js` `paintBaby`, návrh
+`public/dev/ai-difficulty.html`): okrúhla modrá hlava, srdiečko na anténke, podbradník, cumlík FRONT RING - vo všetkých
+náladách na mieste a v rovnakej farbe (aj smiech, K.O.), len „dudle"; nálady mení očami (+ slzy / pot), pri premýšľaní
+bez bodiek. Bez úľav mimo bota (HP, časovač).
+
+Správanie (`bot.js` `babyPick`, parametre `BABY`): ten istý výpočet s 15 % rozpočtu (~1,5 s/kolo), bez modelu súpera;
+z ohodnotených front vyberá **mäkko**: hodnota = zmes „proti súperovej rovnováhe" a „proti súperovi, ktorý ostane
+stáť" (nepredvída - strieľa tam, kde súper stojí), časť kôl zahrá náhodnú frontu z lepších 80 % predvýberu
+(„ležérny ťah"), obrana max 1 za kolo + penalizácia, démon nikdy, istú výhru prehliadne (70 % keď vedie / 35 % keď
+prehráva); **skryté vyrovnávanie** (vlastník ho výslovne chcel): čím viac vedie na HP, tým naivnejšie a ležérnejšie.
+Meranie (30 zápasov, `--sims 1500`): vs random 90 %, vs aggro 97 %, vs greedy 80 % (NORMAL 100 / 100 / 85-90 %) -
+skriptovaní súperi sú len hrubá náhrada dieťaťa; **silu doladiť podľa skutočného hrania** (`node tools/ai-vs.mjs 30
+--level baby --baby "SLOP=0.8,…"`). Testy: `test/ai-bot.mjs` (determinizmus BABY), `test/ai-room.mjs` (level, meno, aiRoom.level).
+
 ## 9. Ako hru hrá vlastník (zadanie pre hodnotenie a kandidátov, 2026-11-02)
 
 Zistenie: bot v kole ohodnotí len ~105 náhodných z 1 300–6 000 súperových front a do matice sa dostane 15–40 - rozumné

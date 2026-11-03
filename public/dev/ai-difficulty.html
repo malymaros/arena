@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Obťažnosť bota — návrh</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry, nič odtiaľto nie je v hre): výber obťažnosti AI bota
+     (BABY / NORMAL) po kliknutí na hlavu bota v room browseri + nový avatar Baby bota s cumlíkom.
+     Room browser a hlava NORMAL bota sú ten istý kód ako v hre (room-tiles.js, bot-face.js);
+     okno výberu a Baby avatar sú zatiaľ len tu. */
+  /* styles.css hry zakazuje skrolovanie stránky - tu ho treba povoliť */
+  html, body { overflow: auto !important; height: auto !important; min-height: 100%; position: static !important; touch-action: auto !important; }
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 700 18px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0; color: #8b92a0; max-width: 980px; }
+  main { padding: 20px; display: grid; gap: 26px; max-width: 1400px; }
+  section > h2 { font: 700 15px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  section > p { margin: 0 0 12px; color: #9aa1ad; max-width: 980px; }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 22px; }
+  figure { margin: 0; }
+  figcaption { margin: 0 0 8px; color: #cfd2d6; font-weight: 600; }
+  figcaption small { display: block; color: #8b92a0; font-weight: 400; }
+  .screen { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #262a33; border-radius: 6px; background: #000; }
+  .screen .inner { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+  .screen .rooms { position: absolute; }
+  .big .screen { max-width: 1280px; }
+
+  /* ---------- okno CHOOSE DIFFICULTY (návrh) ---------- */
+  .diff-back { position: absolute; inset: 0; z-index: 10001; background: rgba(4,6,10,.72);
+    display: flex; align-items: center; justify-content: center; font-family: "Press Start 2P", monospace; }
+  .diff-back.hidden { display: none; }
+  .diff-win { position: relative; padding: 30px 40px 34px; background: #15171d;
+    box-shadow: 0 0 0 4px #000, inset 0 3px 0 #2c3039, inset 0 -3px 0 #0c0d11, 8px 8px 0 4px rgba(0,0,0,.5); }
+  .diff-title { margin: 0 0 26px; text-align: center; font-size: 24px; color: #ffb300; letter-spacing: 2px;
+    text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.55); }
+  .diff-cards { display: flex; gap: 34px; }
+  .diff-card { position: relative; width: 270px; padding: 18px 14px 20px; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 12px; font-family: inherit; color: #fff;
+    background: #1d2027; box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc-dim), inset 0 -6px 0 rgba(0,0,0,.35);
+    transition: transform .1s; }
+  .diff-card canvas { width: 160px; height: 170px; image-rendering: pixelated; display: block; }
+  .diff-card .name { font-size: 20px; color: var(--acc); letter-spacing: 2px; text-shadow: 3px 3px 0 #000; }
+  .diff-card.baby { --acc: #ff8fc7; --acc-dim: #5a2c45; }
+  .diff-card.normal { --acc: #5ef2ff; --acc-dim: #1f4a52; }
+  .diff-card.hover, .diff-card:hover { transform: translateY(-4px);
+    box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc), inset 0 -6px 0 rgba(0,0,0,.35), 0 0 22px 2px color-mix(in srgb, var(--acc) 45%, transparent); }
+  .diff-card:active { transform: translateY(2px); }
+  .diff-close { position: absolute; top: -18px; right: -18px; width: 40px; height: 40px; border: none; cursor: pointer;
+    font: 16px "Press Start 2P", monospace; color: #fff; background: #b3261e;
+    box-shadow: 0 0 0 3px #000, inset 0 -4px 0 rgba(0,0,0,.35); }
+  .diff-toast { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 10002; padding: 10px 14px;
+    background: #000; color: #7dff7a; font: 11px "Press Start 2P", monospace; box-shadow: 0 0 0 2px #7dff7a; }
+  .diff-toast.hidden { display: none; }
+
+  /* ---------- galéria a HUD ---------- */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .card { background: #101217; box-shadow: 0 0 0 2px #000; padding: 10px; text-align: center; }
+  .card canvas { width: 128px; height: 128px; image-rendering: pixelated; }
+  .card .n { font: 9px "Press Start 2P", monospace; color: #ff8fc7; margin-top: 6px; }
+  .card .d { color: #8b92a0; font-size: 12px; margin-top: 4px; }
+  .pair { display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-end; }
+  .pair .card canvas { width: 160px; height: 170px; }
+  .hudbox { position: relative; width: 260px; padding: 16px 14px 14px; border-radius: 10px; background: rgba(0,0,0,.45);
+    box-shadow: inset 0 0 0 2px #2b2e36; }
+  .hudbox .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); padding: 3px 8px; background: #2d2f36;
+    box-shadow: 0 0 0 2px #000; font: 9px "Press Start 2P", monospace; color: #e6e6e6; white-space: nowrap; }
+  .hudbox canvas { display: block; margin: 0 auto; width: 160px; height: 160px; image-rendering: pixelated; }
+  .hud-scene { padding: 24px; border-radius: 6px; background: linear-gradient(#5d5650, #3f3a36 60%, #2b2826);
+    display: flex; gap: 30px; flex-wrap: wrap; }
+  .variants { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .variant { background: #101217; box-shadow: 0 0 0 2px #000; padding: 10px 10px 12px; cursor: pointer; border: none; color: inherit; text-align: center; font: inherit; }
+  .variant.on { box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #ff8fc7, 0 0 18px rgba(255,143,199,.35); }
+  .variant .row4 { display: flex; justify-content: center; gap: 4px; }
+  .variant canvas { width: 76px; height: 80px; image-rendering: pixelated; }
+  .variant .n { font: 10px "Press Start 2P", monospace; color: #ff8fc7; margin-top: 6px; }
+  .variant .d { color: #8b92a0; font-size: 12px; margin-top: 3px; }
+  ul.q { margin: 0; padding-left: 18px; color: #cfd2d6; }
+  ul.q li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OBŤAŽNOSŤ BOTA: NÁVRH</h1>
+  <p>Jedna AI roomka. Klik na hlavu bota v room browseri otvorí okno <b>CHOOSE DIFFICULTY</b>: vľavo BABY, vpravo NORMAL.
+     Klik na kartu = sadneš si do AI roomky s danou obťažnosťou (potom normálne lobby). Keď je bot obsadený, klik ťa pustí
+     sledovať ako dnes (okno sa neotvára). V hornej scéne si to môžeš naklikať.</p>
+</header>
+<main>
+  <section>
+    <h2>0 · VYBER CUMLÍK</h2>
+    <p>Na vybranom variante hlavy (predvolene D · BIB). Klik = použije sa všade nižšie. Pokoj · trafil ťa · plače · vyhral.</p>
+    <div class="variants" id="pacis"></div>
+  </section>
+
+  <section>
+    <h2>0b · VARIANT HLAVY</h2>
+    <p>Klik na variant = použije sa vo všetkých scénach nižšie (okno výberu, room browser, nálady, HUD). Každý variant: pokoj · trafil ťa · plače · vyhral.</p>
+    <div class="variants" id="variants"></div>
+  </section>
+
+  <section class="big">
+    <h2>1 · NAKLIKAJ SI TO</h2>
+    <p>Klikni na bota vpravo dole. Prejdi myšou cez karty (hlava sa usmeje a poskočí). ✕ alebo klik mimo okna = späť.</p>
+    <figure><div class="screen" id="live"></div></figure>
+  </section>
+
+  <section>
+    <h2>2 · STAVY</h2>
+    <div class="scenes" id="scenes"></div>
+  </section>
+
+  <section>
+    <h2>3 · BABY BOT: VŠETKY NÁLADY</h2>
+    <p>Tie isté nálady ako NORMAL bot (rovnaké spúšťače z verejnej timeline), len detsky: keď ho trafíš, nezlostí sa, ale
+       <b>plače</b>. Cumlík má stále v ústach, aj pri smiechu a K.O.</p>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <section>
+    <h2>4 · VEDĽA SEBA + V HUD</h2>
+    <div class="hud-scene">
+      <div class="pair" id="pair"></div>
+      <div class="hudbox"><div class="tag">OPPONENT · BABY</div><canvas id="hud-baby" width="160" height="160"></canvas></div>
+      <div class="hudbox"><div class="tag">OPPONENT · AI</div><canvas id="hud-normal" width="160" height="160"></canvas></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5 · NA ROZHODNUTIE</h2>
+    <ul class="q">
+      <li>Keď je bot obsadený, v rohu room browsera je hlava toho bota, s ktorým sa práve hrá (scéna „Obsadené Baby botom").</li>
+      <li>Meno v HUD: „BABY" namiesto „AI".</li>
+      <li>Telefón: okno bude väčšie (ako ostatné okná na telefóne), karty ostanú vedľa seba.</li>
+    </ul>
+  </section>
+</main>
+
+<script type="module">
+  import { buildRoomGrid } from "/client/room-tiles.js";
+  import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
+
+  /* =================== BABY BOT avatar (návrh, 32×32 umeleckých pixelov) =================== */
+  // 2 = farba nálady, 1 = tlmená, 3 = biely odlesk oka
+  const bm = (rows) => rows.map(r => [...r].map(c => (c === "#" ? 2 : c === "+" ? 1 : c === "o" ? 3 : 0)));
+  const EYES = {
+    dot:    bm([".###.", "#o###", "#####", "#####", ".###."]),
+    happy:  bm([".....", ".###.", "#...#", "#...#", "....."]),
+    wide:   bm([".###.", "#...#", "#.#.#", "#...#", ".###."]),
+    closed: bm([".....", ".....", "#####", ".....", "....."]),
+    up:     bm([".###.", "#o###", "#####", ".....", "....."]),
+    down:   bm([".....", ".....", "#####", "#o###", ".###."]),
+    pout:   bm([".....", ".....", "#####", "#o###", ".###."]),
+    half:   bm([".....", ".....", "#####", "#####", "....."]),
+    gtL:    bm(["#....", ".##..", "...#.", ".##..", "#...."]),
+    ltR:    bm(["....#", "..##.", ".#...", "..##.", "...."+"#"]),
+    x:      bm(["#...#", ".#.#.", "..#..", ".#.#.", "#...#"]),
+  };
+  const BROWS = {
+    worried: [bm(["...##", "###.."]), bm(["##...", "..###"])],
+    pout:    [bm(["##...", "..###"]), bm(["...##", "###.."])],
+    raised:  [bm([".###.", "....."]), bm([".###.", "....."])],
+  };
+  // cumlík: P štít, p obrys, w odlesk, r krúžok
+  // tvary cumlíka (vlastník si vyberie): vrstvy { rows, dx, dy }; P štít, p obrys, w odlesk, r krúžok, k gombík
+  const PACI_SHAPES = {
+    old: { name: "0 · OLD", d: "široký štít + krúžok pod ním (pre porovnanie)", dy: 0, layers: [
+      { rows: ["..ppppppp..", ".pPPPPPPPp.", "pPPwPPPPPPp", ".pPPPPPPPp.", "..ppppppp..", "....rrr....", "...r...r...", "....rrr...."] }] },
+    ring: { name: "1 · FRONT RING", d: "klasický cumlík spredu: motýlí štít, cez stred krúžok", dy: 0, layers: [
+      { rows: [".ppp...ppp.", "pPwPp.pPPPp", "pPPPPpPPPPp", "pPPPp.pPPPp", ".ppp...ppp."] },
+      { rows: [".rrr.", "r...r", "r.k.r", "r...r", ".rrr."], dx: 3 }] },
+    button: { name: "2 · BUTTON", d: "malý okrúhly štít s gombíkom, bez krúžku", dy: 1, layers: [
+      { rows: ["..ppppp..", ".pPwPPPp.", "pPPPkPPPp", ".pPPPPPp.", "..ppppp.."] }] },
+    heart: { name: "3 · HEART", d: "štít v tvare srdiečka s gombíkom", dy: -1, layers: [
+      { rows: [".pp...pp.", "pPwp.pPPp", "pPPPpPPPp", "pPPPkPPPp", ".pPPPPPp.", "..pPPPp..", "...pPp...", "....p...."] }] },
+    hang: { name: "4 · HANGING RING", d: "menší okrúhly štít, krúžok visí na stopke", dy: -1, layers: [
+      { rows: ["..ppppp..", ".pPwPPPp.", "pPPPPPPPp", ".ppppppp.", "....r....", "...rrr...", "..r...r..", "..r...r..", "...rrr..."] }] },
+    big: { name: "5 · BIG RING", d: "motýlí štít, veľký krúžok spredu presahuje dole", dy: -1, layers: [
+      { rows: [".ppp...ppp.", "pPwPp.pPPPp", "pPPPPpPPPPp", ".ppp...ppp."] },
+      { rows: [".rrrrr.", "r.....r", "r..k..r", "r.....r", "r.....r", ".rrrrr."], dx: 2, dy: 1 }] },
+  };
+  const paciW = (sh) => Math.max(...sh.layers.map(l => (l.dx || 0) + l.rows[0].length));
+  let CURP = "ring";
+  try { const v = localStorage.getItem("dev.babyPaci"); if (PACI_SHAPES[v]) CURP = v; } catch { /* bez úložiska */ }
+  const MOODS = {
+    neutral:   { col: "#8ff0ff", eyes: ["dot", "dot"] },
+    thinking:  { col: "#d7b8ff", eyes: ["up", "up"], fx: "think" },
+    happy:     { col: "#9dff9a", eyes: ["happy", "happy"], fx: "bob" },
+    smug:      { col: "#d9ff8a", eyes: ["half", "dot"] },
+    frown:     { col: "#ffd88a", eyes: ["down", "down"], brows: "worried", fx: "sniff" },
+    angry:     { col: "#ff9a9a", eyes: ["pout", "pout"], brows: "pout", fx: "cry" },   // trafený silno → plače
+    surprised: { col: "#fff07a", eyes: ["wide", "wide"], brows: "raised", fx: "pop" },
+    worried:   { col: "#b5d0ff", eyes: ["dot", "dot"], brows: "worried", fx: "sweat" },
+    sad:       { col: "#8fbaff", eyes: ["down", "down"], brows: "worried", fx: "tear" },
+    laugh:     { col: "#9dff9a", eyes: ["gtL", "ltR"], fx: "laugh" },
+    ko:        { col: "#a7adb5", eyes: ["x", "x"], fx: "ko" },
+  };
+  const hex = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const PINK = [255, 140, 192], PINK_LO = [196, 70, 130];
+  const PACIS = {
+    pink: { P: [255, 140, 192], p: [196, 70, 130], w: [255, 214, 232], r: [255, 190, 90] },
+    blue: { P: [120, 190, 255], p: [50, 110, 190], w: [210, 236, 255], r: [255, 190, 90] },
+    mint: { P: [120, 230, 180], p: [40, 150, 110], w: [210, 255, 236], r: [255, 140, 192] },
+  };
+  const BLUE = { body: [178, 204, 232], hi: [222, 236, 250], lo: [112, 134, 176] };
+  // varianty dizajnu (vlastník si vyberie): tvar hlavy r (5 okrúhla, 1 hranatá ako NORMAL), ozdoba hore, cumlík, doplnky
+  const VARIANTS = {
+    A: { name: "A · ROUND", d: "doterajší návrh: okrúhla modrá hlava, srdiečko", ...BLUE, r: 5, top: "heart", paci: "pink" },
+    B: { name: "B · PINK", d: "ružová hlava, biele srdiečko, modrý cumlík", body: [240, 192, 214], hi: [252, 228, 240], lo: [172, 104, 140], r: 5, top: "heart", heart: [255, 255, 255], paci: "blue" },
+    C: { name: "C · CURL", d: "namiesto anténky zlatá kučierka", ...BLUE, r: 5, top: "curl", paci: "pink" },
+    D: { name: "D · BIB", d: "doterajší + biely podbradník so srdiečkom", ...BLUE, r: 5, top: "heart", paci: "pink", bib: true },
+    E: { name: "E · MINI NORMAL", d: "hranatý monitor ako NORMAL bot, svetlejší, s kučierkou", body: [150, 160, 178], hi: [196, 204, 218], lo: [92, 100, 116], r: 1, top: "curl", paci: "pink" },
+    F: { name: "F · TEDDY", d: "okrúhle uška hore, mätový cumlík", body: [214, 188, 156], hi: [240, 222, 196], lo: [150, 116, 86], r: 5, top: "none", ears: true, paci: "mint" },
+  };
+  let CUR = "D";
+  try { const v = localStorage.getItem("dev.babyVariant"); if (VARIANTS[v]) CUR = v; } catch { /* bez úložiska */ }
+  const SCR = { x: 6, y: 10, w: 20, h: 16 };
+  const inRound = (x, y, x0, y0, x1, y1, r) => {
+    const dx = Math.max(x0 + r - x, 0, x - (x1 - r)), dy = Math.max(y0 + r - y, 0, y - (y1 - r));
+    return x >= x0 && x <= x1 && y >= y0 && y <= y1 && dx * dx + dy * dy <= r * r + 1;
+  };
+
+  const buf = document.createElement("canvas"); buf.width = buf.height = 32;
+  const bctx = buf.getContext("2d");
+  function paintBaby(st, mood, now, V) {
+    const BODY = V.body, BODY_HI = V.hi, BODY_LO = V.lo, R = V.r;
+    if (mood !== st.mood) { st.mood = mood; st.since = now; }
+    const m = MOODS[mood], age = now - st.since;
+    if (now > st.nextBlink) { st.blinkUntil = now + 130; st.nextBlink = now + 1800 + Math.random() * 2800; }
+    const blink = now < st.blinkUntil && !["ko", "laugh", "happy", "angry"].includes(mood);
+    const img = bctx.createImageData(32, 32);
+    const put = (x, y, c) => { if (x < 0 || y < 0 || x > 31 || y > 31) return; const i = (y * 32 + x) * 4; img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255; };
+    const stamp = (b, ox, oy, C, D) => b.forEach((row, y) => row.forEach((v, x) => { if (v) put(ox + x, oy + y, v === 3 ? [255, 255, 255] : v === 2 ? C : D); }));
+    const C = hex(m.col), DIM = mix(C, [10, 16, 24], 0.6), BG = mix(C, [8, 12, 18], 0.9);
+    let jx = 0, jy = 0;
+    if (m.fx === "bob") jy = Math.floor(now / 420) % 2 ? -1 : 0;
+    if (m.fx === "laugh") jy = Math.floor(now / 160) % 2 ? -1 : 0;
+    if (m.fx === "cry" && age < 1200) jx = Math.round(Math.sin(now / 30));
+    const heartOn = m.fx === "think" ? Math.floor(now / 260) % 2 === 0 : true;
+    if (V.top === "heart") { // anténka s pulzujúcim srdiečkom
+      for (let y = 4; y <= 6; y++) put(15 + jx, y + jy, BODY_LO);
+      const H = mood === "ko" ? [120, 120, 128] : heartOn ? (V.heart || PINK) : PINK_LO;
+      stamp(bm(["##.##", "#####", ".###.", "..#.."]), 13 + jx, 0 + jy, H, H);
+    } else if (V.top === "curl") { // zlatá kučierka (pri premýšľaní sa vlní)
+      const G = mood === "ko" ? [150, 140, 120] : [250, 196, 96], GD = mood === "ko" ? [100, 94, 84] : [190, 132, 44];
+      const w = m.fx === "think" && Math.floor(now / 260) % 2 ? 1 : 0;
+      stamp(bm([".###.", "#...#", "#.#.#", "#.##.", ".#...", "..#..", "..#.."]), 13 + jx + w, 0 + jy, G, GD);
+    }
+    if (V.ears) for (const cx of [7, 24]) for (let y = 2; y <= 10; y++) for (let x = cx - 4; x <= cx + 4; x++) {
+      const d = (x - cx) ** 2 + (y - 6) ** 2;
+      if (d > 13) continue;
+      put(x + jx, y + jy, d > 7 ? BODY_LO : d <= 2 ? PINK : BODY);
+    }
+    // hlava (R 5 = okrúhla, 1 = hranatý monitor)
+    const HY0 = R > 1 ? 7 : 6, HY1 = R > 1 ? 30 : 29;
+    const inH = (x, y) => inRound(x, y, 2, HY0, 29, HY1, R);
+    for (let y = 6; y <= 30; y++) for (let x = 1; x <= 30; x++) {
+      if (!inH(x, y)) continue;
+      const edge = !inH(x - 1, y) || !inH(x + 1, y) || !inH(x, y - 1) || !inH(x, y + 1);
+      put(x + jx, y + jy, edge ? BODY_LO : y <= HY0 + 2 ? BODY_HI : y >= HY1 - 2 ? BODY_LO : BODY);
+    }
+    if (R <= 1) [[4, 8], [27, 8], [4, 27], [27, 27]].forEach(([x, y]) => put(x + jx, y + jy, BODY_HI)); // skrutky ako NORMAL
+    // podbradník
+    if (V.bib) {
+      const half = [9, 9, 8, 7, 5];
+      for (let k = 0; k < 5; k++) for (let x = 16 - half[k]; x <= 15 + half[k]; x++) {
+        const edge = k === 4 || x === 16 - half[k] || x === 15 + half[k];
+        put(x + jx, 27 + k + jy, edge ? [255, 140, 192] : [248, 248, 252]);
+      }
+      stamp(bm(["#.#", "###", ".#."]), 14 + jx, 28 + jy, [255, 120, 170], [255, 120, 170]);
+    }
+    // uši-reproduktory
+    if (!V.ears) for (let y = 15; y <= 20; y++) { put(0 + jx, y + jy, BODY_LO); put(1 + jx, y + jy, BODY_HI); put(31 + jx, y + jy, BODY_LO); put(30 + jx, y + jy, BODY_HI); }
+    // obrazovka so zaoblenými rohmi
+    const sx = SCR.x + jx, sy = SCR.y + jy;
+    for (let y = 0; y < SCR.h; y++) for (let x = 0; x < SCR.w; x++) {
+      if (!inRound(x, y, 0, 0, SCR.w - 1, SCR.h - 1, 3)) continue;
+      put(sx + x, sy + y, BG.map(v => Math.round(v * (y % 2 ? 0.84 : 1))));
+    }
+    // oči
+    let ex = 0;
+    if (m.fx === "think") ex = [-1, 0, 1, 0][Math.floor(now / 700) % 4];
+    const [eL, eR] = m.eyes;
+    stamp(EYES[blink ? "closed" : eL], sx + 2 + ex, sy + 3, C, DIM);
+    stamp(EYES[blink ? "closed" : eR], sx + 13 + ex, sy + 3, C, DIM);
+    if (m.brows) { const [bl, br] = BROWS[m.brows]; stamp(bl, sx + 2, sy + 0, C, DIM); stamp(br, sx + 13, sy + 0, C, DIM); }
+    // líčka
+    const blush = mood === "angry" ? [255, 90, 110] : [255, 120, 170];
+    if (mood !== "ko") { put(sx + 1, sy + 9, blush); put(sx + 2, sy + 9, blush); put(sx + 17, sy + 9, blush); put(sx + 18, sy + 9, blush); }
+    // ústa / cumlík
+    const SH = PACI_SHAPES[V.shape || CURP];
+    // cumlík je v každej nálade na tom istom mieste a v tej istej farbe - nálada sa mení len očami
+    // dudlanie: rytmicky ho vtiahne o pixel do úst a pustí (vo všetkých náladách rovnako)
+    const suck = Math.floor(now / 260) % 3 === 1 ? -1 : 0;
+    const px = sx + Math.floor((SCR.w - paciW(SH)) / 2), py = sy + 9 + SH.dy + suck;
+    const PC0 = PACIS[V.paci]; // cumlík nemení farbu ani pri K.O.
+    const PC = { ...PC0, k: PC0.r };
+    for (const L of SH.layers) L.rows.forEach((row, y) => [...row].forEach((ch, x) => { if (PC[ch]) put(px + (L.dx || 0) + x, py + (L.dy || 0) + y, PC[ch]); }));
+    // efekty
+    const tearC = [130, 190, 255], tearH = [200, 232, 255];
+    if (m.fx === "tear" || m.fx === "cry") {
+      const sp = m.fx === "cry" ? 90 : 150;
+      for (const ox of m.fx === "cry" ? [3, 14] : [3]) {
+        const dy = Math.floor(age / sp) % 8;
+        put(sx + ox, sy + 8 + dy, tearH); put(sx + ox, sy + 9 + dy, tearC);
+      }
+      if (m.fx === "cry") { const dy = Math.floor((age + 300) / 90) % 8; put(sx + 1, sy + 8 + dy, tearC); put(sx + 18, sy + 8 + dy, tearC); }
+    }
+    if (m.fx === "sniff") { const dy = Math.floor(age / 220) % 5; put(sx + 3, sy + 8 + dy, tearC); }
+    if (m.fx === "sweat") { const dy = Math.floor(age / 180) % 6; put(sx + 19, sy + 1 + dy, tearH); put(sx + 19, sy + 2 + dy, tearC); }
+    if (m.fx === "pop" && age < 1400) { const c = hex("#fff07a"); for (let y = 0; y < 4; y++) put(29, y, c); put(29, 5, c); put(30, 0, c); put(30, 1, c); }
+    if (m.fx === "ko") { const r = Math.floor(now / 300) % 4, s = [[2, 2], [3, 1], [4, 2], [3, 3]][r]; put(sx + s[0] + 16, sy - 6 + s[1], [255, 230, 120]); }
+    bctx.putImageData(img, 0, 0);
+  }
+  // hlava do plátna: figure = 32×34 (room browser / karta, s poskakovaním), hud = spodné 2/3 plátna
+  function drawBaby(cvs, mood, now, { hop = false, hud = false, variant = null, shape = null } = {}) {
+    const st = cvs._baby || (cvs._baby = { mood: "", since: 0, blinkUntil: 0, nextBlink: 1200 + Math.random() * 2000 });
+    const V = VARIANTS[variant || CUR];
+    paintBaby(st, mood, now, shape ? { ...V, shape } : V);
+    const ctx = cvs.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    if (hud) {
+      const k = Math.max(1, Math.floor((cvs.height * 2 / 3 - 4) / 32)), s = 32 * k;
+      ctx.drawImage(buf, 0, 0, 32, 32, Math.round((cvs.width - s) / 2), cvs.height - s - 2, s, s);
+      return;
+    }
+    const k = Math.max(1, Math.floor(cvs.width / FIGURE_W));
+    const y = hop ? [2, 1, 0, 1][Math.floor(now / 120) % 4] : 1 + (Math.floor(now / 900) % 2);
+    ctx.drawImage(buf, 0, 0, 32, 32, 0, y * k, 32 * k, 32 * k);
+  }
+
+  /* =================== kreslenie (jeden raf) =================== */
+  const draws = []; // { cvs, kind: "baby"|"normal", mood: () => mood, hop: () => bool, hud }
+  const loop = (now) => {
+    for (const d of draws) {
+      if (d.kind === "baby") drawBaby(d.cvs, d.mood(), now, { hop: d.hop?.(), hud: d.hud, variant: d.variant, shape: d.shape });
+      else if (d.hud) drawNormalHud(d.cvs, d.mood(), now);
+      else drawBotFigure(d.cvs, d.mood(), now, { hop: d.hop?.() });
+    }
+    requestAnimationFrame(loop);
+  };
+  // NORMAL v HUD: tá istá hlava ako figúrka, len do spodnej časti (náhrada drawBotFace pre návrh)
+  const tmp = document.createElement("canvas"); tmp.width = FIGURE_W * 4; tmp.height = FIGURE_H * 4;
+  function drawNormalHud(cvs, mood, now) {
+    drawBotFigure(tmp, mood, now, {});
+    const ctx = cvs.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, cvs.width, cvs.height);
+    const k = Math.max(1, Math.floor((cvs.height * 2 / 3 - 4) / 32)), s = 32 * k;
+    ctx.drawImage(tmp, 0, 4, 128, 128, Math.round((cvs.width - s) / 2), cvs.height - s - 2, s, s);
+  }
+
+  /* =================== scény =================== */
+  const AI_FREE = { players: 0, max: 1, canJoin: true }, AI_BUSY = { players: 1, max: 1, canJoin: false };
+  const fit = (screen, inner) => { const f = () => { inner.style.transform = `scale(${screen.clientWidth / 1280})`; }; new ResizeObserver(f).observe(screen); f(); };
+  const canvasHtml = (cls) => `<canvas class="${cls}" width="${FIGURE_W * 4}" height="${FIGURE_H * 4}"></canvas>`;
+
+  // pracuje nad jednou obrazovkou: room browser + hlava bota + okno výberu
+  function buildScene(screen, sc) {
+    const inner = document.createElement("div"); inner.className = "inner";
+    const rooms = document.createElement("div"); rooms.className = "rooms";
+    rooms.innerHTML = `<div class="rooms-card"><h1 class="rooms-title">ARENA</h1><div class="rooms-list"></div></div>`;
+    rooms.querySelector(".rooms-list").appendChild(buildRoomGrid({ rooms: sc.rooms || [], slots: 2 }, () => {}));
+    const free = sc.ai.canJoin;
+    const st = { botHover: !!sc.botHover, cardHover: sc.cardHover || null, open: !!sc.open };
+    const bot = document.createElement("button"); bot.type = "button";
+    bot.className = "lobby-bot" + (free ? "" : " busy");
+    bot.innerHTML = `<div class="lobby-bot-bubble"></div>${canvasHtml("lobby-bot-figure")}`;
+    const bubble = bot.querySelector(".lobby-bot-bubble");
+    const syncBot = () => {
+      bot.classList.toggle("hover", st.botHover);
+      bubble.textContent = free ? (st.botHover ? "LET'S DUEL!" : "PLAY VS AI") : (st.botHover ? "WATCH THE MATCH" : "BUSY… IN A MATCH");
+    };
+    syncBot();
+    rooms.appendChild(bot);
+    // obsadený: v rohu je hlava bota, s ktorým sa práve hrá (premýšľa)
+    const busyKind = sc.busyKind || "normal";
+    draws.push({ cvs: bot.querySelector("canvas"), kind: free ? "normal" : busyKind,
+      mood: () => (!free ? "thinking" : st.botHover ? "happy" : "neutral"), hop: () => free && st.botHover });
+
+    const back = document.createElement("div"); back.className = "diff-back" + (st.open ? "" : " hidden");
+    back.innerHTML = `
+      <div class="diff-win">
+        <button class="diff-close" type="button" aria-label="Back">✕</button>
+        <h2 class="diff-title">CHOOSE DIFFICULTY</h2>
+        <div class="diff-cards">
+          <button class="diff-card baby" type="button" data-lv="baby">${canvasHtml("")}<div class="name">BABY</div></button>
+          <button class="diff-card normal" type="button" data-lv="normal">${canvasHtml("")}<div class="name">NORMAL</div></button>
+        </div>
+      </div>`;
+    const toast = document.createElement("div"); toast.className = "diff-toast hidden";
+    for (const card of back.querySelectorAll(".diff-card")) {
+      const lv = card.dataset.lv;
+      if (st.cardHover === lv) card.classList.add("hover");
+      draws.push({ cvs: card.querySelector("canvas"), kind: lv, mood: () => (st.cardHover === lv ? "happy" : "neutral"), hop: () => st.cardHover === lv });
+      if (sc.interactive) {
+        card.addEventListener("mouseenter", () => { st.cardHover = lv; });
+        card.addEventListener("mouseleave", () => { if (st.cardHover === lv) st.cardHover = null; });
+        card.addEventListener("click", (e) => {
+          e.stopPropagation();
+          back.classList.add("hidden"); st.cardHover = null;
+          toast.textContent = `→ join_room { roomId: "ai", level: "${lv}" }  (ďalej lobby)`;
+          toast.classList.remove("hidden");
+          setTimeout(() => toast.classList.add("hidden"), 2600);
+        });
+      }
+    }
+    if (sc.interactive) {
+      bot.addEventListener("mouseenter", () => { st.botHover = true; syncBot(); });
+      bot.addEventListener("mouseleave", () => { st.botHover = false; syncBot(); });
+      bot.addEventListener("click", () => {
+        if (!free) { toast.textContent = "→ spectate_room (bez okna)"; toast.classList.remove("hidden"); setTimeout(() => toast.classList.add("hidden"), 2000); return; }
+        st.botHover = false; syncBot(); back.classList.remove("hidden");
+      });
+      const close = () => { back.classList.add("hidden"); st.cardHover = null; };
+      back.querySelector(".diff-close").addEventListener("click", close);
+      back.addEventListener("click", (e) => { if (e.target === back) close(); });
+    } else bot.style.cursor = "default";
+    inner.append(rooms, back, toast);
+    screen.appendChild(inner);
+    fit(screen, inner);
+  }
+
+  buildScene(document.getElementById("live"), { ai: AI_FREE, interactive: true });
+
+  const SCENES = [
+    { t: "Okno výberu", d: "po kliknutí na voľného bota", ai: AI_FREE, open: true },
+    { t: "Hover na BABY", d: "Baby sa usmeje a poskakuje, karta sa rozsvieti ružovo", ai: AI_FREE, open: true, cardHover: "baby" },
+    { t: "Hover na NORMAL", d: "Normal bot sa usmeje a poskakuje, karta tyrkysová", ai: AI_FREE, open: true, cardHover: "normal" },
+    { t: "Obsadené Baby botom", d: "niekto hrá proti Baby: v rohu premýšľa Baby, klik = sledovať (bez okna)", ai: AI_BUSY, busyKind: "baby" },
+  ];
+  const host = document.getElementById("scenes");
+  for (const sc of SCENES) {
+    const fig = document.createElement("figure");
+    fig.innerHTML = `<figcaption>${sc.t}<small>${sc.d}</small></figcaption>`;
+    const screen = document.createElement("div"); screen.className = "screen";
+    fig.appendChild(screen); host.appendChild(fig);
+    buildScene(screen, sc);
+  }
+
+  const DESC = {
+    neutral: "pokoj, žmurká", thinking: "plánuje kolo (srdiečko bliká, bez bodiek)", happy: "trafil ťa", smug: "jeho obrana zabrala",
+    frown: "trafil si ho slabšie (posmrkáva)", angry: "trafil si ho silno (plače)", surprised: "odrazil si mu útok (povolí cumlík)",
+    worried: "má málo HP / Last Stand", sad: "prehráva o 4+ HP", laugh: "vyhral (cumlík ostane v ústach)", ko: "prehral (cumlík ostane v ústach)",
+  };
+  const gal = document.getElementById("gallery");
+  for (const mood of Object.keys(MOODS)) {
+    const c = document.createElement("div"); c.className = "card";
+    c.innerHTML = `<canvas width="128" height="128"></canvas><div class="n">${mood.toUpperCase()}</div><div class="d">${DESC[mood]}</div>`;
+    gal.appendChild(c);
+    const cvs = c.querySelector("canvas"); cvs.width = FIGURE_W * 4; cvs.height = FIGURE_H * 4;
+    // ko/surprised sa opakujú (inak by efekt dobehol raz)
+    draws.push({ cvs, kind: "baby", mood: () => mood, hop: () => false });
+    if (mood === "ko" || mood === "surprised" || mood === "angry") setInterval(() => { if (cvs._baby) cvs._baby.mood = ""; }, 2600);
+  }
+  const pair = document.getElementById("pair");
+  for (const [kind, label] of [["baby", "BABY"], ["normal", "NORMAL"]]) {
+    const c = document.createElement("div"); c.className = "card";
+    c.innerHTML = `${canvasHtml("")}<div class="n" style="color:${kind === "baby" ? "#ff8fc7" : "#5ef2ff"}">${label}</div>`;
+    pair.appendChild(c);
+    draws.push({ cvs: c.querySelector("canvas"), kind, mood: () => "neutral" });
+  }
+  const hudMoods = ["neutral", "thinking", "happy", "angry", "sad", "laugh"];
+  const hm = (now) => hudMoods[Math.floor(now / 2200) % hudMoods.length];
+  draws.push({ cvs: document.getElementById("hud-baby"), kind: "baby", hud: true, mood: () => hm(performance.now()) });
+  draws.push({ cvs: document.getElementById("hud-normal"), kind: "normal", hud: true, mood: () => hm(performance.now()) });
+  // galéria variantov: 4 nálady na variant, klik = vyber (použije sa vo všetkých scénach)
+  const VMOODS = ["neutral", "happy", "angry", "laugh"];
+  const vhost = document.getElementById("variants"), vEls = {};
+  for (const [key, V] of Object.entries(VARIANTS)) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "variant" + (key === CUR ? " on" : "");
+    b.innerHTML = `<div class="row4">${VMOODS.map(() => canvasHtml("")).join("")}</div><div class="n">${V.name}</div><div class="d">${V.d}</div>`;
+    VMOODS.forEach((mood, i) => draws.push({ cvs: b.querySelectorAll("canvas")[i], kind: "baby", variant: key, mood: () => mood }));
+    b.addEventListener("click", () => {
+      CUR = key;
+      try { localStorage.setItem("dev.babyVariant", key); } catch { /* bez úložiska */ }
+      for (const [k, el] of Object.entries(vEls)) el.classList.toggle("on", k === key);
+    });
+    vEls[key] = b; vhost.appendChild(b);
+  }
+  // galéria cumlíkov (na vybranom variante hlavy), klik = vyber
+  const phost = document.getElementById("pacis"), pEls = {};
+  for (const [key, SHP] of Object.entries(PACI_SHAPES)) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "variant" + (key === CURP ? " on" : "");
+    b.innerHTML = `<div class="row4">${VMOODS.map(() => canvasHtml("")).join("")}</div><div class="n">${SHP.name}</div><div class="d">${SHP.d}</div>`;
+    VMOODS.forEach((mood, i) => draws.push({ cvs: b.querySelectorAll("canvas")[i], kind: "baby", shape: key, mood: () => mood }));
+    b.addEventListener("click", () => {
+      CURP = key;
+      try { localStorage.setItem("dev.babyPaci", key); } catch { /* bez úložiska */ }
+      for (const [k, el] of Object.entries(pEls)) el.classList.toggle("on", k === key);
+    });
+    pEls[key] = b; phost.appendChild(b);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>

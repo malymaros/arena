@@ -1,6 +1,6 @@
 // tools/ai-vs.mjs - zápasy AI bota (engine/ai/bot.js) priamo na engine (docs/AI_PLAN.md, meranie sily).
 // Bot dostáva rovnaké payloady ako klient na serveri (snapshotFor + redactTimelineFor, you_are, new_game).
-// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--vs random|bot] [--chars p1,p2] [--log] [--portal | --swamp]
+// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--level baby] [--vs random|bot] [--chars p1,p2] [--log] [--portal | --swamp]
 //   --sims n     deterministický rozpočet: n simulácií na rozhodnutie (namiesto času)
 //   --vs random  bot (osoba B) proti náhodnému botovi (tools/random-bot.mjs) - cieľ ≥ 98 % výhier
 //   --vs bot     bot proti botu (rovnaké nastavenie, rôzne seedy) - sanity / ladenie
@@ -19,6 +19,8 @@ const SIMS = opt("--sims", null) ? Number(opt("--sims")) : null; // deterministi
 const VS = opt("--vs", "random");
 const CHARS_ARG = opt("--chars", null)?.split(",");
 const LOG = argv.includes("--log");
+const BABY_TUNE = opt("--baby", null) ? Object.fromEntries(opt("--baby").split(",").map(kv => { const [k, v] = kv.split("="); return [k, Number(v)]; })) : null;
+const LEVEL = opt("--level", null); // úroveň bota B (baby / normal); s --vs bot hrá A normálny bot
 const NO_MODEL = argv.includes("--no-model");
 const ARENA = argv.includes("--portal") ? "portal" : argv.includes("--swamp") ? "swamp" : null; // aréna (bez voľby Stone Bridge) // bot bez modelu súpera (porovnanie A5)
 
@@ -103,7 +105,7 @@ if (process.argv[1]?.endsWith("ai-vs.mjs")) {
   const losses = [];
   for (let i = 0; i < N; i++) {
     const chars = CHARS_ARG ? { p1: CHARS_ARG[0], p2: CHARS_ARG[1] } : null;
-    const r = playMatch(1000 + i, players, { chars, log: LOG ? (e) => console.log(JSON.stringify(e)) : null });
+    const r = playMatch(1000 + i, players, { chars, log: LOG ? (e) => console.log(JSON.stringify(e)) : null, ...(LEVEL ? { botOpts: { B: { level: LEVEL, ...(BABY_TUNE ? { babyTune: BABY_TUNE } : {}) } } } : {}) });
     done++; rounds += r.rounds; sims += r.sims;
     if (r.winner === "B") wins++; else losses.push(`seed ${1000 + i} ${r.chars.A}(A) vs ${r.chars.B}(B) → ${r.winner ?? "nedohraté"}`);
     process.stdout.write(`\r${done}/${N}  B vyhral ${wins}  (${(100 * wins / done).toFixed(0)} %)   `);

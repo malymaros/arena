@@ -1,0 +1,19 @@
+/* PROTOTYP (náhľad): zakázaná postava vo výbere postáv - nedá sa kliknúť, zhasnutá, nehýbe sa, krížik + BANNED */
+.char-card.banned { cursor: not-allowed; background: #2e3138;
+  box-shadow: 0 0 0 3px #5a2226, 0 0 0 5px #000, inset 0 -4px 0 rgba(0,0,0,.5); }
+.char-card.banned:hover { transform: none; box-shadow: 0 0 0 3px #5a2226, 0 0 0 5px #000, inset 0 -4px 0 rgba(0,0,0,.5); }
+.char-card.banned::before { content: ""; position: absolute; inset: 26% 24% 36%; z-index: 3; opacity: .9; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23000' d='M0 0h3v1h1v1h2V1h1V0h3v3H9v1H8v2h1v1h1v3H7V9H6V8H4v1H3v1H0V7h1V6h1V4H1V3H0z'/%3E%3Cpath fill='%23e53935' d='M1 1h1v1h1v1h1v1h2V3h1V2h1V1h1v1H8v1H7v1H6v2h1v1h1v1h1v1H8V8H7V7H6V6H4v1H3v1H2v1H1V8h1V7h1V6h1V4H3V3H2V2H1z'/%3E%3C/svg%3E") center / contain no-repeat;
+  image-rendering: pixelated; }
+.char-card.banned .char-canvas { filter: grayscale(1) brightness(.5); }
+.char-card.banned::after { content: "BANNED"; position: absolute; left: 0; right: 0; bottom: 34px; z-index: 4; padding: 6px 0;
+  font: 12px "Press Start 2P", monospace; letter-spacing: 2px; color: #fff; background: #b3261e; text-shadow: 2px 2px 0 #000;
+  box-shadow: 0 2px 0 #000, 0 -2px 0 #000; }
+.char-card.banned .char-name { text-decoration: line-through; color: #9aa0a8; }
+/* telefón: v strede pásu je zakázaná postava → PICK je zablokovaný a hovorí prečo */
+#touch-pick.ban-locked { background: #3a3e47; color: #ff8a80; cursor: not-allowed; box-shadow: 0 0 0 2px #000, inset 0 -4px 0 rgba(0,0,0,.35); }
+/* telefón: bočné karty sú v páse stlmené - BANNED musí byť čitateľné aj tam */
+.strip-mode .char-card.banned::after { opacity: 1; }
+/* aj označená (v strede pásu / ťuknutá) zakázaná karta ostane červeno-sivá, nie zlatá */
+.char-card.banned[class] { box-shadow: 0 0 0 3px #b3261e, 0 0 0 5px #000, inset 0 -4px 0 rgba(0,0,0,.5) !important; }
+.char-card.banned .char-name { background: #23252b !important; color: #8b92a0 !important; text-decoration: line-through; }

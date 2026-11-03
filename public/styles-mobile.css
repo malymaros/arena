@@ -255,6 +255,8 @@
 .phone .lobby-bot { right: 40px; bottom: 30px; gap: 10px; }
 .phone .lobby-bot-figure { width: 224px; height: 238px; }
 .phone .lobby-bot-bubble { font-size: 20px; padding: 16px 18px; }
+/* okno CHOOSE DIFFICULTY: na telefóne celé zväčšené (karty ostanú vedľa seba) */
+.phone .ai-diff-win { zoom: 1.5; }
 
 /* --- nastavenie zápasu (lobby hosta) na celú obrazovku: nadpis, arény + kocka, ADVANCED SETTINGS, dva stĺpce
    (FORMAT | TURN TIMER, YOUR COLOR | RANDOM CHARACTERS), START dole; voľné miesto sa rozdelí rovnomerne medzi riadky.

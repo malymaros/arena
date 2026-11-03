@@ -14,12 +14,21 @@ import { createOpponentModel } from "./model.js";
 import { seedPlans, doomPlans } from "./plans.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
+// Baby bot: podiel času / simulácií normálneho bota, šanca prehliadnuť istú výhru (vedie / prehráva), penalizácia
+// za obranu, max. odstup od najlepšej fronty, teplota softmaxu = BABY_T + BABY_T_LEAD × náskok HP (orezaná)
+// (babyTune v createBot ich prepíše - ladenie cez tools/ai-vs.mjs --baby "T=0.3,SPREAD=1")
+export const BABY = { NAIVE: 0.8, NAIVE_LEAD: 0.1, NAIVE_MIN: 0.3, NAIVE_MAX: 0.95, SLOP: 0.6, SLOP_LEAD: 0.1, SLOP_MIN: 0.2, SLOP_MAX: 0.9, TOP: 0.8, BUDGET: 0.15, MERCY: 0.7, MERCY_BEHIND: 0.35, DEF_PEN: 0.08, SPREAD: 0.45, T: 0.1, T_LEAD: 0.03, T_MIN: 0.05, T_MAX: 0.35 };
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "shield_breaker", "special1"];
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
 
 // budgetMs = čas na rozhodnutie; budgetSims (voliteľné) = deterministický režim pre testy a self-play: „čas"
 // sa meria počtom simulácií (budgetSims simulácií = budgetMs), takže výsledok nezávisí od rýchlosti CPU
-export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, model = true, log = null, debug = null } = {}) {
+// level = "normal" (plná sila) | "baby" (pre deti a úplných začiatočníkov, babyPick nižšie): rovnaké hodnotenie
+// front, len výber je mäkký, s menej simuláciami, bez modelu súpera a so skrytým vyrovnávaním hry
+export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weights = WEIGHTS, model = true, log = null, debug = null, level = "normal", babyTune = null } = {}) {
+  const BB = { ...BABY, ...(babyTune || {}) };
+  const base = { budgetMs, budgetSims, model };
+  let baby = false;
   const belief = createBelief();
   const rng = seededRng(seed);
   const sim = createSim(), tsSim = createSim();
@@ -114,6 +123,19 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
 
   // rýchlosť simulácie (dvojíc front za ms pri D = 1) - priebežne meraná, určuje veľkosť vzoriek
   let rate = budgetSims ? budgetSims / budgetMs : 8;
+
+  // obťažnosť (dá sa zmeniť aj po vytvorení - server ju nastaví, keď si hráč sadne do AI roomky)
+  function setLevel(lv) {
+    baby = lv === "baby";
+    model = baby ? false : base.model;
+    budgetMs = base.budgetMs; budgetSims = base.budgetSims;
+    if (baby) {
+      if (budgetSims) budgetSims = Math.max(50, Math.round(budgetSims * BB.BUDGET));
+      else budgetMs = Math.max(300, Math.round(budgetMs * BB.BUDGET));
+    }
+    if (budgetSims) rate = budgetSims / budgetMs;
+  }
+  setLevel(level);
 
   // ohodnoť frontu z poolu proti sondám; vráti `count` najlepších (deduplikácia podľa vektora hodnôt)
   function prefilter(pool, probes, score, count, deadline) {
@@ -263,7 +285,13 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       R.forEach((r, k) => { const v = C.reduce((acc, c) => acc + value(r, c), 0) / C.length; if (v > bv) { bv = v; bi = k; } });
       mix = R.map((r, k) => (k === bi ? 1 : 0));
     }
-    const i = sampleMix(mix, rng);
+    let i;
+    if (!baby) i = sampleMix(mix, rng);
+    else {
+      const q = babyPick(R, C, sol.col, value, s0, me, pm.all);
+      i = R.indexOf(q);
+      if (i < 0) { R.push(q); mix = [...R.map((r, k) => mix[k] ?? 0)]; i = R.length - 1; } // ležérna fronta mimo matice
+    }
     debug?.({ R, C, sol, mix, value, s0, me, pick: i }); // tools/ai-explain.mjs - rozbor rozhodnutia
     const ms = now() - t0;
     if (ms > 50 && !budgetSims) rate = 0.7 * rate + 0.3 * ((stats.sims - sims0) / D / ms);
@@ -283,6 +311,40 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       model: useModel ? om.observations : 0,
     };
     return R[i];
+  }
+
+  // ---------- Baby bot (docs/AI_PLAN.md, „Obťažnosť BABY"): z ohodnotených front vyberá mäkko (softmax hodnoty
+  // proti súperovej rovnovážnej zmesi), obranu dáva zriedka (max 1 za kolo, penalizovaná - dieťa ho musí vedieť
+  // trafiť), démona nevolá, istú výhru často „prehliadne" a tlmí ho skryté vyrovnávanie: čím viac vedie na HP,
+  // tým voľnejšie hrá, keď prehráva, pritvrdí (stále mäkko). Hlúpe fronty (o veľa horšie ako najlepšia) nehrá. ----------
+  const STAND = [{ type: "pass" }, { type: "pass" }, { type: "pass" }];
+  const DEF_TYPES = new Set(["shield", "mirror", "golden_shield", "golden_mirror"]);
+  const defs = (q) => q.filter(a => DEF_TYPES.has(a.type)).length;
+  function babyPick(R, C, col, value, s0, me, ranked) {
+    const lead = s0.players[me].hp - s0.players[other(me)].hp;
+    const allowed = (q) => defs(q) <= 1 && !q.some(a => a.type === "last_stand");
+    // ležérny ťah: náhodná fronta z lepšej časti predvýberu (priemerná, nie hlúpa) - tým častejšie, čím viac vedie
+    if (rng() < clamp(BB.SLOP + BB.SLOP_LEAD * lead, BB.SLOP_MIN, BB.SLOP_MAX)) {
+      const top = ranked.slice(0, Math.max(3, Math.ceil(ranked.length * BB.TOP))).filter(allowed);
+      if (top.length) return top[Math.floor(rng() * top.length)];
+    }
+    // nepredvída: hodnota fronty je zmes „proti súperovej rovnováhe" a „proti súperovi, ktorý ostane stáť" (strieľa
+    // tam, kde dieťa stojí teraz) - čím viac vedie, tým naivnejšie
+    const a = clamp(BB.NAIVE + BB.NAIVE_LEAD * lead, BB.NAIVE_MIN, BB.NAIVE_MAX);
+    const vs = R.map(r => (1 - a) * C.reduce((acc, c, j) => acc + (col[j] ?? 0) * value(r, c), 0) + a * value(r, STAND));
+    let ok = R.map((r, k) => k).filter(k => allowed(R[k]));
+    if (!ok.length) ok = R.map((r, k) => k);
+    // istá výhra (zabije aspoň v polovici súperových možností) - s pravdepodobnosťou ju prehliadne
+    const kills = (k) => C.filter(c => value(R[k], c) >= 0.99).length >= C.length / 2;
+    if (rng() < (lead >= 0 ? BB.MERCY : BB.MERCY_BEHIND)) { const rest = ok.filter(k => !kills(k)); if (rest.length) ok = rest; }
+    const score = (k) => vs[k] - BB.DEF_PEN * defs(R[k]);
+    const best = Math.max(...ok.map(score));
+    ok = ok.filter(k => score(k) >= best - BB.SPREAD);
+    const T = clamp(BB.T + BB.T_LEAD * lead, BB.T_MIN, BB.T_MAX);
+    const w = ok.map(k => Math.exp((score(k) - best) / T)), tot = w.reduce((a, b) => a + b, 0);
+    let r = rng() * tot;
+    for (let n = 0; n < ok.length; n++) { r -= w[n]; if (r <= 0) return R[ok[n]]; }
+    return R[ok[ok.length - 1]];
   }
 
   // ---------- citlivosť na smrť: fronta, po ktorej ma niektorý súperov plán v matici zabije, sa nehrá,
@@ -352,6 +414,6 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
 
   return {
     onYouAre: belief.onYouAre, onState: belief.onState, onNewGame: belief.onNewGame,
-    decide, belief, stats,
+    decide, belief, stats, setLevel,
   };
 }

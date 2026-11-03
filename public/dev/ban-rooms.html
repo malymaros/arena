@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Zákazy na dlaždici roomky</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* NÁVRH (nie je v hre): ako dlaždica roomky v room browseri ukáže zákazy postáv. Dlaždice kreslí ten istý modul
+     ako hra (room-tiles.js); nové sú len doplnky .bt-* nižšie. Vložené v /dev/ban-chars.html. */
+  html, body { overflow: auto !important; height: auto !important; position: static !important; margin: 0; background: #000; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  .row { display: flex; gap: 40px; padding: 22px; flex-wrap: wrap; align-items: flex-start; }
+  .col h3 { margin: 0 0 4px; font: 600 14px system-ui, sans-serif; color: #ffb300; }
+  .col p { margin: 0 0 12px; color: #8b92a0; max-width: 600px; }
+  .col .room-grid { display: flex; gap: 18px; }
+  .room-btn.room-tile { cursor: default; }
+  /* A: riadok BANNED v tabuľke - žeton farby + počet (červený, keď nie je 0) */
+  .bt-n { font-size: 9px; color: #6b6f7a; text-shadow: 2px 2px 0 #000; }
+  .bt-n.on { color: #ff6b6b; }
+  .room-tile .rt-c.bt { gap: 6px; }
+  /* B: bodka „upravené" na badge arény (ako na záložke v ADVANCED SETTINGS) + štítok CUSTOM */
+  .bt-dot { position: absolute; right: 6px; top: 6px; z-index: 2; width: 10px; height: 10px; background: #ffb300; box-shadow: 0 0 0 2px #000; }
+  .bt-chip { position: absolute; right: 6px; bottom: 5px; z-index: 2; padding: 2px 4px; font-size: 6px; letter-spacing: 1px; color: #1a1200; background: #ffb300; box-shadow: 0 0 0 2px #000; }
+</style>
+</head>
+<body>
+<div class="row" id="row"></div>
+<script type="module">
+  import { buildRoomGrid } from "/client/room-tiles.js";
+
+  const PAL = { "#": "#000", w: "#f4f1e8", W: "#b9b5a8", b: "#2b2e36", B: "#5c606b", h: "#8a8f9a" };
+  const pix = (rows) => {
+    let r = "";
+    rows.forEach((row, y) => [...row].forEach((c, x) => { if (PAL[c]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${PAL[c]}"/>`; }));
+    return `<svg class="rt-ico tok" viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges">${r}</svg>`;
+  };
+  const token = (c, C, hl) => pix(["..####..", `.#${c}${c}${c}${c}#.`, `#${c}${hl}${c}${c}${c}${C}#`, `#${c}${c}${c}${c}${c}${C}#`,
+    `#${c}${c}${c}${c}${C}${C}#`, `#${c}${c}${c}${C}${C}${C}#`, `.#${C}${C}${C}${C}#.`, "..####.."]);
+  const WHITE = token("w", "W", "w"), BLACK = token("b", "B", "h");
+
+  // dve roomky: vľavo bez zákazov, vpravo čierny má 3 zákazy
+  const rooms = { rooms: [
+    { id: 1, slot: 1, players: 1, canJoin: true, phase: "lobby", info: { arena: "bridge", color: "random", chars: "manual", timer: 60 } },
+    { id: 2, slot: 2, players: 1, canJoin: true, phase: "lobby", info: { arena: "bridge", color: "black", chars: "manual", timer: "off" } },
+  ], slots: 2 };
+  const bans = [{ p1: 0, p2: 0 }, { p1: 0, p2: 3 }];
+
+  const host = document.getElementById("row");
+  function col(title, desc, decorate) {
+    const c = document.createElement("div"); c.className = "col";
+    c.innerHTML = `<h3>${title}</h3><p>${desc}</p>`;
+    const g = buildRoomGrid(rooms, () => {});
+    g.querySelectorAll(".room-tile").forEach((t, i) => decorate(t, bans[i]));
+    c.appendChild(g); host.appendChild(c);
+  }
+  col("Oranžový štvorček = aréna CUSTOM", "Vľavo aréna s predvolenými ADVANCED SETTINGS, vpravo upravená (zákazy alebo čokoľvek iné) - v rohu badge oranžový štvorček, ako na záložke v okne.", (t, b) => {
+    if (b.p1 + b.p2) t.querySelector(".rt-badge").insertAdjacentHTML("beforeend", `<i class="bt-dot"></i>`);
+  });
+</script>
+</body>
+</html>

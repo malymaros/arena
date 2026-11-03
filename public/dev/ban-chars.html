@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- public/dev/ban-chars.html - NÁVRH (nie je v hre): BANNED CHARACTERS v ADVANCED SETTINGS na viacerých zariadeniach
+     naraz. Každý rámček je /dev/ban-mock.html v presnej veľkosti zariadenia (?device= vynúti rozloženie ako v hre).
+     Myš = prst (klik = ťuk). -->
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banned characters — návrh</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0c0e; color: #ddd; font: 13px/1.5 system-ui, sans-serif; padding: 16px 20px 40px; }
+  h1 { font-size: 18px; color: #ffb300; margin: 0 0 6px; }
+  p { margin: 0 0 10px; color: #9aa1ad; max-width: 1100px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 18px; }
+  .bar button { background: #1c1d20; color: #ddd; border: 1px solid #333; border-radius: 6px; padding: 8px 12px; cursor: pointer; font: inherit; }
+  .bar button.on { background: #ffb300; color: #1a1200; border-color: #ffb300; font-weight: 600; }
+  .bar .sep { width: 1px; height: 26px; background: #333; margin: 0 6px; }
+  .bar .lab { color: #8b92a0; margin-right: 2px; }
+  .vdesc { color: #cfd2d6; margin: -6px 0 16px; }
+  .devs { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  .dev h2 { font-size: 13px; color: #cfd2d6; margin: 0 0 6px; font-weight: 600; }
+  .holder { position: relative; overflow: hidden; }
+  .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; border: 8px solid #222; border-radius: 18px; background: #000; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  .frame.pc { border-width: 4px; border-radius: 6px; }
+  iframe { display: block; border: 0; }
+  ul { margin: 18px 0 0; padding-left: 18px; color: #cfd2d6; max-width: 1100px; }
+  li { margin: 5px 0; }
+  b { color: #fff; }
+</style>
+</head>
+<body>
+<h1>BANNED CHARACTERS: návrh</h1>
+<p>Nová prvá položka ľavého stĺpca v <b>ADVANCED SETTINGS</b>. Klik na hlavu = zakázať (krížik, zhasne a prestane sa hýbať), druhý klik = povoliť.
+   Každá farba má vlastnú mriežku (napr. čiernemu zakážeš 3 postavy, biely má všetky). Zakázané postavy nie sú vo výbere ani pri RANDOM CHARACTERS.
+   Posledná postava farby sa zakázať nedá. Okno je ten istý kód a CSS ako v hre, len sekcia BANNED je nová.</p>
+<div class="bar" id="bar"></div>
+<div class="vdesc" id="vdesc"></div>
+<div class="devs" id="devs"></div>
+<h2 style="font-size:15px;color:#ffb300;margin:26px 0 6px">Room browser: ako ukázať zákazy na dlaždici roomky</h2>
+<p>Zákazy sú zmena ADVANCED SETTINGS danej arény, takže ich dlaždica ukáže pri aréne. Dva návrhy (vľavo bez zmien, vpravo so zákazmi):</p>
+<iframe src="/dev/ban-rooms.html" style="width:100%;max-width:1300px;height:520px;border:1px solid #262a33;border-radius:6px;background:#000"></iframe>
+<ul>
+  <li><b>Rozhodnuté:</b> zákazy má každá aréna zvlášť (sekcia je na každej záložke a pamätá si vlastné zákazy; záložka so zákazmi má bodku „upravené"; RESET TO DEFAULT ich zmaže pre tú arénu).</li>
+  <li><b>Rozhodnuté:</b> skryté postavy sú v mriežke svojej farby (fialové, blikajú).</li>
+  <li><b>Rozhodnuté:</b> aj v AI roomke WHITE / BLACK (zákazy patria farbe).</li>
+  <li><b>Rozhodnuté:</b> keď má farba po zákazoch menej ako 3 postavy, TOURNAMENT sa zamkne; ak bol zvolený, prepne sa na SINGLE.</li>
+  <li><b>Otázka:</b> pri náhodnej aréne (kocka) má byť TOURNAMENT zamknutý, keď to platí pre <i>ktorúkoľvek</i> z troch arén (každá má vlastné zákazy)?</li>
+  <li><b>Rozhodnuté:</b> room browser zákazy ukáže (pozri návrhy vyššie).</li>
+</ul>
+<script>
+  const VARIANTS = {
+    E: "E · TLAČIDLÁ + OBRAZOVKA (výber vlastníka): v ľavom stĺpci dve tlačidlá WHITE: n a BLACK: n (číslo červené, keď nie je 0); klik otvorí obrazovku tej farby ako pri losovaní postáv - mriežka 4×3 s menami, CLEAR a DONE.",
+    A: "A · VEDĽA SEBA: dve mriežky 4×3 (WHITE | BLACK) vedľa seba, ako mriežka pri losovaní postáv.",
+    B: "B · POD SEBOU: dve mriežky 6×2 pod sebou (väčšie hlavy, ľahšie trafiť prstom).",
+    C: "C · PREPÍNAČ: jedna väčšia mriežka a nad ňou prepínač WHITE / BLACK s počtom zákazov.",
+    D: "D · VLASTNÁ ZÁLOŽKA: 4. karta BANNED vedľa arén, dve veľké mriežky vedľa seba (okno ostane rovnako veľké). Nie je to prvá položka ľavého stĺpca, ale zmestí sa všade.",
+  };
+  const DEVICES = [
+    { key: "pc", label: "PC 1600×900", w: 1600, h: 900, scale: 0.62 },
+    { key: "tablet", label: "iPad 1180×820", w: 1180, h: 820, scale: 0.62 },
+    { key: "phone", label: "iPhone 844×390", w: 844, h: 390, scale: 1 },
+    { key: "phone", label: "Android 915×412", w: 915, h: 412, scale: 1 },
+  ];
+  let v = "E", ai = false;
+  try { const s = JSON.parse(localStorage.getItem("dev.banChars.e")); ai = !!s?.ai; } catch {}
+  const bar = document.getElementById("bar"), devs = document.getElementById("devs");
+  function renderBar() {
+    bar.innerHTML = "";
+    document.getElementById("vdesc").textContent = VARIANTS[v];
+  }
+  function renderDevs() {
+    devs.innerHTML = "";
+    for (const d of DEVICES) {
+      const wrap = document.createElement("div"); wrap.className = "dev";
+      const fw = d.w + (d.key === "pc" ? 8 : 16), fh = d.h + (d.key === "pc" ? 8 : 16);
+      wrap.innerHTML = `<h2>${d.label}${d.scale < 1 ? ` <span style="color:#777;font-weight:400">(zmenšené na ${Math.round(d.scale * 100)} %)</span>` : ""}</h2>
+        <div class="holder" style="width:${fw * d.scale}px;height:${fh * d.scale}px"><div class="frame ${d.key === "pc" ? "pc" : ""}" style="transform:scale(${d.scale})">
+        <iframe width="${d.w}" height="${d.h}" src="/dev/ban-mock.html?device=${d.key}&v=${v}${ai ? "&ai=1" : ""}"></iframe></div></div>`;
+      devs.appendChild(wrap);
+    }
+  }
+  bar.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.v) v = b.dataset.v; else if ("ai" in b.dataset) ai = !ai;
+    try { localStorage.setItem("dev.banChars.e", JSON.stringify({ v, ai })); } catch {}
+    renderBar(); renderDevs();
+  });
+  renderBar(); renderDevs();
+</script>
+</body>
+</html>

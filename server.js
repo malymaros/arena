@@ -185,6 +185,9 @@ function okAdmin(keyFromClient) {
 // ai = roomka proti AI botovi: bot sedí ako osoba B (virtuálny socket, engine/ai/seat.js)
 function createRoom(id, { ai = false, slot = null } = {}) {
   const botPerson = ai ? "B" : null;
+  // obťažnosť bota (docs/AI_PLAN.md, „Obťažnosť BABY"): hráč ju vyberie pri vstupe (join_room { level }) -
+  // okno CHOOSE DIFFICULTY po kliknutí na hlavu bota; platí, kým roomka žije (po odchode hráča vznikne nová, normal)
+  let aiLevel = "normal";
   /* -------------------- Game state (per-room) -------------------- */
   // identita hráča je „osoba" A/B (A = prvý pripojený = host); slot p1/p2 je len ľavá/pravá rola,
   // ktorá sa medzi hrami série prehadzuje (štartér danej hry vždy sedí v p1 = vľavo)
@@ -208,7 +211,8 @@ function createRoom(id, { ai = false, slot = null } = {}) {
     names: () => personNames,
     awaitingOpponent: () => pendingMatchConfig != null,
     vsAi: () => (ai ? slotForPerson(botPerson) : null), // slot bota (snapshot vsAi)
-  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson });
+    aiLevel: () => (ai ? aiLevel : null),               // obťažnosť bota (snapshot aiLevel)
+  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson, aiLevel: () => aiLevel });
   const { snapshot, snapshotFor, redactTimelineFor, slotForPerson, startMatch, newGame, sanitizeConfig } = engine;
 
   // per-room emit: nahrádza io.emit - pošle len hráčom A/B a divákom TEJTO roomky (nie cudzím)
@@ -354,7 +358,7 @@ function onTurnTimeout() {
   function roomEmpty() { return ["A", "B"].filter(p => p !== botPerson).every(p => !personAlive(p)); } // bot sa nepočíta
   // riadok tejto roomky pre room-browser (počet hráčov, či sa dá pripojiť)
   function roomsRow() {
-    if (ai) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), phase: engine.game.phase, ai: true };
+    if (ai) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), phase: engine.game.phase, ai: true, level: aiLevel };
     const players = ["A", "B"].filter(personAlive).length;
     // slot = pevné miesto v room-browseri (ROOM 1…MAX_ROOMS, číslo sa nemení, kým roomka žije); mená sediacich hráčov
     // names = [host, druhý hráč] po stranách (prázdne miesto = null) - room browser ich píše vedľa štvorčekov
@@ -441,8 +445,10 @@ function onTurnTimeout() {
   }
 
   // pripoj sa do tejto roomky ako 2. hráč (osoba B; ak host odišiel a B ostal, obsadí A)
-  function join(socket) {
+  function join(socket, level) {
     if (socket.data.person) return;
+    // AI roomka: hráč si sadá k botovi → nastav obťažnosť (len pred zápasom, keď je miesto hosta voľné)
+    if (ai && isFree("A") && engine.game.phase === "lobby") setAiLevel(level);
     if (isFree("B")) { seat(socket, "B"); broadcastRooms(); }
     else if (isFree("A")) { seat(socket, "A"); broadcastRooms(); }
     else socket.emit("join_denied", "full");
@@ -619,10 +625,16 @@ function onTurnTimeout() {
     }
   }
   let botPending = null, botTimer = null; // podržaný ťah kola bota (čaká na hráčovo zamknutie)
-  let seatBot = null;
+  let seatBot = null, botSock = null;
+  function setAiLevel(level) {
+    aiLevel = level === "baby" ? "baby" : "normal";
+    personNames[botPerson] = aiLevel === "baby" ? "BABY" : "AI"; // meno bota v HUD
+    botSock?.setLevel(aiLevel);
+  }
   if (ai) {
     const sock = createBotSeat({ botOpts: { seed: crypto.randomInt(2 ** 31), ...(AI_SIMS ? { budgetSims: AI_SIMS, budgetMs: 1000 } : { budgetMs: AI_THINK_MS }) }, onDecision: (d) => onBotDecision(d) });
     sock.data.pendingName = "AI";
+    botSock = sock;
     seatBot = () => seat(sock, botPerson);
   }
 
@@ -751,7 +763,7 @@ io.on("connection", (socket) => {
     if (maintBlocked(socket)) return;
     const room = rooms.get(arg?.roomId);
     if (!room) return;
-    room.join(socket);
+    room.join(socket, arg?.level);
   });
   socket.on("spectate_room", (arg) => {
     if (socket.data.person || socket.data.roomId) return;

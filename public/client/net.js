@@ -82,7 +82,7 @@ function renderRooms(info) {
   roomsListEl.innerHTML = "";
   // stála AI roomka nie je v zozname - hrá sa cez postavičku bota vpravo dole (lobby-bot.js): voľná → sadneš si,
   // obsadená (max 1 hra s AI na server) → sleduješ
-  setLobbyBot(roomsEl, info?.aiRoom || null, (r) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id }));
+  setLobbyBot(roomsEl, info?.aiRoom || null, (r, level) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id, ...(level ? { level } : {}) }));
   // pevné dlaždice ROOM 1…N (room-tiles.js): prázdna → CREATE, čaká na súpera → JOIN, plná → SPECTATE
   roomsListEl.appendChild(buildRoomGrid(info, (kind, slot, r) => {
     if (kind === "create") socket.emit("create_room", { slot });

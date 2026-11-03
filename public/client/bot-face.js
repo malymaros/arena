@@ -117,7 +117,7 @@ function baseline() {
 /* ---------- kreslenie do HUD canvasu ---------- */
 export function drawBotFace(cvs, now) {
   const want = face.transient && now < face.until ? face.transient : baseline();
-  if (!paintFace(face, want, now, cvs.width)) return;
+  if (!(botIsBaby() ? paintBaby : paintFace)(face, want, now, cvs.width)) return;
   const ctx = cvs.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, cvs.width, cvs.height);
@@ -186,17 +186,135 @@ function paintFace(f, want, now, salt) {
   return true;
 }
 
+/* ---------- BABY bot (obťažnosť BABY, návrh public/dev/ai-difficulty.html - variant D · BIB + cumlík FRONT RING) ----------
+   Okrúhla pastelová hlava, srdiečko na anténke, podbradník, ružové líčka a cumlík, ktorý stále dudle. Nálady
+   (rovnaké spúšťače ako NORMAL) mení LEN očami (+ slzy / pot / poskočenie); cumlík ostáva v ústach aj pri K.O. */
+const bb = (rows) => rows.map(r => [...r].map(c => (c === "#" ? 2 : c === "+" ? 1 : c === "o" ? 3 : 0)));
+const B_EYES = {
+  dot:    bb([".###.", "#o###", "#####", "#####", ".###."]),
+  happy:  bb([".....", ".###.", "#...#", "#...#", "....."]),
+  wide:   bb([".###.", "#...#", "#.#.#", "#...#", ".###."]),
+  closed: bb([".....", ".....", "#####", ".....", "....."]),
+  up:     bb([".###.", "#o###", "#####", ".....", "....."]),
+  down:   bb([".....", ".....", "#####", "#o###", ".###."]),
+  half:   bb([".....", ".....", "#####", "#####", "....."]),
+  gtL:    bb(["#....", ".##..", "...#.", ".##..", "#...."]),
+  ltR:    bb(["....#", "..##.", ".#...", "..##.", "....#"]),
+  x:      bb(["#...#", ".#.#.", "..#..", ".#.#.", "#...#"]),
+};
+const B_BROWS = {
+  worried: [bb(["...##", "###.."]), bb(["##...", "..###"])],
+  pout:    [bb(["##...", "..###"]), bb(["...##", "###.."])],
+  raised:  [bb([".###.", "....."]), bb([".###.", "....."])],
+};
+const B_MOODS = {
+  neutral:   { col: "#8ff0ff", eyes: ["dot", "dot"] },
+  thinking:  { col: "#d7b8ff", eyes: ["up", "up"], fx: "think" },
+  happy:     { col: "#9dff9a", eyes: ["happy", "happy"], fx: "bob" },
+  smug:      { col: "#d9ff8a", eyes: ["half", "dot"] },
+  frown:     { col: "#ffd88a", eyes: ["down", "down"], brows: "worried", fx: "sniff" },
+  angry:     { col: "#ff9a9a", eyes: ["down", "down"], brows: "pout", fx: "cry" }, // trafený silno → plače
+  surprised: { col: "#fff07a", eyes: ["wide", "wide"], brows: "raised", fx: "bang" },
+  worried:   { col: "#b5d0ff", eyes: ["dot", "dot"], brows: "worried", fx: "sweat" },
+  sad:       { col: "#8fbaff", eyes: ["down", "down"], brows: "worried", fx: "tear" },
+  laugh:     { col: "#9dff9a", eyes: ["gtL", "ltR"], fx: "laugh" },
+  ko:        { col: "#a7adb5", eyes: ["x", "x"], fx: "ko" },
+};
+const B_BODY = [178, 204, 232], B_HI = [222, 236, 250], B_LO = [112, 134, 176];
+const B_PINK = [255, 140, 192], B_PINK_LO = [196, 70, 130];
+const B_PACI = { P: [255, 140, 192], p: [196, 70, 130], w: [255, 214, 232], r: [255, 190, 90], k: [255, 190, 90] };
+// cumlík FRONT RING: motýlí štít + krúžok spredu (vrstvy { rows, dx })
+const B_SHIELD = [".ppp...ppp.", "pPwPp.pPPPp", "pPPPPpPPPPp", "pPPPp.pPPPp", ".ppp...ppp."];
+const B_RING = [".rrr.", "r...r", "r.k.r", "r...r", ".rrr."];
+const B_SCR = { x: 6, y: 10, w: 20, h: 16 };
+const inRound = (x, y, x0, y0, x1, y1, r) => {
+  const dx = Math.max(x0 + r - x, 0, x - (x1 - r)), dy = Math.max(y0 + r - y, 0, y - (y1 - r));
+  return x >= x0 && x <= x1 && y >= y0 && y <= y1 && dx * dx + dy * dy <= r * r + 1;
+};
+const inHead = (x, y) => inRound(x, y, 2, 7, 29, 30, 5);
+const TEAR = [130, 190, 255], TEAR_HI = [200, 232, 255];
+
+function paintBaby(f, want, now, salt) {
+  ensureBuf();
+  if (want !== f.mood) { f.mood = want; f.since = now; f.flashUntil = 0; }
+  const m = B_MOODS[f.mood] || B_MOODS.neutral, age = now - f.since;
+  const tick = Math.floor(now / 66);
+  if (now > f.nextBlink) { f.blinkUntil = now + 130; f.nextBlink = now + 1800 + Math.random() * 2800; }
+  const blink = now < f.blinkUntil && !["ko", "laugh", "happy", "angry"].includes(f.mood);
+  const key = `b:${f.mood}:${tick}:${blink}:${salt}`;
+  if (key === f.lastKey) return false;
+  f.lastKey = key;
+
+  img.data.fill(0);
+  const C = hexRgb(m.col), DIM = mix(C, [10, 16, 24], 0.6), BG = mix(C, [8, 12, 18], 0.9);
+  let jx = 0, jy = 0;
+  if (m.fx === "bob") jy = Math.floor(now / 420) % 2 ? -1 : 0;
+  if (m.fx === "laugh") jy = Math.floor(now / 160) % 2 ? -1 : 0;
+  if (m.fx === "cry" && age < 1200) jx = Math.round(Math.sin(now / 30));
+  // anténka so srdiečkom (pri premýšľaní bliká)
+  for (let y = 4; y <= 6; y++) put(15 + jx, y + jy, B_LO);
+  const H = f.mood === "ko" ? [120, 120, 128] : (m.fx === "think" && Math.floor(now / 260) % 2) ? B_PINK_LO : B_PINK;
+  stamp(bb(["##.##", "#####", ".###.", "..#.."]), 13 + jx, jy, H, H);
+  // okrúhla hlava
+  for (let y = 6; y <= 30; y++) for (let x = 1; x <= 30; x++) {
+    if (!inHead(x, y)) continue;
+    const edge = !inHead(x - 1, y) || !inHead(x + 1, y) || !inHead(x, y - 1) || !inHead(x, y + 1);
+    put(x + jx, y + jy, edge ? B_LO : y <= 9 ? B_HI : y >= 28 ? B_LO : B_BODY);
+  }
+  // podbradník so srdiečkom
+  const half = [9, 9, 8, 7, 5];
+  for (let k = 0; k < 5; k++) for (let x = 16 - half[k]; x <= 15 + half[k]; x++) {
+    const edge = k === 4 || x === 16 - half[k] || x === 15 + half[k];
+    put(x + jx, 27 + k + jy, edge ? B_PINK : [248, 248, 252]);
+  }
+  stamp(bb(["#.#", "###", ".#."]), 14 + jx, 28 + jy, [255, 120, 170], [255, 120, 170]);
+  // uši-reproduktory
+  for (let y = 15; y <= 20; y++) { put(jx, y + jy, B_LO); put(1 + jx, y + jy, B_HI); put(31 + jx, y + jy, B_LO); put(30 + jx, y + jy, B_HI); }
+  // obrazovka
+  const sx = B_SCR.x + jx, sy = B_SCR.y + jy;
+  for (let y = 0; y < B_SCR.h; y++) for (let x = 0; x < B_SCR.w; x++) {
+    if (inRound(x, y, 0, 0, B_SCR.w - 1, B_SCR.h - 1, 3)) put(sx + x, sy + y, BG.map(v => Math.round(v * (y % 2 ? 0.84 : 1))));
+  }
+  // oči (+ obočie)
+  const ex = m.fx === "think" ? [-1, 0, 1, 0][Math.floor(now / 700) % 4] : 0;
+  const [eL, eR] = m.eyes;
+  stamp(B_EYES[blink ? "closed" : eL], sx + 2 + ex, sy + 3, C, DIM);
+  stamp(B_EYES[blink ? "closed" : eR], sx + 13 + ex, sy + 3, C, DIM);
+  if (m.brows) { const [bl, br] = B_BROWS[m.brows]; stamp(bl, sx + 2, sy, C, DIM); stamp(br, sx + 13, sy, C, DIM); }
+  // líčka
+  if (f.mood !== "ko") { const bl = f.mood === "angry" ? [255, 90, 110] : [255, 120, 170]; put(sx + 1, sy + 9, bl); put(sx + 2, sy + 9, bl); put(sx + 17, sy + 9, bl); put(sx + 18, sy + 9, bl); }
+  // cumlík: v každej nálade na mieste a v rovnakej farbe, len dudle (rytmicky ho vtiahne o pixel)
+  const px = sx + 4, py = sy + 9 + (Math.floor(now / 260) % 3 === 1 ? -1 : 0);
+  B_SHIELD.forEach((row, y) => [...row].forEach((ch, x) => { if (B_PACI[ch]) put(px + x, py + y, B_PACI[ch]); }));
+  B_RING.forEach((row, y) => [...row].forEach((ch, x) => { if (B_PACI[ch]) put(px + 3 + x, py + y, B_PACI[ch]); }));
+  // efekty
+  if (m.fx === "tear" || m.fx === "cry") {
+    const sp = m.fx === "cry" ? 90 : 150;
+    for (const ox of m.fx === "cry" ? [3, 14] : [3]) { const dy = Math.floor(age / sp) % 8; put(sx + ox, sy + 8 + dy, TEAR_HI); put(sx + ox, sy + 9 + dy, TEAR); }
+    if (m.fx === "cry") { const dy = Math.floor((age + 300) / 90) % 8; put(sx + 1, sy + 8 + dy, TEAR); put(sx + 18, sy + 8 + dy, TEAR); }
+  }
+  if (m.fx === "sniff") { const dy = Math.floor(age / 220) % 5; put(sx + 3, sy + 8 + dy, TEAR); }
+  if (m.fx === "sweat") { const dy = Math.floor(age / 180) % 6; put(sx + 19, sy + 1 + dy, TEAR_HI); put(sx + 19, sy + 2 + dy, TEAR); }
+  if (m.fx === "bang" && age < 1400) { const c = hexRgb("#fff07a"); for (let y = 0; y < 4; y++) put(29, y, c); put(29, 5, c); put(30, 0, c); put(30, 1, c); }
+  if (m.fx === "ko") { const s = [[2, 2], [3, 1], [4, 2], [3, 3]][Math.floor(now / 300) % 4]; put(sx + s[0] + 16, sy - 6 + s[1], [255, 230, 120]); }
+  octx.putImageData(img, 0, 0);
+  return true;
+}
+// obťažnosť bota v AI roomke (snapshot aiLevel)
+export const botIsBaby = () => state?.aiLevel === "baby";
+
 /* ---------- hlava bota v room browseri (klik = hra proti AI, lobby-bot.js) ---------- */
 // plátno 32×34 umeleckých pixelov: len hlava (tá istá ako v HUD), pokojne sa vznáša; hop = poskakuje (hover)
 export const FIGURE_W = 32, FIGURE_H = 34;
-export function drawBotFigure(cvs, mood, now, { hop = false } = {}) {
+// baby = hlava Baby bota (obťažnosť BABY)
+export function drawBotFigure(cvs, mood, now, { hop = false, baby = false } = {}) {
   const k = Math.max(1, Math.floor(cvs.width / FIGURE_W));
   const y = hop ? [2, 1, 0, 1][Math.floor(now / 120) % 4] : 1 + (Math.floor(now / 900) % 2);
   // stav tváre per plátno (dev/rooms.html kreslí viac hláv naraz)
   const fc = cvs._botFace || (cvs._botFace = { mood: "neutral", since: 0, flashUntil: 0, blinkUntil: 0, nextBlink: 1500 + Math.random() * 2000, lastKey: "", figKey: "" });
   // paintFace kreslí do zdieľaného bufferu - pri viacerých plátnach ho treba prekresliť vždy, keď sa kreslí sem
   fc.lastKey = "";
-  paintFace(fc, mood, now, "fig");
+  (baby ? paintBaby : paintFace)(fc, mood, now, "fig");
   const key = fc.lastKey + ":" + y + ":" + cvs.width;
   if (key === fc.figKey) return;
   fc.figKey = key;

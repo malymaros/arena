@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Banned characters — maketa</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/styles-mobile.css" />
+<style>
+  /* NÁVRH (nie je v hre): okno ADVANCED SETTINGS s novou sekciou BANNED CHARACTERS ako prvou položkou ľavého
+     stĺpca. Okno je ten istý markup a CSS ako v hre (styles.css + styles-mobile.css, zmenšenie cez viewport.js,
+     ?device=phone|tablet|pc), nové sú len triedy .ban-*. Varianty: ?v=A (dve mriežky vedľa seba), B (pod sebou),
+     C (jedna mriežka s prepínačom farby); ?ai=1 = AI roomka (YOU / BOT namiesto WHITE / BLACK). */
+  /* okno je o niečo širšie, aby sa dve mriežky zmestili do ľavého stĺpca (na PC / tablete; telefón má celú šírku) */
+  html:not(.phone):not(.v-D):not(.v-E) .lobby-adv .lobby-card { width: 860px; }
+  /* okno má pevnú veľkosť pre všetky záložky - s mriežkami musí byť vyššie (najdlhšia je PORTAL REALM) */
+  html:not(.phone):not(.v-D):not(.v-E) .adv-body { height: 620px; }
+  html:not(.phone).v-B .adv-body { height: 700px; }
+  /* telefón: ľavý stĺpec sa pri dlhej záložke posúva (PORTAL REALM sa inak nezmestí) */
+  html.phone:not(.v-D):not(.v-E) .adv-cols > div:first-child { overflow-y: auto; padding-right: 8px; }
+  /* variant D: vlastná záložka BANNED (4. karta) s veľkými mriežkami */
+  .adv-tabs .arena-card.ban-tab { background: #3a1216; display: flex; align-items: center; justify-content: center; }
+  .adv-tabs .arena-card.ban-tab span { color: #ff8a80; }
+  .v-D .adv-tabs.arena-pick { display: grid; grid-template-columns: 1fr 1fr 1fr .8fr; }
+  .v-D .ban-grid { gap: 8px; grid-template-columns: repeat(6, 1fr); }
+  .v-D .ban-box { padding: 10px; }
+  .v-D .ban-head { font-size: 11px; margin-bottom: 10px; }
+  .phone.v-D .ban-head { font-size: 16px; }
+  .ban-note { font-size: 8px; color: #8b92a0; margin-top: 10px; line-height: 1.6; }
+  .phone .ban-note { font-size: 12px; }
+  .ban-grids { display: flex; gap: 10px; }
+  .v-B .ban-grids { flex-direction: column; gap: 8px; }
+  .ban-box { flex: 1; min-width: 0; padding: 6px 6px 7px; background: rgba(0,0,0,.25); box-shadow: inset 0 0 0 2px #23262e; }
+  .ban-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; font-size: 9px; letter-spacing: 1px; white-space: nowrap; }
+  .ban-head .side.white { color: #f2f2f2; } .ban-head .side.black { color: #9aa0ad; }
+  .ban-head .cnt { color: #ff6b6b; }
+  .ban-head .cnt.zero { color: #6b6f7a; }
+  .ban-clear { border: none; cursor: pointer; font: 8px "Press Start 2P", monospace; color: #cfd2d6; background: #2a2e37; padding: 4px 5px;
+    box-shadow: 0 0 0 2px #000; }
+  .ban-clear[disabled] { opacity: .3; cursor: default; }
+  .ban-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .v-B .ban-grid { grid-template-columns: repeat(6, 1fr); }
+  .v-C .ban-grid { grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .ban-cell { position: relative; aspect-ratio: 1; padding: 0; border: none; cursor: pointer; background: rgba(12,14,18,.85);
+    box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(255,255,255,.07); overflow: hidden; }
+  .ban-cell canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .ban-cell:hover { box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #ffb300; }
+  .ban-cell.corrupt { background: rgba(60,14,90,.55); box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(197,155,255,.35); }
+  .ban-cell.corrupt.flash canvas { filter: hue-rotate(80deg) saturate(2); transform: translateX(1px); }
+  .ban-cell.future { cursor: default; opacity: .3; background: repeating-linear-gradient(45deg, #15171d 0 6px, #1b1e26 6px 12px);
+    display: flex; align-items: center; justify-content: center; font-size: 8px; color: #6b6f7a; }
+  .ban-cell.banned canvas { filter: grayscale(1) brightness(.75) contrast(.8); opacity: .55; }
+  .ban-cell.banned::after { content: ""; position: absolute; inset: 14%; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23000' d='M0 0h3v1h1v1h2V1h1V0h3v3H9v1H8v2h1v1h1v3H7V9H6V8H4v1H3v1H0V7h1V6h1V4H1V3H0z'/%3E%3Cpath fill='%23e53935' d='M1 1h1v1h1v1h1v1h2V3h1V2h1V1h1v1H8v1H7v1H6v2h1v1h1v1h1v1H8V8H7V7H6V6H4v1H3v1H2v1H1V8h1V7h1V6h1V4H3V3H2V2H1z'/%3E%3C/svg%3E") center / contain no-repeat;
+    image-rendering: pixelated; }
+  .ban-cell.nope { animation: ban-nope .35s steps(4); }
+  @keyframes ban-nope { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+  .ban-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; min-height: 18px; }
+  .ban-msg { font-size: 8px; color: #ff6b6b; letter-spacing: 1px; }
+  .ban-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+  .ban-tabs .opt { flex: 1; font-size: 9px; padding: 7px 4px; }
+  .ban-tabs .opt .n { color: #ff6b6b; margin-left: 4px; }
+  .ban-tabs .opt.active .n { color: #7a1f00; }
+  /* telefón: väčšie hlavy (prst) */
+  .phone .ban-head { font-size: 12px; }
+  .phone .ban-clear { font-size: 11px; padding: 6px 7px; }
+  .phone .ban-msg { font-size: 11px; }
+  .phone .ban-tabs .opt { font-size: 13px; }
+  /* ---------- variant E (vlastník 2026-11-03): tlačidlo v ľavom stĺpci → samostatná obrazovka ako losovanie postáv
+     (char-roll: rovnaká mriežka 4×3, mená, glitch skrytých postáv), hore prepínač WHITE / BLACK ---------- */
+  .ban-open { flex: 1; min-width: 0; white-space: nowrap; }
+  .ban-open b { color: #ff6b6b; font-weight: 400; }
+  .ban-screen { z-index: 10010; gap: 22px; }
+  .ban-screen .rr-title { margin-top: -12px; }
+  .ban-screen .bs-title { font-size: 22px; color: #ffb300; letter-spacing: 3px; text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.55); }
+  .ban-screen .bs-sides { display: flex; gap: 14px; }
+  .ban-screen .bs-side { min-width: 200px; border: none; cursor: pointer; font: 14px "Press Start 2P", monospace; letter-spacing: 2px;
+    padding: 12px 16px; color: #cfd2d6; background: #1d2027; box-shadow: 0 0 0 3px #000, inset 0 -4px 0 rgba(0,0,0,.35); }
+  .ban-screen .bs-side.on { background: #ffb300; color: #1a1200; }
+  .ban-screen .bs-side .n { margin-left: 8px; color: #ff6b6b; }
+  .ban-screen .bs-side.on .n { color: #7a1f00; }
+  .ban-screen .rr-cell { cursor: pointer; }
+  .ban-screen .rr-cell:not(.future):not(.banned):hover .rr-face::after { box-shadow: 0 0 0 2px #000, inset 0 0 0 4px #ffb300; }
+  .ban-screen .rr-cell.banned .rr-face canvas { filter: grayscale(1) brightness(.7) contrast(.8); opacity: .5; }
+  .ban-screen .rr-cell.banned .rr-name { color: #6b6f7a; text-decoration: line-through; animation: none; }
+  .ban-screen .rr-cell.banned .rr-face { animation: none; }
+  .ban-screen .rr-cell.banned .rr-face::before { content: ""; position: absolute; inset: 14%; z-index: 2; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23000' d='M0 0h3v1h1v1h2V1h1V0h3v3H9v1H8v2h1v1h1v3H7V9H6V8H4v1H3v1H0V7h1V6h1V4H1V3H0z'/%3E%3Cpath fill='%23e53935' d='M1 1h1v1h1v1h1v1h2V3h1V2h1V1h1v1H8v1H7v1H6v2h1v1h1v1h1v1H8V8H7V7H6V6H4v1H3v1H2v1H1V8h1V7h1V6h1V4H3V3H2V2H1z'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .ban-screen .rr-cell.nope .rr-face { animation: ban-nope .35s steps(4); }
+  .ban-screen .bs-foot { width: 496px; margin-top: -10px; } /* šírka mriežky (4 × 112 + 3 × 16) */
+  /* CLEAR: pixel-art tlačidlo (zubaté rohy po 2 px, čierny obrys, svetlá horná a tmavá spodná hrana) - rovnako veľké ako DONE */
+  .ban-screen .bs-clear { flex: 1; margin: 0; padding: 16px; cursor: pointer; border: none; border-radius: 0;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    font-family: inherit; font-size: 14px; letter-spacing: 2px; color: #e3e5ea; background: #3a3e47; text-shadow: 2px 2px 0 #000;
+    clip-path: polygon(0 2px, 2px 2px, 2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px),
+      calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px));
+    box-shadow: inset 0 0 0 2px #000, inset 0 5px 0 rgba(255,255,255,.16), inset 0 -6px 0 rgba(0,0,0,.4); }
+  .ban-screen .bs-clear svg { width: 14px; height: 14px; display: block; fill: #ff6a5a; filter: drop-shadow(2px 2px 0 #000); }
+  .ban-screen .bs-clear:hover { background: #4a2a2c; color: #ffd0c8; }
+  .ban-screen .bs-clear:active { transform: translateY(3px); }
+  .ban-screen .bs-clear:disabled { cursor: default; color: #6b6f7a; background: #23252b; transform: none; }
+  .ban-screen .bs-clear:disabled svg { fill: #4a4d55; }
+  .ban-screen .bs-foot { align-items: stretch; }
+  .ban-screen .bs-foot .adv-done { margin: 0; }
+  .phone .ban-screen .bs-clear { font-size: 18px; }
+  .phone .ban-screen .bs-clear svg { width: 18px; height: 18px; }
+  .ban-screen .bs-msg { min-height: 12px; margin-top: -8px; font-size: 11px; color: #ff6b6b; letter-spacing: 1px; }
+  .phone .ban-screen { zoom: 1.2; }
+  .phone .ban-screen .bs-side { font-size: 18px; padding: 14px 20px; }
+  .phone .ban-screen .bs-msg { font-size: 15px; }
+</style>
+</head>
+<body>
+  <!-- sprites.js → dom.js číta #grid (gap dosky); maketa dosku nemá -->
+  <div id="grid" style="display:none"></div>
+  <div id="lobby-adv" class="lobby-adv">
+    <div class="lobby-card">
+      <h2 class="adv-title">ADVANCED SETTINGS</h2>
+      <div class="arena-pick adv-tabs" id="tabs"></div>
+      <div class="adv-body" id="body"></div>
+      <div class="adv-foot">
+        <button class="adv-reset" id="reset">RESET TO DEFAULT</button>
+        <button class="lobby-start adv-done">DONE</button>
+      </div>
+    </div>
+  </div>
+  <div id="ban-screen" class="char-roll ban-screen hidden">
+    <div class="bs-title">BANNED CHARACTERS</div>
+    <div class="rr-title" id="bs-side"></div>
+    <div class="rr-grid" id="bs-grid"></div>
+    <div class="bs-msg" id="bs-msg"></div>
+    <div class="adv-foot bs-foot"><button class="bs-clear" id="bs-clear"><svg viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><path d="M0 0h2v1h1v1h2V1h1V0h2v2H7v1H6v2h1v1h1v2H6V7H5V6H3v1H2v1H0V6h1V5h1V3H1V2H0z"/></svg>CLEAR</button><button class="lobby-start adv-done" id="bs-done">DONE</button></div>
+  </div>
+<script type="module">
+  import "/client/viewport.js";
+  import { pixSvg } from "/client/pix.js";
+  import { ARENA_KEYS, ARENA_NAMES, drawArenaThumb } from "/client/arena-thumbs.js";
+  import { PORTAL_TYPES, PORTAL_ORDER, FLAME2_SVG } from "/client/portal-art.js";
+  import { drawMageHeadAnim, mageHeadHtml } from "/client/mage-head.js";
+  import { usesAltColor } from "/client/sprites.js";
+  import { CHAR_META, SIDE_CHARS } from "/chars/index.js";
+
+  const P = new URLSearchParams(location.search);
+  const V = ["A", "B", "C", "D", "E"].includes(P.get("v")) ? P.get("v") : "E";
+  const AI = P.get("ai") === "1";
+  document.documentElement.classList.add("v-" + V);
+  // poradie ako v losovaní postáv (char-roll.js); side-postavy podľa strany, null = budúca postava
+  const LAYOUT = {
+    p1: ["fire", "lightning", "wanderer", "countess", "medusa", "minotaur", "naruto", "luffy", "escanor", "soldier", "werewolf", null],
+    p2: ["fire", "lightning", "wanderer", "onre", "medusa", "minotaur", "naruto", "jotaro", "escanor", "soldier", "werewolf", null],
+  };
+  const SIDE_LABEL = { p1: "⚪ WHITE", p2: "⚫ BLACK" }; // aj v AI roomke farby (zákazy závisia od farby)
+  const SHORT = { lightning: "LIGHTNING", wanderer: "WANDERER" }; // ako losovanie postáv
+  const nameOf = (c) => SHORT[c] || (CHAR_META[c]?.name || c).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  // zákazy sú pre každú arénu zvlášť (rozhodnutie vlastníka 2026-11-03) - banned ukazuje na zákazy otvorenej záložky
+  const BANS = { bridge: { p1: new Set(), p2: new Set(["medusa", "minotaur", "jotaro"]) }, portal: { p1: new Set(), p2: new Set() }, swamp: { p1: new Set(), p2: new Set() } };
+  let banned = BANS.bridge;
+  let curSide = "p2"; // variant C
+  const msg = { p1: "", p2: "" };
+
+  // záložky arén (rovnaké ako v hre); variant D má navyše 4. záložku BANNED
+  let tab = V === "D" ? "ban" : "bridge";
+  document.getElementById("tabs").innerHTML = ARENA_KEYS.map(a =>
+    `<button class="arena-card" data-tab="${a}"><canvas width="320" height="180"></canvas><i class="dot"></i><span>${ARENA_NAMES[a]}</span></button>`).join("")
+    + (V === "D" ? `<button class="arena-card ban-tab" data-tab="ban"><i class="dot"></i><span>BANNED</span></button>` : "");
+  document.querySelectorAll("#tabs canvas").forEach(cv => drawArenaThumb(cv, cv.parentElement.dataset.tab));
+  document.getElementById("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; if (BANS[tab]) banned = BANS[tab]; render(); } });
+
+  const section = (label, body) => `<div class="lobby-section"><div class="lobby-label">${label}</div>${body}</div>`;
+  const opt = (vals, cur, cls = "") => `<div class="opt-row${cls}">${vals.map(v => `<button class="opt${v === cur ? " active" : ""}">${v}</button>`).join("")}</div>`;
+  const wRow = (l, ico, v) => `<label class="weight"><span class="w-ico">${ico}</span>${l}
+    <button type="button" class="w-step">−</button><input type="number" value="${v}" readonly><button type="button" class="w-step">+</button><span class="pct">%</span></label>`;
+  const weights = (rows) => `<div class="weights">${rows.map(r => wRow(...r)).join("")}</div><div class="weights-sum">Total: 100%</div>`;
+  const BRIDGE_T = [["Damage", pixSvg("flame"), 75], ["Insta-kill", pixSvg("skull"), 5], ["Heal", pixSvg("heart"), 5], ["Power", pixSvg("sword"), 5], ["Mana", pixSvg("drop"), 5], ["Def-blocker", pixSvg("shieldx"), 5]];
+  const PORTAL_T = [["Damage", FLAME2_SVG, 90], ["Insta-kill", pixSvg("skull"), 10]];
+  const PORTAL_P = PORTAL_ORDER.map((k, i) => [PORTAL_TYPES[k].en, `<span class="w-ico w-portal" style="--pc:${PORTAL_TYPES[k].pc};--pc2:${PORTAL_TYPES[k].pc2}"></span>`, [70, 5, 10, 5, 10][i]]);
+  // obsah záložiek arén (ten istý ako v hre, len statický)
+  function arenaCols() {
+    if (tab === "portal") return [section("SPECIAL TILES PER ROUND", opt([1, 2, 3], 1)) + section("TILE PREVIEW", opt(["On", "Off"], "On")) + section("TILE CHANCE", weights(PORTAL_T)),
+      section("PORTALS PER ROUND", opt([1, 2, 3, 4, 5, 6, 7], 2, " tight")) + section("PORTAL CHANCE", weights(PORTAL_P))];
+    if (tab === "swamp") return [section("ITEMS PER ROUND", opt([1, 2, 3], 1)) + section("SHREK PREVIEW", opt(["On", "Off"], "On")),
+      section("ITEM CHANCE", weights([["Heart", pixSvg("heart"), 60], ["Mana", pixSvg("drop"), 40]]))];
+    return [section("SPECIAL TILES PER ROUND", opt([1, 2, 3], 1)) + section("TILE PREVIEW", opt(["On", "Off"], "On")), section("TILE CHANCE", weights(BRIDGE_T))];
+  }
+
+  const cellHtml = (slot, c) => {
+    if (!c) return `<div class="ban-cell future">???</div>`;
+    const b = banned[slot].has(c);
+    return `<button class="ban-cell${SIDE_CHARS[c] ? " corrupt" : ""}${b ? " banned" : ""}" data-slot="${slot}" data-char="${c}" title="${nameOf(c)}">${mageHeadHtml(c, usesAltColor(c, slot) ? "alt-color" : "", slot)}</button>`;
+  };
+  const cnt = (slot) => { const n = banned[slot].size; return `<span class="cnt${n ? "" : " zero"}">${n ? `${n} BANNED` : "NONE"}</span>`; };
+  const box = (slot) => `<div class="ban-box"><div class="ban-head"><span class="side ${slot === "p1" ? "white" : "black"}">${SIDE_LABEL[slot]}</span>${cnt(slot)}</div>
+    <div class="ban-grid">${LAYOUT[slot].map(c => cellHtml(slot, c)).join("")}</div>
+    <div class="ban-foot"><span class="ban-msg">${msg[slot]}</span><button class="ban-clear" data-clear="${slot}"${banned[slot].size ? "" : " disabled"}>CLEAR</button></div></div>`;
+
+  function banSection() {
+    if (V === "E") {
+      const n = (sl) => banned[sl].size ? `<b>${banned[sl].size}</b>` : "0";
+      const lab = ["WHITE", "BLACK"];
+      return section("BANNED CHARACTERS", `<div class="opt-row"><button class="opt ban-open" data-open="p1">${lab[0]}: ${n("p1")}</button><button class="opt ban-open" data-open="p2">${lab[1]}: ${n("p2")}</button></div>`);
+    }
+    if (V === "C") {
+      const tabs = ["p1", "p2"].map(s => `<button class="opt${s === curSide ? " active" : ""}" data-side="${s}">${SIDE_LABEL[s]}<span class="n">${banned[s].size || ""}</span></button>`).join("");
+      return section("BANNED CHARACTERS", `<div class="ban-tabs">${tabs}</div><div class="ban-grids">${box(curSide)}</div>`);
+    }
+    return section("BANNED CHARACTERS", `<div class="ban-grids">${box("p1")}${box("p2")}</div>`);
+  }
+  function render() {
+    document.querySelectorAll("#tabs [data-tab]").forEach(b => {
+      b.classList.toggle("active", b.dataset.tab === tab);
+      const bb = BANS[b.dataset.tab];
+      b.classList.toggle("custom", b.dataset.tab === "ban" ? (banned.p1.size + banned.p2.size) > 0 : !!bb && (bb.p1.size + bb.p2.size) > 0);
+    });
+    if (V === "D" && tab === "ban") {
+      document.getElementById("body").innerHTML = `<div class="adv-cols"><div>${section("BANNED CHARACTERS", box("p1"))}</div><div>${section("&nbsp;", box("p2"))}</div></div>`;
+    } else {
+      const [l, r] = arenaCols();
+      document.getElementById("body").innerHTML = `<div class="adv-cols"><div>${V === "D" ? "" : banSection()}${l}</div><div>${r}</div></div>`;
+    }
+    document.getElementById("reset").disabled = !banned.p1.size && !banned.p2.size;
+    paintStatic();
+  }
+  // zabanované hlavy sa neanimujú - nakreslí sa raz 1. frame a ďalej sa neprekresľujú
+  function paintStatic() { document.querySelectorAll(".ban-cell.banned canvas").forEach(cv => drawMageHeadAnim(cv, cv.dataset.char, 0)); }
+
+  document.getElementById("body").addEventListener("click", (e) => {
+    const side = e.target.closest("[data-side]");
+    if (side) { curSide = side.dataset.side; render(); return; }
+    const clr = e.target.closest("[data-clear]");
+    if (clr) { banned[clr.dataset.clear].clear(); msg[clr.dataset.clear] = ""; render(); return; }
+    const cell = e.target.closest(".ban-cell[data-char]");
+    if (!cell) return;
+    const { slot, char } = cell.dataset, set = banned[slot];
+    const pool = LAYOUT[slot].filter(Boolean);
+    if (!set.has(char) && set.size >= pool.length - 1) { // posledná postava musí ostať
+      msg[slot] = "1 MUST STAY";
+      render();
+      document.querySelector(`.ban-cell[data-slot="${slot}"][data-char="${char}"]`)?.classList.add("nope");
+      return;
+    }
+    if (set.has(char)) set.delete(char); else set.add(char);
+    msg[slot] = "";
+    render();
+  });
+  // ---------- variant E: samostatná obrazovka ----------
+  const bs = document.getElementById("ban-screen");
+  let bsSide = "p1", bsMsg = "";
+  function renderScreen() {
+    const t = document.getElementById("bs-side");
+    t.className = "rr-title " + (bsSide === "p1" ? "white" : "black");
+    t.textContent = SIDE_LABEL[bsSide];
+    bs.classList.toggle("p2-side", bsSide === "p2");
+    document.getElementById("bs-grid").innerHTML = LAYOUT[bsSide].map(c => c
+      ? `<div class="rr-cell${SIDE_CHARS[c] ? " corrupt" : ""}${banned[bsSide].has(c) ? " banned" : ""}" data-char="${c}"><div class="rr-face">${mageHeadHtml(c, usesAltColor(c, bsSide) ? "alt-color" : "", bsSide)}</div><div class="rr-name">${nameOf(c)}</div></div>`
+      : `<div class="rr-cell future"><div class="rr-face"><span class="rr-q">???</span></div><div class="rr-name"></div></div>`).join("");
+    document.getElementById("bs-msg").textContent = bsMsg;
+    document.getElementById("bs-clear").disabled = !banned[bsSide].size;
+    bs.querySelectorAll(".rr-cell.banned canvas").forEach(cv => drawMageHeadAnim(cv, cv.dataset.char, 0));
+  }
+  document.getElementById("body").addEventListener("click", (e) => {
+    const o = e.target.closest("[data-open]");
+    if (!o) return;
+    bsSide = o.dataset.open; bsMsg = ""; bs.classList.remove("hidden"); renderScreen();
+  });
+  bs.addEventListener("click", (e) => {
+    if (e.target.closest("#bs-done")) { bs.classList.add("hidden"); render(); return; }
+    if (e.target.closest("#bs-clear")) { banned[bsSide].clear(); bsMsg = ""; renderScreen(); return; }
+    const cell = e.target.closest(".rr-cell[data-char]");
+    if (!cell) return;
+    const c = cell.dataset.char, set = banned[bsSide];
+    if (!set.has(c) && set.size >= LAYOUT[bsSide].filter(Boolean).length - 1) {
+      bsMsg = "1 MUST STAY"; renderScreen();
+      bs.querySelector(`.rr-cell[data-char="${c}"]`)?.classList.add("nope");
+      return;
+    }
+    if (set.has(c)) set.delete(c); else set.add(c);
+    bsMsg = ""; renderScreen();
+  });
+  document.getElementById("reset").addEventListener("click", () => { banned.p1.clear(); banned.p2.clear(); msg.p1 = msg.p2 = ""; render(); });
+
+  render();
+  // animácia nezabanovaných hláv + glitch skrytých postáv
+  const loop = (now) => {
+    document.querySelectorAll(".ban-cell:not(.banned) canvas.mage-head").forEach(cv => drawMageHeadAnim(cv, cv.dataset.char, now));
+    if (!bs.classList.contains("hidden")) bs.querySelectorAll(".rr-cell:not(.banned) canvas.mage-head").forEach(cv => drawMageHeadAnim(cv, cv.dataset.char, now));
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+  setInterval(() => document.querySelectorAll(".ban-cell.corrupt:not(.banned), .ban-screen .rr-cell.corrupt:not(.banned)").forEach(c => c.classList.toggle("flash", Math.random() < 0.2)), 120);
+</script>
+</body>
+</html>

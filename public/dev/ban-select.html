@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- public/dev/ban-select.html - NÁVRH (nie je v hre): ako hráč vo výbere postáv vidí, že postavu nemôže vybrať (zákaz
+     z ADVANCED SETTINGS → BANNED CHARACTERS). Obrázky sú snímky skutočnej hry (PC 1720×920, iPhone 844×390) s
+     prototypom štýlu ban-preview/banned-card.css. -->
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zakázaná postava — náhľad</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0c0e; color: #ddd; font: 13px/1.5 system-ui, sans-serif; padding: 16px 20px 40px; }
+  h1 { font-size: 18px; color: #ffb300; margin: 0 0 6px; }
+  h2 { font-size: 15px; color: #ffb300; margin: 28px 0 6px; }
+  p, li { color: #9aa1ad; max-width: 1100px; }
+  b { color: #fff; }
+  .shots { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  figure { margin: 0; }
+  figcaption { color: #cfd2d6; font-weight: 600; margin-bottom: 6px; }
+  figcaption small { display: block; color: #8b92a0; font-weight: 400; }
+  img { display: block; border: 1px solid #262a33; border-radius: 6px; max-width: 100%; }
+  .pc img { width: 1000px; }
+  .ph img { width: 844px; border: 8px solid #222; border-radius: 18px; }
+  iframe { width: 100%; max-width: 760px; height: 400px; border: 1px solid #262a33; border-radius: 6px; background: #000; }
+</style>
+</head>
+<body>
+<h1>Zakázaná postava vo výbere: náhľad</h1>
+<p>Snímky skutočnej hry so zakázaným <b>Lightning Mage</b> (prototyp štýlu, v hre ešte nie je). Zakázaná karta: sivý podklad, postava
+   zošedne a <b>nehýbe sa</b>, cez ňu červený pixelový krížik, pás <b>BANNED</b>, meno prečiarknuté, červený rám namiesto zlatého.
+   Nedá sa vybrať (kurzor „zákaz", žiadne nadvihnutie pri prejdení myšou). Náhľad schopnosti ostáva, aby hráč videl, o čo prišiel.</p>
+
+<h2>PC</h2>
+<div class="shots">
+  <figure class="pc"><figcaption>Výber postáv (stránka Mages)<small>klik na zakázanú kartu nič neurobí</small></figcaption><img src="/dev/ban-preview/select-pc.png" alt="PC"></figure>
+</div>
+
+<h2>Telefón (iPhone 844×390)</h2>
+<div class="shots">
+  <figure class="ph"><figcaption>Zakázaná postava vedľa stredu pásu<small>BANNED je čitateľné aj na stlmenej bočnej karte</small></figcaption><img src="/dev/ban-preview/select-phone-side.png" alt="telefón"></figure>
+  <figure class="ph"><figcaption>Zakázaná postava v strede pásu<small>tlačidlo PICK sa zmení na sivé <b>BANNED</b> a nedá sa stlačiť</small></figcaption><img src="/dev/ban-preview/select-phone-center.png" alt="telefón - stred"></figure>
+</div>
+
+<h2>Ďalšie miesta (návrh, rovnaký vzhľad)</h2>
+<ul>
+  <li><b>RANDOM CHARACTERS:</b> server zakázané postavy nelosuje; v mriežke losovania majú krížik a kurzor ich preskakuje (rovnaká mriežka ako obrazovka zákazov v ADVANCED SETTINGS).</li>
+  <li><b>Turnajový draft:</b> zakázané karty vyzerajú rovnako a do tímu sa pridať nedajú.</li>
+  <li><b>Skrytá stránka (runa):</b> zakázaná skrytá postava má tú istú kartu (fialový glitch + krížik).</li>
+  <li><b>Súper:</b> vidí vlastné zákazy pre svoju farbu (zákazy patria farbe, nie hráčovi).</li>
+</ul>
+
+<h2>Room browser (rozhodnutie)</h2>
+<p>Na dlaždici roomky len <b>oranžový štvorček v rohu badge arény</b>, keď je zvolená aréna CUSTOM (je jedno, čo je upravené). Návrh: pri náhodnej aréne (kocka) štvorček, keď je CUSTOM niektorá z arén v losovaní.</p>
+<iframe src="/dev/ban-rooms.html"></iframe>
+</body>
+</html>

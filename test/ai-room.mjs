@@ -101,11 +101,12 @@ try {
   await wait(2600);
   const recs = fs.readdirSync(TDIR).filter(f => f.endsWith(".jsonl")).flatMap(f => fs.readFileSync(path.join(TDIR, f), "utf8").split(/\r?\n/).filter(Boolean).map(l => JSON.parse(l)));
   const ms = recs.find(r => r.t === "match_start"), botSide = recs.find(r => r.t === "ai")?.side;
-  const early = [2, 3, 4].map(t => {
+  // len kolá 2-4, ktoré sa naozaj odohrali (bot s náhodným seedom občas vyhrá už v 2. kole)
+  const early = [2, 3, 4].filter(t => t <= round).map(t => {
     const lk = recs.find(r => r.t === "lock" && r.turn === t && r.side !== botSide), b = recs.find(r => r.t === "bot" && r.turn === t);
     return lk && b && ms ? Date.parse(b.ts) < Date.parse(ms.ts) + lk.at : null;
   });
-  if (early.every(e => e === true)) pass("bot rozmýšľa od začiatku kola (rozhodnutie pred hráčovým lockom)");
+  if (early.length && early.every(e => e === true)) pass("bot rozmýšľa od začiatku kola (rozhodnutie pred hráčovým lockom)");
   else fail("bot rozhodol až po hráčovom locku / chýba záznam: " + JSON.stringify(early));
   if (/\[ai\]/.test(serverErr)) fail("server hlási chybu bota: " + serverErr.split("\n").find(l => l.includes("[ai]")));
   else pass("bez chýb bota na serveri");
@@ -114,6 +115,33 @@ try {
   sock.emit("leave_room");
   if (await until(() => c.rooms?.aiRoom?.players === 0 && c.rooms.aiRoom.canJoin && c.rooms.aiRoom.phase === "lobby", 5000, "AI roomka po odchode hráča znova 0/1"))
     pass("AI roomka po odchode hráča znova čistá 0/1");
+  // obťažnosť: bez level = normal (meno AI); join_room { level: "baby" } → snapshot aiLevel, meno BABY v HUD,
+  // room browser ukáže hlavu Baby bota (aiRoom.level); po odchode je nová roomka znova normal
+  const botOf = (s) => s?.names?.[c.slot === "p1" ? "p2" : "p1"];
+  if (ms && recs.find(r => r.t === "ai")?.level === "normal") pass("telemetria: zápas proti NORMAL botovi (ai.level)"); else fail("telemetria ai.level chýba");
+  c.state = null;
+  sock.emit("join_room", { roomId: c.rooms.aiRoom.id, level: "baby" });
+  await until(() => c.state?.phase === "lobby", 5000, "lobby AI roomky (baby)");
+  if (c.state?.aiLevel === "baby" && botOf(c.state) === "BABY") pass("BABY: snapshot aiLevel=baby, bot sa v HUD volá BABY");
+  else fail(`BABY snapshot: aiLevel=${c.state?.aiLevel} meno=${botOf(c.state)}`);
+  const sw = io(URL, { transports: ["websocket"], auth: { name: "browse", pass: "testpass" } });
+  const cw = { rooms: null };
+  sw.on("rooms", (r) => { cw.rooms = r; });
+  if (await until(() => cw.rooms, 5000, "zoznam roomiek (baby)") && cw.rooms.aiRoom?.level === "baby" && !cw.rooms.aiRoom.canJoin)
+    pass("room browser: obsadená AI roomka nesie level=baby (hlava Baby bota)");
+  else fail(`aiRoom: ${JSON.stringify(cw.rooms?.aiRoom)}`);
+  sw.close();
+  c.rooms = null;
+  sock.emit("leave_room");
+  await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (baby)");
+  c.state = null;
+  sock.emit("join_room", { roomId: c.rooms.aiRoom.id });
+  await until(() => c.state?.phase === "lobby", 5000, "lobby AI roomky (normal)");
+  if (c.state?.aiLevel === "normal" && botOf(c.state) === "AI") pass("po odchode z BABY je nová AI roomka NORMAL (meno AI)");
+  else fail(`NORMAL snapshot: aiLevel=${c.state?.aiLevel} meno=${botOf(c.state)}`);
+  c.rooms = null;
+  sock.emit("leave_room");
+  await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (normal)");
   // admin: reset AI roomky (ako hocijakej inej) → zanikne a hneď je znova čistá 0/1; globálny reset ju tiež nechá
   const adm = io(URL, { transports: ["websocket"], auth: { name: "admin", pass: "testadmin" } });
   const ca = { rooms: null, reload: false };

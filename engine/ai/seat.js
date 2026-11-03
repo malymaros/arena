@@ -32,6 +32,8 @@ export function createBotSeat({ botOpts, onDecision }) {
     handshake: { auth: {} },
     emit(ev, payload) { if (alive && FORWARD.has(ev)) shared().postMessage({ room, ev, payload }); },
     join() {}, leave() {},
+    // obťažnosť bota ("normal" / "baby") - zmena pred zápasom (hráč si ju vybral pri vstupe do AI roomky)
+    setLevel(level) { if (alive) shared().postMessage({ room, ev: "level", payload: level }); },
     disconnect() {
       if (!alive) return;
       alive = false;

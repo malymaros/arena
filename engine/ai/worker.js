@@ -31,7 +31,8 @@ parentPort.on("message", ({ room, ev, payload }) => {
   if (ev === "close") { rooms.delete(room); return; }
   const r = rooms.get(room);
   if (!r) return;
-  if (ev === "you_are") r.bot.onYouAre(payload);
+  if (ev === "level") { r.opts = { ...r.opts, level: payload }; r.bot.setLevel(payload); }
+  else if (ev === "you_are") r.bot.onYouAre(payload);
   else if (ev === "new_game") r.bot.onNewGame(payload);
   else if (ev === "reset") { r.bot = createBot(r.opts); r.decided.clear(); }
   else if (ev === "state") { r.bot.onState(payload); decideLater(room); }

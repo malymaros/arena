@@ -1,6 +1,7 @@
 // test/ai-bot.mjs - AI bot (docs/AI_PLAN.md): determinizmus a minimálna sila. Deterministický rozpočet
 // (budgetSims), takže výsledok nezávisí od rýchlosti stroja.
 //  1. rovnaký seed + rovnaké payloady → identické rozhodnutia (dva behy toho istého zápasu)
+//  1b. to isté pre BABY bota
 //  2. bot (B) porazí náhodného bota vo väčšine zápasov aj pri malom rozpočte
 import { playMatch } from "../tools/ai-vs.mjs";
 
@@ -14,6 +15,14 @@ for (const run of [0, 1]) {
 }
 if (!picks[0].length) fail("bot nerozhodol ani raz");
 if (JSON.stringify(picks[0]) !== JSON.stringify(picks[1])) fail("rovnaký seed dal iné rozhodnutia");
+
+// 1b. BABY bot (obťažnosť pre deti): tiež deterministický (vlastné rng, budgetSims)
+const babyPicks = [[], []];
+for (const run of [0, 1]) {
+  playMatch(4343, { A: "random", B: "bot" }, { budgetSims: 400, budgetMs: 100, botOpts: { B: { level: "baby" } }, log: (e) => babyPicks[run].push(e.pick ?? null) });
+}
+if (!babyPicks[0].length) fail("baby bot nerozhodol ani raz");
+if (JSON.stringify(babyPicks[0]) !== JSON.stringify(babyPicks[1])) fail("baby bot: rovnaký seed dal iné rozhodnutia");
 
 // 2. sila proti náhodnému botovi
 const N = 8;

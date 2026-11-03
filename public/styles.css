@@ -3206,7 +3206,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
   animation: lobby-bot-bubble 2.4s ease-in-out infinite;
 }
 .lobby-bot-bubble::after{
-  content: ""; position: absolute; left: calc(50% - 6px); bottom: -11px; width: 12px; height: 12px;
+  content: ""; position: absolute; left: calc(50% - 17px); bottom: -11px; width: 12px; height: 12px; /* hrot (pravý dolný roh) mieri na anténku */
   background: #fff; box-shadow: 3px 3px 0 0 #000; clip-path: polygon(0 0, 100% 0, 100% 100%);
 }
 .lobby-bot.hover .lobby-bot-bubble{ background: #7dff7a; }
@@ -3215,6 +3215,31 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .lobby-bot.busy .lobby-bot-bubble::after{ background: #c59bff; }
 @keyframes lobby-bot-bubble{ 0%, 100%{ transform: translateY(0); } 50%{ transform: translateY(-4px); } }
 .perf-lite .lobby-bot-bubble{ animation: none; }
+/* okno CHOOSE DIFFICULTY po kliknutí na voľného bota (ai-difficulty.js; návrh public/dev/ai-difficulty.html) */
+.ai-diff{
+  position: fixed; inset: 0; z-index: 10005; background: rgba(4,6,10,.72);
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #fff;
+}
+.ai-diff.hidden{ display: none; }
+.ai-diff-win{ position: relative; padding: 30px 40px 34px; background: #15171d;
+  box-shadow: 0 0 0 4px #000, inset 0 3px 0 #2c3039, inset 0 -3px 0 #0c0d11, 8px 8px 0 4px rgba(0,0,0,.5); }
+.ai-diff-title{ margin: 0 0 26px; text-align: center; font-size: 24px; font-weight: 400; color: #ffb300; letter-spacing: 2px;
+  text-shadow: 3px 3px 0 #7a1f00, 6px 6px 0 rgba(0,0,0,.55); }
+.ai-diff-cards{ display: flex; gap: 34px; }
+.ai-diff-card{ position: relative; width: 270px; padding: 18px 14px 22px; border: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 12px; font-family: inherit; color: #fff;
+  background: #1d2027; box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc-dim), inset 0 -6px 0 rgba(0,0,0,.35);
+  transition: transform .1s; }
+.ai-diff-card canvas{ width: 160px; height: 170px; image-rendering: pixelated; display: block; }
+.ai-diff-name{ font-size: 20px; color: var(--acc); letter-spacing: 2px; text-shadow: 3px 3px 0 #000; }
+.ai-diff-card.baby{ --acc: #ff8fc7; --acc-dim: #5a2c45; }
+.ai-diff-card.normal{ --acc: #5ef2ff; --acc-dim: #1f4a52; }
+.ai-diff-card:hover{ transform: translateY(-4px);
+  box-shadow: 0 0 0 3px #000, inset 0 0 0 3px var(--acc), inset 0 -6px 0 rgba(0,0,0,.35), 0 0 22px 2px color-mix(in srgb, var(--acc) 45%, transparent); }
+.ai-diff-card:active{ transform: translateY(2px); }
+.ai-diff-close{ position: absolute; top: -18px; right: -18px; width: 40px; height: 40px; border: none; cursor: pointer;
+  font: 16px "Press Start 2P", monospace; color: #fff; background: #b3261e; box-shadow: 0 0 0 3px #000, inset 0 -4px 0 rgba(0,0,0,.35); }
 .room-btn.spectate{ background: #6a6d75; color: #10141a; }
 .room-btn:hover{ filter: brightness(1.1); }
 .room-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }

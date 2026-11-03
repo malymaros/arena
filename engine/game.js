@@ -248,6 +248,8 @@ function snapshot() {
     // roomka proti AI botovi (docs/AI_PLAN.md): slot bota ("p1"/"p2") - lobby ponúkne len podporované nastavenia,
     // HUD bota ukáže jeho tvár (public/client/bot-face.js); kľúč len v AI roomke
     ...(io.vsAi?.() ? { vsAi: io.vsAi() } : {}),
+    // obťažnosť bota v AI roomke ("normal" / "baby") - HUD a room browser kreslia podľa nej hlavu bota
+    ...(io.aiLevel?.() ? { aiLevel: io.aiLevel() } : {}),
     // Jotaro THE WORLD: kým čaká na 3 zmrazené akcie, klient (obaja) vie prepnúť UI mód (neutrálne - len slot)
     timestop: (game.timestop && game.timestop.mode === "waiting") ? { slot: game.timestop.slot } : null,
     board: { ...game.board },
