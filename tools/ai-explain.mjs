@@ -11,6 +11,8 @@ import { createBot } from "../engine/ai/bot.js";
 import { queueKey, baseQueues, extraVariants } from "../engine/ai/candidates.js";
 import { createSim } from "../engine/ai/sim.js";
 import { seededRng } from "../engine/constants.js";
+import { evaluate } from "../engine/ai/eval.js";
+import { isTournament, seriesValue, teamLead } from "../engine/ai/series.js";
 
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };
@@ -117,6 +119,12 @@ if (pair) {
       console.log("   ", JSON.stringify(e).slice(0, 160));
   }
   console.log(`  koniec: p1 HP ${end.players.p1.hp}, p2 HP ${end.players.p2.hp}, winner ${end.winner ?? "-"}`);
+  // turnaj: zložky hodnoty (series.js) - eval hry, lavičky, hodnota turnaja
+  if (isTournament(dbg.s0)) {
+    const e = evaluate(end, dbg.me);
+    console.log(`  turnaj: eval hry ${e.toFixed(3)}, hodnota turnaja ${seriesValue(end, dbg.me, e, teamLead(dbg.s0, dbg.me), dbg.s0.players[dbg.me].hp).toFixed(3)}`);
+    console.log(`  na doske: p1 ${end.players.p1.char} ${end.players.p1.hp}/${end.players.p1.mana}, p2 ${end.players.p2.char} ${end.players.p2.hp}/${end.players.p2.mana}; lavičky HP ${JSON.stringify(end.mageHp)} mana ${JSON.stringify(end.mageMana)}`);
+  }
 }
 
 // --br "<súperova fronta>" = moje najlepšie odpovede z CELÉHO poolu (vrátane golden doplnkov) na túto frontu

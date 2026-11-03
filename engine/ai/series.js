@@ -17,7 +17,13 @@ export const SERIES = {
   FLOOR: 0.15,     // minimálna cena živého maga (special)
   WOLF: 0.45,      // minimálna cena živého Werewolfa (moon charge pri nízkom HP)
   RISK: 0.15,      // sklon k riziku: vedúci si cení vlastné HP viac, prehrávajúci menej
-  SWAP_PEN: 0.04,  // penalizácia za swap vo fronte (swap je výnimka)
+  SWAP_PEN: 0.04,  // penalizácia za môj swap vo fronte (swap je výnimka)
+  // súperov swap: eval hry berie príchod zdravého maga skoro ako vyliečenie (10 HP proti 5 = takmer istá výhra hry),
+  // takže rovnováha čakala swap človeka v 11 zo 16 kôl - hráč neswapol ani raz a bot hral proti fiktívnemu magovi
+  // (turnaj f4212aa3ae8e, 2026-11-03). Podľa vlastníka je swap takmer vždy zlá hra → silná penalizácia súperovho
+  // swapu, ktorá zoslabne (SWAP_OPP_SEEN), keď človek už niekedy naozaj swapol (história odhalených front)
+  SWAP_OPP_PEN: 0.5,
+  SWAP_OPP_SEEN: 0.15,
 };
 
 export const isTournament = (state) => state?.config?.format === "tournament" && !!state.roster && !!state.mageHp;

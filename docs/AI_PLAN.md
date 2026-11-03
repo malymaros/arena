@@ -256,7 +256,10 @@ Stratégia vlastníka (2026-11-03), pre všetky úrovne (BABY smie swapovať, CH
    prehrávajúci menej (musí dohnať) - `SERIES.RISK` × náskok tímov.
 5. **Swap len výnimočne** (zlý matchup, napr. Naruto proti Meduse; vysoko-dmg kombo nového maga): kandidáti navyše,
    nezahlcujú šírku (`swapVariants`: swap na začiatku + 2 akcie z rozumných plánov nového maga, 2 akcie + swap na konci;
-   súperovi menej) a každý swap má penalizáciu `SERIES.SWAP_PEN`.
+   súperovi menej) a každý swap má penalizáciu `SERIES.SWAP_PEN`. **Súperov swap** má silnú penalizáciu `SWAP_OPP_PEN`
+   (0,5; po prvom naozajstnom swape človeka `SWAP_OPP_SEEN` 0,15): eval hry berie príchod zdravého maga skoro ako
+   vyliečenie, takže rovnováha čakala swap človeka v 11 zo 16 kôl a bot hral proti fiktívnemu magovi (turnaj
+   f4212aa3ae8e - napr. Escanor strieľal tam, kam sa skutočný Wanderer nemohol dostať).
 
 Simulácia: `view.simState` doplní roster oboch strán + HP/manu lavičky (`rosterHp` / `rosterMana` sú verejné, vlastné
 `mageHp` / `mageMana`), takže engine v simulácii swap prijme a vykoná. Meranie: `node tools/ai-vs.mjs 20 --sims 600

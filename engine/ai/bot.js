@@ -121,6 +121,8 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const opp = other(me), cache = new Map(), outcome = new Map();
     const tour = isTournament(states[0]);
     const lead = tour ? teamLead(states[0], me) : 0, hp0 = states[0].players[me].hp;
+    // súper už niekedy swapol (odhalené fronty) → jeho swap nie je až taká výnimka
+    const oppPen = belief.history.some(h => h.actions?.some(a => a?.type === "swap")) ? SERIES.SWAP_OPP_SEEN : SERIES.SWAP_OPP_PEN;
     function value(qm, qo) {
       const key = queueKey(qm) + "|" + queueKey(qo);
       const hit = cache.get(key);
@@ -139,7 +141,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
         n++;
       }
       let v = n ? s / n : 0;
-      if (tour) { v += SERIES.SWAP_PEN * (swapCount(qo) - swapCount(qm)); outcome.set(key, n ? g / n : 0); }
+      if (tour) { v += oppPen * swapCount(qo) - SERIES.SWAP_PEN * swapCount(qm); outcome.set(key, n ? g / n : 0); }
       cache.set(key, v);
       return v;
     }

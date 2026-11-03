@@ -22,7 +22,7 @@ import { isTouch } from "/client/viewport.js";
 // a líščie uši; platí len v tom kole a hre (nové kolo ju zruší samo)
 let cheaterSpy = null;
 export function setCheaterSpy(s) { cheaterSpy = s; renderQueue(); }
-const spiedNow = (idx) => !!cheaterSpy && cheaterSpy.idx === idx && cheaterSpy.turn === state?.turn
+const spiedNow = (idx) => !!cheaterSpy && state?.aiLevel === "cheater" && cheaterSpy.idx === idx && cheaterSpy.turn === state?.turn
   && cheaterSpy.game === (state?.series?.gameIndex ?? 1);
 // ucho 8×8 px: oranžový obrys, tmavšie vnútro (pravé = zrkadlo)
 const EAR = ["#.......", "##......", "#+#.....", "#++#....", "#+++#...", "#++++#..", "#+++++#.", "########"];

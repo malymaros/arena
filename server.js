@@ -520,6 +520,7 @@ function onTurnTimeout() {
   function onConfigure(socket, raw) {
     if (socket.data.person !== "A") return;   // konfiguruje len host
     if (engine.game.phase !== "lobby") return;        // len pred začiatkom zápasu
+    lastSpy = null;                                   // CHEATER: odhalenie z predošlého zápasu neplatí
     // proti AI: všetky arény (aj kocka) aj všetky formáty vrátane turnaja (bot draftuje tím a swapuje - docs/AI_PLAN.md 8d)
     const config = sanitizeConfig(raw);
     if (!config) return;

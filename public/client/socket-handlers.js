@@ -112,6 +112,7 @@ socket.on("spectator", (info) => {
 // úplný reset herného UI (plánovaná fronta, golden/Last Stand voľby, game-over stavy, figúry): server ho
 // pošle pri retry; volá sa aj pri návrate na room-browser - nová roomka nesmie zdediť ťahy z poslednej hry
 function resetGameUi() {
+  setCheaterSpy(null);       // odhalenie CHEATERA patrí len k svojmu zápasu (inak sa ukázalo v ďalšom zápase na tom istom kole)
   stopCharRoll();            // rozbehnuté losovanie postáv / arény nesmie prežiť reset / odchod z roomky
   stopArenaRoll();
   colorRollGen++;            // ani odložené roztočenie rulety farieb
