@@ -147,7 +147,10 @@ Hodnota stavu po kole z pohľadu bota (výhra/prehra = ±1, inak odhad pravdepod
 - **Rozsah v1: single na Stone Bridge.** Architektúra sa ale od začiatku navrhuje pre všetky formáty a arény
   (eval/kandidáti s háčikmi pre portály, Shreka, turnaj), ďalšie sa pridávajú postupne.
 - **Budúcnosť — arkáda:** hráč postupne porazí bota za každú postavu; keď porazí všetky, vyhral. Až po v1.
-- ~~Čas na rozmýšľanie: až ~5 s~~ → **zmenené 2026-11-02:** pevný počet simulácií na ťah (`AI_SIMS`, default 1 500),
+- **Čas na rozmýšľanie 10 s (vlastník 2026-11-03):** `AI_THINK_MS` (default 10 000), reálny čas. Duel: 2× výpočtu = 46 % (±11),
+  4× = 59 % (±7,6) proti 1 500 simuláciám. Zároveň oprava: bot dovtedy začínal rozmýšľať až po hráčovom locku (snapshot po
+  kole niesol ešte `locked`), teraz hneď po timeline kola. `AI_SIMS` ostáva ako pevný rozpočet pre testy.
+- ~~Čas na rozmýšľanie: až ~5 s~~ → **zmenené 2026-11-02 (prekonané 2026-11-03):** pevný počet simulácií na ťah (`AI_SIMS`, default 1 500),
   nie čas. Merania ukázali, že viac výpočtu dnešnému botovi nepomáha; pevný rozpočet = pevná, predvídateľná sila
   a minimum CPU (~0,2 s/ťah na PC, ~1 s na e2-micro). Všetky AI roomky počítajú v **jednom** worker vlákne, ťah po ťahu.
 - **Stála AI roomka (2026-11-02):** namiesto tlačidla PLAY VS AI existuje vždy jedna roomka VS AI (0/1), hrá v nej naraz

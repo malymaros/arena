@@ -4,6 +4,9 @@
 // znova čistá 0/1. Malý rozpočet bota (AI_SIMS).
 import { spawn } from "child_process";
 import { io } from "socket.io-client";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const PORT = 3994;
 const URL = `http://localhost:${PORT}`;
@@ -18,9 +21,10 @@ async function until(fn, ms, what) {
   return false;
 }
 
+const TDIR = fs.mkdtempSync(path.join(os.tmpdir(), "ai-room-"));
 try {
   server = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ADMIN_KEY: "testadmin", ARENA_SEED: "3", AI_SIMS: "400" },
+    env: { ...process.env, PORT: String(PORT), FORCE_FIRST_STARTER: "A", PLAYER_KEYS: "testpass", ADMIN_KEY: "testadmin", ARENA_SEED: "3", AI_SIMS: "400", TELEMETRY_DIR: TDIR },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stderr.on("data", d => { serverErr += d; });
@@ -83,6 +87,8 @@ try {
     const stone = Math.min(3, me?.stone || 0);
     const q = QUEUES[round % QUEUES.length].map((a, i) => (i < stone ? { type: "stoned" } : a));
     const before = c.timelines;
+    // kolá 2-4: hráč chvíľu „plánuje" - bot musí rozhodnúť už počas toho (nie až po hráčovom locku)
+    if (round >= 1 && round <= 3) await wait(1500);
     sock.emit("lock_in", q, turn, () => {});
     round++;
     if (!await until(() => c.timelines > before || c.result, 15000, `kolo ${round} sa vyhodnotilo`)) break;
@@ -91,6 +97,16 @@ try {
   if (c.result) pass(`zápas proti botovi dohraný za ${round} kôl (víťaz ${c.result.gameWinner})`);
   if (c.over) pass("game_over prišiel"); else fail("chýba game_over");
   if (c.oppReadyFirst) fail("bot zamkol skôr ako hráč (OPPONENT IS READY)"); else pass("bot nikdy nezamkol skôr ako hráč");
+  // telemetria (flush každé 2 s): rozhodnutie bota v kolách 2-4 prišlo PRED hráčovým lockom
+  await wait(2600);
+  const recs = fs.readdirSync(TDIR).filter(f => f.endsWith(".jsonl")).flatMap(f => fs.readFileSync(path.join(TDIR, f), "utf8").split(/\r?\n/).filter(Boolean).map(l => JSON.parse(l)));
+  const ms = recs.find(r => r.t === "match_start"), botSide = recs.find(r => r.t === "ai")?.side;
+  const early = [2, 3, 4].map(t => {
+    const lk = recs.find(r => r.t === "lock" && r.turn === t && r.side !== botSide), b = recs.find(r => r.t === "bot" && r.turn === t);
+    return lk && b && ms ? Date.parse(b.ts) < Date.parse(ms.ts) + lk.at : null;
+  });
+  if (early.every(e => e === true)) pass("bot rozmýšľa od začiatku kola (rozhodnutie pred hráčovým lockom)");
+  else fail("bot rozhodol až po hráčovom locku / chýba záznam: " + JSON.stringify(early));
   if (/\[ai\]/.test(serverErr)) fail("server hlási chybu bota: " + serverErr.split("\n").find(l => l.includes("[ai]")));
   else pass("bez chýb bota na serveri");
   // odchod hráča → AI roomka sa hneď vytvorí znova čistá (0/1, lobby)
@@ -128,6 +144,7 @@ try {
   fail(e.stack || String(e));
 } finally {
   server?.kill();
+  try { fs.rmSync(TDIR, { recursive: true, force: true }); } catch { /* */ }
 }
 console.log(fails ? `ai-room: ${fails} CHÝB` : "ai-room: OK");
 process.exit(fails ? 1 : 0);

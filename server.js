@@ -133,10 +133,13 @@ const MAX_ROOMS = 2;                        // cap: max toľko bežných roomiek
 // stála AI roomka (docs/AI_PLAN.md): existuje vždy, hrá v nej najviac jeden človek proti botovi; po odchode hráča
 // alebo admin resete sa hneď vytvorí znova čistá. V zozname roomiek ide samostatne (rooms snapshot `aiRoom`).
 const AI_ROOM_ID = "ai";
-// AI bot (docs/AI_PLAN.md): pevný počet simulácií na ťah = pevná, predvídateľná sila nezávislá od rýchlosti
-// a záťaže servera (merania: viac výpočtu dnešnému botovi nepomáha). ~0,2 s na ťah na PC, ~1 s na e2-micro;
-// všetky AI roomky počítajú v jednom worker vlákne po jednom ťahu.
-const AI_SIMS = Math.max(100, Math.min(20000, Number(process.env.AI_SIMS) || 1500));
+// AI bot (docs/AI_PLAN.md): čas na rozmýšľanie AI_THINK_MS (default 10 s, vlastník 2026-11-03 - 4× viac výpočtu
+// = ~59 % proti 1× v duele). Bot rozmýšľa od začiatku kola (počas animácie a hráčovho plánovania), nie až po jeho
+// locku. Reálny čas, nie počet simulácií: e2-micro pri dlhej záťaži spomalí (burst CPU) a pevný počet simulácií
+// by trval oveľa dlhšie. AI_SIMS = pevný počet simulácií namiesto času (testy, deterministická sila).
+// Všetky AI roomky počítajú v jednom worker vlákne po jednom ťahu.
+const AI_SIMS = process.env.AI_SIMS ? Math.max(100, Math.min(20000, Number(process.env.AI_SIMS) || 1500)) : null;
+const AI_THINK_MS = Math.max(500, Math.min(30000, Number(process.env.AI_THINK_MS) || 10000));
 
 // Validácia zobrazovaného mena: 1–8 znakov anglickej abecedy, nič iné (žiadne emoji/diakritika/medzery).
 function validateName(raw) {
@@ -554,7 +557,7 @@ function onTurnTimeout() {
   let botPending = null, botTimer = null; // podržaný ťah kola bota (čaká na hráčovo zamknutie)
   let seatBot = null;
   if (ai) {
-    const sock = createBotSeat({ botOpts: { seed: crypto.randomInt(2 ** 31), budgetSims: AI_SIMS, budgetMs: 1000 }, onDecision: (d) => onBotDecision(d) });
+    const sock = createBotSeat({ botOpts: { seed: crypto.randomInt(2 ** 31), ...(AI_SIMS ? { budgetSims: AI_SIMS, budgetMs: 1000 } : { budgetMs: AI_THINK_MS }) }, onDecision: (d) => onBotDecision(d) });
     sock.data.pendingName = "AI";
     seatBot = () => seat(sock, botPerson);
   }

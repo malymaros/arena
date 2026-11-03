@@ -76,6 +76,13 @@ export function createBelief() {
   b.onState = (payload) => {
     if (!b.mySlot) return;
     const { timeline, ...root } = payload;
+    // stav s timeline odohraného kola nesie ešte príznaky locked / myLock (engine ich nuluje až po emite) - kolo je
+    // ale skončené, nové plánovanie začína hneď (inak bot začal rozmýšľať až po ďalšom emite = po hráčovom locku).
+    // Výnimka: THE WORLD pauza (kolo pokračuje).
+    if (timeline && !root.timestop && root.phase === "playing" && root.p1?.hp > 0 && root.p2?.hp > 0) { // nie po konci hry
+      for (const s of ["p1", "p2"]) if (root[s]) root[s] = { ...root[s], locked: false };
+      delete root.myLock;
+    }
     if (root.turn === 1 && (!b.view || b.view.turn !== 1 || !root[b.mySlot]?.char)) {
       if (!timeline) resetGame(); // čerstvá hra (char-select / prvý plánovací snapshot)
     }
