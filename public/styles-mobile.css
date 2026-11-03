@@ -291,7 +291,8 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 .phone .adv-chip { font-size: 15px; padding: 8px 11px; }
 .phone .lobby-start { grid-area: start; margin: 0; padding: 28px; font-size: 38px; }
 /* ✕ (odchod z roomky) v pravom hornom rohu lobby - mriežka lobby ostáva nedotknutá */
-.phone .lobby-leave { top: 24px; right: 40px; width: 64px; height: 64px; font-size: 26px; }
+.phone .lobby-leave { top: 24px; right: 40px; width: 64px; height: 64px; }
+.phone .lobby-leave svg { width: 32px; height: 32px; }
 .phone .room-leave { font-size: 20px; padding: 18px 24px; }
 .phone .wait-box { gap: 48px; }
 
