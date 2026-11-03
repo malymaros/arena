@@ -58,11 +58,11 @@ function loadSettings() {
   return st;
 }
 let settings = null; // načíta sa pri prvom zobrazení lobby (showLobby)
-// roomka proti AI botovi (snapshot vsAi): len Stone Bridge a single / bo3 - uložené voľby sa neprepisujú,
-// len sa pre túto roomku čítajú obmedzene (main())
+// roomka proti AI botovi (snapshot vsAi): všetky arény, len single / bo3 (turnaj bot zatiaľ nevie) - uložené voľby
+// sa neprepisujú, len sa pre túto roomku čítajú obmedzene (main())
 let vsAi = false;
 const main = () => !vsAi ? settings.main
-  : { ...settings.main, arena: "bridge", format: settings.main.format === "tournament" ? "single" : settings.main.format };
+  : { ...settings.main, format: settings.main.format === "tournament" ? "single" : settings.main.format };
 let savedFlash = 0;
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch {}
@@ -217,8 +217,8 @@ function build() {
 }
 
 /* ---------- AI roomka: zamknuté voľby ---------- */
-// ostatné arény, kocka a turnaj ostávajú viditeľné, len zamknuté (🔒, .ai-locked) - proti botovi zatiaľ nie sú
-const AI_LOCKED = '#lobby-arena [data-arena]:not([data-arena="bridge"]), #lobby-adv-tabs [data-tab]:not([data-tab="bridge"]), #lobby-format .opt[data-val="tournament"]';
+// turnaj ostáva viditeľný, len zamknutý (🔒, .ai-locked) - proti botovi zatiaľ nie je (arény aj kocka áno)
+const AI_LOCKED = '#lobby-format .opt[data-val="tournament"]';
 const aiLocked = (el) => vsAi && !!el?.closest?.(AI_LOCKED);
 function markAiLocked() {
   document.querySelectorAll(AI_LOCKED).forEach(el => {
@@ -230,7 +230,6 @@ function markAiLocked() {
 /* ---------- Lobby (host nastavuje zápas) ---------- */
 export function showLobby(s) {
   vsAi = !!s?.vsAi;
-  if (vsAi) tab = "bridge";
   $("lobby").classList.remove("hidden");
   if (!built) { settings = loadSettings(); build(); }
   markAiLocked();

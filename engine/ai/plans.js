@@ -7,6 +7,7 @@ import { actionHits, bestHit, reach } from "./threat.js";
 import { actionCost, extraVariants } from "./candidates.js";
 import { MAX_MANA, RECHARGE_GAIN } from "../../shared/balance.js";
 import { portalStep } from "../../shared/geometry.js";
+import { SHREK_ROAR_DMG, SHREK_RAGE_HP } from "../../shared/balance.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 const STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -26,6 +27,14 @@ function moveBy(state, c, dir, n, portals = null) {
   }
   return { x, y };
 }
+
+// Shrek Swamp (stratégia vlastníka 2026-11-03): rev k-teho skoku zasiahne značku k + ortogonálnych susedov po k-tom
+// kroku - ako dmg políčko (netreba uhýbať za každú cenu); smrad = dmg políčko; itemy ako heal / mana políčko
+const shrekRoar = (sh) => (sh.hp <= SHREK_RAGE_HP[1] ? SHREK_ROAR_DMG[2] : sh.hp <= SHREK_RAGE_HP[0] ? SHREK_ROAR_DMG[1] : SHREK_ROAR_DMG[0]);
+const roarAt = (sh, k, c) => !!sh && !sh.dead && !(sh.stone > 0) && !!sh.marks?.[k]
+  && Math.abs(sh.marks[k][0] - c.x) + Math.abs(sh.marks[k][1] - c.y) <= 1;
+const stenchAt = (sh, c) => !!sh?.dead && (sh.stench || []).some(([x, y]) => x === c.x && y === c.y);
+const itemAt = (state, c, type) => (state.items || []).some(i => i.type === type && i.x === c.x && i.y === c.y);
 
 const tileAt = (state, c, type) => state.tiles.some(t => t.type === type && t.x === c.x && t.y === c.y);
 const ikAt = (state, c) => state.iks.some(t => t.x === c.x && t.y === c.y);
@@ -68,13 +77,21 @@ export function rankPlans(state, slot, pool) {
         }
       }
       if (t === "dash") pos = moveBy(state, pos, a.dir, 2, portals);
-      if (DEF[t]) def = Math.max(def, DEF[t] * Math.min(1, foeMax / hp));
+      // obrana, ktorú hneď po tomto kroku zje Shrekov rev (nestartér - súper hrá až v ďalšom kroku), súperovi nepomôže
+      const roarNow = roarAt(state.shrek, steps, pos);
+      if (DEF[t] && !(roarNow && state.starter !== slot)) def = Math.max(def, DEF[t] * Math.min(1, foeMax / hp));
       const c = actionCost(a, me.char);
       mana = t === "recharge" ? Math.min(MAX_MANA, mana + RECHARGE_GAIN) : Math.max(0, mana - Math.max(0, c));
       if (ikAt(state, pos)) tiles -= 10;
       else if (tileAt(state, pos, "dmg") && !(me.char === "fire" && mana >= 5)) tiles -= 1;
       if (tileAt(state, pos, "heal") && me.hp < 10 && me.char !== "werewolf") tiles += me.char === "lightning" ? (10 - me.hp) / 2 : 1;
       if (tileAt(state, pos, "mana")) tiles += mana < 5 ? 1 : 0.3;
+      if (state.shrek) {
+        if (roarNow) tiles -= shrekRoar(state.shrek);
+        if (stenchAt(state.shrek, pos)) tiles -= 1;
+        if (itemAt(state, pos, "heal") && me.hp < 10 && me.char !== "werewolf") tiles += 1;
+        if (itemAt(state, pos, "mana")) tiles += mana < 5 ? 1 : 0.3;
+      }
       risk += threatAt(pos) / hp; steps++;
     }
     risk = (risk + 2 * threatAt(pos) / hp) / (steps + 2);

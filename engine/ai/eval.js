@@ -6,6 +6,7 @@
 import { CHARS, SIDE_CHARS } from "../constants.js";
 import { WEIGHTS } from "./weights.js";
 import { bestHit, reach } from "./threat.js";
+import { SHREK_ROAR_DMG, SHREK_RAGE_HP } from "../../shared/balance.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 const ONCE = new Set(["jotaro", "luffy"]); // jednorazový special za hru (worldUsed)
@@ -33,7 +34,25 @@ function hazard(state, p) {
   if (state.iks.some(c => c.x === p.x && c.y === p.y)) h += 1;
   // dmg políčko: súper vie, že sa musím pohnúť (čitateľnosť) - okrem Fira so specialom (políčko mu rozšíri zónu)
   if (state.tiles.some(t => t.type === "dmg" && t.x === p.x && t.y === p.y) && !(p.char === "fire" && p.mana >= 5)) h += 0.5;
-  return h;
+  return h + swampDanger(state, p);
+}
+
+/* ---------- Shrek Swamp (stratégia vlastníka 2026-11-03): rev a smrad = ako dmg políčka - nie uhýbať za každú
+   cenu, dmg je v poriadku, keď za to dám súperovi viac; itemy ako heal / mana políčka (srdiečko = +1 HP aj Lightning) */
+// dmg revu podľa Shrekových HP (engine/swamp.js roarDmg)
+const shrekRoar = (sh) => (sh.hp <= SHREK_RAGE_HP[1] ? SHREK_ROAR_DMG[2] : sh.hp <= SHREK_RAGE_HP[0] ? SHREK_ROAR_DMG[1] : SHREK_ROAR_DMG[0]);
+// zasiahne bunku c ohlásený skok (dopad alebo ortogonálny sused)? - skamenený Shrek neskáče
+const inRoar = (sh, c) => !sh.dead && !(sh.stone > 0) && (sh.marks || []).some(([x, y]) => Math.abs(x - c.x) + Math.abs(y - c.y) <= 1);
+const inStench = (sh, c) => sh.dead && (sh.stench || []).some(([x, y]) => x === c.x && y === c.y);
+// nebezpečenstvo bunky na budúce kolo v škále dmg políčka (0.5 = 1 dmg za krok): smrad = dmg políčko; rev podľa sily
+// a počtu skokov, ktoré bunku zasiahnu (ohlásené skoky sú verejné; ďalšie kolo len so SHREK PREVIEW - view.js)
+function swampDanger(state, c) {
+  const sh = state.shrek;
+  if (!sh) return 0;
+  if (inStench(sh, c)) return 0.5;
+  if (sh.dead || sh.stone > 0) return 0;
+  const n = (sh.marks || []).filter(([x, y]) => Math.abs(x - c.x) + Math.abs(y - c.y) <= 1).length;
+  return n ? 0.25 * Math.min(2, n * shrekRoar(sh)) : 0;
 }
 
 const hidden = (p) => p.x === null || p.x === undefined;
@@ -42,6 +61,7 @@ const SPECIAL_MANA = 5;
 // zlá bunka na ďalšie kolo: IK alebo dmg políčko (Fire so specialom ho chce)
 function badCell(state, c, p) {
   if (state.iks.some(t => t.x === c.x && t.y === c.y)) return true;
+  if (state.shrek && (inStench(state.shrek, c) || inRoar(state.shrek, c))) return true;
   return state.tiles.some(t => t.type === "dmg" && t.x === c.x && t.y === c.y) && !(p.char === "fire" && p.mana >= SPECIAL_MANA);
 }
 
@@ -86,6 +106,15 @@ function pickupValue(state, p, foeKit, cells) {
       else if (p.char !== "werewolf") need = Math.ceil((p.hp + 1) / foeKit) > Math.ceil(p.hp / foeKit) ? 1 : 0.25;
     } else if (t.type === "mana" && p.mana < 10) need = p.mana < SPECIAL_MANA ? 0.3 + (SPECIAL_MANA - p.mana) / SPECIAL_MANA * 0.7 : 0.1;
     else if (t.type === "power" && p.mana >= 1) need = 0.3;
+    best = Math.max(best, need * (c.cost === 2 ? 0.6 : 1));
+  }
+  // Shrek Swamp: itemy - srdiečko +1 HP (aj Lightning len +1), kvapka +1 mana; hodnota ako heal / mana políčko
+  for (const it of state.items || []) {
+    const c = cells.find(r => r.x === it.x && r.y === it.y);
+    if (!c) continue;
+    let need = 0;
+    if (it.type === "heal" && p.hp < 10 && p.char !== "werewolf") need = Math.ceil((p.hp + 1) / foeKit) > Math.ceil(p.hp / foeKit) ? 1 : 0.25;
+    else if (it.type === "mana" && p.mana < 10) need = p.mana < SPECIAL_MANA ? 0.3 + (SPECIAL_MANA - p.mana) / SPECIAL_MANA * 0.7 : 0.1;
     best = Math.max(best, need * (c.cost === 2 ? 0.6 : 1));
   }
   return best;

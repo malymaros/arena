@@ -1,6 +1,6 @@
 // test/ai-room.mjs - stála AI roomka cez reálny server (docs/AI_PLAN.md): v zozname je vždy (rooms snapshot
 // `aiRoom`, 0/1), hráč sa do nej pripojí ako host (bot sedí ako osoba B), druhý človek ju môže len sledovať,
-// lobby povolí len Stone Bridge + single/bo3, hráč s botom odohrá celý zápas a po jeho odchode je roomka
+// lobby povolí všetky arény + single/bo3 (turnaj nie), hráč s botom odohrá celý zápas a po jeho odchode je roomka
 // znova čistá 0/1. Malý rozpočet bota (AI_SIMS).
 import { spawn } from "child_process";
 import { io } from "socket.io-client";
@@ -64,11 +64,11 @@ try {
   if (await until(() => c2.spectator, 3000, "divák AI roomky")) pass("AI roomku sa dá sledovať");
   if (c.state?.vsAi === (c.slot === "p1" ? "p2" : "p1")) pass("snapshot nesie vsAi = slot bota"); else fail(`snapshot vsAi: ${c.state?.vsAi}`);
 
-  // pokus o portal realm + turnaj → server vynúti Stone Bridge + single
+  // portal realm + turnaj → server vynúti single, aréna ostane (bot hrá všetky arény, turnaj zatiaľ nie)
   sock.emit("configure_match", { format: "tournament", arena: "portal", tilesPerRound: 1, timer: "off", tilePreview: true, colorPref: "white",
     tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 }, portalWeights: { classic: 100, hp: 0, mana: 0, power: 0, nodef: 0 } });
   await until(() => c.state?.phase === "playing", 10000, "štart zápasu");
-  if (c.state?.config?.format === "single" && !c.state?.config?.arena) pass("AI roomka: vynútený single na Stone Bridge");
+  if (c.state?.config?.format === "single" && c.state?.config?.arena === "portal") pass("AI roomka: vynútený single, Portal Realm ostal");
   else fail(`AI roomka config: ${JSON.stringify(c.state?.config)}`);
 
   sock.emit("choose_character", "fire");

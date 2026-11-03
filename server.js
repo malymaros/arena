@@ -505,12 +505,8 @@ function onTurnTimeout() {
   function onConfigure(socket, raw) {
     if (socket.data.person !== "A") return;   // konfiguruje len host
     if (engine.game.phase !== "lobby") return;        // len pred začiatkom zápasu
-    // proti AI: zatiaľ len Stone Bridge, single / bo3 (bot nevie draftovať tím, arény ešte neladil)
-    if (ai && raw && typeof raw === "object") {
-      raw = { ...raw, format: raw.format === "bo3" ? "bo3" : "single" };
-      delete raw.arena; delete raw.arenas; delete raw.portalWeights; delete raw.portalsPerRound;
-      delete raw.itemsPerRound; delete raw.itemWeights; delete raw.shrekPreview;
-    }
+    // proti AI: všetky arény (aj kocka), len single / bo3 - turnaj bot zatiaľ nevie (draft tímu, swap)
+    if (ai && raw && typeof raw === "object") raw = { ...raw, format: raw.format === "bo3" ? "bo3" : "single" };
     const config = sanitizeConfig(raw);
     if (!config) return;
     if (personAlive("B")) {
