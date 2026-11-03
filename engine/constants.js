@@ -19,11 +19,19 @@ export function seededRng(seed) {
 }
 // hlboká kópia čistých dát (objekty, polia, primitíva) - stav hry pre simulácie AI bota; ~niekoľkokrát
 // rýchlejšia než structuredClone pri malých objektoch
+// (primitíva sa kopírujú priamo bez rekurzívneho volania - kópia stavu beží pri každej simulácii bota)
 export function cloneData(v) {
   if (v === null || typeof v !== "object") return v;
-  if (Array.isArray(v)) return v.map(cloneData);
+  return cloneObj(v);
+}
+function cloneObj(v) {
+  if (Array.isArray(v)) {
+    const n = v.length, out = new Array(n);
+    for (let i = 0; i < n; i++) { const x = v[i]; out[i] = x === null || typeof x !== "object" ? x : cloneObj(x); }
+    return out;
+  }
   const out = {};
-  for (const k in v) out[k] = cloneData(v[k]);
+  for (const k in v) { const x = v[k]; out[k] = x === null || typeof x !== "object" ? x : cloneObj(x); }
   return out;
 }
 

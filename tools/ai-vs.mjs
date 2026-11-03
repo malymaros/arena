@@ -1,6 +1,6 @@
 // tools/ai-vs.mjs - zápasy AI bota (engine/ai/bot.js) priamo na engine (docs/AI_PLAN.md, meranie sily).
 // Bot dostáva rovnaké payloady ako klient na serveri (snapshotFor + redactTimelineFor, you_are, new_game).
-// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--vs random|bot] [--chars p1,p2] [--log]
+// Spustenie: node tools/ai-vs.mjs [zápasov=20] [--budget ms=300] [--sims n] [--vs random|bot] [--chars p1,p2] [--log] [--portal | --swamp]
 //   --sims n     deterministický rozpočet: n simulácií na rozhodnutie (namiesto času)
 //   --vs random  bot (osoba B) proti náhodnému botovi (tools/random-bot.mjs) - cieľ ≥ 98 % výhier
 //   --vs bot     bot proti botu (rovnaké nastavenie, rôzne seedy) - sanity / ladenie
@@ -19,7 +19,8 @@ const SIMS = opt("--sims", null) ? Number(opt("--sims")) : null; // deterministi
 const VS = opt("--vs", "random");
 const CHARS_ARG = opt("--chars", null)?.split(",");
 const LOG = argv.includes("--log");
-const NO_MODEL = argv.includes("--no-model"); // bot bez modelu súpera (porovnanie A5)
+const NO_MODEL = argv.includes("--no-model");
+const ARENA = argv.includes("--portal") ? "portal" : argv.includes("--swamp") ? "swamp" : null; // aréna (bez voľby Stone Bridge) // bot bez modelu súpera (porovnanie A5)
 
 const poolFor = (slot) => [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
 
@@ -46,7 +47,8 @@ export function playMatch(seed, players, { budgetMs = BUDGET, budgetSims = SIMS,
   for (const person of ["A", "B"]) if (players[person] === "bot") bots[person] = (botOpts[person]?.create || createBot)({ seed: seed * 31 + (person === "A" ? 1 : 2), budgetMs, budgetSims, log, ...(NO_MODEL ? { model: false } : {}), ...(botOpts[person] || {}) });
   engine.startMatch(engine.sanitizeConfig({
     format: "single", tilesPerRound: 2, timer: "off", tilePreview: true, colorPref: "random",
-    tileWeights: { dmg: 50, heal: 10, mana: 10, ik: 10, power: 10, block: 10 },
+    tileWeights: ARENA === "portal" ? { dmg: 90, ik: 10 } : { dmg: 50, heal: 10, mana: 10, ik: 10, power: 10, block: 10 },
+    ...(ARENA ? { arena: ARENA } : {}),
   }));
   for (const [person, b] of Object.entries(bots)) { b.onYouAre({ slot: engine.slotForPerson(person) }); b.onState(engine.snapshotFor(person)); }
   const rng = { A: seededRng(seed * 2 + 11), B: seededRng(seed * 2 + 12) };

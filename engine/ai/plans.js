@@ -6,20 +6,23 @@
 import { actionHits, bestHit, reach } from "./threat.js";
 import { actionCost, extraVariants } from "./candidates.js";
 import { MAX_MANA, RECHARGE_GAIN } from "../../shared/balance.js";
+import { portalStep } from "../../shared/geometry.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 const STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const ATTACKS = new Set(["attack", "melee", "special", "special1", "dash"]);
 const DEF = { shield: 0.8, mirror: 1, golden_shield: 0.8, golden_mirror: 1 };
 
-function moveBy(state, c, dir, n) {
-  const d = STEP[dir];
-  if (!d) return c;
-  let { x, y } = c;
+// pohyb o n krokov; s portálmi (Portal Realm) krok cez okraj s portálom pokračuje na druhom konci (pár raz)
+function moveBy(state, c, dir, n, portals = null) {
+  if (!STEP[dir]) return c;
+  let { x, y } = c, d = dir;
+  const closed = new Set();
   for (let i = 0; i < n; i++) {
-    const nx = x + d[0], ny = y + d[1];
-    if (nx < 0 || ny < 0 || nx >= state.board.w || ny >= state.board.h) break;
-    x = nx; y = ny;
+    const st = portalStep(state.board, portals, x, y, d, closed);
+    if (!st) break;
+    if (st.portal) closed.add(st.portal.id);
+    x = st.x; y = st.y; d = st.dir;
   }
   return { x, y };
 }
@@ -32,16 +35,18 @@ export function rankPlans(state, slot, pool) {
   if (foe.x === null || foe.x === undefined || me.x === null || me.x === undefined || !me.char || !foe.char) return [];
   const w = state.board.w;
   const idx = (c) => c.y * w + c.x;
+  // Portal Realm: pohyby, dosahy a zásahy s portálmi tohto kola (mapy sa počítajú raz pre rozloženie - threat.js)
+  const P = !!state.portals?.length, portals = P ? state.portals : null;
   // kde bude súper: 40 % ostane, zvyšok rovnomerne po bunkách, kam sa dostane
-  const foeCells = reach(state, foe, foe.mana);
+  const foeCells = reach(state, foe, foe.mana, true, P);
   const foeDist = new Map(foeCells.map(c => [idx(c), 0.6 / foeCells.length]));
   foeDist.set(idx(foe), (foeDist.get(idx(foe)) || 0) + 0.4);
   // čo mi súper vie dať na bunku c (pohyb + útok, jeho mana)
-  const foeNear = reach(state, foe, foe.mana, false);
+  const foeNear = reach(state, foe, foe.mana, false, P);
   const threatCache = new Map();
   const threatAt = (c) => {
     const k = idx(c);
-    if (!threatCache.has(k)) threatCache.set(k, Math.max(0, ...foeNear.map(f => bestHit(state, other(slot), f, c, foe.mana))));
+    if (!threatCache.has(k)) threatCache.set(k, Math.max(0, ...foeNear.map(f => bestHit(state, other(slot), f, c, foe.mana, P))));
     return threatCache.get(k);
   };
   const foeMax = threatAt(me);
@@ -53,16 +58,16 @@ export function rankPlans(state, slot, pool) {
     let out = 0, kill = 0, def = 0, tiles = 0, risk = 0, steps = 0;
     for (const a of q) {
       const t = a.type;
-      if (t === "move") pos = moveBy(state, pos, a.dir, 1);
+      if (t === "move") pos = moveBy(state, pos, a.dir, 1, portals);
       if (ATTACKS.has(t)) {
-        const hits = actionHits(state, slot, pos, a);
+        const hits = actionHits(state, slot, pos, a, P);
         if (hits) {
           let e = 0;
           for (const [k, p] of foeDist) e += p * hits[k];
           out += e; kill += hits[idx(foe)] * 0.6 + e * 0.4;
         }
       }
-      if (t === "dash") pos = moveBy(state, pos, a.dir, 2);
+      if (t === "dash") pos = moveBy(state, pos, a.dir, 2, portals);
       if (DEF[t]) def = Math.max(def, DEF[t] * Math.min(1, foeMax / hp));
       const c = actionCost(a, me.char);
       mana = t === "recharge" ? Math.min(MAX_MANA, mana + RECHARGE_GAIN) : Math.max(0, mana - Math.max(0, c));

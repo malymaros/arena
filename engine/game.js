@@ -308,7 +308,8 @@ function inBounds(x, y, board = game.board) {
 function pushStateFrame(timeline, effects = [], delayMs = SMALL_DELAY_MS) {
   // io.noFrames (simulácie AI bota): frame bez snapshotu - engine framy nikdy nečíta, len ich posiela von
   const frame = io.noFrames ? { effects, delayMs } : { ...snapshot(), effects, delayMs };
-  if (actTag) Object.defineProperty(frame, "act", { value: actTag }); // neenumerovateľný - neserializuje sa
+  // neenumerovateľný tag akcie (telemetria, labyrint peek) - simulácie bota (noFrames) ho nečítajú, defineProperty je drahé
+  if (actTag && !io.noFrames) Object.defineProperty(frame, "act", { value: actTag });
   timeline.push(frame);
 }
 

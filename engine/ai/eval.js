@@ -131,13 +131,16 @@ function relation(a, b) {
   };
 }
 
-// rozdiel (ja − súper) pre každú feature, škála ~[-1, 1]
-export function features(state, me) {
-  const a = state.players[me], b = state.players[other(me)];
+// predpočítané kľúče per-postava features (eval beží tisíckrát za ťah - reťazce sa neskladajú pri každom volaní)
+const CHAR_KEY = Object.fromEntries(ALL_CHARS.map(c => [c, "char:" + c]));
+const REL_KEY = Object.fromEntries(ALL_CHARS.map(c => [c, REL.map(r => `${r}:${c}`)]));
+const CHAR_IDX = Object.fromEntries(ALL_CHARS.map((c, i) => [c, i]));
+
+// všeobecné features (BASE) - rozdiel (ja − súper), škála ~[-1, 1]; per-postava pridáva features() / evaluate()
+function baseFeatures(state, me, a, b, rel) {
   const d = (fa, fb) => fa - fb;
   const lvl = (p) => (p.pride || 0) / 3 + (p.moon || 0) / 3;
-  const rel = relation(a, b);
-  const f = {
+  return {
     hp: d(a.hp, b.hp) / 10,
     hp2: d(a.hp * a.hp, b.hp * b.hp) / 100,
     lowHp: d(a.hp <= 4 ? 1 : 0, b.hp <= 4 ? 1 : 0),
@@ -158,10 +161,17 @@ export function features(state, me) {
     manaOpt: d(manaTiers(a.mana), manaTiers(b.mana)),
     starterPress: (state.starter === me && b.mana < 4 ? 1 : 0) - (state.starter !== me && a.mana < 4 ? 1 : 0),
   };
+}
+
+// všetky features (rozdiel ja − súper) - ladenie váh (tools/ai-tune.mjs); evaluate ráta to isté bez nulových členov
+export function features(state, me) {
+  const a = state.players[me], b = state.players[other(me)];
+  const rel = relation(a, b);
+  const f = baseFeatures(state, me, a, b, rel);
   for (const c of ALL_CHARS) {
     const sa = a.char === c ? 1 : 0, sb = b.char === c ? 1 : 0;
-    f["char:" + c] = sa - sb;
-    for (const r of REL) f[`${r}:${c}`] = rel && sa !== sb ? (sa - sb) * rel[r] : 0;
+    f[CHAR_KEY[c]] = sa - sb;
+    REL.forEach((r, i) => { f[REL_KEY[c][i]] = rel && sa !== sb ? (sa - sb) * rel[r] : 0; });
   }
   return f;
 }
@@ -184,8 +194,19 @@ export function evaluate(state, me, w = WEIGHTS) {
     for (const k of DOOM_FEATURES) s += (w[k] || 0) * df[k];
     return Math.tanh(s) * (ds === me ? 1 : -1);
   }
-  const f = features(state, me);
+  // = Σ w·features v poradí FEATURES; per-postava features sú nenulové len pre postavy oboch hráčov (a len keď sa
+  // líšia) - nulové členy sa vynechajú (pripočítanie 0 súčet nemení, výsledok je bit-identický)
+  const rel = relation(a, b);
+  const f = baseFeatures(state, me, a, b, rel);
   let s = 0;
-  for (const k of FEATURES) s += (w[k] || 0) * f[k];
+  for (const k of BASE) s += (w[k] || 0) * f[k];
+  if (a.char !== b.char) {
+    const cs = [a.char, b.char].filter(c => c in CHAR_IDX).sort((x, y) => CHAR_IDX[x] - CHAR_IDX[y]);
+    for (const c of cs) s += (w[CHAR_KEY[c]] || 0) * (c === a.char ? 1 : -1);
+    if (rel) for (const c of cs) {
+      const sgn = c === a.char ? 1 : -1;
+      REL.forEach((r, i) => { s += (w[REL_KEY[c][i]] || 0) * (sgn * rel[r]); });
+    }
+  }
   return Math.tanh(s);
 }

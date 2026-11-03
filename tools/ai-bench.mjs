@@ -4,17 +4,19 @@
 //   1. správnosť - simulácia bez frame-ov (io.noFrames) musí skončiť v bit-identickom stave ako s frame-ami
 //      a ako skutočné kolo hlavného enginu (pri rovnakom rng);
 //   2. rýchlosť - ms na simulované kolo s frame-ami a bez nich.
-// Spustenie: node tools/ai-bench.mjs [počet zápasov na dvojicu=2]
+// Spustenie: node tools/ai-bench.mjs [počet zápasov na dvojicu=2] [--portal | --swamp]  (aréna; bez voľby Stone Bridge)
 import { createEngine } from "../engine/game.js";
 import { CHARS, seededRng, cloneData } from "../engine/constants.js";
 import { candidate } from "./random-bot.mjs";
 
-const N = Number(process.argv[2]) || 2;
+const N = Number(process.argv.slice(2).find(a => /^d+$/.test(a))) || 2;
+const ARENA = process.argv.includes("--portal") ? "portal" : process.argv.includes("--swamp") ? "swamp" : null;
 const P1_POOL = [...CHARS, "countess", "luffy"];
 const P2_POOL = [...CHARS, "onre", "jotaro"];
 const CONFIG = {
   format: "single", tilesPerRound: 2, timer: "off", tilePreview: true, colorPref: "white",
-  tileWeights: { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 },
+  tileWeights: ARENA === "portal" ? { dmg: 90, ik: 10 } : { dmg: 36, heal: 15, mana: 15, ik: 4, power: 15, block: 15 },
+  ...(ARENA ? { arena: ARENA } : {}),
 };
 const REPS = 20; // opakovaní simulácie toho istého kola pri meraní času
 
@@ -91,7 +93,7 @@ pairs.forEach(([ch1, ch2], pi) => {
 });
 
 const per = (ms) => (ms / rounds).toFixed(4);
-console.log(`${rounds} kôl, rozdielov: ${mismatches}, THE WORLD páuz (preskočené): ${paused}`);
+console.log(`aréna ${ARENA || "bridge"}: ${rounds} kôl, rozdielov: ${mismatches}, THE WORLD páuz (preskočené): ${paused}`);
 console.log(`ms/kolo: export stavu ${per(time.clone)} | simulácia s frame-ami ${per(time.frames)} | bez frame-ov ${per(time.fast)}`);
 console.log(`→ bez frame-ov ~${Math.round(1000 / ((time.fast + time.clone) / rounds))} simulovaných kôl/s (vrátane klonovania stavu)`);
 if (mismatches) process.exit(1);
