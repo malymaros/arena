@@ -10,6 +10,7 @@ import {
   GOLDEN_COST, GOLDEN_MIRROR_COST, DEMON_COST, JOTARO_S1_COST, LUFFY_S1_COST, MAX_MANA,
 } from "../../shared/balance.js";
 import { DEFENSE_SLOT, cloneData, seededRng } from "../constants.js";
+import { DIAG_DIRS, vampShotRoute } from "../../shared/geometry.js";
 
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
 const TYPES = ["move", "dash", "recharge", "attack", "melee", "special", "shield", "mirror", "special1", "shield_breaker", "mirror_breaker", "demon"];
@@ -40,16 +41,38 @@ export function actionOptions(sim, state, slot, prefix, cells) {
 export const actionCost = (a, char) => (a.type === "special1" ? (S1_COST[char] ?? 4) : (COST[a.type] ?? 0));
 
 // stačí mana na každú akciu v poradí? (golden predťah platí pred frontou)
-function affordable(q, mana, char, pre = 0) {
+// recharge pri plnej mane engine prečiarkne (mana_full) - premárnený slot, pre človeka vyzerá hlúpo
+export function affordable(q, mana, char, pre = 0) {
   let m = mana - pre;
   if (m < 0) return false;
   for (const a of q) {
     if (a.type === "stoned") continue;
+    if (a.type === "recharge" && m >= MAX_MANA) return false;
     const c = actionCost(a, char);
     if (c > 0 && m < c) return false;
     m = Math.min(MAX_MANA, m - c);
   }
   return true;
+}
+
+// diagonálna bounce strela (Vampire/Onryō/Jotaro/Luffy): smer je zbytočný, ak iný smer z tej istej bunky
+// prejde všetkými jeho bunkami aspoň tak skoro (dmg 3/2/1 podľa vzdialenosti) a niečím navyše - napr. strela
+// hneď do susednej steny (odraz minie dosah) vs. smer, ktorý odrazom pokryje o bunku viac
+export function dominatedShot(board, x, y, dir) {
+  if (!DIAG_DIRS[dir]) return false;
+  const mine = vampShotRoute(board, x, y, dir);
+  const at = (route) => new Map(route.map((c, i) => [c.x + "," + c.y, i]));
+  const m = at(mine);
+  for (const d of Object.keys(DIAG_DIRS)) {
+    if (d === dir) continue;
+    const other = vampShotRoute(board, x, y, d), o = at(other);
+    if (other.length < mine.length) continue;
+    if ([...m].some(([k, i]) => !(o.get(k) <= i))) continue;
+    // rovnaké pokrytie: nechaj len prvý smer v poradí DIAG_DIRS
+    if (other.length === mine.length && [...m].every(([k, i]) => o.get(k) === i) && Object.keys(DIAG_DIRS).indexOf(d) > Object.keys(DIAG_DIRS).indexOf(dir)) continue;
+    return true;
+  }
+  return false;
 }
 
 const keyOf = (a) => a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "");
@@ -98,6 +121,7 @@ export function baseQueues(sim, state, slot) {
       if (used.has(a.type) || (DEFENSE_SLOT[a.type] && used.has("def:" + DEFENSE_SLOT[a.type]))) continue;
       const r = probe(x, y, a);
       if (r.wall) continue; // akcia do steny z tejto bunky
+      if (a.type === "attack" && dominatedShot(state.board, x, y, a.dir)) continue;
       const u = new Set(used); u.add(a.type); if (DEFENSE_SLOT[a.type]) u.add("def:" + DEFENSE_SLOT[a.type]);
       rec([...q, a], u, r.x, r.y);
     }

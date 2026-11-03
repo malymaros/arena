@@ -4,7 +4,7 @@
 // Hodnotí ich mapami zásahov z threat.js (čo kto komu vie dať z ktorej bunky). Bot ich vždy pridá do hry kola
 // (za seba aj za súpera), aby mu nechýbali zjavné hrozby a odpovede; presné ohodnotenie urobí až simulácia.
 import { actionHits, bestHit, reach } from "./threat.js";
-import { actionCost } from "./candidates.js";
+import { actionCost, extraVariants } from "./candidates.js";
 import { MAX_MANA, RECHARGE_GAIN } from "../../shared/balance.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
@@ -102,6 +102,53 @@ export function seedPlans(state, slot, pool, per = 3) {
       if (seen.has(q)) continue;
       seen.add(q); out.push({ q, style }); n++;
     }
+  }
+  return out;
+}
+
+// ---------- kolo s démonom (Last Stand doom) - štandard podľa vlastníka: útočník zahrá démona v jednej z troch
+// akcií, obranca pokryje obranou 2 z 3 súperových akcií. Double oracle tieto fronty v čase nestihol nájsť
+// (bug reporty), preto idú do matice vždy; výnimky (skamenenie, zabitie s Last Hope boostom) nájde simulácia.
+const BASE_SKIP = new Set(["golden_shield", "golden_mirror", "golden_mana", "last_stand", "last_hope"]);
+const baseIdx = (q, type) => q.filter(a => !BASE_SKIP.has(a.type)).findIndex(a => a.type === type);
+// ktoré súperove akcie (index 0-2) pokryje moja obrana: obrana kryje súperovu NASLEDUJÚCU akciu - startér
+// hrá v dvojici prvý (moja i-ta kryje jeho i-tu), nestartér druhý (moja i-ta kryje jeho i+1); golden predťah
+// nestartéra kryje jeho prvú akciu
+export function coverage(q, starter) {
+  const out = new Set();
+  if (q.some(a => a.type === "golden_shield" || a.type === "golden_mirror")) out.add(0);
+  q.filter(a => !BASE_SKIP.has(a.type)).forEach((a, i) => {
+    if (a.type !== "shield" && a.type !== "mirror") return;
+    const j = starter ? i : i + 1;
+    if (j < 3) out.add(j);
+  });
+  return out;
+}
+
+export function doomPlans(sim, state, slot, pool, per = 3) {
+  const me = state.players[slot], foe = state.players[other(slot)];
+  const top = (qs, style, n) => {
+    const sc = rankPlans(state, slot, qs);
+    return sc.sort((a, b) => b.s[style] - a.s[style]).slice(0, n).map(x => x.q);
+  };
+  const out = [];
+  if (me.lastStandBuff) {
+    // útočník: démon v 1., 2. aj 3. akcii
+    for (let i = 0; i < 3; i++) out.push(...top(pool.filter(q => baseIdx(q, "demon") === i), "killer", per));
+    return out;
+  }
+  if (!foe.lastStandBuff) return out;
+  // obranca: fronty s 2 obranami (aj golden predťah nestartéra, aj s Last Hope) pre každú dvojicu pokrytých akcií
+  const starter = state.starter === slot;
+  const defs = (q) => q.filter(a => a.type === "shield" || a.type === "mirror").length;
+  const cands = [...pool.filter(q => defs(q) >= 1)];
+  for (const q of pool.filter(q => defs(q) >= 1)) {
+    for (const v of extraVariants(sim, state, slot, q))
+      if (!v.some(a => a.type === "golden_mana" || a.type === "last_stand")) cands.push(v);
+  }
+  for (const pair of [[0, 1], [0, 2], [1, 2]]) {
+    const hit = cands.filter(q => { const c = coverage(q, starter); return c.size === 2 && c.has(pair[0]) && c.has(pair[1]); });
+    out.push(...top(hit, "defensive", per));
   }
   return out;
 }

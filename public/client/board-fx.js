@@ -297,15 +297,17 @@ function pulseGlow(color, now) {
 // isClone = true: klon NEZRKADLÍ Last Stand vizuály (zlatý death-glow) - ostáva neutrálny (rozhodnutie hráča)
 export function actorFilter(slot, now, isClone = false) {
   const st = state?.[slot];
-  // golden recharge stav (death summon) - žiarivý zlatý pulz postavy, má prednosť pred ostatným (klon ho nemá)
+  // skamenená postava - kamenná sivá (prekryje aj alt filter, socha je socha)
+  const stone = (st?.stone || 0) > 0 && (st?.hp ?? 1) > 0 ? "grayscale(.92) brightness(.82) contrast(1.12) " : "";
+  // golden recharge stav (death summon) - žiarivý zlatý pulz postavy, má prednosť pred ostatným (klon ho nemá);
+  // skamenená socha (napr. odrazený petrify v Last Stande) ostane sivá, len so zlatou žiarou
   if (lastStand.goldenSlot === slot && !isClone) {
+    if (stone) return stone + pulseGlow("#ffd24a", now);
     if (perf.lite) return "brightness(1.35) saturate(1.5) " + pulseGlow("#ffd24a", now);
     const t = 0.5 + 0.5 * Math.sin(glowStep(now) / 110);
     return `brightness(${(1.15 + 0.45 * t).toFixed(2)}) saturate(1.5) ` + pulseGlow("#ffd24a", now);
   }
   const alt = usesAltColor(st?.char, slot) ? "saturate(.22) brightness(1.4) " : "";
-  // skamenená postava - kamenná sivá (prekryje aj alt filter, socha je socha)
-  const stone = (st?.stone || 0) > 0 && (st?.hp ?? 1) > 0 ? "grayscale(.92) brightness(.82) contrast(1.12) " : "";
   let glow = "";
   if (st?.shield)      glow = pulseGlow(st.shieldGold ? GLOW_COL.shieldGold : GLOW_COL.shield, now);
   else if (st?.mirror) glow = pulseGlow(st.mirrorGold ? GLOW_COL.mirrorGold : GLOW_COL.mirror, now);

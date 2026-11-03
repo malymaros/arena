@@ -6,12 +6,12 @@
 import { CHARS, SIDE_CHARS, seededRng, cloneData } from "../constants.js";
 import { createBelief, decisionKind, hasHidden, simState } from "./view.js";
 import { createSim } from "./sim.js";
-import { baseQueues, extraVariants, queueKey } from "./candidates.js";
+import { baseQueues, extraVariants, queueKey, affordable, dominatedShot } from "./candidates.js";
 import { evaluate, desperate } from "./eval.js";
 import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
 import { createOpponentModel } from "./model.js";
-import { seedPlans } from "./plans.js";
+import { seedPlans, doomPlans } from "./plans.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "shield_breaker", "special1"];
@@ -57,6 +57,39 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       if (v > bestV) { bestV = v; best = q; }
     }
     return best;
+  }
+
+  // všetky zmrazené trojice (každý typ max 1×, štít XOR breaker), ktoré si Jotaro môže dovoliť - náhodné
+  // vzorkovanie ich minulo (napr. pri 1 mane jedinú rozumnú „recharge, útok"); pozícia sa sleduje len na
+  // vyradenie pohybu do steny a zbytočných diagonálnych smerov basicu
+  function allFrozen(st, me) {
+    const p = st.players[me], diag = !!SIDE_CHARS[p.char];
+    const opts = [];
+    for (const t of TS_TYPES) {
+      if (t === "move" || t === "dash") for (const dir of DIRS.slice(0, 4)) opts.push({ type: t, dir });
+      else if (t === "attack") for (const dir of diag ? DIRS.slice(4) : DIRS.slice(0, 4)) opts.push({ type: t, dir });
+      else if (t === "special1") for (const dir of ["left", "right"]) opts.push({ type: t, dir });
+      else opts.push({ type: t });
+    }
+    const STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+    const out = [];
+    const rec = (q, x, y) => {
+      if (q.length === 3) { if (affordable(q, p.mana, p.char)) out.push(q); return; }
+      for (const a of opts) {
+        if (q.some(b => b.type === a.type)) continue;
+        if ((a.type === "shield" && q.some(b => b.type === "shield_breaker")) || (a.type === "shield_breaker" && q.some(b => b.type === "shield"))) continue;
+        if (a.type === "attack" && diag && dominatedShot(st.board, x, y, a.dir)) continue;
+        let nx = x, ny = y;
+        if (a.type === "move" || a.type === "dash") {
+          const [dx, dy] = STEP[a.dir], n = a.type === "dash" ? 2 : 1;
+          nx = Math.max(0, Math.min(st.board.w - 1, x + dx * n)); ny = Math.max(0, Math.min(st.board.h - 1, y + dy * n));
+          if (nx === x && ny === y) continue; // do steny
+        }
+        rec([...q, a], nx, ny);
+      }
+    };
+    rec([], p.x, p.y);
+    return out;
   }
 
   // ---------- hodnota dvojice front (priemer cez determinizácie), s cache ----------
@@ -162,8 +195,10 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       return out;
     };
     const lead = (seeds, rest) => [...seeds, ...rest.filter(q => !seeds.includes(q))];
-    let R = lead(seedMe.slice(0, 8), withExtras(pm.top, me));
-    const C = lead(seedOpp.slice(0, 10), withExtras(po.top, opp));
+    // kolo s démonom: štandardné plány oboch strán (démon v 1./2./3. akcii, obrana kryjúca 2 z 3) vždy v matici
+    const doomMe = doomPlans(sim, s0, me, myPool), doomOpp = doomPlans(sim, s0, opp, oppPool);
+    let R = lead([...doomMe, ...seedMe.slice(0, 8)], withExtras(pm.top, me));
+    const C = lead([...doomOpp, ...seedOpp.slice(0, 10)], withExtras(po.top, opp));
     // model súpera: fronty s jeho opakovanými vzormi typov akcií pridaj do matice, aj keď nie sú „rovnovážne"
     const om = model ? createOpponentModel(belief.history) : null;
     const useModel = !!om && om.observations >= 2 && om.weight > 0.05;
@@ -273,7 +308,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
   // Pohľad počas pauzy nenesie zvyšok kola (súperove zostávajúce akcie sú pre bota skryté, ako pre človeka):
   // aproximácia = kolo, v ktorom je súper skamenený a ja hrám zmrazené akcie.
   function decideTimestop() {
-    const t0 = now(), deadline = t0 + Math.min(budgetMs, 2000);
+    const t0 = now(), deadline = t0 + Math.min(budgetMs, 4000);
     const me = belief.mySlot, opp = other(me);
     const st = simState(belief, rng);
     st.players[opp].stone = 3;
@@ -281,18 +316,19 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const stoned = [{ type: "stoned" }, { type: "stoned" }, { type: "stoned" }];
     let best = null, bestV = -Infinity;
     const tried = new Set();
-    for (let attempt = 0; now() < deadline && tried.size < 400 && attempt < 2000; attempt++) {
-      const q = randomFrozen(st.players[me].char);
-      const k = queueKey(q);
-      if (tried.has(k)) continue;
-      tried.add(k);
+    // keď čas nestačí na všetky: najprv trojice so zásahom (útok / melee / Special 1)
+    const dmg = (q) => q.some(x => x.type === "attack" || x.type === "melee" || x.type === "special1") ? 0 : 1;
+    const all = shuffle(allFrozen(st, me)).sort((x, y) => dmg(x) - dmg(y));
+    for (const q of all) {
+      if (now() > deadline) break;
+      tried.add(queueKey(q));
       const res = sim.play(st, { [me]: q, [opp]: stoned }, seededRng(1), tsPolicy);
       stats.sims++;
       if (!res) continue;
       const v = evaluate(res, me, weights);
       if (v > bestV) { bestV = v; best = q; }
     }
-    log?.({ kind: "timestop", ms: Math.round(now() - t0), tried: tried.size, pick: best && queueKey(best) });
+    log?.({ kind: "timestop", ms: Math.round(now() - t0), tried: tried.size, of: all.length, pick: best && queueKey(best) });
     return best || [{ type: "recharge" }, { type: "shield" }, { type: "move", dir: "up" }];
   }
 
