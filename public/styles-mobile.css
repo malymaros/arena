@@ -478,3 +478,32 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 .phone .maint-head { width: 288px; height: 306px; }
 .phone .maint-sub { font-size: 22px; }
 .phone .maint-admin { font-size: 18px; right: 40px; bottom: 30px; }
+
+/* MATCHES na telefóne (match-list.js): okno na celú obrazovku, obsah zväčšený zoom-om (na displeji sa virtuálna
+   obrazovka zmenšuje ~2×) a v riadku len podstatné stĺpce: dátum | aréna | typ | hlavy bieleho | skóre | hlavy
+   čierneho | koniec hier. Štítky WHITE/BLACK, mená a kolá sú v rozbalených hrách. */
+.phone .ml-card { zoom: 2.4; width: calc((var(--app-w) - 40px) / 2.4); height: calc((var(--app-h) - 30px) / 2.4); padding: 10px 12px; }
+.phone .ml-head { margin-bottom: 8px; }
+.phone .ml-title { font-size: 18px; }
+.phone .ml-row { grid-template-columns: 76px 90px 84px 84px 40px 84px 1fr; gap: 8px; padding: 6px 8px; }
+.phone .ml-row .ml-side, .phone .ml-row .ml-meta { display: none; }
+.phone .ml-arena { width: 90px; height: 34px; }
+.phone .ml-arena > span:last-child { font-size: 6px; }
+.phone .ml-when { font-size: 8px; }
+.phone .ml-chip { font-size: 7px; padding: 4px 0; }
+.phone .ml-ai { font-size: 6px; }
+.phone .ml-heads.small canvas { width: 24px; height: 24px; }
+.phone .ml-heads { gap: 4px; }
+.phone .ml-row .ml-heads.w { justify-content: flex-end; }
+.phone .ml-score { font-size: 14px; letter-spacing: 1px; }
+.phone .ml-cause { width: 22px; height: 22px; }
+.phone .ml-cause svg { width: 13px; height: 13px; }
+/* rozbalené hry: číslo | hlavy s VS | ikona konca | kolá (+ démon) | ANALYZE */
+.phone .ml-games { margin-left: 16px; }
+.phone .ml-game { grid-template-columns: 18px auto 22px 1fr auto; gap: 8px; padding: 6px 8px; }
+.phone .ml-pair { grid-template-columns: 30px 24px 30px; gap: 6px; }
+.phone .ml-pair .ml-nm { display: none; }
+.phone .ml-pair canvas { width: 30px; height: 30px; }
+.phone .ml-ctext { font-size: 0; gap: 0; }
+.phone .ml-game .ml-meta { font-size: 8px; }
+.phone .ml-analyze { font-size: 8px; padding: 8px 10px; }
