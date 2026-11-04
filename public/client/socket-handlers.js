@@ -15,7 +15,7 @@ import { stopTurnTimer, tlog, setServerTimer } from "/client/turn-timer.js";
 import { clearActionLogs } from "/client/action-log.js";
 import { planning, resetPlanning } from "/client/planning.js";
 import { renderQueue, setCheaterSpy } from "/client/queue.js";
-import { clearActors, schedulePlayTimeline } from "/client/timeline.js";
+import { clearActors, schedulePlayTimeline, showGameOverOnLoad } from "/client/timeline.js";
 import { renderGrid } from "/client/grid.js";
 import { renderHUD, costHtml, applySpecialSkin } from "/client/hud.js";
 import { fxAll } from "/client/fx-registry.js";
@@ -185,6 +185,8 @@ socket.on("state", (s) => {
     // finálny stav (vrátane nových tiles) nevykresľuj hneď - ukáže ho až posledný frame timeline
     schedulePlayTimeline(s.timeline);
   } else if (!playback.playing) {
+    // reload / nové pripojenie do skončeného zápasu → okno game over (PLAY AGAIN · ANALYZE · LEAVE ROOM)
+    if (s.phase === "match_over") showGameOverOnLoad(s);
     // reload počas čakania na súpera: server mi pošle moju locknutú voľbu → vráť ju do lišty kola
     if (s.myLock && !planning.myQueue.length) {
       planning.myQueue = s.myLock.queue.map(a => ({ ...a }));

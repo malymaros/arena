@@ -207,6 +207,7 @@ function createRoom(id, { ai = false, slot = null } = {}) {
   let personFreedAt = { A: 0, B: 0 };         // kedy sa slot uvoľnil (grace, počas ktorej ho cudzí klient neobsadí)
   let roomDestroyTimer = null;                // po odpojení oboch: po grace roomku zruší
   let pendingMatchConfig = null;              // host stlačil START, ale 2. hráč ešte nie je → čaká sa; po jeho príchode sa spustí
+  let lastRecordId = null;                    // id záznamu posledného zápasu (MATCHES) - hráč po reloade skončeného zápasu ho dostane znova
   const spectators = new Set();               // diváci tejto roomky (dostávajú nemaskovaný stav cez roomEmit)
 
   const engine = createRecordedEngine({
@@ -223,7 +224,7 @@ function createRoom(id, { ai = false, slot = null } = {}) {
     aiLevel: () => (ai ? aiLevel : null),               // obťažnosť bota (snapshot aiLevel)
   }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson, aiLevel: () => aiLevel,
     // uložený záznam zápasu → hráčom a divákom roomky jeho id (tlačidlo ANALYZE na game over)
-    matchLog: matchLog && { save: (r) => { matchLog.save(r); roomEmit("match_record", { id: r.id }); } } });
+    matchLog: matchLog && { save: (r) => { matchLog.save(r); lastRecordId = r.id; roomEmit("match_record", { id: r.id }); } } });
   const { snapshot, snapshotFor, redactTimelineFor, slotForPerson, startMatch, newGame, sanitizeConfig } = engine;
 
   // per-room emit: nahrádza io.emit - pošle len hráčom A/B a divákom TEJTO roomky (nie cudzím)
@@ -451,6 +452,8 @@ function onTurnTimeout() {
     socket.emit("state", snapshotFor(p)); // počas char-selectu maskuje súperov pick
     // CHEATER: odhalená akcia aktuálneho kola (reload počas kola) - klient ju ukáže, len ak kolo sedí
     if (lastSpy && ai && p !== botPerson) socket.emit("cheater_spy", lastSpy);
+    // reload skončeného zápasu: ANALYZE na game over potrebuje id jeho záznamu
+    if (lastRecordId && engine.game.phase === "match_over") socket.emit("match_record", { id: lastRecordId });
     if (p === "B") maybeStartPending(); // 2. hráč dorazil → ak host čakal, spusti zápas
     broadcastSpectators();
   }

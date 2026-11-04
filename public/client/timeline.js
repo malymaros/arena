@@ -39,6 +39,35 @@ import { shrekEffect } from "/client/shrek.js";
 import { sideTag } from "/client/side-tag.js";
 
 /* ---------- GameOver sekvencia ---------- */
+// verdikt namiesto ROUND n v hud-turn (hlavné okno nič neprekrýva) + pri sérii finálne skóre a koruny
+function renderGameOverVerdict(winner) {
+  let verdict, cls;
+  if (winner === "draw")        { verdict = "TIE"; cls = "tie"; }
+  else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
+  else if (me)                  { verdict = "LOSER!"; cls = "lose"; }
+  else                          { verdict = `${sideTag(winner)} WINS`; cls = "tie"; } // divák: ⚪ WHITE WINS / ⚫ BLACK WINS
+  const ser = playback.serverGameResult?.series || state?.series;
+  let scoreLine = "";
+  if (ser && ser.format && ser.format !== "single") {
+    // skóre drží strany (ľavá : pravá), rovnako ako koruny v HUD - nie „ja : oponent"
+    scoreLine = `<span class="go-verdict tie">${ser.winsP1 ?? 0} : ${ser.winsP2 ?? 0}</span>`;
+    renderSeriesCrowns(ser); // dokresli finálne koruny (server po match_over už neposiela state)
+  }
+  if (hudTurn) hudTurn.innerHTML = `GAME OVER<span class="go-verdict ${cls}">${verdict}</span>${scoreLine}`;
+}
+// obnovenie stránky / nové pripojenie do SKONČENÉHO zápasu (fáza match_over, žiadna timeline na prehranie):
+// rovno okno game over s verdiktom - bez animácie smrti, znelky a víťaznej pózy (inak ostala holá doska bez tlačidiel)
+export function showGameOverOnLoad(s) {
+  if (playback.gameOverShown || playback.playing) return;
+  const ser = s?.series;
+  const winner = ser && ser.format && ser.format !== "single"
+    ? ((ser.winsP1 ?? 0) > (ser.winsP2 ?? 0) ? "p1" : (ser.winsP2 ?? 0) > (ser.winsP1 ?? 0) ? "p2" : computeWinnerFromState(s))
+    : computeWinnerFromState(s);
+  if (!winner) return;
+  playback.gameOverShown = true;
+  renderGameOverVerdict(winner);
+  goOverlay.classList.remove("hidden");
+}
 function showGameOverSequence(winner) {
   if (playback.gameOverShown) return;
   playback.gameOverShown = true;
@@ -60,26 +89,12 @@ function showGameOverSequence(winner) {
     }
 
     setTimeout(() => {
-      // verdikt namiesto ROUND n v hud-turn - hlavné okno nič neprekrýva
-      let verdict, cls;
       setMusic(null); // séria rozhodnutá - hudba stíchne, zaznie znelka
       const jingle = sfx(me && winner !== me && winner !== "draw" ? "game.lose" : "game.win");
       // po doznení znelky sa vráti hudba z lobby (game-over obrazovka nemá byť v tichu); ak už medzitým
       // niečo hudbu prepol (retry → nová hra), neprepisuj to
       Promise.resolve(jingle).then(h => h?.ended).then(() => { if (musicKey() === null) setMusic("music.menu"); });
-      if (winner === "draw")        { verdict = "TIE"; cls = "tie"; }
-      else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
-      else if (me)                  { verdict = "LOSER!"; cls = "lose"; }
-      else                          { verdict = `${sideTag(winner)} WINS`; cls = "tie"; } // divák: ⚪ WHITE WINS / ⚫ BLACK WINS
-      // pri sérii (BO3/BO5) doplň finálne skóre
-      const ser = playback.serverGameResult?.series || state?.series;
-      let scoreLine = "";
-      if (ser && ser.format && ser.format !== "single") {
-        // skóre drží strany (ľavá : pravá), rovnako ako koruny v HUD - nie „ja : oponent"
-        scoreLine = `<span class="go-verdict tie">${ser.winsP1 ?? 0} : ${ser.winsP2 ?? 0}</span>`;
-        renderSeriesCrowns(ser); // dokresli finálne koruny (server po match_over už neposiela state)
-      }
-      if (hudTurn) hudTurn.innerHTML = `GAME OVER<span class="go-verdict ${cls}">${verdict}</span>${scoreLine}`;
+      renderGameOverVerdict(winner);
       // uprac overlay z poslednej akcie (special/melee cast) - po game over ho už renderGrid neuprace
       actorsEl.querySelectorAll(".special-center").forEach(n => n.remove());
       clearCharOverlays();
