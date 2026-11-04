@@ -1,7 +1,6 @@
 // tools/make-icons.mjs - ikony aplikácie (PWA manifest, apple-touch-icon): písmeno A z nadpisu ARENA (glyf Press Start 2P
-// 7×7 prekreslený ako pixel art - zlaté pásy, tmavočervená 3D hrana a tieň ako text-shadow nadpisu) v oranžovom ráme na
-// tmavom pozadí. Písmeno ostáva vnútri bezpečnej zóny maskable
-// ikony (Android ju môže orezať do kruhu).
+// 7×7 prekreslený ako pixel art - zlaté pásy, tmavočervená 3D hrana a tieň ako text-shadow nadpisu) na čiernom
+// pozadí bez rámu, malé - ostáva hlboko vnútri bezpečnej zóny maskable ikony (Android ju oreže do kruhu / zaobleného štvorca).
 //   node tools/make-icons.mjs   → public/icons/icon-{180,192,512}.png
 import pngjs from "pngjs";
 import fs from "node:fs";
@@ -12,7 +11,7 @@ const OUT = "public/icons";
 const A = ["..XXX..", ".XX.XX.", "XX...XX", "XX...XX", "XXXXXXX", "XX...XX", "XX...XX"];
 const on = (x, y) => A[y]?.[x] === "X";
 const GOLD = [[255, 226, 122], [255, 194, 26], [255, 179, 0], [232, 138, 0]];
-const EXT = [122, 31, 0], BG = [18, 19, 21], FRAME = [255, 179, 0];
+const EXT = [122, 31, 0];
 
 function icon(size) {
   const img = new PNG({ width: size, height: size });
@@ -26,13 +25,9 @@ function icon(size) {
         img.data[i + 3] = 255;
       }
   };
-  // rám: čierna hrana, oranžový pás, tmavé pozadie
-  const b = Math.round(size / 40);
-  rect(0, 0, size, size, [0, 0, 0]);
-  rect(b, b, size - 2 * b, size - 2 * b, FRAME);
-  rect(3 * b, 3 * b, size - 6 * b, size - 6 * b, BG);
-  // písmeno (proporcie podľa 512 px návrhu: bunka 44, stred 248×244)
-  const k = size / 512, cell = Math.round(44 * k), x0 = Math.round(248 * k - 3.5 * cell), y0 = Math.round(244 * k - 3.5 * cell);
+  rect(0, 0, size, size, [0, 0, 0]); // čierne pozadie, bez rámu
+  // písmeno: bunka 26 px pri 512 (glyf ~36 % strany), stred mierne vľavo hore - 3D hrana a tieň idú doprava dole
+  const k = size / 512, cell = Math.round(26 * k), x0 = Math.round(250 * k - 3.5 * cell), y0 = Math.round(248 * k - 3.5 * cell);
   const cells = [];
   for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) if (on(x, y)) cells.push([x, y]);
   const sq = ([x, y], c, a = 1, d = 0) => rect(x0 + x * cell + d, y0 + y * cell + d, cell, cell, c, a);
