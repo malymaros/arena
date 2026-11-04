@@ -6,7 +6,8 @@
 // z tools/sprites-shrek (public/assets/shrek/*.png + anims.json).
 import { state } from "/client/session.js";
 import { cellToPx, TILE_W, TILE_H, gridEl, actorsEl, figuresEl, rowZ } from "/client/dom.js";
-import { spawnFloat, spawnCellFloat, spawnManaFloat } from "/client/board-fx.js";
+import { spawnCellFloat, spawnChargeAura } from "/client/board-fx.js";
+import { itemPickDelay } from "/shared/timing.js";
 import { pixSvg } from "/client/pix.js";
 import { perf } from "/client/perf.js";
 import { setStyle } from "/client/style-cache.js";
@@ -29,6 +30,7 @@ let freshStench = new Map();         // "x,y" → do kedy sa bunka smradu „roz
 const flashCells = new Map();        // "x,y" → do kedy bliká (stench_proc)
 const alertCells = new Map();        // "x,y" → do kedy bliká ako vyhodnocovaná dlaždica (výkrik: cieľ skoku / zasiahnutý Shrek)
 const freshItems = new Map();        // "x,y" → do kedy item „padá" (item_drop)
+const heldItems = new Map();         // "x,y" → { x, y, type, until } - zobraný item ostáva vidieť, kým k nemu figúra nedobehne
 
 function ensureEls() {
   if (fig) return;
@@ -107,10 +109,13 @@ export function renderShrek(s) {
   }
   // itemy: srdiečko / kvapka (pixel ikony dlaždíc) bez krúžku, vznášajú sa nad tieňom; čerstvé padajú zhora
   // Kreslia sa do vlastnej vrstvy nad figúrami - vždy najviac vpredu, aj pred hráčmi a mŕtvym Shrekom.
+  // Zobraný item, ku ktorému figúra ešte nedobehla (heldItems), sa kreslí ďalej - zmizne až pri prechode bunkou.
   itemsEl.replaceChildren();
-  for (const it of s.items || []) {
+  for (const [k, h] of heldItems) if (h.until < now) heldItems.delete(k);
+  for (const it of [...(s.items || []), ...heldItems.values()]) {
     const { left, top } = cellToPx(it.x, it.y);
     const el = document.createElement("div");
+    el.dataset.cell = `${it.x},${it.y}`;
     el.className = `swamp-item ${it.type}` + ((freshItems.get(`${it.x},${it.y}`) || 0) > now ? " fresh" : "");
     el.style.left = (left + TILE_W / 2) + "px"; el.style.top = (top + TILE_H / 2) + "px";
     el.innerHTML = `<i>${pixSvg(it.type === "heal" ? "heart" : "drop")}</i>`;
@@ -148,7 +153,20 @@ export function renderShrek(s) {
 }
 
 /* ---------- efekty timeline ---------- */
-export function shrekEffect(e, hold) {
+// za koľko ms od začiatku pohybového frame-u figúra prebehne bunkou itemu (spoločné so zvukom - sounds/events.js)
+const pickDelay = (e, ctx, hold) => itemPickDelay(e.cell, ctx?.prev?.[e.target], state?.[e.target], hold,
+  !!ctx?.effects?.some(f => f?.kind === "trap_tp_in"));
+
+// zber itemu: ikona vyletí, +HP float / +MANA float s nabíjacou aurou (bunka neblikne - zvuk zaznie zo sound-map)
+function itemPickFx(e) {
+  spawnCellFloat(e.cell, e.type === "heal" ? "❤" : "💧", "item-pop");
+  if (e.target === "shrek") { if (e.amount > 0) floatOverShrek(`+${e.amount} HP`, "heal-float"); return; }
+  if (!(e.amount > 0)) return; // plné HP / mana - item sa spotrebuje naprázdno (ako dlaždica)
+  if (e.type === "heal") spawnCellFloat(e.cell, `+${e.amount} HP`, "heal-float");
+  else { spawnCellFloat(e.cell, `+${e.amount} MANA`, "mana-float"); spawnChargeAura(e.target); }
+}
+
+export function shrekEffect(e, hold, ctx = null) {
   const now = performance.now();
   switch (e.kind) {
     case "shrek_jump": {
@@ -223,13 +241,20 @@ export function shrekEffect(e, hold) {
     case "item_drop":
       for (const it of e.items || []) freshItems.set(`${it.x},${it.y}`, now + 900);
       break;
-    case "item_pick":
-      // item zmizne (stav ho už nemá) - krátky záblesk na bunke + float hráčovi / Shrekovi (ten berie len HP)
-      spawnCellFloat(e.cell, e.type === "heal" ? "❤" : "💧", "item-pop");
-      if (e.target === "shrek") { if (e.amount > 0) floatOverShrek(`+${e.amount} HP`, "heal-float"); }
-      else if (e.type === "heal") spawnFloat(e.target, `+${e.amount} HP`, "heal-float");
-      else spawnManaFloat(e.target, e.amount);
+    case "item_pick": {
+      // hráč berie item v pohybovom frame-e (engine trackSteps) - efekt sa pustí, keď figúra bunkou prebieha;
+      // dovtedy item ostáva nakreslený (stav ho už nemá). Shrek berie item až po dopade skoku = hneď.
+      const delay = e.target === "shrek" ? 0 : pickDelay(e, ctx, hold);
+      if (delay <= 0) { itemPickFx(e); break; }
+      const key = `${e.cell[0]},${e.cell[1]}`;
+      heldItems.set(key, { x: e.cell[0], y: e.cell[1], type: e.type, until: now + delay });
+      setTimeout(() => {
+        heldItems.delete(key);
+        itemsEl?.querySelector(`[data-cell="${key}"]`)?.remove();
+        itemPickFx(e);
+      }, delay);
       break;
+    }
     case "stench_spread":
       for (const [x, y] of e.cells || []) freshStench.set(`${x},${y}`, now + 1600);
       break;

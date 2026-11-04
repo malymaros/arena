@@ -118,27 +118,27 @@ function spawnItems() {
 
 const itemsSnapshot = () => E.game.items.map(i => ({ ...i }));
 
-// po akcii: hráč, ktorý vstúpil na políčko s itemom alebo ním prebehol (moved = actionSteps akcie), ho zoberie
-// v poradí prejdených buniek. Klon itemy neberie (neodobraný item pod „postavou" prezrádza, ktorá je pravá).
-function pickupItems(moved, tl) {
-  if (!isSwamp() || !moved) return;
-  for (const slot of order()) {
-    const p = E.game.players[slot];
-    for (const [x, y] of moved[slot] || []) {
-      if (p.hp <= 0) break;
-      const idx = E.game.items.findIndex(i => i.x === x && i.y === y);
-      if (idx < 0) continue;
-      const it = E.game.items[idx];
-      E.game.items.splice(idx, 1);
-      let amount;
-      if (it.type === "heal") {
-        amount = Math.min(START_HP, p.hp + ITEM_HEAL_GAIN) - p.hp; p.hp += amount;
-      } else {
-        amount = Math.min(MAX_MANA, p.mana + ITEM_MANA_GAIN) - p.mana; p.mana += amount;
-      }
-      E.pushStateFrame(tl, [{ kind: "item_pick", target: slot, cell: [x, y], type: it.type, amount }], SMALL_DELAY_MS);
+// hráč vstúpil na políčko s itemom alebo ním prebieha (bunky pohybu z trackSteps - move/dash/charge/kotúľ/teleport
+// pasce/Jotaro počas THE WORLD): item zoberie HNEĎ, v poradí prejdených buniek. Stav sa zmení ešte pred pohybovým
+// frame-om a efekt item_pick ide do TOHO ISTÉHO frame-u - klient ho načasuje na moment prechodu bunkou.
+// Klon itemy neberie (neodobraný item pod „postavou" prezrádza, ktorá je pravá) - trackCloneSteps sem nechodí.
+function pickupOnSteps(slot, cells) {
+  if (!isSwamp() || !cells?.length) return [];
+  const p = E.game.players[slot], fx = [];
+  for (const [x, y] of cells) {
+    if (p.hp <= 0) break;
+    const idx = E.game.items.findIndex(i => i.x === x && i.y === y);
+    if (idx < 0) continue;
+    const it = E.game.items.splice(idx, 1)[0];
+    let amount;
+    if (it.type === "heal") {
+      amount = Math.min(START_HP, p.hp + ITEM_HEAL_GAIN) - p.hp; p.hp += amount;
+    } else {
+      amount = Math.min(MAX_MANA, p.mana + ITEM_MANA_GAIN) - p.mana; p.mana += amount;
     }
+    fx.push({ kind: "item_pick", target: slot, cell: [x, y], type: it.type, amount });
   }
+  return fx;
 }
 
 // Shrek pri dopade skoku 1-2-3 zoberie item na políčku: srdiečko ho vylieči o ITEM_HEAL_GAIN (max SHREK_HP),
@@ -426,5 +426,5 @@ function tackle(dx, tl) {
   if (!E.winnerNow() && !E.game.shrek.dead) E.shrekTraps(run, tl);
 }
 
-return { isSwamp, shrekAt, shrekCell, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, shrekResume, swampActionStart, noteDefense };
+return { isSwamp, shrekAt, shrekCell, swampStartGame, shrekSnapshot, itemsSnapshot, pickupOnSteps, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, shrekResume, swampActionStart, noteDefense };
 }

@@ -165,3 +165,17 @@ export const SHREK_TACKLE_MS  = 600;  // beh po riadku po prvú figúru / okraj 
 export const SHREK_RETURN_MS  = 600;  // návrat na štartové políčko
 export const SHREK_DIE_MS     = 1300; // padne (HurtDead) - smrad sa objaví v tom istom frame
 export const STENCH_PROC_MS   = 600;  // smradové políčko sa rozsvieti pred zásahom (ako tile_proc)
+
+// Shrek Swamp: hráč berie item v pohybovom frame-e (engine trackSteps) - za koľko ms od začiatku frame-u figúra
+// prebehne bunkou itemu (zvuk aj obraz zberu sa pustia v tom momente). Sklz z bunky pred frame-om (`from`) na novú
+// (`to`) ide lineárne MOVE_MS (move/dash/charge/kotúľ - vždy priamka, aj diagonálna); teleport pasce = pri zjavení.
+export function itemPickDelay(cell, from, to, holdMs, teleport = false) {
+  if (teleport) return Math.round(holdMs * 0.5);
+  if (!from || !to || from.x == null || to.x == null || !Array.isArray(cell)) return 0;
+  const d = (p, q) => Math.max(Math.abs(p[0] - q[0]), Math.abs(p[1] - q[1]));
+  const A = [from.x, from.y], B = [to.x, to.y], total = d(A, B);
+  if (!total) return 0;
+  const k = d(A, cell);
+  if (k + d(cell, B) !== total) return MOVE_MS;  // mimo priamky - radšej pri dobehnutí
+  return Math.round(MOVE_MS * k / total * 0.9);  // tesne pred stredom bunky - figúra „vbehne" do itemu
+}

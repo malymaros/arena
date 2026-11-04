@@ -1,7 +1,7 @@
 // test/sound-events.mjs - čisté mapovanie timeline → zvukové udalosti (public/sounds/events.js) na syntetických
 // frame-och: raz za beh, move vs dash, skrytý súper, prah ťažkého zásahu, char zasiahnutého, okná.
 import { eventsForFrame, newTracker, resetTracker, HIT_HEAVY_DMG } from "../public/sounds/events.js";
-import { portalWalkPlan, portalWalkMs, PORTAL_SHOT_STEP_MS, PORTAL_SHOT_PHASES } from "../shared/timing.js";
+import { portalWalkPlan, portalWalkMs, PORTAL_SHOT_STEP_MS, PORTAL_SHOT_PHASES, itemPickDelay, MOVE_MS } from "../shared/timing.js";
 const J = JSON.stringify;
 
 let failures = 0;
@@ -172,6 +172,18 @@ const keys = (evs) => evs.map(e => e.key);
   check(keys.filter(k => k === "attack").length === 1 && keys.filter(k => k === "voice.attack").length === 1,
     "let strely cez portál = jeden zvuk útoku a jeden hlas (zatvorenie portálu beh neprerušuje)", JSON.stringify(keys));
   check(ev[1].find(e => e.key === "attack")?.windowMs === 400, "okno letu zahŕňa aj frame zatvorenia portálu", JSON.stringify(ev[1]));
+}
+
+/* Shrek Swamp: zber itemu v pohybovom frame-e dashu → zvuk heal/mana dlaždice v momente prechodu bunkou */
+{
+  const to = { ...P1, x: 2 };
+  const tl = [fr([]), fr([{ kind: "item_pick", target: "p1", cell: [1, 1], type: "mana", amount: 1 }], 1000, to)];
+  const ev = play(tl)[0].filter(e => e.key.startsWith("tile."));
+  const half = itemPickDelay([1, 1], P1, to, 1000);
+  check(ev.length === 1 && ev[0].key === "tile.mana" && ev[0].atMs === half && half > 0 && half < MOVE_MS,
+    "item_pick: zvuk tile.mana uprostred dashu (prechod medzibunkou)", J(ev));
+  const end = play([fr([]), fr([{ kind: "item_pick", target: "p1", cell: [2, 1], type: "heal", amount: 1 }], 1000, to)])[0].filter(e => e.key.startsWith("tile."));
+  check(end[0]?.key === "tile.heal" && end[0].atMs > half, "item_pick: srdiečko na cieľovej bunke znie až pri dobehnutí", J(end));
 }
 
 console.log(failures ? `\n${failures} ZLYHANÍ` : "\nsound-events: VŠETKO PREŠLO");

@@ -5,7 +5,7 @@
 // ktorá v hre zvuk spúšťa.
 // Redakcia labyrintu/pasce platí automaticky: čo server klientovi zamaskoval, v timeline nie je → nezaznie.
 
-import { portalWalkPlan, PORTAL_SHOT_PHASES } from "../../shared/timing.js";
+import { portalWalkPlan, PORTAL_SHOT_PHASES, itemPickDelay } from "../../shared/timing.js";
 
 // druh efektu zo servera → kľúč registra (char = postava z e.from / e.target)
 export const DIRECT = {
@@ -142,6 +142,14 @@ export function eventsForFrame(timeline, i, before, tr, { board = { w: 4 }, fall
     }
     if (e.kind === "tile_proc") {
       if (TILE_KINDS.includes(e.tile)) out.push({ key: `tile.${e.tile}`, char: null, pan: panOf(e), windowMs: win });
+      continue;
+    }
+    if (e.kind === "item_pick") {
+      // Shrek Swamp: zber itemu znie ako heal/mana dlaždica - v MOMENTE prechodu bunkou (efekt je v pohybovom frame-e)
+      const hero = e.target === "p1" || e.target === "p2";
+      const at = hero ? itemPickDelay(e.cell, before?.[e.target], frame[e.target], win,
+        (frame.effects || []).some(f => f?.kind === "trap_tp_in")) : 0;
+      out.push({ key: `tile.${e.type === "heal" ? "heal" : "mana"}`, char: null, pan: panOf(e), windowMs: Math.max(0, win - at), ...(at > 0 ? { atMs: at } : {}) });
       continue;
     }
     if (e.kind === "golden_mana" && !e.gained) continue; // odmietnutá výmena

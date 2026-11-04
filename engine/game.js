@@ -64,7 +64,7 @@ export function createEngine(io = {}) {
   const { dealMul, recvDmg, doDemon, resolveLastStandSummon, resolveLastHopeSummon, resolveLastStandBanish } = Object.assign(E, lastStandModule(E));
   const { fireOnDmgTile, defenseBlockedBy, powerBoost, endOfStepTileEffects, endOfRoundTiles, rollPendingTiles } = Object.assign(E, tilesModule(E));
   const { walkDelay, isPortalRealm, portalList, spawnPortalRound, closePortals, bodyEffect, trackPath, walkAction } = Object.assign(E, portalsModule(E));
-  const { isSwamp, shrekAt, shrekCell, swampStartGame, shrekSnapshot, itemsSnapshot, pickupItems, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, swampActionStart, noteDefense } = Object.assign(E, swampModule(E));
+  const { isSwamp, shrekAt, shrekCell, swampStartGame, shrekSnapshot, itemsSnapshot, shrekStepEnd, shrekRoundEnd, shrekShot, shrekMelee, shrekZone, shrekPetrify, swampActionStart, noteDefense } = Object.assign(E, swampModule(E));
 
   // explicitný ctx pre postavy (engine/characters/*): stav hry + engine funkcie, ktoré postava smie volať
   // (framy, damage pipeline, statusy, labyrint, power tile). Vzniká až po inštalácii modulov.
@@ -1544,7 +1544,6 @@ function runRoundLoop() {
       }
       if (foeShieldArmed) { game.players[foe].shield = false; game.players[foe].shieldGold = false; }
       if (foeMirrorArmed) { game.players[foe].mirror = false; game.players[foe].mirrorGold = false; }
-      pickupItems(actionSteps, tl); // Shrek Swamp: item na prejdenom políčku sa zoberie hneď po pohybe (pred pascou)
       resolveTrapsAfterAction(tl);
       actionSteps = null;
 

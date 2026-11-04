@@ -78,14 +78,13 @@ function runTimestopActions(queue) {
   ts.mode = "frozen";
   const slot = ts.slot;
   // pasce sa počas zamrazenia netriggerujú (D4) - resolveTrapsAfterAction sa nevolá; prejdené bunky (actionSteps)
-  // slúžia len na zber itemov v Shrek Swamp (Jotaro sa hýbe naživo); trackSteps niť labyrintu pletie ďalej (D5)
+  // sa tu nevyhodnocujú (itemy Shrek Swamp Jotaro zbiera naživo v trackSteps); trackSteps niť labyrintu pletie ďalej (D5)
   for (const act of queue) {
     E.actionSteps = { p1: [], p2: [], p1c: [], p2c: [] };
     // frozen:true - klient túto akciu NEzaráta do round-scriptu (kurzor ostáva na THE WORLD), len ju animuje
     E.beginAct(slot); // labyrint peek: aj zmrazená akcia z bunky prekliateho sa mu odhalí
     E.pushStateFrame(tl, [{ kind: "action", from: slot, action: { type: act.type, dir: act.dir || null }, frozen: true }], 250);
     E.doAction(slot, act, tl); // frozen: zásah na súpera sa cez guardy v apply* len ohlási (ts_hit/ts_mirror)
-    E.pickupItems(E.actionSteps, tl);
     E.actionSteps = null;
     E.pushStateFrame(tl, [], ACTION_GAP_MS);
     E.endAct();

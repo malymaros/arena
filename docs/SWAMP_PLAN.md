@@ -60,7 +60,7 @@ Last Stand a maze. Ak Shrek prežije, hneď zareaguje. Reakcia môže útočník
   (`config.itemWeights`, default 60 / 40, spolu 100).
 - Itemy padnú na štarte hry a na konci každého kola na voľné políčko (bez itemu, hráča, klona a živého Shreka).
   Na ploche je naraz najviac 4 (`ITEM_MAX`).
-- Hráč item zoberie hneď pri vstupe na políčko alebo prebehnutí cezeň: pohyb, dash, charge, Luffyho kotúľ.
+- Hráč item zoberie hneď pri vstupe na políčko alebo prebehnutí cezeň: pohyb, dash, charge, Luffyho kotúľ, teleport na pascu (aj Jotaro počas THE WORLD). Zber sa robí priamo v `trackSteps` (`pickupOnSteps`) - efekt `item_pick` je v tom istom pohybovom frame-e a klient ho (ikona, +HP / +MANA s aurou, zvuk `tile.heal`/`tile.mana`, bunka neblikne) pustí v momente, keď figúra bunkou prebieha (rozhodnutie 2026-11-04; predtým až po dokončení akcie).
   Zber číta prejdené bunky akcie (`actionSteps`) pred vyhodnotením pasce. Pri plnom HP alebo mane sa item aj tak
   spotrebuje.
 - Narutov klon itemy neberie. Prekliaty v labyrinte vidí item len na fakľovej bunke, ako heal/mana dlaždice.

@@ -297,6 +297,10 @@ console.log("Itemy (srdiečko / mana)");
   const b = scenario("fire", "lightning", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.items = [{ x: 1, y: 1, type: "mana" }]; });
   const tlb = b.round([{ type: "dash", dir: "right" }, PASS, PASS], PASS3);
   check(b.game.players.p1.x === 2 && fx(tlb, "item_pick").some(e => e.type === "mana" && J(e.cell) === "[1,1]" && e.amount === 1), "I7: dash cez kvapku → +1 mana", J([b.game.players.p1.mana, b.game.players.p1.x]));
+  // zber padne do TOHO ISTÉHO frame-u ako pohyb (klient ho načasuje na prechod bunkou), nie do frame-u po akcii
+  const pickFrame = tlb.find(f => (f.effects || []).some(e => e.kind === "item_pick"));
+  check(pickFrame && pickFrame.p1.x === 2 && !pickFrame.items.some(i => i.x === 1 && i.y === 1),
+    "I7b: item_pick je v pohybovom frame-e dashu (stav už bez itemu)", J(pickFrame?.effects));
   // Lightning sa zo srdiečka vylieči do plna
   const c = scenario("lightning", "fire", (g) => { shrekSet(g, { x: 3, y: 0, marks: [[3, 2], [3, 0], [3, 2]] }); g.players.p1.hp = 3; g.items = [{ x: 1, y: 1, type: "heal" }]; });
   c.round([{ type: "move", dir: "right" }, PASS, PASS], PASS3);

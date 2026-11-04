@@ -290,7 +290,7 @@ function trackSteps(slot, cells) {
   // pasca (Countess/Onre): zbieraj bunky, ktorými figúra počas akcie prešla (vrátane teleportu triggera) -
   // resolveTrapsAfterAction z nich po dokončení akcie vyhodnotí vstup/prechod cez pascu
   if (E.actionSteps) E.actionSteps[slot].push(...cells.map(c => [...c]));
-  const fx = [];
+  const fx = E.pickupOnSteps(slot, cells); // Shrek Swamp: item na bunke sa zoberie v momente prechodu
   const p = E.game.players[slot];
   const foeS = E.other(slot);
   const foe = E.game.players[foeS];

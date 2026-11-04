@@ -470,7 +470,7 @@ export function schedulePlayTimeline(timeline) {
         if (e.from && (e.gained ?? 0) > 0) setTimeout(() => spawnManaFloat(e.from, e.gained), 400);
       }
       // Shrek Swamp: skok, rev, reakcie, pád a smrad (public/client/shrek.js)
-      if (e.kind.startsWith("shrek_") || e.kind.startsWith("stench_") || e.kind.startsWith("item_")) shrekEffect(e, frameHold);
+      if (e.kind.startsWith("shrek_") || e.kind.startsWith("stench_") || e.kind.startsWith("item_")) shrekEffect(e, frameHold, { prev, effects: frame.effects });
       // choreografia autora efektu (register fx: public/chars/fx/<key>.js - Vojak, Vlkolak, Luffy, …)
       CHAR_FX[state?.[e.from]?.char]?.effect?.(e, frameHold);
       if (e.kind === "melee" && (e.from === "p1" || e.from === "p2")) {
