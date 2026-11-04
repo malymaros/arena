@@ -30,6 +30,13 @@ const EAR = ["#.......", "##......", "#+#.....", "#++#....", "#+++#...", "#++++#
 const earSvg = (flip) => `<svg viewBox="0 0 8 8" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${EAR.flatMap((row, y) => [...row].map((c, x) =>
   c === "." ? "" : `<rect x="${flip ? 7 - x : x}" y="${y}" width="1" height="1" fill="${c === "#" ? "#ff8a1e" : "#b8500c"}"/>`)).join("")}</svg>`;
 const SPY_HTML = `<span class="spy-cover"></span><span class="spy-ears">${earSvg(false)}${earSvg(true)}</span>`;
+function markSpy(el) {
+  el.classList.add("spied");
+  el.insertAdjacentHTML("beforeend", SPY_HTML);
+  el.title = "CHEATER saw this action";
+}
+// divák AI roomky: zvýrazní sa akcia človeka (slot, ktorý nie je bot)
+const spyHumanSlot = () => (state?.vsAi === "p1" ? "p2" : state?.vsAi === "p2" ? "p1" : null);
 
 /* ---------- Queue + Lock ---------- */
 // ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove); ownerSlot kvôli alt-color hláv p2
@@ -241,11 +248,7 @@ export function renderQueue() {
       if (v.cls) el.classList.add(v.cls);
       if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text;
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
-      if (b.kind === "act" && spiedNow(b.idx)) {
-        el.classList.add("spied");
-        el.insertAdjacentHTML("beforeend", SPY_HTML);
-        el.title = "CHEATER saw this action";
-      }
+      if (b.kind === "act" && spiedNow(b.idx)) markSpy(el);
       // akcia podľa plánu nebude mať efekt → žltý ⚠ v rohu + dôvod v tooltipe
       const warn = b.kind === "act" ? warnings[b.idx]
         : (filled.type === "golden_mirror" && foeMirrorImmune()) ? MIRROR_IMMUNE_WARN : null;
@@ -272,6 +275,8 @@ export function renderQueue() {
         : mine ? "Your action (required)" : "Opponent (hidden until it resolves)";
     }
 
+    // divák: akcia človeka, ktorú CHEATER videl (obsah ešte skrytý - len zvýraznenie bunky)
+    if (isSpectator && b.kind === "act" && b.owner === spyHumanSlot() && spiedNow(b.idx)) markSpy(el);
     queueEl.appendChild(el);
     qBeatEls[b.pos] = el;
   });
@@ -288,13 +293,13 @@ export function renderQueue() {
 
 // počas animácie: posuň kurzor na práve vyhodnocovaný beat a odhal súperovu akciu
 export function highlightRoundBeat(from, action, counts, starterSlot) {
-  let pos;
+  let pos, actIdx = null; // actIdx = poradie bežnej akcie v jej fronte (CHEATER zvýraznenie u diváka)
   // labyrint: redigovaná akcia ("unknown") nesie beat, aby padla na správny slot lišty (gold pre/post vs. bežná)
   const maskedBeat = action.type === "unknown" ? (action.beat || "act") : null;
   if (action.type === "last_hope" || maskedBeat === "lhope") pos = 9;
   else if (action.type === "golden_shield" || action.type === "golden_mirror" || maskedBeat === "gpre") pos = 0;
   else if (action.type === "golden_mana" || action.type === "last_stand" || maskedBeat === "gmana") pos = (from === starterSlot) ? 7 : 8;
-  else { const k = counts[from]++; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
+  else { const k = counts[from]++; actIdx = k; pos = (from === starterSlot) ? [1, 3, 5][k] : [2, 4, 6][k]; }
   if (pos == null) return null;
   qBeatEls.forEach(e => e && e.classList.remove("q-now"));
   const el = qBeatEls[pos];
@@ -307,6 +312,8 @@ export function highlightRoundBeat(from, action, counts, starterSlot) {
     if (v.cls) el.classList.add(v.cls);
     if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text; // pixelové ikony (breaker)
     el.title = "Opponent"; // swap badge hlavu animuje raf (canvas.mage-head)
+    // divák: odhalená akcia človeka, ktorú CHEATER videl - zvýraznenie ostáva aj po odhalení
+    if (isSpectator && from === spyHumanSlot() && actIdx != null && spiedNow(actIdx)) markSpy(el);
   }
   el.classList.add("q-now");
   // zelená šípka pod lištou sa presunie pod aktuálny beat

@@ -480,6 +480,7 @@ function onTurnTimeout() {
     socket.join(String(id));
     socket.emit("spectator", { roomId: id }); // roomId → klient sa po reloade vráti sledovať tú istú roomku
     socket.emit("state", spectatorView(snapshot()));
+    if (lastSpy && ai) socket.emit("cheater_spy", lastSpy); // CHEATER: divák pripojený počas kola vidí, čo bot videl
     broadcastSpectators();
   }
 
@@ -624,10 +625,11 @@ function onTurnTimeout() {
     if (g.phase !== "playing" || !human?.locked || !human.queue?.length || g.timestop) return;
     const idx = crypto.randomInt(human.queue.length), game = g.series?.gameIndex ?? 1, turn = g.turn;
     botSock?.spy({ turn, game, idx, action: { ...human.queue[idx] } });
-    // hráč vidí, ktorú jeho akciu CHEATER videl (lišta kola ju zvýrazní na oranžovo s líščími ušami) - len on,
-    // nie diváci; po reloade v tom istom kole sa pošle znova (seat)
+    // hráč aj diváci vidia, ktorú akciu hráča CHEATER videl (lišta kola ju zvýrazní na oranžovo s líščími ušami);
+    // po reloade / príchode diváka v tom istom kole sa pošle znova (seat, spectate)
     lastSpy = { turn, game, idx };
     personSockets[botPerson === "A" ? "B" : "A"]?.emit("cheater_spy", lastSpy);
+    for (const s of spectators) { try { s.emit("cheater_spy", lastSpy); } catch {} }
     // poistka: keby rozhodnutie so spy neprišlo (worker zlyhal), po čase sa zahrá záložný ťah - hra nezamrzne
     if (spyTimer) clearTimeout(spyTimer);
     spyTimer = setTimeout(() => {

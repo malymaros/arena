@@ -155,6 +155,11 @@ try {
   await until(() => c.state?.phase === "playing", 10000, "štart zápasu (cheater)");
   sock.emit("choose_character", "fire");
   await until(() => c.state?.p1?.char && c.state?.p2?.char, 15000, "cheater si vybral postavu");
+  // divák zápasu s CHEATEROM tiež dostáva cheater_spy (vidí, ktorú akciu hráča bot videl)
+  const specSpy = [];
+  sock2.on("cheater_spy", (r) => specSpy.push(r));
+  sock2.emit("spectate_room", { roomId: ai0?.id });
+  await wait(300);
   const cheatQ = [];
   for (let r = 0; r < 3 && !c.result; r++) {
     const turn = c.state.turn, stone = Math.min(3, c.state[c.slot]?.stone || 0);
@@ -178,6 +183,9 @@ try {
   const msgs = c.spyMsgs || [];
   if (spies.length && spies.every(b => msgs.some(m => m.turn === b.turn && m.idx === b.spy.slot - 1))) pass(`hráč vidí, ktorú akciu CHEATER videl (${msgs.length}× cheater_spy)`);
   else fail("cheater_spy hráčovi: " + JSON.stringify(msgs));
+  if (spies.length && spies.every(b => specSpy.some(m => m.turn === b.turn && m.idx === b.spy.slot - 1))) pass(`divák vidí, ktorú akciu CHEATER videl (${specSpy.length}× cheater_spy)`);
+  else fail("cheater_spy divákovi: " + JSON.stringify(specSpy));
+  sock2.emit("leave_room");
   c.rooms = null;
   sock.emit("leave_room");
   await until(() => c.rooms?.aiRoom?.players === 0, 5000, "AI roomka po odchode (cheater)");
