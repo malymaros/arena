@@ -7,6 +7,7 @@ import { state } from "/client/session.js";
 import { playback } from "/client/playback.js";
 import { paintFox, foxBuffer } from "/client/bot-face-fox.js";
 import { sfx } from "/client/sound.js";
+import { review } from "/client/review-state.js";
 
 // slot bota v AI roomke (snapshot vsAi) alebo null
 export const botSlot = () => (state?.vsAi === "p1" || state?.vsAi === "p2" ? state.vsAi : null);
@@ -134,14 +135,20 @@ function baseline() {
 const STATE_SOUND = new Set(["thinking", "worried", "sad", "laugh", "ko"]);
 let lastBase; // undefined = ešte nič (prvé vyhodnotenie po načítaní stránky nehrá)
 
+// HUD canvas medzitým kreslil portrét postavy (rozbor zápasu prepína medzi zápasmi s botom a bez neho) → tvár
+// nakresli znova, aj keď sa jej nálada / snímok nezmenili
+export function invalidateBotFace() { face.lastKey = ""; }
+
 /* ---------- kreslenie do HUD canvasu ---------- */
 export function drawBotFace(cvs, now) {
-  const base = baseline();
-  if (base !== lastBase) {
+  // rozbor zápasu (ANALYZE): statická hlava bota v pokojnej nálade, bez zvukov nálad
+  const base = review.active ? "neutral" : baseline();
+  if (review.active) lastBase = undefined;
+  else if (base !== lastBase) {
     if (lastBase !== undefined && STATE_SOUND.has(base)) moodSound(base);
     lastBase = base;
   }
-  const want = face.transient && now < face.until ? face.transient : base;
+  const want = !review.active && face.transient && now < face.until ? face.transient : base;
   const lv = botLevel(), src = lv === "cheater" ? foxBuffer() : off;
   if (!(lv === "cheater" ? paintFox : lv === "baby" ? paintBaby : paintFace)(face, want, now, cvs.width)) return;
   const ctx = cvs.getContext("2d");

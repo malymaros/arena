@@ -14,6 +14,8 @@ import { buttonUi, planning } from "/client/planning.js";
 import { mageHeadHtml } from "/client/mage-head.js";
 import { HIDDEN_GLITCH_CHARS } from "/client/char-select.js";
 import { renderQueue } from "/client/queue.js";
+import { review } from "/client/review-state.js";
+import { SIDE_LABEL } from "/client/side-tag.js";
 
 /* ---------- HUD ---------- */
 // spojitý bar s 10 zárezmi: hlavná výplň + biely „trail", ktorý sa pri strate stiahne s oneskorením
@@ -34,8 +36,8 @@ function renderBar(el, value) {
   fill.style.height  = (v * 10) + "%";
   trail.style.height = (v * 10) + "%"; // trail má oneskorený transition - pri strate sa stiahne neskôr
 
-  // pri zisku výplň blikne do jasu
-  if (v > prev) {
+  // pri zisku výplň blikne do jasu (rozbor zápasu je statický - bez bliknutia)
+  if (v > prev && !review.active) {
     fill.classList.remove("gain");
     void fill.offsetWidth; // reflow = reštart animácie
     fill.classList.add("gain");
@@ -97,7 +99,7 @@ export function renderHUD() {
   hudBoxP1.classList.toggle("watch", !me);
   hudBoxP2.classList.toggle("watch", !me);
   // štítok nad widgetom = meno hráča (::before content: attr(data-name)); fallback pre chýbajúce meno
-  const tagName = (slot) => state?.names?.[slot] || (slot === me ? "YOU" : me ? "OPPONENT" : (slot === "p1" ? "P1" : "P2"));
+  const tagName = (slot) => state?.names?.[slot] || (slot === me ? "YOU" : me ? "OPPONENT" : SIDE_LABEL[slot]);
   hudBoxP1.dataset.name = tagName("p1");
   hudBoxP2.dataset.name = tagName("p2");
 

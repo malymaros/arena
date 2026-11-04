@@ -1172,8 +1172,11 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
   animation: cr-pop .35s cubic-bezier(.2,1.6,.4,1) both;
 }
 .cr-result.hidden { display: none; animation: none; }
-.cr-result .cr-white { color: #f1f1ec; text-shadow: 0 0 10px rgba(255,255,255,.55), 2px 2px 0 rgba(0,0,0,.7); }
-.cr-result .cr-black { color: #9aa0ab; text-shadow: 0 0 10px rgba(0,0,0,.9), 2px 2px 0 rgba(0,0,0,.7); }
+.cr-result .cr-white { color: #f2efe6; text-shadow: 0 0 10px rgba(255,255,255,.55), 2px 2px 0 rgba(0,0,0,.7); }
+.cr-result .cr-black { color: #b48cff; text-shadow: 0 0 10px rgba(150,90,255,.6), 2px 2px 0 rgba(0,0,0,.7); }
+/* jednotný štítok strany (side-tag.js) - rovnaké farby ako v MATCHES */
+.side-tag.p1 { color: #f2efe6; }
+.side-tag.p2 { color: #b48cff; }
 @keyframes cr-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ========== Losovanie arény (lobby kocka, public/client/arena-roll.js) ========== */
@@ -1219,7 +1222,8 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 }
 .char-roll.hidden { display: none; }
 .rr-title { font-size: 22px; letter-spacing: 3px; text-shadow: 3px 3px 0 #000; }
-.rr-title.white { color: #f4f4f4; } .rr-title.black { color: #b9b9c4; }
+/* farby strán = jednotný štítok ⚪ WHITE / ⚫ BLACK (public/client/side-tag.js .side-tag) */
+.rr-title.white { color: #f2efe6; } .rr-title.black { color: #b48cff; }
 .rr-grid { position: relative; display: grid; grid-template-columns: repeat(4, 112px); gap: 16px; }
 .rr-cell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; transition: opacity .3s; }
 .rr-face { position: relative; width: 112px; height: 112px; border-radius: 10px; overflow: hidden; background: rgba(12,14,18,.8); }
@@ -1569,8 +1573,8 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .spec-curtain.hidden{ display: none; }
 .sc-rows{ display: grid; grid-template-columns: auto auto auto; gap: 18px 28px; align-items: center; font-size: 16px; letter-spacing: 1px; }
 .sc-row{ display: contents; }
-.sc-row .sc-side{ color: #f1f1ec; text-shadow: 2px 2px 0 rgba(0,0,0,.7); }
-.sc-row[data-side="black"] .sc-side{ color: #9aa0ab; }
+.sc-row .sc-side{ color: #f2efe6; text-shadow: 2px 2px 0 rgba(0,0,0,.7); }
+.sc-row[data-side="black"] .sc-side{ color: #b48cff; }
 .sc-row .sc-name{ color: #cfd2d6; }
 .sc-row .sc-state{ color: #8d9096; min-width: 220px; }
 .sc-row.ready .sc-state{ color: #7fd36b; }
@@ -1652,6 +1656,68 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .hud-turn .go-verdict.tie  { color: #ddd;    text-shadow: 2px 2px 0 #333,    4px 4px 0 rgba(0,0,0,.55); }
 
 .panel { display: grid; gap: 8px; justify-items: center; }
+
+/* ---------- Rozbor zápasu ANALYZE (public/client/review.js, docs/MATCH_REVIEW_PLAN.md) ---------- */
+.retry.analyze { background: #1f5f9c; }
+.retry.analyze:hover { background: #2a73b8; }
+.retry.analyze.hidden { display: none; }
+/* statická herná obrazovka: skryté ovládanie, časovač, bannery a všetky okná nad hrou */
+body.review-mode .controls-row, body.review-mode #gameover, body.review-mode #rooms, body.review-mode #lobby,
+body.review-mode #lobby-adv, body.review-mode #lobby-wait, body.review-mode #host-wait, body.review-mode #team-wait,
+body.review-mode #intermission, body.review-mode #char-select, body.review-mode #color-roll, body.review-mode #char-roll,
+body.review-mode #arena-roll, body.review-mode #turn-timer, body.review-mode #turn-status, body.review-mode #round-banner,
+body.review-mode #spectator, body.review-mode #spec-curtain, body.review-mode #timestop-overlay, body.review-mode #world-center,
+body.review-mode #hidden-rune, body.review-mode .you-marker, body.review-mode #conn-error, body.review-mode #matches { display: none !important; }
+/* väčšia lišta kola (spodná lišta akcií tu nie je) - bunky sa dajú kliknúť */
+body.review-mode .panel { gap: 34px; }
+body.review-mode .panel #queue { transform: translateY(16px) scale(1.55); transform-origin: top center; } /* bližšie k dolnému panelu kôl */
+body.review-mode .panel #queue { margin-bottom: 12px; }
+body.review-mode .rv-beat { cursor: pointer; }
+/* zamknutá akcia, na ktorú nedošlo (hra skončila skôr) - zašednutá, prerušovaný rám */
+body.review-mode .q-badge.rv-unplayed { opacity: .45; filter: grayscale(.7); box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(255,255,255,.35); outline: 2px dashed rgba(255,255,255,.45); outline-offset: -4px; }
+body.review-mode .rv-beat:hover { filter: brightness(1.25); }
+body.review-mode .q-badge.rv-world { box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(120,200,255,.75); }
+body.review-mode .hud-box { cursor: pointer; }
+/* HP / mana preskočia na novú hodnotu bez animácie (statický rozbor) */
+body.review-mode .bar .fill, body.review-mode .bar .fill-trail { transition: none !important; animation: none !important; }
+/* THE WORLD: frozen akcie rozbalené za bunkou THE WORLD - modrý rám skupiny */
+.rv-ts-group { display: flex; gap: 4px; align-items: center; padding: 3px; background: rgba(10,20,40,.75); box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(120,200,255,.75); }
+.rv-ts-group .q-badge { width: 40px; }
+.rv-ts-group .rv-ts-end { background: #1d3550; color: #9fd8ff; }
+/* ovládanie rozboru: hore záložky hier + zatvoriť, dole ◀ ROUND n / N ▶ */
+.review-chrome .rv-games { display: flex; gap: 8px; }
+.review-chrome .rv-games:empty { display: none; }
+/* rozloženie je PRESNE ako v hre (doska, HUD, nápis ROUND) - mení sa len spodok: namiesto panelu akcií je na jeho
+   mieste rovnako veľký panel rozboru (hry série, ◀ ROUND n / N ▶, zatvoriť) v štýle .controls */
+.review-chrome .rv-nav { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%) scale(1.2); transform-origin: bottom center; z-index: 6;
+  display: flex; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 2px; background: #23262d;
+  box-shadow: 0 0 0 2px #000, inset 0 2px 0 rgba(255,255,255,.07), inset 0 -2px 0 rgba(0,0,0,.55); }
+.review-chrome button { font: 13px "Press Start 2P", monospace; color: #fff; background: #3a3f4a; border: none; border-radius: 2px; padding: 12px 16px; cursor: pointer;
+  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.18), inset 0 -4px 0 rgba(0,0,0,.35); text-shadow: 2px 2px 0 rgba(0,0,0,.55); }
+.review-chrome button:hover:not(:disabled) { filter: brightness(1.25); }
+.review-chrome button:disabled { opacity: .35; cursor: default; }
+.review-chrome .rv-game.on { background: #b07a00; }
+/* odchod: červené pixel-art tlačidlo s pixelovým X (review.js, match-list.js) - hráč si ho ľahšie všimne */
+.review-chrome .rv-close, .ml-close { background: #b3261e; padding: 10px 12px; box-shadow: 0 0 0 2px #000, inset 0 3px 0 #e5534b, inset 0 -4px 0 #6d140f; }
+.review-chrome .rv-close:hover, .ml-close:hover { background: #cf3328; filter: none; }
+.pix-x { display: block; width: 21px; height: 21px; image-rendering: pixelated; }
+.pix-edge { display: block; width: 14px; height: 14px; }
+/* PLAY (zelené) - akcie po jednej s pauzou; počas prehrávania svieti */
+.review-chrome .rv-play { background: #1e7d45; padding: 11px 14px; box-shadow: 0 0 0 2px #000, inset 0 3px 0 #3fbf6f, inset 0 -4px 0 #0f4a28; }
+.review-chrome .rv-play.on { background: #2fa85f; box-shadow: 0 0 0 2px #000, 0 0 10px rgba(84,224,122,.7), inset 0 3px 0 #6fe39a, inset 0 -4px 0 #0f4a28; }
+/* ◀ ▶ po stranách lišty kola - krok po akciách */
+.queue .rv-step { width: 26px; align-self: stretch; padding: 0; border: none; border-radius: 2px; cursor: pointer; font-size: 12px; color: #fff; background: #3a3f4a;
+  box-shadow: 0 0 0 1px #000, inset 0 2px 0 rgba(255,255,255,.15), inset 0 -2px 0 rgba(0,0,0,.35); }
+.queue .rv-step:hover:not(:disabled) { filter: brightness(1.25); }
+.queue .rv-step:disabled { opacity: .35; cursor: default; }
+.review-chrome .rv-edge { padding: 11px 13px; }
+/* statické prostredie: živé pozadie arény, portály, dlaždice, aury - CSS animácie zastavené */
+/* (len konkrétne vrstvy - plošné pravidlo na celú dosku spomaľovalo každé prepnutie akcie) */
+body.review-mode #arena-fx *, body.review-mode .portal *, body.review-mode #grid * { animation-play-state: paused !important; }
+/* figúry sa presunú okamžite (bez kĺzania) */
+body.review-mode #actors * { transition: none !important; }
+.review-chrome .rv-round { font: 16px "Press Start 2P", monospace; color: #ffd54f; letter-spacing: 2px; min-width: 230px; text-align: center; text-shadow: 2px 2px 0 #000;
+  display: inline-flex; align-items: center; justify-content: center; gap: 12px; }
 
 /* ---------- Series crowns (BO3/BO5) + turn timer ---------- */
 /* placeholdery pod žrďou vlajky (celá vlajka visí pod HUD boxom: top:100% + 40px margin, výška 308px),
@@ -3132,6 +3198,79 @@ html:not(.phone) .lobby{ align-items: flex-start; padding-top: calc(var(--app-h,
 }
 .login-btn:hover{ background: #ffc333; }
 .login-btn:active{ transform: translateY(3px); box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(0,0,0,.25); }
+
+/* ---------- MATCHES - zoznam odohraných zápasov (public/client/match-list.js) ---------- */
+.matches-open { align-self: stretch; padding: 12px 22px; /* šírka = celý rad dlaždíc roomiek */ cursor: pointer; border: none; border-radius: 2px; font-family: inherit; font-size: 12px; letter-spacing: 2px;
+  color: #fff; background: #1f5f9c; box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.25), inset 0 -4px 0 rgba(0,0,0,.3); }
+.matches-open:hover { background: #2a73b8; }
+.matches { position: fixed; inset: 0; z-index: 10001; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center;
+  font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; color: #dfe3ea; }
+.matches.hidden { display: none; }
+.ml-card { width: min(1180px, calc(var(--app-w, 100vw) - 40px)); height: min(820px, calc(var(--app-h, 100vh) - 40px)); box-sizing: border-box; padding: 22px 26px;
+  display: flex; flex-direction: column; background: #15171d; box-shadow: 0 0 0 4px #000, inset 0 3px 0 #2c3039, inset 0 -3px 0 #0c0d11, 8px 8px 0 4px rgba(0,0,0,.5); }
+.ml-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.ml-title { margin: 0; font-size: 22px; color: #ffb300; letter-spacing: 2px; text-shadow: 3px 3px 0 #7a1f00; }
+.ml-close, .ml-analyze { font-family: inherit; color: #fff; border: none; border-radius: 2px; cursor: pointer; background: #3a3f4a;
+  box-shadow: 0 0 0 2px #000, inset 0 3px 0 rgba(255,255,255,.15), inset 0 -3px 0 rgba(0,0,0,.35); }
+.ml-close { font-size: 14px; }
+/* posuvník v oranžovej farbe ARENA (#ffb300), hranatý pixelový */
+@supports not selector(::-webkit-scrollbar) { .ml-rows { scrollbar-color: #ffb300 #0e1014; } } /* Firefox */
+.ml-rows::-webkit-scrollbar { width: 14px; }
+.ml-rows::-webkit-scrollbar-track { background: #0e1014; box-shadow: inset 0 0 0 2px #000; }
+.ml-rows::-webkit-scrollbar-thumb { background: #ffb300; border: 2px solid #000; box-shadow: inset 0 2px 0 #ffd54f, inset 0 -3px 0 #b07a00; }
+.ml-rows::-webkit-scrollbar-thumb:hover { background: #ffc333; }
+.ml-rows::-webkit-scrollbar-button { display: none; height: 0; }
+.ml-rows { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 10px; padding: 4px 8px 4px 4px; }
+.ml-empty { margin: auto; font-size: 11px; color: #8b92a0; }
+/* 10 stĺpcov pevnej šírky: dátum | aréna | typ | hlavy bieleho | WHITE | skóre | BLACK | hlavy čierneho | kolá | koniec hier (5 ikon) */
+.ml-row { display: grid; grid-template-columns: 82px 134px 116px 90px 90px 52px 90px 90px 84px 156px; align-items: center; gap: 10px; padding: 10px 12px; background: #1b1e25; box-shadow: 0 0 0 3px #000; cursor: pointer; }
+.ml-row:hover { background: #22262f; }
+.ml-row.open { background: #232733; box-shadow: 0 0 0 3px #000, inset 0 0 0 2px rgba(255,179,0,.5); }
+.ml-when { font-size: 9px; line-height: 1.8; color: #cfd2d6; }
+.ml-when small, .ml-meta small { display: block; color: #8b92a0; font-size: 8px; }
+.ml-arena { justify-self: end; position: relative; width: 120px; height: 42px; /* medzera za dátumom */ box-shadow: 0 0 0 2px #000; overflow: hidden; }
+.ml-arena canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.ml-arena > span:last-child { position: absolute; left: 0; right: 0; bottom: 0; font-size: 7px; color: #fff; text-align: center; padding: 3px 0; background: rgba(0,0,0,.65); }
+.ml-dice { position: absolute; right: 3px; top: 3px; width: 16px; height: 16px; } .ml-dice svg { width: 100%; height: 100%; }
+/* typ zápasu a štítok bota: rovnako široké (celý stĺpec), text v strede */
+.ml-fmt { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.ml-chip { font-size: 9px; padding: 5px 0; text-align: center; background: #23262e; color: #cfd2d6; box-shadow: 0 0 0 2px #000; }
+.ml-ai { font-size: 7px; color: #000; background: #5ef2ff; padding: 4px 0; text-align: center; box-shadow: 0 0 0 2px #000; white-space: nowrap; }
+.ml-ai.baby { background: #ffb6d5; } .ml-ai.cheater { background: #ff8a3d; }
+.ml-side { min-width: 0; overflow: hidden; }
+.ml-side .ml-lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-row .ml-side.w { text-align: right; } /* štítky smerujú k skóre */
+.ml-heads { display: flex; gap: 6px; }
+.ml-row .ml-heads.w { justify-content: flex-end; } /* hlavy pri svojom štítku */
+.ml-row .ml-heads.b { justify-content: flex-start; }
+.ml-heads canvas, .ml-pair canvas { width: 34px; height: 34px; image-rendering: pixelated; background: #0e1014; box-shadow: 0 0 0 2px #000; display: block; }
+.ml-heads.small canvas { width: 26px; height: 26px; }
+.ml-heads canvas.ml-alt, .ml-pair canvas.ml-alt { filter: saturate(.22) brightness(1.4); } /* p2 albino paleta (ako .mage-head.alt-color) */
+.ml-heads canvas.ml-dead { opacity: .35; filter: grayscale(1); }
+.ml-heads canvas.ml-bot.ml-dead { opacity: .4; }
+.ml-lbl { font-size: 8px; line-height: 1.7; color: #cfd2d6; }
+.ml-lbl.p1 { color: #f2efe6; } .ml-lbl.p2 { color: #b48cff; }
+.ml-score { font-size: 16px; color: #fff; letter-spacing: 2px; text-align: center; } .ml-score .lose { color: #6c7280; }
+.ml-meta { font-size: 9px; line-height: 1.8; color: #cfd2d6; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ml-unfin { color: #f39c12; }
+.ml-demon { display: inline-flex; align-items: center; gap: 5px; font-size: 7px; color: #fff; background: #4a0b0e; padding: 3px 5px; box-shadow: 0 0 0 2px #000; white-space: nowrap; }
+.ml-demon img { width: 12px; height: 12px; image-rendering: pixelated; }
+.ml-causes { display: flex; gap: 4px; flex-wrap: nowrap; justify-content: flex-end; }
+.ml-cause { width: 28px; height: 28px; flex: none; display: grid; place-items: center; background: #101217; box-shadow: 0 0 0 2px #000; }
+.ml-cause.w { box-shadow: 0 0 0 2px #000, inset 0 -3px 0 #f2efe6; } .ml-cause.b { box-shadow: 0 0 0 2px #000, inset 0 -3px 0 #b48cff; }
+.ml-cause svg { width: 16px; height: 16px; display: block; }
+.ml-q { font-size: 10px; color: #f39c12; }
+.ml-games { margin: -6px 0 4px 40px; display: flex; flex-direction: column; gap: 6px; }
+.ml-game { display: grid; grid-template-columns: 44px 1fr 290px 150px 110px; align-items: center; gap: 12px; padding: 8px 12px; background: #15181e; box-shadow: 0 0 0 2px #000; }
+.ml-g { font-size: 9px; color: #ffb300; }
+/* dvojica v hre série: meno + hlava | VS v strede | hlava + meno - pevné stĺpce, VS je v každom riadku na tom istom mieste */
+.ml-pair { display: grid; grid-template-columns: minmax(0, 1fr) 34px 36px 34px minmax(0, 1fr); align-items: center; gap: 8px; }
+.ml-pair .ml-nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ml-pair .ml-nm.p1 { text-align: right; }
+.ml-pair .ml-vs { text-align: center; }
+.ml-ctext { display: flex; align-items: center; gap: 8px; font-size: 8px; line-height: 1.6; }
+.ml-analyze { justify-self: end; font-size: 8px; padding: 8px 10px; background: #1f5f9c; }
+.ml-analyze:hover, .ml-close:hover { filter: brightness(1.25); }
 
 /* ---------- Room browser ---------- */
 .rooms{

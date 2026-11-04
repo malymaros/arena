@@ -30,6 +30,7 @@ import { slotOf, labelInfo, openerOf, MANA_BUTTONS } from "/client/touch-label.j
 import { costMarkup, BUTTON_TEXT } from "/client/balance-ui.js";
 import { hydratePix } from "/client/pix.js";
 import { state, me } from "/client/session.js";
+import { review } from "/client/review-state.js";
 import { rosterFirstCard, selectOverlayBusy } from "/client/char-select.js";
 
 
@@ -235,6 +236,7 @@ function initTapSelect() {
   document.body.appendChild(infoEl);
 
   document.addEventListener("click", (ev) => {
+    if (review.active) return; // rozbor zápasu (ANALYZE): ťuk na bunku lišty = skok na akciu (review.js), žiadny náhľad
     if (armed && !armed.isConnected) disarm();
     const el = ev.target.closest?.(SELECTABLE);
     if (isTouch && selEl && !selEl.classList.contains("hidden")) setTimeout(keepCardPreview, 30);

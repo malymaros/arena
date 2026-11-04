@@ -10,6 +10,8 @@ import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { createRecordedEngine } from "./telemetry/recorder.js";
 import { createJsonlStore } from "./telemetry/store.js";
+import { createMatchLog } from "./telemetry/match-log.js";
+import { MATCHES_SHOWN } from "./shared/match-record.js";
 import { createBotSeat } from "./engine/ai/seat.js";
 import { matchConfigCustom } from "./shared/arena-defaults.js";
 import { ARENA_ROLL_MS, COLOR_ROLL_MS, charRollMs } from "./shared/timing.js";
@@ -80,6 +82,9 @@ const PLAYER_KEYS = new Set((process.env.PLAYER_KEYS || "hamara").split(",").map
 // TELEMETRY_DIR = adresár pre denné JSONL súbory (na VM /home/arena/arena-data); bez neho sa nič nezapisuje.
 const TELEMETRY_DIR = process.env.TELEMETRY_DIR || "";
 const telemetry = TELEMETRY_DIR ? createJsonlStore(path.resolve(TELEMETRY_DIR)) : null;
+// záznamy zápasov pre MATCHES / ANALYZE (docs/MATCH_REVIEW_PLAN.md): MATCHES_DIR, inak <TELEMETRY_DIR>/matches; bez nich vypnuté
+const MATCHES_DIR = process.env.MATCHES_DIR || (TELEMETRY_DIR ? path.join(TELEMETRY_DIR, "matches") : "");
+const matchLog = MATCHES_DIR ? createMatchLog(path.resolve(MATCHES_DIR)) : null;
 // verzia servera do match_start: commit (+ či bol pracovný strom čistý) a odtlačok shared/balance.js
 const telemetryMeta = (() => {
   const meta = { commit: null, dirty: null, balance: null };
@@ -216,7 +221,9 @@ function createRoom(id, { ai = false, slot = null } = {}) {
     awaitingOpponent: () => pendingMatchConfig != null,
     vsAi: () => (ai ? slotForPerson(botPerson) : null), // slot bota (snapshot vsAi)
     aiLevel: () => (ai ? aiLevel : null),               // obťažnosť bota (snapshot aiLevel)
-  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson, aiLevel: () => aiLevel });
+  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson, aiLevel: () => aiLevel,
+    // uložený záznam zápasu → hráčom a divákom roomky jeho id (tlačidlo ANALYZE na game over)
+    matchLog: matchLog && { save: (r) => { matchLog.save(r); roomEmit("match_record", { id: r.id }); } } });
   const { snapshot, snapshotFor, redactTimelineFor, slotForPerson, startMatch, newGame, sanitizeConfig } = engine;
 
   // per-room emit: nahrádza io.emit - pošle len hráčom A/B a divákom TEJTO roomky (nie cudzím)
@@ -854,6 +861,20 @@ io.on("connection", (socket) => {
     telemetry?.append(rec);
     console.log(`bug report [${rec.device.kind} ${rec.device.os}/${rec.device.browser}] room ${rec.room ?? "-"}: ${text.slice(0, 160).replace(/s+/g, " ")}`);
     ack({ ok: true });
+  });
+
+  // --- záznamy zápasov (MATCHES / ANALYZE, docs/MATCH_REVIEW_PLAN.md) - vidí každý prihlásený hráč
+  // matches_list → ack { rows } (posledných MATCHES_SHOWN, najnovšie prvé; uložené sú všetky); match_review { id } → ack { record } / { error }
+  socket.on("matches_list", (arg, ack) => {
+    if (typeof ack !== "function") return;
+    if (!matchLog || maintBlocked(socket)) { ack({ rows: [], off: !matchLog }); return; }
+    ack({ rows: matchLog.list({ limit: MATCHES_SHOWN }).rows });
+  });
+  socket.on("match_review", (arg, ack) => {
+    if (typeof ack !== "function") return;
+    if (!matchLog || maintBlocked(socket)) { ack({ error: "off" }); return; }
+    const record = matchLog.get(arg?.id);
+    ack(record ? { record } : { error: "not_found" });
   });
 
   // --- admin reset LEN tejto roomky (rohový button / menu): odpojí jej hráčov aj divákov a roomku zruší

@@ -16,6 +16,7 @@ import { qCursor } from "/client/actor-layers.js";
 import { renderMageHeads } from "/client/hud.js";
 import { socket } from "/client/net.js";
 import { isTouch } from "/client/viewport.js";
+import { review } from "/client/review-state.js";
 
 /* ---------- CHEATER: ktorú moju akciu videl (docs/AI_PLAN.md 8c, schválený návrh public/dev/cheater-spy.html) ---------- */
 // server po locku pošle cheater_spy { turn, game, idx } - akcia idx mojej fronty dostane blikajúce oranžové pozadie
@@ -32,7 +33,7 @@ const SPY_HTML = `<span class="spy-cover"></span><span class="spy-ears">${earSvg
 
 /* ---------- Queue + Lock ---------- */
 // ikona/farba akcie pre lištu (zdieľané: moje akcie aj odhalené súperove); ownerSlot kvôli alt-color hláv p2
-function actionBadgeView(a, ownerSlot) {
+export function actionBadgeView(a, ownerSlot) {
   // telefón: v lište len piktogramy, bez smerových šípok (na malej bunke sú nečitateľné; smer ukáže náhľad / ghost)
   const arrow = isTouch ? {} : ARROW_DIR;
   const dd = arrow[displayDir(a, ownerSlot)] || ""; // Narutov vertikálny smer (move/dash/attack) súperovi anonymizovaný (↕)
@@ -159,6 +160,7 @@ function renderTsQueue() {
 export function hideTsQueue() { tsQueueEl.classList.add("hidden"); queueEl.classList.remove("ts-executing"); }
 
 export function renderQueue() {
+  if (review.active) return; // rozbor zápasu (ANALYZE) kreslí lištu sám (review.js)
   // THE WORLD plánovanie: NEprestavuj pôvodnú lištu (ostáva „executing"), zadávaj do samostatného placeholdera
   if (playback.tsPlanning) { renderTsQueue(); updateActionButtons(); syncGoldenHalves(); updateGoldenButton(); updateLockButton(); return; }
   hideTsQueue();

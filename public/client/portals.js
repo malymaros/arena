@@ -8,6 +8,7 @@ import { PORTAL_TYPES, riftDataUrl, glyphSvg, typeIconSvg, RIFT_PAD } from "/cli
 import { board } from "/client/session.js";
 import { portalWalkPlan, PORTAL_SHOT_PHASES as SP } from "/shared/timing.js";
 import { actors } from "/client/actors.js";
+import { review } from "/client/review-state.js";
 
 const PT = 32;              // hrúbka trhliny (8 pixelov po 4 px)
 const POFF = PT / 2 + 4;    // stred trhliny je kúsok von od hrany políčka
@@ -67,12 +68,12 @@ export function renderPortals(s) {
   for (const [key, els] of shown) {
     if (want.has(key)) continue;
     shown.delete(key);
-    els.forEach(el => closeAnim(el));
+    els.forEach(el => (review.active ? el.remove() : closeAnim(el))); // rozbor zápasu: bez animácie
   }
   for (const [key, pair] of want) {
     if (shown.has(key)) continue;
     const els = [0, 1].map(i => portalEl(pair, i));
-    els.forEach(el => { root.appendChild(el); if (inited) openAnim(el); });
+    els.forEach(el => { root.appendChild(el); if (inited && !review.active) openAnim(el); });
     shown.set(key, els);
   }
   inited = true;

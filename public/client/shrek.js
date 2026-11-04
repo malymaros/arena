@@ -12,6 +12,7 @@ import { pixSvg } from "/client/pix.js";
 import { perf } from "/client/perf.js";
 import { setStyle } from "/client/style-cache.js";
 import { SHREK_RAGE_HP } from "/shared/balance.js";
+import { review } from "/client/review-state.js";
 
 const DIR = "/assets/shrek/";
 const K = 3.2;                       // mierka sprite-u (75 % pôvodných 4,3: ~45 px Shrek → ~145 px)
@@ -135,6 +136,7 @@ export function renderShrek(s) {
   if (view.px == null || (!view.motion && !sh.dead)) {
     const p = restPos(sh);
     if (view.px == null) { view.px = p.x; view.py = p.y; }
+    else if (review.active) { view.px = p.x; view.py = p.y; view.motion = null; } // rozbor zápasu: okamžite, bez kĺzania
     else if (!view.motion) view.motion = { from: { x: view.px, y: view.py }, to: p, start: now, ms: 220, arc: 0 };
   }
   if (sh.dead && view.anim !== "HurtDead") { play("HurtDead"); view.start = 0; } // reload po smrti - rovno ležiaci
@@ -313,7 +315,7 @@ function tick(now) {
   const oneShotDone = (!m.loop || view.anim === "H_Roar") && view.anim !== "HurtDead" && view.ms && now - view.start > view.ms + 60;
   if (oneShotDone || (sh.dead && view.anim !== "HurtDead")) { play(sh.dead ? "HurtDead" : "Idle"); if (sh.dead) view.start = 0; m = META[view.anim]; }
   if (stoned) m = META.Idle || m;
-  const f = stoned ? 0 : frameIndex(m, now);
+  const f = stoned ? 0 : frameIndex(m, review.active ? 0 : now); // rozbor zápasu: statický frame 0
   const hurt = now < view.hurtUntil;
   const key = `${view.anim}|${f}|${view.flip}|${hurt}`;
   setStyle(fig, "transform", `translate(${Math.round(view.px - CW / 2)}px, ${Math.round(view.py - CH - lift)}px)`);

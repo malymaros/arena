@@ -16,6 +16,7 @@ import { buttonUi } from "/client/planning.js";
 import { state, me } from "/client/session.js";
 import { showCharPeek, hideCharPeek } from "/client/char-select.js";
 import { hydratePix } from "/client/pix.js";
+import { review } from "/client/review-state.js";
 
 const HOLD_MS = 400;   // dĺžka podržania
 const MOVE_TOL = 12;   // px displeja - posun prsta nad toto podržanie zruší (posúvanie, ťahanie)
@@ -74,7 +75,7 @@ function place() {
   box.style.top = (y + boardEl.offsetHeight / 2) + "px";
 }
 function open(what) {
-  if (!what) return false;
+  if (!what || review.active) return false; // rozbor zápasu (ANALYZE): žiadne okno postavy pri HUD
   const key = what.info ? "i:" + what.info.name : `c:${what.char}:${what.side}:${!!what.special}`;
   if (key === shown) return true;
   close();

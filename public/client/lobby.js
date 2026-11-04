@@ -13,6 +13,7 @@ import { PORTAL_MAX_PAIRS } from "/shared/balance.js";
 import { DEF_ARENA, arenaRules as rulesOf } from "/shared/arena-defaults.js";
 import { LAYOUT } from "/client/char-roll.js";
 import { openBanScreen } from "/client/ban-screen.js";
+import { sideTag } from "/client/side-tag.js";
 
 const STORE_KEY = "arena.lobby.v1"; // zmena tvaru uloženého stavu = nový kľúč (v2), starý sa ignoruje
 const TILE_DEF = {
@@ -139,7 +140,7 @@ function renderAdv() {
   const c = settings.arenas[tab], swamp = tab === "swamp", portal = tab === "portal";
   // ľavý stĺpec vždy rovnako: zákazy postáv, počet za kolo + náhľad (+ dlaždice v portal realm); pravý = percentá
   // (portal realm: portály). Zákazy: dve tlačidlá WHITE: n / BLACK: n (číslo červené, keď nie je 0) → obrazovka zákazov
-  const banBtn = (sl) => { const n = c.bans[sl].length; return `<button class="opt ban-open" data-ban="${sl}">${sl === "p1" ? "WHITE" : "BLACK"}: ${n ? `<b>${n}</b>` : "0"}</button>`; };
+  const banBtn = (sl) => { const n = c.bans[sl].length; return `<button class="opt ban-open" data-ban="${sl}">${sideTag(sl)}: ${n ? `<b>${n}</b>` : "0"}</button>`; };
   let left = section("BANNED CHARACTERS", `<div class="opt-row">${banBtn("p1")}${banBtn("p2")}</div>`) + section(`${swamp ? "ITEMS" : "SPECIAL TILES"} PER ROUND`, optRow("count", [1, 2, 3], c.count))
     + section(swamp ? "SHREK PREVIEW" : "TILE PREVIEW", optRow("preview", ["on", "off"], c.preview, ["On", "Off"]));
   let right;

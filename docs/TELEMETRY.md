@@ -74,6 +74,12 @@ Každý riadok je JSON s `t` (typ) a `m` (id zápasu). `at` = ms od začiatku z�
 `reason`: `finished` | `retry` (hráč dal retry) | `admin_reset` | `abandoned` (roomka zanikla – obaja odišli) |
 `restart` (nový zápas bez ukončenia starého). Pri páde/reštarte servera `match_end` chýba.
 
+## Záznamy zápasov (MATCHES / ANALYZE)
+
+Oddelené od JSONL telemetrie (iný účel - rozbor pre hráčov, nie zber dát): `MATCHES_DIR` (default `<TELEMETRY_DIR>/matches`),
+jeden `<id>.json.gz` na zápas / sériu + `index.jsonl`. Zapisuje ich ten istý recorder (`opts.matchLog`), bez mien hráčov.
+Formát, verzia a socket API: `docs/MATCH_REVIEW_PLAN.md`, kód `telemetry/match-record.js`, `telemetry/match-log.js`.
+
 ## Bug reporty
 
 Hráč pošle hlásenie z menu ☰ → **REPORT BUG** (`public/client/bug-report.js`: textový formulár, max 1000 znakov).

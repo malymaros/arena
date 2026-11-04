@@ -19,6 +19,8 @@ import "/client/menu.js";             // menu ☰: reload, celá obrazovka, zvuk
 import "/client/mobile-ui.js";        // dotyk: výzva otočiť na šírku
 import "/client/touch.js";            // dotyk: ťuk = výber + náhľad, pickery na boarde, PICK (po controls/char-select!)
 import "/client/peek.js";             // okno „čo to robí": podržanie tlačidla / portrétu (dotyk), hover portrétu (PC)
+import "/client/review.js";           // rozbor zápasu ANALYZE (statická herná obrazovka zo záznamu)
+import "/client/match-list.js";       // zoznam odohraných zápasov MATCHES (z room browsera)
 import { actors } from "/client/actors.js";
 import { initCharFx, fxAll } from "/client/fx-registry.js";
 import { gridEl, actorsEl, figuresEl, rowZ, TILE_W, TILE_H, GAP, cellToPx } from "/client/dom.js";

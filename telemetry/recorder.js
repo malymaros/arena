@@ -13,6 +13,7 @@
 import crypto from "crypto";
 import { createEngine } from "../engine/game.js";
 import { ARENA_SEED, FORCE_FIRST_STARTER } from "../engine/constants.js";
+import { createMatchRecorder } from "./match-record.js";
 
 export const SCHEMA = 1;
 export const SIDE = { p1: "white", p2: "black" };
@@ -99,6 +100,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
     seed: seedFn = () => ARENA_SEED ?? crypto.randomInt(2 ** 32), meta = {},
     aiPerson = null, // roomka proti AI botovi: osoba bota → po rozsadení záznam { t: "ai", side, level } (len strana, nie osoba)
     aiLevel = null,  // () => obťažnosť bota ("normal" / "baby")
+    matchLog = null, // { save(record) } - záznamy zápasov pre MATCHES / ANALYZE (telemetry/match-log.js); nezávislé od sinku
   } = opts;
   let m = null;        // id práve zapisovaného zápasu (null = nič sa nezapisuje)
   let lastM = null;    // id posledného zápasu - bug report poslaný po konci hry naň ešte odkáže
@@ -118,7 +120,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
     ...io,
     get seed() { return seed; },
     emit: (ev, payload) => { onEmit(ev, payload); io.emit?.(ev, payload); },
-    emitState: (tl) => { if (tl) onTimeline(tl); io.emitState?.(tl); },
+    emitState: (tl) => { if (tl) { onTimeline(tl); safe(() => mr?.timeline(tl)); } io.emitState?.(tl); },
     // ďalšia hra série sa spúšťa časovačom - jeho výstrel je vstup (replay ho musí spustiť v rovnakom poradí)
     schedule: (fn, ms) => {
       const mm = m;
@@ -126,6 +128,8 @@ export function createRecordedEngine(io = {}, opts = {}) {
     },
   });
   const game = () => engine.game;
+  // záznam zápasu pre MATCHES / ANALYZE (zápis kôl pre oba pohľady) - beží aj bez telemetrického sinku
+  const mr = matchLog ? createMatchRecorder(engine, { save: (r) => matchLog.save(r), now, newId }) : null;
   const sideOf = (person) => game().seats.p1 === person ? "white" : game().seats.p2 === person ? "black" : null;
   const gi = () => game().series?.gameIndex ?? null;
 
@@ -156,6 +160,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
           else write({ t: "pick", at: at(), g: gi(), side: SIDE[slot], char: picks[0], random: true });
         }
       } else if (ev === "game_result") {
+        safe(() => mr?.gameResult(payload));
         const w = payload.gameWinner;
         const loser = w === "p1" ? "black" : w === "p2" ? "white" : null;
         let lastHit = null;
@@ -176,6 +181,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
             white: { hp: { ...g.mageHp[g.seats.p1] }, mana: { ...g.mageMana[g.seats.p1] } },
             black: { hp: { ...g.mageHp[g.seats.p2] }, mana: { ...g.mageMana[g.seats.p2] } } } } : {}) });
       } else if (ev === "game_over") {
+        safe(() => mr?.end(true));
         write({ t: "match_end", at: at(), reason: "finished", winner: SIDE[payload.winner] ?? payload.winner, score: score() });
         m = null;
       }
@@ -189,6 +195,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
 
   // nedohraný zápas (retry, admin reset, roomka zanikla)
   function abort(reason) {
+    safe(() => mr?.end(false)); // nedohraný zápas sa uloží, ak sa odohralo aspoň jedno kolo
     if (!m) return;
     safe(() => write({ t: "match_end", at: at(), reason, score: score() }));
     m = null;
@@ -205,6 +212,7 @@ export function createRecordedEngine(io = {}, opts = {}) {
     write({ t: "match_start", v: SCHEMA, ts: new Date(t0).toISOString(), ...meta, seed,
       forceFirst: FORCE_FIRST_STARTER || null, config: copy(config) });
     engine.startMatch(config);
+    safe(() => mr?.matchStart(aiPerson ? { side: game().seats.p1 === aiPerson ? "p1" : "p2", level: aiLevel?.() || "normal" } : null));
     if (aiPerson) write({ t: "ai", at: at(), side: sideOf(aiPerson), level: aiLevel?.() || "normal" }); // replay neznámy typ ignoruje
   }
 

@@ -13,6 +13,15 @@ const ARENA_RES = { w: 320, h: 180 };
 const HD_ARENAS = { "portal-realm": { w: 1672, h: 941, fx: portalRealmFx }, "shrek-swamp": { w: 1671, h: 941, fx: swampFx } };
 let fxWrap = null, fxSize = null;
 
+// vrstvy pozadia každej arény (kľúč = snapshot.arena)
+const ARENA_LAYERS = { bridge: ["sky-bridge.png","clouds.png","clouds-2.png","tower.png","bridge.png"], "portal-realm": ["portal-realm-hd.webp"], "shrek-swamp": ["shrek-swamp-hd.webp"] };
+// pozadie podľa snapshotu - prekreslí sa len pri zmene arény (socket-handlers state, rozbor zápasu review.js)
+export function syncArenaBg(arenaKey) {
+  if (!arenaKey || arenaKey === arenaEl.dataset.key) return;
+  arenaEl.dataset.key = arenaKey;
+  renderArenaLayers(arenaKey, ARENA_LAYERS[arenaKey] || []);
+}
+
 export function renderArenaLayers(arenaKey, layerFiles) {
   arenaEl.innerHTML = "";
   fxWrap = null; fxSize = null;

@@ -2,7 +2,7 @@
 // labyrint - siluety a hmla), klonov, ghostov, Last Stand/Hope žiary a aury, figúr z registra fx, časovač ťahu.
 // Slučka sa spustí pri načítaní modulu; prvý frame beží až po inicializácii client.js.
 import { actorP1, actorP2, cellToPx, TILE_W, TILE_H, hudCharP1, hudBoxP1, hudCharP2, hudBoxP2 } from "/client/dom.js";
-import { botSlot, drawBotFace } from "/client/bot-face.js";
+import { botSlot, drawBotFace, invalidateBotFace } from "/client/bot-face.js";
 import { tickTurnTimer } from "/client/turn-timer.js";
 import { perf, perfFrame } from "/client/perf.js";
 import { setStyle } from "/client/style-cache.js";
@@ -24,6 +24,7 @@ import { lastStand } from "/client/last-stand-state.js";
 import { deathBehind, deathCenter, hopeCenter, overlayVis } from "/client/overlays.js";
 import { DEATH_SEQ, DEATH_DIR, DEATH_ANIM, HOPE_DIR, HOPE_ANIM } from "/client/demon-sprites.js";
 import { hideDeathCenter, hideHopeCenter } from "/client/last-stand.js";
+import { review } from "/client/review-state.js";
 
 // prednačítanie + dekódovanie spritov démona a Last Hope: kreslia sa až pri vyvolaní (len viditeľné), nech sa
 // prvé vyvolanie nezasekne na sťahovaní/dekódovaní veľkého obrázka
@@ -42,14 +43,18 @@ const CHARGE_AURAS = document.getElementsByClassName("charge-aura");
 // figúr aj projektilov robia CSS transitions mimo tejto slučky, takže plynulosť ostáva; šetrí CPU a batériu
 let lastDrawAt = -Infinity;
 export function raf() {
-  const now = performance.now();
+  const realNow = performance.now();
+  // rozbor zápasu (ANALYZE) je statický: všetko sa kreslí v čase 0 = idle frame 0, žiadna animácia
+  const now = review.active ? 0 : realNow;
   const map = { p1: actorP1, p2: actorP2 };
 
-  perfFrame(now);     // strážca FPS (auto úsporná grafika)
-  tickTurnTimer(now); // odpočet času na ťah (auto-lock pri vypršaní)
+  perfFrame(realNow);     // strážca FPS (auto úsporná grafika)
+  tickTurnTimer(realNow); // odpočet času na ťah (auto-lock pri vypršaní)
   // -4 ms tolerancia: pri 60 Hz displeji kreslí presne každý druhý frame (nie občas každý tretí)
-  if (perf.fpsCap && now - lastDrawAt < 1000 / perf.fpsCap - 4) { requestAnimationFrame(raf); return; }
-  lastDrawAt = now;
+  if (perf.fpsCap && realNow - lastDrawAt < 1000 / perf.fpsCap - 4) { requestAnimationFrame(raf); return; }
+  // rozbor zápasu je statický: kreslí sa len chvíľu po prepnutí akcie (review.js drawUntil - dočítanie spritov), inak nič
+  if (review.active && realNow > review.drawUntil) { requestAnimationFrame(raf); return; }
+  lastDrawAt = realNow;
 
   // po vypršaní facing override (streľba do strany) otoč postavu späť k súperovi -
   // positionActors sa inak volá len pri timeline frame-och, takže posledná akcia kola by ostala "visieť"
@@ -306,8 +311,10 @@ export function raf() {
     }
     // AI roomka: v HUD bota je namiesto portrétu jeho tvár s náladou (okno postavy cez peek.js ostáva)
     const isBot = slot === botSlot();
+    const wasBot = cvs.classList.contains("bot-face");
     cvs.classList.toggle("bot-face", isBot); // tvár bota sa nezrkadlí ani na p2 (nápisy HA/EZ by boli obrátené)
     if (isBot) {
+      if (!wasBot) invalidateBotFace(); // canvas mal portrét postavy - tvár nakresli znova
       cvs.classList.remove("wounded", "critical", "dead", "stoned", "alt-color");
       drawBotFace(cvs, now);
       return;

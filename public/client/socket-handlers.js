@@ -3,7 +3,7 @@
 // Každá udalosť má jediný handler; registrujú sa pri načítaní, pripojenie je asynchrónne.
 import { socket, hideRooms, rememberSpectate, forgetSpectate } from "/client/net.js";
 import { setIdentity, me, setSpectator, setState } from "/client/session.js";
-import { colorRollEl, crResultEl, crArrowEl, selEl, intermissionEl, goOverlay, dirPicker, aimPicker, lockBtn, hudTurn, arenaEl, meleeBtn, specialBtn } from "/client/dom.js";
+import { colorRollEl, crResultEl, crArrowEl, selEl, intermissionEl, goOverlay, dirPicker, aimPicker, lockBtn, hudTurn, meleeBtn, specialBtn } from "/client/dom.js";
 import { stopCharSelectPreview } from "/client/char-select.js";
 import { playback } from "/client/playback.js";
 import { preloadChar } from "/client/sprites.js";
@@ -19,7 +19,8 @@ import { clearActors, schedulePlayTimeline } from "/client/timeline.js";
 import { renderGrid } from "/client/grid.js";
 import { renderHUD, costHtml, applySpecialSkin } from "/client/hud.js";
 import { fxAll } from "/client/fx-registry.js";
-import { renderArenaLayers } from "/client/arena-bg.js";
+import { syncArenaBg } from "/client/arena-bg.js";
+import { review } from "/client/review-state.js";
 import { applyPhaseUI, updateMatchScore } from "/client/phase-ui.js";
 import { syncSpectatorScreens } from "/client/spectator-curtain.js";
 import { hideDeathCenter, hideDeathBehind } from "/client/last-stand.js";
@@ -158,6 +159,7 @@ socket.on("force_reload", () => { forgetSpectate(); location.reload(); });
 socket.on("rooms", () => { setSpectator(false); resetGameUi(); });
 
 socket.on("state", (s) => {
+  if (review.active) return; // rozbor zápasu (ANALYZE): dosku nemeň - po zatvorení sa stránka obnoví (review.dirty)
   tlog("recv state", { phase: s.phase, timerMs: s.timerMs, timeline: !!s.timeline, p1c: s.p1?.char, p2c: s.p2?.char, playing: playback.playing });
   setState(s);
   for (const slot of ["p1", "p2"]) {
@@ -173,11 +175,7 @@ socket.on("state", (s) => {
   syncMusic(s, playback.finalRoundActive);
 
   // arena
-  if (s.arena && s.arena !== arenaEl.dataset.key) {
-    arenaEl.dataset.key = s.arena;
-    const ARENAS_CLIENT = { bridge: ["sky-bridge.png","clouds.png","clouds-2.png","tower.png","bridge.png"], "portal-realm": ["portal-realm-hd.webp"], "shrek-swamp": ["shrek-swamp-hd.webp"] };
-    renderArenaLayers(s.arena, ARENAS_CLIENT[s.arena] || []);
-  }
+  syncArenaBg(s.arena);
 
   // lobby / čakanie / char-select podľa fázy hry
   applyPhaseUI(s);

@@ -36,6 +36,7 @@ import { soundForFrame, soundTimelineStart, syncMusic } from "/client/sound-map.
 import { perf } from "/client/perf.js";
 import { animatePortalWalk, followPortalWalk, spawnVoidHit } from "/client/portals.js";
 import { shrekEffect } from "/client/shrek.js";
+import { sideTag } from "/client/side-tag.js";
 
 /* ---------- GameOver sekvencia ---------- */
 function showGameOverSequence(winner) {
@@ -69,7 +70,7 @@ function showGameOverSequence(winner) {
       if (winner === "draw")        { verdict = "TIE"; cls = "tie"; }
       else if (me && winner === me) { verdict = "WINNER!"; cls = "win"; }
       else if (me)                  { verdict = "LOSER!"; cls = "lose"; }
-      else                          { verdict = `${winner.toUpperCase()} WINS`; cls = "tie"; } // divák
+      else                          { verdict = `${sideTag(winner)} WINS`; cls = "tie"; } // divák: ⚪ WHITE WINS / ⚫ BLACK WINS
       // pri sérii (BO3/BO5) doplň finálne skóre
       const ser = playback.serverGameResult?.series || state?.series;
       let scoreLine = "";
