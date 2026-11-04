@@ -11,7 +11,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createRecordedEngine } from "../telemetry/recorder.js";
 import { createMatchLog, summaryOf } from "../telemetry/match-log.js";
-import { MATCH_RECORD_VERSION, END_CAUSES } from "../shared/match-record.js";
+import zlib from "zlib";
+import { MATCH_RECORD_VERSION, END_CAUSES, diffState, applyDiff, expandRecord } from "../shared/match-record.js";
 import { playBotMatch } from "../tools/random-bot.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,7 +57,23 @@ const MATCHES = [
   { arena: "swamp", chars: ["werewolf", "medusa"], seed: 9 },
   { arena: "bridge", format: "tournament", teams: [["fire", "minotaur", "luffy"], ["soldier", "naruto", "jotaro"]], seed: 11 },
 ];
-const recs = MATCHES.map(play);
+const stored = MATCHES.map(play); // tak, ako sa ukladajú (beaty = rozdiely stavu)
+const recs = stored.map(r => r && expandRecord(structuredClone(r))); // tak, ako ich kreslí klient (beaty = celé stavy)
+
+console.log("Formát v2 (rozdiely)");
+{
+  const sb = stored.flatMap(r => r.games.flatMap(g => g.rounds.flatMap(rd => ["p1", "p2"].flatMap(v => rd.views[v].beats))));
+  check(sb.every(b => b.d && !b.state), "uložený beat nesie len rozdiel d, nie celý stav");
+  // rozdiel + aplikácia = presne nasledujúci stav (každá dvojica po sebe idúcich stavov všetkých záznamov)
+  let ok = true, n = 0;
+  for (const r of recs) for (const g of r.games) for (const rd of g.rounds) for (const v of ["p1", "p2"]) {
+    let prev = rd.views[v].start;
+    for (const b of rd.views[v].beats) { n++; if (JSON.stringify(applyDiff(prev, diffState(prev, b.state))) !== JSON.stringify(b.state)) ok = false; prev = b.state; }
+  }
+  check(ok && n > 100, "applyDiff(diffState) vráti presne ďalší stav", `${n} beatov`);
+  const full = recs.reduce((s, r) => s + JSON.stringify(r).length, 0), small = stored.reduce((s, r) => s + JSON.stringify(r).length, 0);
+  check(small * 3 < full, "rozdiely zmenšia záznam aspoň 3×", `${Math.round(full / 1024)} kB → ${Math.round(small / 1024)} kB`);
+}
 
 console.log("Záznam");
 check(recs.every(Boolean), "každý zápas uloží záznam");
@@ -91,12 +108,15 @@ console.log("Úložisko");
 {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "arena-matches-"));
   const log = createMatchLog(dir);
-  recs.forEach(r => log.save(r));
+  stored.forEach(r => log.save(r));
   const p1 = log.list({ limit: 4 });
   check(p1.rows.length === 4 && p1.more && p1.rows[0].id === recs[recs.length - 1].id, "stránka zoznamu: najnovšie prvé, more");
   const p2 = log.list({ before: p1.rows[3].id, limit: 4 });
   check(p2.rows.length === 2 && !p2.more, "ďalšia stránka (before)");
-  check(JSON.stringify(log.get(recs[2].id)) === JSON.stringify(recs[2]), "get vráti celý záznam");
+  check(JSON.stringify(log.get(recs[2].id)) === JSON.stringify(stored[2]), "get vráti celý záznam");
+  const raw = await log.getRaw(recs[2].id);
+  check(Buffer.isBuffer(raw) && JSON.stringify(JSON.parse(zlib.gunzipSync(raw))) === JSON.stringify(stored[2]), "getRaw vráti zabalený súbor (gzip) záznamu");
+  check(await log.getRaw("../index") === null && await log.getRaw("ffffffffffff") === null, "getRaw: neplatné / neznáme id = null");
   check(log.get("../index") === null && log.get("ffffffffffff") === null, "neplatné / neznáme id = null");
   check(JSON.stringify(p1.rows[0]) === JSON.stringify(summaryOf(recs[recs.length - 1])), "riadok zoznamu = summaryOf");
   // iná verzia → presun do old-v<N>/
@@ -115,7 +135,7 @@ console.log("Stráž formátu (MATCH_RECORD_VERSION)");
   // cesty kľúčov záznamu (polia zlúčené cez []). Len STABILNÉ kľúče - nie tie, čo sa objavia náhodou podľa priebehu
   // zápasu: stav (start / state) len do hĺbky kľúčov postavy (p1.trap aj keď je null), voliteľné príznaky beatov /
   // kôl / záznamu (frozen, invalid, demon, ai…) sa vynechajú; slovníky per postava (rosterHp…) sú list
-  const OPTIONAL = new Set(["frozen", "invalid", "empty", "tsEnd", "action", "demon", "ai", "team", "dead", "randomArena", "vsAi", "aiLevel", "config", "planned"]);
+  const OPTIONAL = new Set(["d", "frozen", "invalid", "empty", "tsEnd", "action", "demon", "ai", "team", "dead", "randomArena", "vsAi", "aiLevel", "config", "planned"]);
   const paths = new Set();
   const walk = (v, p) => {
     const last = p.split(".").pop().replace("[]", "");

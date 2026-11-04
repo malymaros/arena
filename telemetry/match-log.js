@@ -44,6 +44,7 @@ export function createMatchLog(dir) {
     if (old.size) fs.writeFileSync(indexFile, keep.map(r => JSON.stringify(r)).join("\n") + (keep.length ? "\n" : ""));
     rows = keep;
   }
+  const ids = new Set(rows.map(r => r.id)); // rýchle overenie id (index je bez limitu)
 
   function save(record) {
     if (!ID_RE.test(record.id)) return;
@@ -51,6 +52,7 @@ export function createMatchLog(dir) {
     const row = summaryOf(record);
     fs.appendFileSync(indexFile, JSON.stringify(row) + "\n");
     rows.push(row);
+    ids.add(row.id);
   }
 
   // stránka zoznamu: najnovšie prvé; before = id posledného riadku predošlej stránky
@@ -61,11 +63,19 @@ export function createMatchLog(dir) {
     return { rows: rows.slice(start, end).reverse(), more: start > 0 };
   }
 
+  // zabalený súbor záznamu tak, ako leží na disku (server ho pošle klientovi bez rozbaľovania - rozbalí prehliadač);
+  // asynchrónne - čítanie neblokuje herný server
+  const known = (id) => typeof id === "string" && ID_RE.test(id) && ids.has(id);
+  async function getRaw(id) {
+    if (!known(id)) return null;
+    try { return await fs.promises.readFile(path.join(dir, `${id}.json.gz`)); } catch { return null; }
+  }
+
   function get(id) {
-    if (typeof id !== "string" || !ID_RE.test(id) || !rows.some(r => r.id === id)) return null;
+    if (!known(id)) return null;
     try { return JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(dir, `${id}.json.gz`))).toString("utf8")); }
     catch { return null; }
   }
 
-  return { save, list, get, get size() { return rows.length; } };
+  return { save, list, get, getRaw, get size() { return rows.length; } };
 }

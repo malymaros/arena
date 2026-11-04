@@ -86,6 +86,7 @@ Záznam ukladá **výsledné stavy** (nič sa nedosimulováva), takže zmena pra
 obsahuje (pole stavu, postava, sprity, rozloženie lišty kola), ho môže rozbiť. Preto:
 
 - konštanta `MATCH_RECORD_VERSION` (jedno miesto, zdieľané serverom aj klientom); každý záznam ju nesie;
+- **minimálne nároky (v2, 2026-11-04):** beat ukladá len rozdiel stavu oproti predošlému (`d`; `diffState` / `applyDiff` / `expandRecord` v `shared/match-record.js`) - záznam ~5× menší (7 demo záznamov 2606 → 506 kB, gzip 43.6 → 23.7 kB); `match_review { id, gz: true }` vráti súbor tak, ako leží na disku (asynchrónne čítanie, server ho nerozbaľuje ani neparsuje), rozbalí a rozvinie ho prehliadač; v pamäti servera je len index;
 - server pri štarte záznamy **inej verzie nezobrazí** - história začína odznova (súbory presunie do `matches/old-v<N>/`, nič sa
   nemaže natrvalo; keby sa niekedy oplatilo, dajú sa vrátiť migráciou);
 - verziu treba zvýšiť pri každej zmene, po ktorej by starý záznam nevedel klient správne vykresliť. Stráži to test so **vzorovým

@@ -869,15 +869,17 @@ io.on("connection", (socket) => {
   });
 
   // --- záznamy zápasov (MATCHES / ANALYZE, docs/MATCH_REVIEW_PLAN.md) - vidí každý prihlásený hráč
-  // matches_list → ack { rows } (posledných MATCHES_SHOWN, najnovšie prvé; uložené sú všetky); match_review { id } → ack { record } / { error }
+  // matches_list → ack { rows } (posledných MATCHES_SHOWN, najnovšie prvé; uložené sú všetky); match_review { id, gz } →
+  // ack { gz: <bajty súboru> } (gz = klient vie rozbaliť - server súbor ani nerozbalí) / { record } / { error }
   socket.on("matches_list", (arg, ack) => {
     if (typeof ack !== "function") return;
     if (!matchLog || maintBlocked(socket)) { ack({ rows: [], off: !matchLog }); return; }
     ack({ rows: matchLog.list({ limit: MATCHES_SHOWN }).rows });
   });
-  socket.on("match_review", (arg, ack) => {
+  socket.on("match_review", async (arg, ack) => {
     if (typeof ack !== "function") return;
     if (!matchLog || maintBlocked(socket)) { ack({ error: "off" }); return; }
+    if (arg?.gz) { const raw = await matchLog.getRaw(arg?.id); ack(raw ? { gz: raw } : { error: "not_found" }); return; }
     const record = matchLog.get(arg?.id);
     ack(record ? { record } : { error: "not_found" });
   });

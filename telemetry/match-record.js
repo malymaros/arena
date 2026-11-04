@@ -3,7 +3,7 @@
 // stav na začiatku kola a stav po každej akcii - presne tak, ako ho daný hráč dostal (redactTimelineFor), bez efektov.
 // Ukladajú sa výsledné stavy, nič sa nedosimulováva → záznam nezávisí od budúcej hernej logiky.
 // Bez identity hráčov: mená sa zo stavov odstránia (FRAME_DROP), strany sú len p1 / p2.
-import { MATCH_RECORD_VERSION, FRAME_DROP } from "../shared/match-record.js";
+import { MATCH_RECORD_VERSION, FRAME_DROP, diffState } from "../shared/match-record.js";
 
 const ARENA_KEY = { "portal-realm": "portal", "shrek-swamp": "swamp" };
 const OTHER = { p1: "p2", p2: "p1" };
@@ -36,9 +36,12 @@ export function roundView(frames) {
     if (cur && effectsOf(f).some(e => e.kind === "invalid" && e.target === cur.from)) cur.invalid = true;
     if (cur) cur.last = i;
   }
+  // stav po akcii = len rozdiel voči predošlému (začiatok kola celý) - expandView ho na klientovi poskladá späť
+  const start = strip(frames[0]);
+  let prev = start;
   return {
-    start: strip(frames[0]),
-    beats: beats.map(({ last, ...b }) => ({ ...b, state: strip(frames[last]) })),
+    start,
+    beats: beats.map(({ last, ...b }) => { const s = strip(frames[last]); const d = diffState(prev, s); prev = s; return { ...b, d }; }),
   };
 }
 

@@ -14,7 +14,7 @@ import { state, me, isHost, setIdentity, setState } from "/client/session.js";
 import { queueEl, hudBoxP1, hudBoxP2, hudTurn } from "/client/dom.js";
 import { qCursor } from "/client/actor-layers.js";
 import { actionBadgeView, renderQueue } from "/client/queue.js";
-import { beatPos, emptyBeatPos, MATCH_RECORD_VERSION } from "/shared/match-record.js";
+import { beatPos, emptyBeatPos, MATCH_RECORD_VERSION, expandRecord } from "/shared/match-record.js";
 import { renderHUD } from "/client/hud.js";
 import { renderGrid } from "/client/grid.js";
 import { positionActors } from "/client/placement.js";
@@ -62,11 +62,21 @@ let R = null;     // { rec, gi, view, round, beat } - beat = index v zázname ko
 let saved = null; // čo bolo pred rozborom (identita, stav, verdikt game over)
 
 /* ---------- vstup / výstup ---------- */
+// záznam príde zabalený (gzip tak, ako leží na disku servera) a rozbalí ho prehliadač; bez DecompressionStream ho
+// server pošle rozbalený. Stavy po akciách sú v zázname len ako rozdiely - expandRecord ich poskladá.
+const canGunzip = typeof DecompressionStream === "function";
+async function gunzipJson(buf) {
+  const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return JSON.parse(await new Response(stream).text());
+}
 export function openReview(id, opts = {}) {
   if (!id) return;
-  socket.emit("match_review", { id }, (res) => {
-    if (res?.record) enterReview(res.record, opts);
-    else console.warn("match_review:", res?.error || "no response");
+  socket.emit("match_review", { id, gz: canGunzip }, async (res) => {
+    try {
+      const rec = res?.gz ? await gunzipJson(res.gz) : res?.record;
+      if (rec) enterReview(expandRecord(rec), opts);
+      else console.warn("match_review:", res?.error || "no response");
+    } catch (err) { console.warn("match_review: záznam sa nedal načítať", err); }
   });
 }
 
