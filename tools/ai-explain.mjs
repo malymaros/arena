@@ -22,14 +22,16 @@ const SIMS = Number(opt("--sims", 1500)), ROWS = Number(opt("--rows", 12)), COLS
 if (!src || !MATCH) { console.error("použitie: node tools/ai-explain.mjs <dáta> --match <id> --game <g> --turn <t>"); process.exit(1); }
 
 const files = fs.statSync(src).isDirectory() ? fs.readdirSync(src).filter(f => f.endsWith(".jsonl")).sort().map(f => path.join(src, f)) : [src];
-const recs = files.flatMap(f => fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l))).filter(r => r.m === MATCH);
+const recs = files.flatMap(f => fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l))).filter(r => r.m === MATCH || (r.t === "bot" && r.match === MATCH)); // zdôvodnenia bota nesú id v poli match
 const start = recs.find(r => r.t === "match_start");
 const aiRec = recs.find(r => r.t === "ai");
 if (!start || !aiRec) { console.error("zápas nenájdený alebo nie je z AI roomky"); process.exit(1); }
 const botSide = aiRec.side;
 
 let dbg = null;
-const bot = createBot({ seed: 7, budgetMs: 5000, budgetSims: SIMS, debug: (d) => { dbg = d; } });
+// --spy: CHEATER - po rozhodnutí z plánovania aj dopočet s akciou hráča, ktorú bot v tom kole naozaj videl (telemetria)
+const SPY = argv.includes("--spy");
+const bot = createBot({ seed: 7, budgetMs: 5000, budgetSims: SIMS, debug: (d) => { dbg = d; }, ...(SPY ? { level: "cheater" } : {}) });
 const pending = [];
 const engine = createRecordedEngine({
   schedule: (fn) => { pending.push(fn); },
@@ -77,6 +79,20 @@ console.log(`  tiles: ${JSON.stringify(g.tiles)}  iks: ${JSON.stringify(g.iks)}`
 bot.onState(engine.snapshotFor(person(botSide))); // čerstvý pohľad pred kolom (ako server pred rozhodnutím)
 const res = bot.decide();
 if (!dbg) { console.log("bot nerozhodoval kolo:", res); process.exit(0); }
+if (SPY) {
+  const spyRec = recs.find(r => r.t === "bot" && r.g === G && r.turn === T && r.spy);
+  const hq = humanQ[botSide === "white" ? "black" : "white"];
+  const EXTRA = new Set(["golden_shield", "golden_mirror", "golden_mana", "last_stand", "last_hope"]);
+  const base = (hq || []).filter(a => !EXTRA.has(a.type));
+  if (!spyRec || !base.length) console.log("\n--spy: v telemetrii chýba odhalená akcia tohto kola");
+  else {
+    const idx = spyRec.spy.slot - 1;
+    const r2 = bot.decide({ spy: { idx, action: { ...base[idx] } } });
+    console.log(`\nCHEATER videl ${spyRec.spy.slot}. akciu (${spyRec.spy.a}); v hre zahral: ${spyRec.pick}`);
+    console.log(`dopočet teraz: ${queueKey(r2?.queue || [])}  (hodnota ${r2?.why?.value}, p ${r2?.why?.p})`);
+    console.log(`  čakal od súpera: ${(r2?.why?.opp || []).map(o => `${o.q} p=${o.p}`).join(" | ")}`);
+  }
+}
 const { R, C, sol, mix, value } = dbg;
 const oppSide = botSide === "white" ? "black" : "white";
 const human = humanQ[oppSide];

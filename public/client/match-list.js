@@ -22,8 +22,8 @@ const CAUSE = {
 };
 const LEVEL = { baby: "BABY", normal: "AI", cheater: "CHEATER" };
 const FORMAT = { single: "SINGLE", bo3: "BO3", tournament: "TOURNAMENT" };
-// skrátené mená postáv s dlhým menom (inak by sa v stĺpci zalamovali / skracovali)
-const SHORT = { wanderer: "WANDERER", lightning: "LIGHTNING" };
+// mená postáv vo veľkých písmenách: skrátené dlhé (inak by sa v stĺpci zalamovali / skracovali), bez diakritiky mimo písma
+const SHORT = { wanderer: "WANDERER", lightning: "LIGHTNING", onre: "ONRYO" }; // ONRYO: pixelové písmo nemá „Ō"
 const nm = (c) => SHORT[c] || (CHAR_META[c]?.name || c || "?").toUpperCase();
 const side = (s) => (s === "p1" ? "WHITE" : "BLACK");
 const pad = (n) => String(n).padStart(2, "0");
@@ -113,7 +113,7 @@ function rowHtml(r) {
     <div class="ml-side b">${b.label}</div>
     <div class="ml-heads b${b.small ? " small" : ""}">${b.heads}</div>
     <div class="ml-meta">${rounds} ROUNDS<small>${r.games.length} ${r.games.length > 1 ? "GAMES" : "GAME"}${r.finished ? "" : ' · <span class="ml-unfin">UNFINISHED</span>'}</small>${demon ? `<span class="ml-demon">${LS_BADGE_IMG}DEMON</span>` : ""}</div>
-    <div class="ml-causes">${r.games.map(g => `<span class="ml-cause ${g.winner === "p1" ? "w" : g.winner === "p2" ? "b" : ""}" title="G${g.g}: ${causeText(g)}">${causeIco(g)}</span>`).join("")}</div>
+    <div class="ml-causes">${r.games.map(g => `<span class="ml-cause ${g.winner === "p1" ? "w" : g.winner === "p2" ? "b" : ""}" title="${g.g}: ${causeText(g)}">${causeIco(g)}</span>`).join("")}</div>
   </div>`;
 }
 function gamesHtml(r) {

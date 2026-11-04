@@ -5,7 +5,8 @@
 // (za seba aj za súpera), aby mu nechýbali zjavné hrozby a odpovede; presné ohodnotenie urobí až simulácia.
 import { actionHits, bestHit, reach } from "./threat.js";
 import { actionCost, extraVariants } from "./candidates.js";
-import { MAX_MANA, RECHARGE_GAIN } from "../../shared/balance.js";
+import { MAX_MANA, RECHARGE_GAIN, GOLDEN_COST } from "../../shared/balance.js";
+import { seededRng } from "../constants.js";
 import { portalStep } from "../../shared/geometry.js";
 import { SHREK_ROAR_DMG, SHREK_RAGE_HP } from "../../shared/balance.js";
 
@@ -145,6 +146,71 @@ export function coverage(q, starter) {
     if (j < 3) out.add(j);
   });
   return out;
+}
+
+// ISTÝ ZÁSAH (stratégia vlastníka 2026-11-04): bot začína kolo a súper nemá manu na golden predťah (GOLDEN_COST) →
+// pred mojou prvou akciou sa súper nepohne a obranu mať nemôže (jediná obrana pred prvou akciou kola je golden
+// predťah nezačínajúceho). Prvá akcia, ktorá ho na jeho bunke zasiahne, je teda istý dmg - fronty, ktoré ňou
+// začínajú, idú vždy do matice (inak ich predvýber proti sondám mohol zahodiť). Zásah sa overí simuláciou samotnej
+// prvej akcie (súper stojí). Neplatí v poslednom kole s démonom (Last Hope dá súperovi manu pred všetkým).
+export function sureHitPlans(sim, state, slot, pool, per = 4) {
+  const opp = other(slot), foe = state.players[opp], me = state.players[slot];
+  if (state.starter !== slot || foe.mana >= GOLDEN_COST || foe.x == null || foe.hp <= 0) return [];
+  if (me.lastStandBuff || foe.lastStandBuff) return [];
+  const oppStone = Math.min(3, foe.stone || 0);
+  const oppQ = Array.from({ length: 3 }, (_, i) => ({ type: i < oppStone ? "stoned" : "pass" }));
+  const byFirst = new Map();
+  for (const q of pool) {
+    const a = q[0];
+    if (!a || !ATTACKS.has(a.type)) continue;
+    const k = a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "");
+    if (!byFirst.has(k)) byFirst.set(k, []);
+    byFirst.get(k).push(q);
+  }
+  const out = [];
+  for (const qs of byFirst.values()) {
+    if (!sim.play(state, { [slot]: [qs[0][0], { type: "pass" }, { type: "pass" }], [opp]: oppQ }, seededRng(1))) continue;
+    // zásah súpera mojou PRVOU akciou: hit po jej ohlásení a pred ďalšou ohlásenou akciou (súper ešte nič neurobil)
+    let mine = false, hit = false;
+    scan: for (const f of sim.lastTimeline()) for (const e of f.effects || []) {
+      if (e.kind === "action") { if (mine) break scan; if (e.from === slot) mine = true; }
+      else if (mine && e.kind === "hit" && e.target === opp && (e.dmg || 0) > 0) hit = true;
+    }
+    if (hit) out.push(...qs.slice(0, per));
+  }
+  return out;
+}
+
+// ISTÝ MINUTÝ ÚDER: začínam kolo → pri mojej prvej akcii súper ešte stojí na známej bunke. Čisto útočná prvá akcia
+// (basic, melee, Special 1, breaker), ktorá ho ani jeho klona isto nezasiahne, je vyhodená mana aj akcia (nahlásené:
+// CHEATER strieľal do prázdneho stĺpca / radu). Vráti predikát „fronta začína takou akciou" (cache podľa akcie).
+const PURE_HIT = new Set(["attack", "melee", "special1", "shield_breaker", "mirror_breaker"]);
+const TOUCH = new Set(["hit", "block", "mirror", "clone_die", "clone_hit", "breaker", "ts_hit", "ts_mirror"]);
+export function wastedOpener(sim, state, slot) {
+  const opp = other(slot), foe = state.players[opp];
+  if (state.starter !== slot || foe.x == null || foe.hp <= 0) return () => false;
+  const oppStone = Math.min(3, foe.stone || 0);
+  const oppQ = Array.from({ length: 3 }, (_, i) => ({ type: i < oppStone ? "stoned" : "pass" }));
+  const cache = new Map();
+  return (q) => {
+    const a = q[0];
+    if (!a || !PURE_HIT.has(a.type)) return false;
+    const k = a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "");
+    if (cache.has(k)) return cache.get(k);
+    let touched = true; // pri neplatnej simulácii nič nevyhadzuj
+    if (sim.play(state, { [slot]: [a, { type: "pass" }, { type: "pass" }], [opp]: oppQ }, seededRng(1))) {
+      touched = false;
+      let mine = false;
+      scan: for (const f of sim.lastTimeline()) for (const e of f.effects || []) {
+        if (e.kind === "action") { if (mine) break scan; if (e.from === slot) mine = true; }
+        else if (mine && e.kind === "breaker") { if (e.result && e.result !== "none") { touched = true; break scan; } } // breaker bez obrany súpera = nič
+        else if (mine && TOUCH.has(e.kind) && e.target === opp) { touched = true; break scan; }
+        else if (mine && e.kind.startsWith("shrek_")) { touched = true; break scan; } // Shrek Swamp: zásah Shreka nie je minutie
+      }
+    }
+    cache.set(k, !touched);
+    return !touched;
+  };
 }
 
 export function doomPlans(sim, state, slot, pool, per = 3) {

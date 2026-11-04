@@ -13,7 +13,7 @@ import { evaluate, desperate } from "./eval.js";
 import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
 import { createOpponentModel } from "./model.js";
-import { seedPlans, doomPlans } from "./plans.js";
+import { seedPlans, doomPlans, sureHitPlans, wastedOpener } from "./plans.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 // Baby bot: podiel času / simulácií normálneho bota, šanca prehliadnuť istú výhru (vedie / prehráva), penalizácia
@@ -24,10 +24,22 @@ export const BABY = { NAIVE: 0.8, NAIVE_LEAD: 0.1, NAIVE_MIN: 0.3, NAIVE_MAX: 0.
 // (typ + smer / bunka). Počas plánovania počíta ako NORMAL (plný rozpočet; tento ťah je zároveň záloha, keď
 // vyprší čas kola) a výpočet si odloží; po odhalení ho len dopočíta (refineRound, REFINE rozpočtu) - stĺpce
 // matice = súperove fronty s odhalenou akciou (aspoň MIN_COLS). Bez odloženého výpočtu: celé kolo so zúžením (SPY).
-export const CHEAT = { REFINE: 0.15, SPY: 0.3, MIN_COLS: 12, CHECK: 400, SAFE: 0.1 };
+// MIN_ROWS = koľko riadkov matica dopočtu drží aj po termíne (riadky sú zoradené: istý zásah, potom podľa zmesi z plánovania)
+export const CHEAT = { REFINE: 0.25, SPY: 0.3, MIN_COLS: 12, MIN_ROWS: 12, CHECK: 400, SAFE: 0.1 };
 // základné akcie fronty (bez golden predťahu / golden many / démona / Last Hope) - poradie = slot 1-3 (ako me.queue po lockIn)
 const EXTRA = new Set(["golden_shield", "golden_mirror", "golden_mana", "last_stand", "last_hope"]);
 export const baseActions = (q) => q.filter(a => !EXTRA.has(a.type));
+// istý zásah (plans.js sureHitPlans): ak zvolený ťah istý zásah nemá a najlepší ťah s ním je proti očakávanej hre
+// súpera horší najviac o SURE_MARGIN, bot zahrá istý zásah (stratégia vlastníka: istý dmg nevynechať)
+export const SURE_MARGIN = 0.05;
+// R[i] → index riadku s istým zásahom, ak ho treba uprednostniť (inak i); col = zmes súpera nad C
+function preferSure(i, R, sure, C, col, value) {
+  if (!sure?.length || sure.includes(R[i])) return i;
+  const vs = (r) => C.reduce((acc, c, j) => acc + (col[j] ?? 0) * value(r, c), 0);
+  let best = -1, bestV = -Infinity;
+  for (const [k, r] of R.entries()) if (sure.includes(r)) { const v = vs(r); if (v > bestV) { bestV = v; best = k; } }
+  return best >= 0 && bestV >= vs(R[i]) - SURE_MARGIN && !C.some(c => value.dead(R[best], c) && !value.dead(R[i], c)) ? best : i;
+}
 const actKey = (a) => a ? a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "") + (a.to ? ">" + a.to : "") : "";
 const TS_TYPES = ["move", "dash", "recharge", "attack", "melee", "shield", "shield_breaker", "special1"];
 const DIRS = ["up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right"];
@@ -211,6 +223,8 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const states = Array.from({ length: D }, () => simState(belief, rng));
     const s0 = states[0];
     let myPool = shuffle(baseQueues(sim, s0, me));
+    // začínam kolo a súper stojí na známej bunke: fronty, ktoré otvárajú isto minutým útokom, preč (zostanú, keby nič iné nebolo)
+    if (D === 1) { const wasted = wastedOpener(sim, s0, me); const kept = myPool.filter(q => !wasted(q)); if (kept.length) myPool = kept; }
     let oppPool = shuffle(baseQueues(sim, s0, opp));
     // CHEATER: súper hrá len fronty, ktoré majú v odhalenom slote presne odhalenú akciu (žiadna nesedí = bez zúženia)
     const fits = spy ? (q) => actKey(baseActions(q)[spy.idx]) === actKey(spy.action) : null;
@@ -256,7 +270,9 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const lead = (seeds, rest) => [...seeds, ...rest.filter(q => !seeds.includes(q))];
     // kolo s démonom: štandardné plány oboch strán (démon v 1./2./3. akcii, obrana kryjúca 2 z 3) vždy v matici
     const doomMe = doomPlans(sim, s0, me, myPool), doomOpp = keep(doomPlans(sim, s0, opp, oppPool));
-    let R = lead([...doomMe, ...seedMe.slice(0, 8)], withExtras(pm.top, me));
+    // istý zásah prvou akciou (začínam kolo, súper nemá manu na golden predťah) - vždy v matici; len pri známom stave
+    const sureMe = D === 1 ? sureHitPlans(sim, s0, me, myPool) : [];
+    let R = lead([...doomMe, ...sureMe, ...seedMe.slice(0, 8)], withExtras(pm.top, me));
     const C = keep(lead([...doomOpp, ...seedOpp.slice(0, 10)], withExtras(po.top, opp)));
     // turnaj: pár front so swapom navyše (výnimka - zlý matchup / kombo nového maga), súperovi menej
     if (isTournament(s0)) {
@@ -324,7 +340,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const lost = hopeless(sol, R, C, value);
     if (lost) mix = playForChance(R, C, sol.col, value, [...seedOpp, ...po.all.slice(0, WIDE)]);
     let i;
-    if (!baby) i = sampleMix(mix, rng);
+    if (!baby) i = preferSure(sampleMix(mix, rng), R, sureMe, C, sol.col, value);
     else {
       const q = babyPick(R, C, sol.col, value, s0, me, pm.all);
       i = R.indexOf(q);
@@ -350,7 +366,9 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       ...(spy ? { spy: { slot: spy.idx + 1, a: actKey(spy.action), used: spied } } : {}),
     };
     // CHEATER: výpočet z plánovania si odlož - po odhalení akcie z neho refineRound len vyškrtne súperove fronty
-    if (cheater && !spy) lastCtx = { key: roundKey(), value, vMe, R, fullR, C, oppRanked: [...po.all, ...oppPool.slice(sampleN)], oppAll: oppPool };
+    // rowP = moja zmes z plánovania (poradie riadkov dopočtu), sure = fronty s istým zásahom
+    if (cheater && !spy) lastCtx = { key: roundKey(), value, vMe, R, rowP: R.map((r, k) => mix[k] ?? 0), sure: sureMe, fullR, C,
+      oppRanked: [...po.all, ...oppPool.slice(sampleN)], oppAll: oppPool };
     return R[i];
   }
 
@@ -370,10 +388,13 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     for (const q of ranked) { if (C.length >= CHEAT.MIN_COLS) break; if (!C.includes(q)) C.push(q); }
     if (!C.length) return null;
     const fullC = [...C, ...ranked.filter(q => !C.includes(q))];
-    let R = [...ctx.R];
+    // riadky: istý zásah, potom podľa zmesi z plánovania - pri nedostatku času sa orežú najmenej sľubné (predtým
+    // ostali prvé 4 v poradí stavby matice a CHEATER vyberal z náhodne malého výberu: štít proti známemu dashu)
+    const ranked0 = ctx.R.map((r, k) => [r, ctx.rowP[k] ?? 0]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    let R = [...new Set([...ctx.sure, ...ranked0])];
     const matrix = () => {
       const M = [];
-      for (const r of R) { M.push(C.map(c => value(r, c))); if (now() > deadline && M.length >= 4) break; }
+      for (const r of R) { M.push(C.map(c => value(r, c))); if (now() > deadline && M.length >= CHEAT.MIN_ROWS) break; }
       R = R.slice(0, M.length);
       return M;
     };
@@ -415,7 +436,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     }
     let mix = avoidDeath(sol.row, R, C, sol.col, value);
     if (hopeless(sol, R, C, value)) mix = playForChance(R, C, sol.col, value, ranked.slice(0, WIDE));
-    const i = sampleMix(mix, rng);
+    const i = preferSure(sampleMix(mix, rng), R, ctx.sure, C, sol.col, value);
     const r2 = (v) => Math.round(v * 100) / 100;
     log?.({ kind: "spy", ms: Math.round(now() - t0), R: R.length, C: C.length, fits: ranked.length, value: +sol.value.toFixed(3), pick: queueKey(R[i]), sims: stats.sims - sims0 });
     lastWhy = {

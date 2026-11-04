@@ -295,11 +295,12 @@ function buildChrome() {
   chrome.className = "review-chrome";
   // jeden pás dole: [hry série] ◀ ROUND n / N ▶ [zatvoriť] - hore ostáva celá plocha pre dosku
   chrome.innerHTML = `
-    <div class="rv-nav"><div class="rv-games"></div><button type="button" class="rv-arrow" data-d="-1" title="Previous round (↑)">◀</button>
+    <div class="rv-nav"><div class="rv-games"></div>
       <button type="button" class="rv-edge" data-e="start" title="First round (Home)">${EDGE_SVG(false)}</button>
+      <button type="button" class="rv-arrow" data-d="-1" title="Previous round (↑)">◀</button>
       <span class="rv-round"></span>
-      <button type="button" class="rv-edge" data-e="end" title="Last round - end of the game (End)">${EDGE_SVG(true)}</button>
       <button type="button" class="rv-arrow" data-d="1" title="Next round (↓)">▶</button>
+      <button type="button" class="rv-edge" data-e="end" title="Last round - end of the game (End)">${EDGE_SVG(true)}</button>
       <button type="button" class="rv-play"></button>
       <button type="button" class="rv-close" title="Close (Esc)">${PIX_X}</button></div>`;
   document.body.appendChild(chrome);

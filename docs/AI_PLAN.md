@@ -235,7 +235,29 @@ dá dmg = posmech (jazyk z obrazovky, HA), 5+ dmg = rehot so slzami (HA HA); dos
 trasú sa mu uši, para z uší; 5+ = záchvat (rozpálený kov, bliká, glitch, nadávky #!); prehráva na HP = zamračený,
 zaťaté zuby, občas zafučí; výhra = tanček, jazyk, uši podskakujú, HA / EZ, iskry, obrazovka oranžová / zlatá.
 Meno v HUD **CHEATER**, snapshot `aiLevel: "cheater"`. Test: `test/ai-room.mjs` (meno, zamyká po hráčovi, spy
-v každom kole sedí s hráčovou frontou).
+v každom kole sedí s hráčovou frontou; od 2026-11-04 `cheater_spy` dostávajú aj diváci).
+
+**Oprava 2026-11-04 (bug reporty z AI roomky):** dopočet po odhalení akcie (`refineRound`) mal len 15 % času kola a pri
+nedostatku času orezal maticu na prvé 4 riadky v poradí stavby - CHEATER potom vyberal z náhodne malého výberu (štít
+proti známemu dashu, strela do prázdneho stĺpca). Teraz: `CHEAT.REFINE` 25 %, riadky zoradené (istý zásah, potom podľa
+zmesi z plánovania), orezanie najmenej na `CHEAT.MIN_ROWS` 12. Rozbor konkrétneho kola aj s odhalenou akciou:
+`node tools/ai-explain.mjs <dáta> --match <id> --game <g> --turn <t> --spy`.
+
+## 8e. Istý zásah a istý minutý úder (stratégia vlastníka 2026-11-04)
+
+Keď **bot začína kolo**, súper pri jeho prvej akcii stojí na známej bunke (pohne sa až po nej) a jediná obrana pred ňou
+je golden predťah nezačínajúceho:
+- **Istý zásah** (`plans.js` `sureHitPlans`): súper má menej many než golden shield (`GOLDEN_COST`) → prvá akcia, ktorá
+  ho podľa simulácie samotnej prvej akcie zasiahne, je istý dmg; fronty s ňou idú vždy do matice a `preferSure` (bot.js)
+  ich zahrá, ak sú proti očakávanej hre súpera horšie najviac o `SURE_MARGIN` 0,05 (a nezabijú bota tam, kde zvolený ťah
+  nie). Neplatí v kole s démonom (Last Hope dá súperovi manu pred všetkým) ani pri skrytom stave (labyrint).
+- **Istý minutý úder** (`plans.js` `wastedOpener`): čisto útočná prvá akcia (basic, melee, Special 1, breaker), ktorá
+  súpera ani jeho klona isto nezasiahne (breaker bez jeho obrany), vypadne z poolu - vyhodená mana aj akcia.
+
+Meranie (`playMatch` 25 zápasov proti náhodnému súperovi, 600 sims): pri súperovi v rade / stĺpci do 3 trafil prvou
+akciou v 64-80 % kôl (predtým 60 %), istý zásah z `sureHitPlans` využitý v 67-77 % (malá vzorka; vynechané hlavne
+diagonálne strely za 1 dmg, keď pasca / pohyb vyšli o viac než marža lepšie). Duel nová vs. pôvodná verzia
+(`tools/ai-duel.mjs --games 200 --sims 1000`): **55,5 % (±6,9)**.
 
 ## 8d. Turnaj proti botovi (implementovaný 2026-11-03)
 
