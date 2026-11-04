@@ -320,13 +320,9 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       }
     }
     mix = avoidDeath(mix, R, C, sol.col, value);
-    // prehraté proti dokonalému súperovi (napr. kolo s démonom): hraj na šancu - fronta, ktorá vyhrá proti čo
-    // najviac súperovým možnostiam (priemer cez všetky jeho fronty v matici), nie náhodná z rovnakých prehier
-    if (sol.value <= -0.9 && C.length) {
-      let bi = 0, bv = -Infinity;
-      R.forEach((r, k) => { const v = C.reduce((acc, c) => acc + value(r, c), 0) / C.length; if (v > bv) { bv = v; bi = k; } });
-      mix = R.map((r, k) => (k === bi ? 1 : 0));
-    }
+    // prehraté proti dokonalému súperovi: hraj na šancu (človek zabijací ťah nemusí nájsť)
+    const lost = hopeless(sol, R, C, value);
+    if (lost) mix = playForChance(R, C, sol.col, value, [...seedOpp, ...po.all.slice(0, WIDE)]);
     let i;
     if (!baby) i = sampleMix(mix, rng);
     else {
@@ -338,13 +334,13 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const ms = now() - t0;
     if (ms > 50 && !budgetSims) rate = 0.7 * rate + 0.3 * ((stats.sims - sims0) / D / ms);
     log?.({ kind: "round", ms: Math.round(ms), R: R.length, C: C.length, pool: [myPool.length, oppPool.length], D,
-      value: +sol.value.toFixed(3), pick: queueKey(R[i]), p: +mix[i].toFixed(2), sims: stats.sims - sims0,
+      value: +sol.value.toFixed(3), pick: queueKey(R[i]), p: +mix[i].toFixed(2), sims: stats.sims - sims0, ...(lost ? { lost: true } : {}),
       ...(useModel ? { model: om.observations } : {}) });
     // zdôvodnenie ťahu (telemetria AI roomky → tools/bugs.mjs): čo bot zvažoval, čo čakal od súpera, čím by zomrel
     const r2 = (v) => Math.round(v * 100) / 100;
     const vsOpp = (r) => C.reduce((acc, c, j) => acc + (sol.col[j] ?? 0) * value(r, c), 0);
     lastWhy = {
-      value: r2(sol.value), pick: queueKey(R[i]), p: r2(mix[i]),
+      value: r2(sol.value), pick: queueKey(R[i]), p: r2(mix[i]), ...(lost ? { lost: true } : {}),
       top: R.map((r, k) => ({ r, p: mix[k] ?? 0 })).filter(x => x.p > 0.01).sort((a, b) => b.p - a.p).slice(0, 4)
         .map(x => ({ q: queueKey(x.r), p: r2(x.p), v: r2(vsOpp(x.r)) })),
       opp: C.map((c, j) => ({ c, p: sol.col[j] ?? 0 })).filter(x => x.p > 0.01).sort((a, b) => b.p - a.p).slice(0, 4)
@@ -418,11 +414,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       R.push(br); sol = resolve();
     }
     let mix = avoidDeath(sol.row, R, C, sol.col, value);
-    if (sol.value <= -0.9) {
-      let bi = 0, bv = -Infinity;
-      R.forEach((r, k) => { const v = C.reduce((acc, c) => acc + value(r, c), 0) / C.length; if (v > bv) { bv = v; bi = k; } });
-      mix = R.map((r, k) => (k === bi ? 1 : 0));
-    }
+    if (hopeless(sol, R, C, value)) mix = playForChance(R, C, sol.col, value, ranked.slice(0, WIDE));
     const i = sampleMix(mix, rng);
     const r2 = (v) => Math.round(v * 100) / 100;
     log?.({ kind: "spy", ms: Math.round(now() - t0), R: R.length, C: C.length, fits: ranked.length, value: +sol.value.toFixed(3), pick: queueKey(R[i]), sims: stats.sims - sims0 });
@@ -488,6 +480,29 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       out[best] += out[k]; out[k] = 0;
     }
     return out;
+  }
+
+  // ---------- prehrané kolo: hra na šancu ----------
+  // „Prehraté" = proti dokonalému súperovi zomriem: hodnota rovnováhy ~ −1, alebo (turnaj - prehra hry tam nie je −1)
+  // každú moju frontu niektorá súperova v matici zabije. Rovnovážna zmes je vtedy bezcenná (všetky riadky sú rovnako
+  // −1, regret matching vráti ľubovoľnú zmes a predtým priemer cez maticu - samé zabijacie stĺpce - vybral 1. riadok,
+  // čo vyzeralo ako náhodný ťah). Človek zabijací ťah často nenájde → hraj frontu, ktorá je najlepšia proti ŠIROKEJ
+  // vzorke rozumných súperových front (stĺpce matice + ľudské plány + najlepšie z predvýberu), aby súper musel trafiť
+  // čo najpresnejšiu odpoveď. Remíza → lepšia proti rovnovážnej zmesi súpera.
+  const WIDE = 24;
+  function hopeless(sol, R, C, value) {
+    if (!R.length || !C.length) return false;
+    return sol.value <= -0.9 || R.every(r => C.some(c => value.dead(r, c)));
+  }
+  function playForChance(R, C, col, value, extra) {
+    const cols = [...new Set([...C, ...extra])];
+    const eq = (r) => C.reduce((acc, c, j) => acc + (col[j] ?? 0) * value(r, c), 0);
+    let bi = 0, bv = -Infinity, be = -Infinity;
+    R.forEach((r, k) => {
+      const v = cols.reduce((acc, c) => acc + value(r, c), 0) / cols.length;
+      if (v > bv + 1e-9 || (v > bv - 1e-9 && eq(r) > be)) { bv = v; bi = k; be = eq(r); }
+    });
+    return R.map((r, k) => (k === bi ? 1 : 0));
   }
 
   // ---------- THE WORLD (bot = Jotaro): súper je zmrazený → jednostranná optimalizácia ----------
