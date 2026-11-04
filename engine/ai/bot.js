@@ -24,7 +24,7 @@ export const BABY = { NAIVE: 0.8, NAIVE_LEAD: 0.1, NAIVE_MIN: 0.3, NAIVE_MAX: 0.
 // (typ + smer / bunka). Počas plánovania počíta ako NORMAL (plný rozpočet; tento ťah je zároveň záloha, keď
 // vyprší čas kola) a výpočet si odloží; po odhalení ho len dopočíta (refineRound, REFINE rozpočtu) - stĺpce
 // matice = súperove fronty s odhalenou akciou (aspoň MIN_COLS). Bez odloženého výpočtu: celé kolo so zúžením (SPY).
-export const CHEAT = { REFINE: 0.15, SPY: 0.3, MIN_COLS: 12 };
+export const CHEAT = { REFINE: 0.15, SPY: 0.3, MIN_COLS: 12, CHECK: 400, SAFE: 0.1 };
 // základné akcie fronty (bez golden predťahu / golden many / démona / Last Hope) - poradie = slot 1-3 (ako me.queue po lockIn)
 const EXTRA = new Set(["golden_shield", "golden_mirror", "golden_mana", "last_stand", "last_hope"]);
 export const baseActions = (q) => q.filter(a => !EXTRA.has(a.type));
@@ -354,7 +354,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       ...(spy ? { spy: { slot: spy.idx + 1, a: actKey(spy.action), used: spied } } : {}),
     };
     // CHEATER: výpočet z plánovania si odlož - po odhalení akcie z neho refineRound len vyškrtne súperove fronty
-    if (cheater && !spy) lastCtx = { key: roundKey(), value, vMe, R, fullR, C, oppRanked: [...po.all, ...oppPool.slice(sampleN)] };
+    if (cheater && !spy) lastCtx = { key: roundKey(), value, vMe, R, fullR, C, oppRanked: [...po.all, ...oppPool.slice(sampleN)], oppAll: oppPool };
     return R[i];
   }
 
@@ -368,7 +368,8 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     const t0 = now(), deadline = t0 + budgetMs * CHEAT.REFINE, sims0 = stats.sims;
     const { value, vMe, fullR } = ctx;
     const fits = (q) => actKey(baseActions(q)[spy.idx]) === actKey(spy.action);
-    const ranked = ctx.oppRanked.filter(fits);
+    // + zvyšok celého poolu: predvýber po termíne (a pri zhodných vektoroch proti sondám) fronty zahodil
+    const ranked = [...new Set([...ctx.oppRanked, ...ctx.oppAll])].filter(fits);
     const C = ctx.C.filter(fits);
     for (const q of ranked) { if (C.length >= CHEAT.MIN_COLS) break; if (!C.includes(q)) C.push(q); }
     if (!C.length) return null;
@@ -392,6 +393,29 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       if (bo && !C.includes(bo)) { C.push(bo); added = true; }
       if (!added) break;
       sol = solveMatrix(matrix());
+    }
+    // poistka (aj po termíne): odhalená akcia zúži súpera na pár desiatok front - zvolené riadky sa overia proti
+    // VŠETKÝM sediacim, či niektorá z nich bota nezabije (double oracle to na pomalom VM nestihol: CHEATER videl
+    // melee a aj tak čakal na rane - recharge, charge, melee). Zabijaci idú do matice a rovnováha sa prepočíta.
+    const resolve = () => solveMatrix(R.map(r => C.map(c => value(r, c))));
+    const safeEnd = now() + budgetMs * CHEAT.SAFE; // vlastný krátky čas poistky (CHEAT.SAFE z rozpočtu kola)
+    for (let round = 0; round < 3; round++) {
+      let dying = false;
+      for (const [k, r] of R.entries()) {
+        if ((sol.row[k] ?? 0) <= 0.01) continue;
+        if (C.some(c => value.dead(r, c))) dying = true;
+        for (const q of ranked.slice(0, CHEAT.CHECK)) {
+          if (now() > safeEnd) break;
+          if (!C.includes(q) && value.dead(r, q)) { C.push(q); dying = true; }
+        }
+      }
+      if (!dying || now() > safeEnd) break;
+      sol = resolve();
+      // moja najlepšia odpoveď na novú zmes (z celého poolu, obmedzený počet - napr. štít krytý presne na to melee)
+      const colSup = C.map((c, j) => [c, sol.col[j]]).filter(([, p]) => p > 0.01);
+      const br = bestResponse(fullR, colSup, vMe, 1, sol.value + 0.005, safeEnd);
+      if (!br || R.includes(br)) break;
+      R.push(br); sol = resolve();
     }
     let mix = avoidDeath(sol.row, R, C, sol.col, value);
     if (sol.value <= -0.9) {
@@ -468,14 +492,33 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
 
   // ---------- THE WORLD (bot = Jotaro): súper je zmrazený → jednostranná optimalizácia ----------
   // Pohľad počas pauzy nenesie zvyšok kola (súperove zostávajúce akcie sú pre bota skryté, ako pre človeka):
-  // aproximácia = kolo, v ktorom je súper skamenený a ja hrám zmrazené akcie.
+  // aproximácia = skutočné THE WORLD v engine (zachytená súperova obrana platí na SÚČET zmrazených zásahov -
+  // nabitý mirror odrazí celý súčet na Jotara, štít ho celý zablokuje) a zvyšok kola sa už neodohrá
+  // (syntetický roundCtx s i = 3 → po obnovení času hneď finishRound). Predtým: kolo so skameneným súperom,
+  // kde súperov mirror „spotreboval" už prvý zmrazený recharge a bot potom strieľal do zrkadla.
   function decideTimestop() {
     const t0 = now(), deadline = t0 + Math.min(budgetMs, 4000);
     const me = belief.mySlot, opp = other(me);
     const st = simState(belief, rng);
-    st.players[opp].stone = 3;
-    st.timestop = null;
-    const stoned = [{ type: "stoned" }, { type: "stoned" }, { type: "stoned" }];
+    const foe = st.players[opp];
+    st.timestop = {
+      slot: me, foeSlot: opp,
+      foeShield: !!foe.shield, foeShieldGold: !!foe.shieldGold,
+      foeMirror: !!foe.mirror, foeMirrorGold: !!foe.mirrorGold,
+      hits: [], cloneEvents: [], shrekHits: [], mode: "waiting",
+    };
+    st.roundCtx = {
+      tl: [], order: [me, opp], i: 3, slotIdx: 0, ended: false,
+      stonedStep: { p1: false, p2: false }, tookStoned: { p1: false, p2: false },
+      charInfo: {}, doomSlot: null, second: opp, emittedUpTo: 0,
+    };
+    const eng = tsSim.engine;
+    const play = (q) => {
+      eng.loadState(cloneData(st), seededRng(1));
+      let ok = false;
+      eng.timestopActions(me === "p1" ? "A" : "B", q, (r) => { ok = !!r?.ok; });
+      return ok ? eng.game : null;
+    };
     let best = null, bestV = -Infinity;
     const tried = new Set();
     // keď čas nestačí na všetky: najprv trojice so zásahom (útok / melee / Special 1)
@@ -484,7 +527,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     for (const q of all) {
       if (now() > deadline) break;
       tried.add(queueKey(q));
-      const res = sim.play(st, { [me]: q, [opp]: stoned }, seededRng(1), tsPolicy);
+      const res = play(q);
       stats.sims++;
       if (!res) continue;
       const v = evaluate(res, me, weights);

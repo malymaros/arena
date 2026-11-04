@@ -204,9 +204,9 @@ export function rosterFirstCard() {
     .filter(c => c.dataset.char in charSelectHp && !c.classList.contains("dead") && !c.classList.contains("preview-char"))
     .sort((a, b) => (+a.style.order || 99) - (+b.style.order || 99))[0] || null;
 }
-// ruleta farieb alebo losovanie postáv ešte zakrýva výber - predvýber s hlasom až po nich
+// losovanie arény, ruleta farieb alebo losovanie postáv ešte zakrýva výber - predvýber s hlasom až po nich
 export function selectOverlayBusy() {
-  return ["color-roll", "char-roll"].some(id => { const el = document.getElementById(id); return !!el && !el.classList.contains("hidden"); });
+  return ["arena-roll", "color-roll", "char-roll"].some(id => { const el = document.getElementById(id); return !!el && !el.classList.contains("hidden"); });
 }
 // desktop nemá „označenú" kartu - pozícia 1 dostane vzhľad hoveru + náhľad špeciálu + intro hlas,
 // kým myš nenadíde na inú kartu

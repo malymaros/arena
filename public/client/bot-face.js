@@ -113,11 +113,16 @@ export function botFaceGameEnd(winner) {
   const b = botSlot();
   if (b && (winner === "p1" || winner === "p2")) face.end = { mood: winner === b ? "laugh" : "ko", game: state?.series?.gameIndex ?? 1 };
 }
+// overlay losovania (arena-roll.js / ruleta farieb / char-roll.js) je hore - bez importu char-select.js,
+// lebo bot-face.js načítavajú aj dev stránky samostatne
+const introOverlay = () => ["arena-roll", "color-roll", "char-roll"].some(id => { const el = document.getElementById(id); return !!el && !el.classList.contains("hidden"); });
 function baseline() {
   const b = botSlot(), me = state?.[b], foe = state?.[b === "p1" ? "p2" : "p1"];
   if (face.end && face.end.game === (state?.series?.gameIndex ?? 1) && (me?.hp <= 0 || foe?.hp <= 0)) return face.end.mood;
   face.end = null;
   if (!me || !foe) return "neutral";
+  // losovanie arény / farieb / postáv ešte beží (overlay) - bot „nepremýšľa" nahlas skôr, než hráč vidí dosku
+  if (introOverlay()) return "neutral";
   // plánovanie kola: bot počíta, kým nezamkne (po zamknutí len nálada zo stavu - nie z ťahu)
   if (state.phase === "playing" && !playback.playing && !me.locked && !state.timestop) return "thinking";
   if (me.lastStandBuff || me.hp <= 3) return "worried";
