@@ -106,7 +106,7 @@ function rowHtml(r) {
   return `<div class="ml-row" data-id="${r.id}">
     <div class="ml-when">${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}<small>${pad(d.getHours())}:${pad(d.getMinutes())}</small></div>
     <div class="ml-arena"><canvas width="120" height="42" data-arena="${r.arena}"></canvas>${r.randomArena ? `<span class="ml-dice">${DICE_SVG}</span>` : ""}<span>${ARENA_NAMES[r.arena] || r.arena}</span></div>
-    <div class="ml-fmt"><span class="ml-chip">${FORMAT[r.format] || r.format}</span>${r.ai ? `<span class="ml-ai ${r.ai.level}">VS AI · ${(r.ai.level || "normal").toUpperCase()}</span>` : ""}</div>
+    <div class="ml-fmt"><span class="ml-chip">${FORMAT[r.format] || r.format}</span>${r.ai ? `<span class="ml-ai ${r.ai.level}"><span class="ml-ai-full">VS AI · ${(r.ai.level || "normal").toUpperCase()}</span><span class="ml-ai-short">${LEVEL[r.ai.level] || "AI"}</span></span>` : ""}</div>
     <div class="ml-heads w${w.small ? " small" : ""}">${w.heads}</div>
     <div class="ml-side w">${w.label}</div>
     <div class="ml-score"><span class="${lose("p1")}">${r.score.p1}</span>:<span class="${lose("p2")}">${r.score.p2}</span></div>

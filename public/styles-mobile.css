@@ -493,7 +493,11 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 .phone .ml-arena > span:last-child { font-size: 6px; }
 .phone .ml-when { font-size: 8px; }
 .phone .ml-chip { font-size: 7px; padding: 4px 0; }
-.phone .ml-ai { font-size: 6px; }
+.phone .ml-ai { font-size: 7px; }
+/* štítok bota na telefóne: len úroveň (CHEATER / AI / BABY), „VS AI ·" sa nevojde */
+.ml-ai-short { display: none; }
+.phone .ml-ai-full { display: none; }
+.phone .ml-ai-short { display: inline; }
 .phone .ml-heads.small canvas { width: 24px; height: 24px; }
 .phone .ml-heads { gap: 4px; }
 .phone .ml-row .ml-heads.w { justify-content: flex-end; }
