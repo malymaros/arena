@@ -254,6 +254,8 @@
 .phone .room-btn { padding: 24px 36px; font-size: 24px; }
 /* dlaždice roomiek na telefóne: rovnaký pixel-art, celé zväčšené (zoom drží pixely ostré a pomery presné) */
 .phone .room-grid { zoom: 1.6; }
+/* ANALYZE MATCHES pod dlaždicami: rovnaké zväčšenie ako mriežka → výška a písmo ako CREATE, šírka ako rad dlaždíc */
+.phone .matches-open { zoom: 1.6; align-self: center; width: 558px; padding: 12px 0 13px; font-size: 11px; letter-spacing: 2px; }
 .phone .lobby-bot { right: 40px; bottom: 30px; gap: 10px; }
 .phone .lobby-bot-figure { width: 224px; height: 238px; }
 .phone .lobby-bot-bubble { font-size: 20px; padding: 16px 18px; }
