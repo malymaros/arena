@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Beginner mód — návrh</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): BEGINNER mód - prepínač vľavo hore v room browseri (hlavy Fire,
+     Lightning, Wanderer), zamknuté roomky druhého módu, zamknuté lobby (len Stone Bridge, bez ADVANCED SETTINGS),
+     char-select so zákazmi v štýle BANNED. Room browser, dlaždice, lobby a hlavy mágov sú ten istý kód / CSS ako v hre. */
+  html, body { overflow: auto !important; height: auto !important; min-height: 100%; position: static !important; touch-action: auto !important; }
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 700 18px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0; color: #8b92a0; max-width: 1000px; }
+  main { padding: 20px; display: grid; gap: 26px; max-width: 1400px; }
+  section > h2 { font: 700 15px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  section > p { margin: 0 0 12px; color: #9aa1ad; max-width: 1000px; }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 22px; }
+  figure { margin: 0; }
+  figcaption { margin: 0 0 8px; color: #cfd2d6; font-weight: 600; }
+  figcaption small { display: block; color: #8b92a0; font-weight: 400; }
+  .screen { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #262a33; border-radius: 6px; background: #000; }
+  .screen .inner { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+  .screen .rooms, .screen .lobby { position: absolute; }
+  .screen .lobby .lobby-card { zoom: 1.35; }
+  .big .screen { max-width: 1280px; }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 16px; }
+  .shots img { width: 100%; border: 1px solid #262a33; border-radius: 6px; display: block; }
+  ul.q { margin: 0; padding-left: 18px; color: #cfd2d6; max-width: 1000px; }
+  ul.q li { margin: 5px 0; }
+  .toggle-demo { margin: 10px 0 0; padding: 8px 12px; border: 2px dashed #8b92a0; background: #101217; color: #dfe3ea; cursor: pointer; font: 9px "Press Start 2P", monospace; }
+
+  /* ---------- prepínač BEGINNER (vľavo hore v room browseri) ---------- */
+  .bg-btn { --n: 4px; clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0, calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n),
+    100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)), calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n)));
+    position: absolute; left: 28px; top: 22px; z-index: 3; width: 214px; height: 74px; box-sizing: border-box;
+    display: flex; align-items: center; gap: 10px; padding: 0 12px; border: none; cursor: pointer; font-family: "Press Start 2P", monospace; text-align: left;
+    color: #9aa1ad; background: #2a2d34; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #3a3e47, inset 0 -4px 0 2px #1b1d22; transition: transform .1s; }
+  .bg-btn .heads { display: flex; flex: none; }
+  .bg-btn .heads canvas { width: 34px; height: 34px; image-rendering: pixelated; margin-left: -8px; filter: grayscale(1) brightness(.7); }
+  .bg-btn .heads canvas:first-child { margin-left: 0; }
+  .bg-btn .lbl { display: flex; flex-direction: column; gap: 7px; font-size: 10px; letter-spacing: 1px; }
+  .bg-btn .sw { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; }
+  .bg-btn .sw i { width: 22px; height: 10px; background: #15161a; box-shadow: inset 0 0 0 2px #000; position: relative; }
+  .bg-btn .sw i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 8px; height: 6px; background: #6b7080; }
+  .bg-btn:hover { filter: brightness(1.15); transform: translateY(-2px); }
+  .bg-btn:active { transform: translateY(2px); }
+  .bg-btn.on { color: #06200f; background: #3ddc84; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #8af0b5, inset 0 -4px 0 2px #1f8f52; }
+  .bg-btn.on .heads canvas { filter: none; }
+  .bg-btn.on .sw i::after { left: 12px; background: #06200f; }
+
+  /* ---------- dlaždica roomky: znak BEGINNER + zamknutá pre druhý mód ---------- */
+  .room-tile .rt-beginner { position: absolute; left: 50%; top: 3px; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 0; padding: 1px 5px 1px 3px;
+    background: #3ddc84; box-shadow: inset 0 0 0 2px #000; }
+  .room-tile .rt-beginner canvas { width: 20px; height: 20px; image-rendering: pixelated; margin-left: -4px; }
+  .room-tile .rt-beginner canvas:first-child { margin-left: 0; }
+  .room-btn.room-tile.mode-locked { cursor: not-allowed; }
+  .room-btn.room-tile.mode-locked::before { content: ""; position: absolute; inset: 0; background: rgba(8,10,14,.62); z-index: 3; pointer-events: none; }
+  .room-btn.room-tile.mode-locked::after { content: "🔒"; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); font-size: 26px; z-index: 4;
+    text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; }
+  .room-btn.room-tile.mode-locked .rt-cta { background: #4d5058; color: #c9ccd3; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #6b6f78, inset 0 -4px 0 2px #33363d; position: relative; z-index: 5; }
+  .room-btn.room-tile { position: relative; }
+
+  /* lobby v beginner móde: štítok pod nadpisom */
+  .lobby-beginner { display: inline-flex; align-items: center; gap: 6px; margin: 4px auto 0; padding: 4px 8px; font: 9px "Press Start 2P", monospace;
+    color: #06200f; background: #3ddc84; box-shadow: 0 0 0 2px #000; }
+  .lobby-beginner canvas { width: 18px; height: 18px; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BEGINNER MÓD: NÁVRH</h1>
+  <p>Vľavo hore v room browseri je prepínač <b>BEGINNER</b> s hlavami Fire, Lightning a Wanderer (pamätá sa v prehliadači).
+     Zapnutý: hrajú sa len títo traja mágovia (ostatní v štýle <b>BANNED</b>), roomka len na <b>Stone Bridge</b> (Portal Realm,
+     Shrek Swamp a kocka zamknuté 🔒), <b>ADVANCED SETTINGS</b> zamknuté. Roomky sú oddelené podľa módu: do roomky beginnera sa
+     nepripojí hráč bez beginner módu a naopak. Platí aj proti AI; turnaj je povolený (normálny draft z troch mágov).</p>
+</header>
+<div id="grid" style="display:none"></div> <!-- dom.js (mage-head → sprites) číta jeho gap -->
+<main>
+  <section class="big">
+    <h2>1 · ROOM BROWSER - NAKLIKAJ SI TO</h2>
+    <p>Klik na prepínač vľavo hore zapne / vypne beginner mód. ROOM 1 vytvoril začiatočník (zelený štítok s hlavami), ROOM 2 bežný hráč.
+       Roomka druhého módu je zamknutá: stmavená, zámok, tlačidlo <i>BEGINNERS ONLY</i> / <i>NO BEGINNERS</i>.</p>
+    <figure><div class="screen" id="live"></div></figure>
+  </section>
+
+  <section>
+    <h2>2 · STAVY</h2>
+    <div class="scenes" id="scenes"></div>
+  </section>
+
+  <section>
+    <h2>3 · CHAR-SELECT (skutočná hra, zákazy beginnera)</h2>
+    <p>Rovnaký štýl ako BANNED CHARACTERS: prvá strana (Mages) sú traja povolení mágovia, ostatné strany zašednuté s krížikom a pásikom BANNED,
+       na telefóne tlačidlo PICK zmení na BANNED.</p>
+    <div class="shots">
+      <img src="/dev/beginner-preview/select-pc-1.png" alt="char-select PC, strana Mages" />
+      <img src="/dev/beginner-preview/select-pc-2.png" alt="char-select PC, zakázané postavy" />
+      <img src="/dev/beginner-preview/select-phone-1.png" alt="char-select telefón" />
+      <img src="/dev/beginner-preview/select-phone-2.png" alt="char-select telefón, zakázaná postava" />
+    </div>
+  </section>
+
+  <section>
+    <h2>4 · NA ROZHODNUTIE</h2>
+    <ul class="q">
+      <li><b>Sledovanie:</b> zamknutá je len hra (JOIN). Sledovať (SPECTATE) sa dá aj roomku druhého módu - alebo zamknúť aj to?</li>
+      <li><b>AI bot:</b> v beginner móde ide do AI roomky s rovnakými zákazmi (bot aj hráč len traja mágovia). AI roomka sa nezamyká -
+        je len jedna, kto ju má obsadenú, ten určuje mód. Divák vidí, či je to beginner hra.</li>
+      <li><b>TRAINING GROUNDS</b> ostáva dostupný v oboch módoch (aj tak sa tam hrá len Fire).</li>
+      <li><b>Prepnutie počas čakania:</b> prepínač je len v room browseri - v roomke (lobby, hra) sa mód nedá zmeniť.</li>
+      <li><b>Telefón:</b> prepínač len s hlavami a vypínačom (bez nápisu), rovnako široký ako TRAINING GROUNDS.</li>
+    </ul>
+  </section>
+</main>
+
+<script type="module">
+  import { buildRoomGrid } from "/client/room-tiles.js";
+  import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
+  import { drawMageHeadAnim } from "/client/mage-head.js";
+  import { DUMMY_SVG } from "/client/training-btn.js";
+  import { ARENA_KEYS, ARENA_NAMES, drawArenaThumb } from "/client/arena-thumbs.js";
+  import { DICE_SVG } from "/client/pix.js";
+
+  const MAGES = ["fire", "lightning", "wanderer"];
+  const heads = []; // { cvs, char }
+  const headCanvas = (char, size = 52) => { const c = document.createElement("canvas"); c.width = size; c.height = size; heads.push({ cvs: c, char }); return c; };
+  const bots = [];
+  function loop(now) {
+    for (const h of heads) if (h.cvs.isConnected && h.cvs.offsetParent !== null) drawMageHeadAnim(h.cvs, h.char, now);
+    for (const b of bots) if (b.isConnected && b.offsetParent !== null) drawBotFigure(b, "neutral", now, {});
+    requestAnimationFrame(loop);
+  }
+  const fit = (screen, inner) => { const f = () => { inner.style.transform = `scale(${screen.clientWidth / 1280})`; }; new ResizeObserver(f).observe(screen); f(); };
+
+  const ROOMS = [
+    { id: 1, slot: 1, players: 1, max: 2, canJoin: true, names: ["Tomi", null], beginner: true, info: { arena: "bridge", color: "random", chars: "manual", timer: "60" } },
+    { id: 2, slot: 2, players: 1, max: 2, canJoin: true, names: ["Maros", null], info: { arena: "portal", color: "white", chars: "manual", timer: "off" } },
+  ];
+
+  function beginnerBadge() {
+    const b = document.createElement("span"); b.className = "rt-beginner";
+    for (const m of MAGES) b.append(headCanvas(m, 52));
+    return b;
+  }
+
+  function buildScene(screen, sc) {
+    const st = { on: !!sc.on };
+    const inner = document.createElement("div"); inner.className = "inner";
+    const rooms = document.createElement("div"); rooms.className = "rooms";
+    rooms.innerHTML = `<div class="rooms-card"><h1 class="rooms-title">ARENA</h1><div class="rooms-list"></div></div>`;
+    const list = rooms.querySelector(".rooms-list");
+    rooms.querySelector(".rooms-card").insertAdjacentHTML("beforeend", `<button class="matches-open" type="button">ANALYZE MATCHES</button>`);
+    // TRAINING GROUNDS vpravo hore + bot vpravo dole (ako v hre)
+    rooms.insertAdjacentHTML("beforeend", `<button class="tg-btn" type="button"><span class="tg-free">${DUMMY_SVG}<span class="tg-t">TRAINING<span>GROUNDS</span></span></span></button>`);
+    const bot = document.createElement("div"); bot.className = "lobby-bot";
+    bot.innerHTML = `<div class="lobby-bot-bubble">PLAY VS AI</div><canvas class="lobby-bot-figure" width="${FIGURE_W * 4}" height="${FIGURE_H * 4}"></canvas>`;
+    bots.push(bot.querySelector("canvas"));
+    rooms.append(bot);
+    // prepínač BEGINNER
+    const tg = document.createElement("button"); tg.type = "button"; tg.className = "bg-btn";
+    const hs = document.createElement("span"); hs.className = "heads"; MAGES.forEach(m => hs.append(headCanvas(m)));
+    tg.append(hs);
+    tg.insertAdjacentHTML("beforeend", `<span class="lbl">BEGINNER<span class="sw"><i></i><b class="swt"></b></span></span>`);
+    rooms.append(tg);
+
+    function sync() {
+      tg.classList.toggle("on", st.on);
+      tg.querySelector(".swt").textContent = st.on ? "ON" : "OFF";
+      list.innerHTML = "";
+      const grid = buildRoomGrid({ rooms: ROOMS, slots: 2 }, () => {});
+      grid.querySelectorAll(".room-tile").forEach((t, i) => {
+        const r = ROOMS[i];
+        if (r.beginner) t.append(beginnerBadge()); // štítok na rohu badge arény (mimo badge - ten má vlastné prekrytie)
+        if (!!r.beginner !== st.on) {
+          t.classList.add("mode-locked");
+          t.querySelector(".rt-cta").textContent = r.beginner ? "BEGINNERS ONLY" : "NO BEGINNERS";
+        }
+      });
+      list.append(grid);
+    }
+    if (sc.interactive) {
+      tg.addEventListener("click", () => { st.on = !st.on; sync(); });
+    }
+    sync();
+    inner.append(rooms);
+    screen.appendChild(inner);
+    fit(screen, inner);
+  }
+
+  // lobby hosta v beginner móde (rovnaké triedy ako v hre; zamknutie = .ai-locked ako pri AI roomke / turnaji)
+  function buildLobby(screen) {
+    const inner = document.createElement("div"); inner.className = "inner";
+    const lobby = document.createElement("div"); lobby.className = "lobby";
+    lobby.innerHTML = `<div class="lobby-card">
+      <h1 class="lobby-title">ARENA</h1><p class="lobby-sub">Match setup</p>
+      <div style="text-align:center"><span class="lobby-beginner">BEGINNER</span></div>
+      <div class="lobby-section"><div class="lobby-label">ARENA</div><div class="arena-pick dice">
+        ${ARENA_KEYS.map(a => `<button class="arena-card${a === "bridge" ? " on" : " ai-locked"}" data-arena="${a}"><canvas width="320" height="180"></canvas><span>${ARENA_NAMES[a]}</span></button>`).join("")}
+        <button class="dice-btn ai-locked" data-arena="random" title="Random arena">${DICE_SVG}</button></div></div>
+      <div class="lobby-section"><button class="adv-open ai-locked"><span class="gear">⚙</span>ADVANCED SETTINGS<span class="adv-sum"></span></button></div>
+      <div class="lobby-section"><div class="lobby-label">FORMAT</div><div class="opt-row">
+        <button class="opt on">Single</button><button class="opt">Best of 3</button><button class="opt">Tournament</button></div></div>
+      <div class="lobby-section"><div class="lobby-label">YOUR COLOR</div><div class="opt-row">
+        <button class="opt on">Random</button><button class="opt">⚪ White</button><button class="opt">⚫ Black</button></div></div>
+      <div class="lobby-section"><div class="lobby-label">RANDOM CHARACTERS</div><div class="opt-row">
+        <button class="opt">On</button><button class="opt on">Off</button></div></div>
+      <div class="lobby-section"><div class="lobby-label">TURN TIMER</div><div class="opt-row">
+        <button class="opt">Off</button><button class="opt">30s</button><button class="opt on">60s</button><button class="opt">120s</button><button class="opt">60s after lock</button></div></div>
+      <button class="lobby-start">START</button></div>`;
+    lobby.querySelectorAll(".arena-card canvas").forEach(c => drawArenaThumb(c, c.parentElement.dataset.arena));
+    const chip = lobby.querySelector(".lobby-beginner");
+    MAGES.forEach(m => chip.prepend(headCanvas(m)));
+    inner.append(lobby);
+    screen.appendChild(inner);
+    fit(screen, inner);
+  }
+
+  buildScene(document.getElementById("live"), { interactive: true });
+  document.getElementById("live").insertAdjacentHTML("afterend", `<button class="toggle-demo" id="toggle-demo" type="button">PREPNI BEGINNER</button>`);
+  document.getElementById("toggle-demo").addEventListener("click", () => document.querySelector("#live .bg-btn").click());
+
+  const host = document.getElementById("scenes");
+  const fig = (t, d) => { const f = document.createElement("figure"); f.innerHTML = `<figcaption>${t}<small>${d}</small></figcaption>`;
+    const s = document.createElement("div"); s.className = "screen"; f.append(s); host.append(f); return s; };
+  buildScene(fig("Beginner vypnutý", "bežný hráč: ROOM 1 (beginner) zamknutá - BEGINNERS ONLY"), { on: false });
+  buildScene(fig("Beginner zapnutý", "prepínač zelený, hlavy farebné; ROOM 2 (bežná) zamknutá - NO BEGINNERS"), { on: true });
+  buildLobby(fig("Lobby v beginner móde", "štítok BEGINNER; Portal Realm, Shrek Swamp, kocka a ADVANCED SETTINGS zamknuté 🔒; ostatné voľby normálne (aj turnaj)"));
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>
