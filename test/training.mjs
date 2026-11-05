@@ -124,6 +124,9 @@ for (const [n, plays] of creative) {
     [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("shield_breaker"), mv("move", "up"), mv("dash", "up")], "c3-demon"],
     [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("mirror"), mv("move", "up"), mv("dash", "up")], "c3-demon"],
     [[mv("recharge"), mv("dash", "right"), mv("mirror")], [mv("last_hope"), mv("dash", "up"), mv("move", "up"), mv("attack", "up")], "c3"],
+    // predpísaný nápad + zbytočná golden obrana navyše = stále WELL DONE
+    [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("golden_mirror"), mv("shield_breaker"), mv("move", "up"), mv("dash", "up")], "c3-demon"],
+    [[mv("recharge"), mv("dash", "right"), mv("shield")], [mv("last_hope"), mv("golden_shield"), mv("dash", "up"), mv("move", "up"), mv("attack", "up")], "c3"],
   ];
   for (const [r1, r2, id] of well) {
     const r = play(sc, [r1, r2]);

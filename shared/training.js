@@ -125,10 +125,17 @@ const TRAILING = new Set(["golden_mana", "last_stand"]);
 const actOk = (s, x) => !!x && x.type === s.type && (!s.dir || x.dir === s.dir);
 const slotOk = (s, x) => s === ANY || (Array.isArray(s) ? s.some(alt => actOk(alt, x)) : actOk(s.opt || s, x));
 const slotTypes = (s) => (Array.isArray(s) ? s : [s?.opt || s]).map(x => x?.type);
+// golden obrana navyše (vlastník 2026-11-05): ak riešenie golden shield / mirror nerieši, hráčov golden predťah
+// (na začiatku, prípadne hneď po Last Hope) sa ignoruje - predpísaný nápad + zbytočný golden = stále WELL DONE
+const GOLD = new Set(["golden_shield", "golden_mirror"]);
 export function matchesSolution(sc, locks, played = sc.rounds) {
   return sc.rounds.every((_, i) => {
     let q = locks[i], sol = played[i]?.solution;
     if (!Array.isArray(q) || !Array.isArray(sol)) return false;
+    if (!sol.some(s => s !== ANY && slotTypes(s).some(t => GOLD.has(t)))) {
+      const gi = q.findIndex(x => GOLD.has(x?.type));
+      if (gi === 0 || (gi === 1 && q[0]?.type === "last_hope")) q = q.filter((_, k) => k !== gi);
+    }
     // voliteľná posledná akcia (OPT), ktorú hráč nezahral → porovnaj bez nej
     if (sol.at(-1)?.opt && q.length === sol.length - 1) sol = sol.slice(0, -1);
     const last = i === sc.rounds.length - 1;
