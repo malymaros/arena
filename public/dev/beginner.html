@@ -66,10 +66,6 @@
   .room-btn.room-tile.mode-locked .rt-cta { background: #4d5058; color: #c9ccd3; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #6b6f78, inset 0 -4px 0 2px #33363d; position: relative; z-index: 5; }
   .room-btn.room-tile { position: relative; }
 
-  /* lobby v beginner móde: štítok pod nadpisom */
-  .lobby-beginner { display: inline-flex; align-items: center; gap: 6px; margin: 4px auto 0; padding: 4px 8px; font: 9px "Press Start 2P", monospace;
-    color: #06200f; background: #3ddc84; box-shadow: 0 0 0 2px #000; }
-  .lobby-beginner .bg-face { width: 22px; height: 22px; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -193,7 +189,6 @@
     const lobby = document.createElement("div"); lobby.className = "lobby";
     lobby.innerHTML = `<div class="lobby-card">
       <h1 class="lobby-title">ARENA</h1><p class="lobby-sub">Match setup</p>
-      <div style="text-align:center"><span class="lobby-beginner">BEGINNER</span></div>
       <div class="lobby-section"><div class="lobby-label">ARENA</div><div class="arena-pick dice">
         ${ARENA_KEYS.map(a => `<button class="arena-card${a === "bridge" ? " on" : " ai-locked"}" data-arena="${a}"><canvas width="320" height="180"></canvas><span>${ARENA_NAMES[a]}</span></button>`).join("")}
         <button class="dice-btn ai-locked" data-arena="random" title="Random arena">${DICE_SVG}</button></div></div>
@@ -208,8 +203,6 @@
         <button class="opt">Off</button><button class="opt">30s</button><button class="opt on">60s</button><button class="opt">120s</button><button class="opt">60s after lock</button></div></div>
       <button class="lobby-start">START</button></div>`;
     lobby.querySelectorAll(".arena-card canvas").forEach(c => drawArenaThumb(c, c.parentElement.dataset.arena));
-    const chip = lobby.querySelector(".lobby-beginner");
-    [...MAGES].reverse().forEach(m => chip.prepend(face(m)));
     inner.append(lobby);
     screen.appendChild(inner);
     fit(screen, inner);
@@ -224,7 +217,7 @@
     const s = document.createElement("div"); s.className = "screen"; f.append(s); host.append(f); return s; };
   buildScene(fig("Beginner vypnutý", "bežný hráč: ROOM 1 (beginner) zamknutá - BEGINNERS ONLY"), { on: false });
   buildScene(fig("Beginner zapnutý", "prepínač zelený, hlavy farebné; ROOM 2 (bežná) zamknutá - NO BEGINNERS"), { on: true });
-  buildLobby(fig("Lobby v beginner móde", "štítok BEGINNER; Portal Realm, Shrek Swamp, kocka a ADVANCED SETTINGS zamknuté 🔒; ostatné voľby normálne (aj turnaj)"));
+  buildLobby(fig("Lobby v beginner móde", "bez štítku; Portal Realm, Shrek Swamp, kocka a ADVANCED SETTINGS zamknuté 🔒; ostatné voľby normálne (aj turnaj)"));
   requestAnimationFrame(loop);
 </script>
 </body>
