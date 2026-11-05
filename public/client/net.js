@@ -84,7 +84,7 @@ function renderRooms(info) {
   // stála AI roomka nie je v zozname - hrá sa cez postavičku bota vpravo dole (lobby-bot.js): voľná → sadneš si,
   // obsadená (max 1 hra s AI na server) → sleduješ
   setLobbyBot(roomsEl, info?.aiRoom || null, (r, level) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id, ...(level ? { level } : {}) }));
-  // TRAINING GROUND vpravo hore (training-btn.js): voľná → okno scenárov → vstup so scenárom; obsadená → sledovať
+  // TRAINING GROUNDS vpravo hore (training-btn.js): voľná → okno scenárov → vstup so scenárom; obsadená → sledovať
   setTrainingBtn(roomsEl, info?.trainingRoom || null, (r, n) => socket.emit(n ? "join_room" : "spectate_room", { roomId: r.id, ...(n ? { scenario: n } : {}) }));
   // pevné dlaždice ROOM 1…N (room-tiles.js): prázdna → CREATE, čaká na súpera → JOIN, plná → SPECTATE
   roomsListEl.appendChild(buildRoomGrid(info, (kind, slot, r) => {

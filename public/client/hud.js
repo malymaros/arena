@@ -79,9 +79,9 @@ export function renderHUD() {
   if (hudTurn && !playback.gameOverShown) {
     // posledné (buffnuté) kolo po Last Stand → „FINAL ROUND"; prepne sa až s bannerom (playback.finalRoundActive)
     hudTurn.textContent = (state?.phase === "playing")
-      ? (playback.finalRoundActive ? "FINAL ROUND" : state.training ? "TRAINING GROUND" : `ROUND ${state.turn}`)
+      ? (playback.finalRoundActive ? "FINAL ROUND" : state.training ? "TRAINING GROUNDS" : `ROUND ${state.turn}`)
       : "";
-    // TRAINING GROUND: pod nadpisom názov scenára (podnadpis)
+    // TRAINING GROUNDS: pod nadpisom názov scenára (podnadpis)
     const sc = state?.phase === "playing" ? trainingScenario(state.training?.n) : null;
     if (sc) hudTurn.insertAdjacentHTML("beforeend", `<span class="hud-turn-sub">${sc.n} · ${sc.name}</span>`);
   }

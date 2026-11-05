@@ -6,10 +6,12 @@ import {
 } from "./constants.js";
 
 export function tilesModule(E) {
+// PRAVIDLO (vlastník 2026-11-05): dlaždica prekrytá IK je NEAKTÍVNA - žiadny pickup (heal/mana), žiadne rozšírenie
+// Fireovho specialu, žiadny power bonus, žiadny Def-blocker. Platí len IK (dmg a zásah IK rieši endOfStepTileEffects).
 // Fire Wizard stojí na Damage dlaždici? Vtedy sa jeho special rozšíri o riadky ±1
 // (dlaždice sú trvalé a vznikli v predošlých kolách, takže existujú v čase resolveTurn).
 function fireOnDmgTile(me) {
-  return !!me && me.char === "fire" &&
+  return !!me && me.char === "fire" && !hasIK(me.x, me.y) &&
     E.game.tiles.some(t => t.type === "dmg" && t.x === me.x && t.y === me.y);
 }
 
@@ -26,7 +28,7 @@ function hasIK(x, y) {
 // Kontrola je až pri VYKONANÍ (nie vo validQueue) - vlastná pozícia v momente vyhodnotenia nie je pri
 // plánovaní istá (charge sa zastavuje o súperovu figúru, trap teleportuje).
 function defenseBlockedBy(a) {
-  const onBlock = (x, y) => E.game.tiles.some(t => t.type === "block" && t.x === x && t.y === y);
+  const onBlock = (x, y) => !hasIK(x, y) && E.game.tiles.some(t => t.type === "block" && t.x === x && t.y === y); // pod IK neaktívny
   return !!a && (onBlock(a.x, a.y) || (!!a.clone && onBlock(a.clone.x, a.clone.y)));
 }
 
@@ -38,6 +40,7 @@ function defenseBlockedBy(a) {
 function powerBoost(slot, tl) {
   if (E.frozenActive()) return 0; // THE WORLD (D2): dlaždice sa počas zamrazenia nevyhodnocujú - power inertný, nespotrebuje sa
   const me = E.game.players[slot];
+  if (hasIK(me.x, me.y)) return 0; // power tile prekrytý IK je neaktívny (nespotrebuje sa)
   const idx = E.game.tiles.findIndex(t => t.type === "power" && t.x === me.x && t.y === me.y);
   if (idx < 0) return 0;
   E.game.tiles.splice(idx, 1);

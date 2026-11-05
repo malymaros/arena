@@ -1,6 +1,6 @@
-// public/client/training-btn.js - TRAINING GROUND v room browseri (schválený návrh public/dev/tutorial.html):
-// tlačidlo vpravo hore (slamená cvičná figurína + TRAINING GROUND, pevná šírka). Voľná miestnosť → klik otvorí
-// okno TRAINING GROUND (v dizajne tlačidla: OBJECTIVE + riadky scenárov s počtom kôl) → join_room { scenario }.
+// public/client/training-btn.js - TRAINING GROUNDS v room browseri (schválený návrh public/dev/tutorial.html):
+// tlačidlo vpravo hore (slamená cvičná figurína + TRAINING GROUNDS, pevná šírka). Voľná miestnosť → klik otvorí
+// okno TRAINING GROUNDS (v dizajne tlačidla: OBJECTIVE + riadky scenárov s počtom kôl) → join_room { scenario }.
 // Obsadená (niekto trénuje) → v tlačidle bez textu Fire wizard dáva figuríne melee, klik = sledovať (ako AI roomka).
 // Telefón: len figurína / obsadená scéna, šírka rovnaká v oboch stavoch.
 import { TRAINING } from "/shared/training.js";
@@ -61,8 +61,8 @@ function build(roomsEl) {
   btn = document.createElement("button");
   btn.type = "button";
   btn.className = "tg-btn";
-  btn.setAttribute("aria-label", "Training ground");
-  btn.innerHTML = `<span class="tg-free">${DUMMY_SVG}<span class="tg-t">TRAINING<span>GROUND</span></span></span>
+  btn.setAttribute("aria-label", "Training grounds");
+  btn.innerHTML = `<span class="tg-free">${DUMMY_SVG}<span class="tg-t">TRAINING<span>GROUNDS</span></span></span>
     <span class="tg-scene"><canvas width="80" height="80"></canvas>${DUMMY_SVG}<i class="tg-pow"></i></span>`;
   cvs = btn.querySelector(".tg-scene canvas");
   dummyEl = btn.querySelector(".tg-scene svg");
@@ -102,29 +102,30 @@ export function setTrainingBtn(roomsEl, trainingRoom, pick) {
   btn.classList.toggle("hidden", !trainingRoom);
   const busy = !!trainingRoom && !trainingRoom.canJoin;
   btn.classList.toggle("busy", busy);
-  btn.setAttribute("aria-label", busy ? "Watch training" : "Training ground");
+  btn.setAttribute("aria-label", busy ? "Watch training" : "Training grounds");
   if (busy) { closeTraining(); loadMelee(); if (!raf) raf = requestAnimationFrame(loop); } // obsadil ju niekto iný → okno preč
-  // LEAVE z okna výsledku → po návrate do room browsera sa okno TRAINING GROUND otvorí znova
+  // LEAVE z okna výsledku → po návrate do room browsera sa okno TRAINING GROUNDS otvorí znova
   let reopen = false;
   try { reopen = sessionStorage.getItem(REOPEN_KEY) === "1"; sessionStorage.removeItem(REOPEN_KEY); } catch { /* bez úložiska */ }
   if (reopen && trainingRoom?.canJoin) btn.click();
 }
 export const REOPEN_KEY = "arenaTrainingReopen";
 
-/* ---------- okno TRAINING GROUND ---------- */
+/* ---------- okno TRAINING GROUNDS ---------- */
 let back = null, choose = null;
 function buildWindow() {
   back = document.createElement("div");
   back.className = "tg-back hidden";
-  back.innerHTML = `<div class="tg-win" role="dialog" aria-label="Training ground">
+  back.innerHTML = `<div class="tg-win" role="dialog" aria-label="Training grounds">
       <button class="tg-close" type="button" aria-label="Back">✕</button>
-      <div class="tg-top">${DUMMY_SVG}<h2 class="tg-title">TRAINING<br>GROUND</h2></div>
+      <div class="tg-top">${DUMMY_SVG}<h2 class="tg-title">TRAINING<br>GROUNDS</h2></div>
       <p class="tg-sub">OBJECTIVE: <b>Kill your opponent!</b></p>
       <div class="tg-list">${TRAINING.map(s => `<button class="tg-row" type="button" data-n="${s.n}">
         <span class="tg-num">${s.n}</span><span class="tg-name">${s.name}</span>
         <span class="tg-rounds">${s.rounds.length} ROUND${s.rounds.length > 1 ? "S" : ""}</span></button>`).join("")}</div>
     </div>`;
   for (const row of back.querySelectorAll(".tg-row")) {
+    row.addEventListener("mouseenter", () => sfx("ui.random_hop")); // zvuková odozva pri prejdení nad scenárom
     row.addEventListener("click", () => { sfx("ui.click"); const cb = choose; closeTraining(); cb?.(Number(row.dataset.n)); });
   }
   back.querySelector(".tg-close").addEventListener("click", () => { sfx("ui.click"); closeTraining(); });

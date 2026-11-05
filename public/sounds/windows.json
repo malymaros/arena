@@ -508,12 +508,6 @@
    1620
   ]
  },
- "demon_attack.onre": {
-  "med": 1620,
-  "values": [
-   1620
-  ]
- },
  "demon_attack.soldier": {
   "med": 1620,
   "values": [
@@ -552,12 +546,6 @@
   ]
  },
  "demon_summon.naruto": {
-  "med": 8020,
-  "values": [
-   8020
-  ]
- },
- "demon_summon.onre": {
   "med": 8020,
   "values": [
    8020

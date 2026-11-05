@@ -1,5 +1,5 @@
-// public/client/training.js - TRAINING GROUND v hre (shared/training.js, schválený návrh public/dev/tutorial.html):
-// banner TRAINING GROUND + názov scenára na začiatku (aj medzi kolami, démonie kolo ostáva klasické FINAL ROUND),
+// public/client/training.js - TRAINING GROUNDS v hre (shared/training.js, schválený návrh public/dev/tutorial.html):
+// banner TRAINING GROUNDS + názov scenára na začiatku (aj medzi kolami, démonie kolo ostáva klasické FINAL ROUND),
 // a na konci scenára Baby bot v strede: smutný (FAILED - LEAVE / TRY AGAIN), šťastný (WELL DONE! - LEAVE / NEXT)
 // alebo prekvapený (★ CREATIVE ★ - hráč vyhral iným než predpísaným ťahom; LEAVE / NEXT), so zvukom nálady.
 // Výsledok počíta server (training_result); okno sa ukáže až po dohraní timeline (timeline.js → trainingEnd).
@@ -25,7 +25,7 @@ let shown = false;
 /* ---------- banner ---------- */
 export function trainingBannerHtml() {
   const sc = trainingScenario(state?.training?.n);
-  return `<span>TRAINING GROUND</span>${sc ? `<span class="rb-sub">${sc.n} · ${sc.name}</span>` : ""}`;
+  return `<span>TRAINING GROUNDS</span>${sc ? `<span class="rb-sub">${sc.n} · ${sc.name}</span>` : ""}`;
 }
 let bannerTimer = 0;
 function playStartBanner() {

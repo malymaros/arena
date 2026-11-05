@@ -1,4 +1,4 @@
-// test/training.mjs - TRAINING GROUND (shared/training.js): každý scenár priamo na engine.
+// test/training.mjs - TRAINING GROUNDS (shared/training.js): každý scenár priamo na engine.
 // Predpísané riešenie musí vyhrať (hráč žije, bot mŕtvy), známe zlé ťahy prehrať a známe kreatívne riešenia
 // vyhrať. Zmeny dlaždíc medzi kolami idú zo scenára (žiadna náhoda).
 import assert from "node:assert/strict";
@@ -79,3 +79,31 @@ for (const [n, plays] of creative) {
   assert.ok(e.game.players.p1.lastStandBuff, "Last Stand mal vyjsť");
 }
 console.log(`training: ${TRAINING.length} scenárov OK (riešenia, ${bad.length} zlých ťahov, ${creative.length} kreatívne)`);
+
+// pravidlo (vlastník 2026-11-05): dlaždica prekrytá IK je neaktívna - Fire na dmg dlaždici pod IK nemá special ±1
+// riadok (a dlaždicu nespotrebuje), power pod IK nedá +2, Def-blocker pod IK neblokuje shield
+{
+  const custom = (tiles, you, bot, rounds) => ({ n: 99, starter: "you", you, bot, tiles, rounds });
+  const run = (sc, q, botQ) => { const e = createEngine({}); e.startTraining(sc); e.lockIn("A", q, 1); e.lockIn("B", botQ, 1); return e.game; };
+  const quiet = [mv("recharge"), mv("shield"), mv("move", "up")]; // bot bez dmg
+  // Fire na B1 (dmg + IK), bot na A4 → special zasiahne len riadok B
+  let g = run(custom([{ type: "dmg", at: "B1" }, { type: "ik", at: "B1" }], { at: "B1", hp: 10, mana: 10 }, { at: "A4", hp: 10, mana: 0 }, []),
+    [mv("special"), mv("recharge"), mv("move", "up")], quiet);
+  assert.equal(g.players.p2.hp, 10, "dmg dlaždica pod IK nesmie Fireovi rozšíriť special");
+  assert.ok(g.tiles.some(t => t.type === "dmg" && t.x === 0 && t.y === 1), "dmg dlaždica pod IK sa nesmie spotrebovať");
+  // bez IK: special ±1 riadok trafí bota na A4
+  g = run(custom([{ type: "dmg", at: "B1" }], { at: "B1", hp: 10, mana: 10 }, { at: "A4", hp: 10, mana: 0 }, []),
+    [mv("special"), mv("recharge"), mv("move", "up")], quiet);
+  assert.equal(g.players.p2.hp, 5, "Fire na dmg dlaždici (bez IK) má special ±1 riadok");
+  // power pod IK: strela bez bonusu (B1 → B4 = 1 dmg), power ostáva
+  g = run(custom([{ type: "power", at: "B1" }, { type: "ik", at: "B1" }], { at: "B1", hp: 10, mana: 10 }, { at: "B4", hp: 10, mana: 0 }, []),
+    [mv("attack", "right"), mv("recharge"), mv("move", "up")], quiet);
+  assert.equal(g.players.p2.hp, 9, "power dlaždica pod IK nesmie pridať +2");
+  assert.ok(g.tiles.some(t => t.type === "power"), "power pod IK sa nesmie spotrebovať");
+  // Def-blocker pod IK: shield sa armuje (strela bota sa zablokuje)
+  g = run(custom([{ type: "block", at: "B1" }, { type: "ik", at: "B1" }], { at: "B1", hp: 20, mana: 10 }, { at: "B4", hp: 10, mana: 10 }, []),
+    [mv("shield"), mv("move", "up"), mv("recharge")], [mv("attack", "left"), mv("recharge"), mv("move", "up")]);
+  // shield zablokuje strelu (1. krok), na konci kroku IK 10, potom hráč z IK odíde → 20 − 10 = 10
+  assert.equal(g.players.p1.hp, 10, "Def-blocker pod IK nesmie zablokovať shield");
+  console.log("training: dlaždice pod IK neaktívne OK");
+}

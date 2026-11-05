@@ -43,7 +43,7 @@
 //   boardFit       { fill, refH, offY } - menší fill na doske normalizovaný na výšku framu (fill × fh/refH),
 //                  ukotvený na nohy (anchorY 1) a zdvihnutý o offY px (default fill 0.95, stred) - aj ghost
 //   previewIdleCaster  caster na mini-doske výberu hrá IDLE (nie efektový sprite specialu)
-//   specialZone    ({ G, board, me, dir, tiles }) → [[x,y]…] náhľad zóny specialu (G = shared/geometry.js)
+//   specialZone    ({ G, board, me, dir, tiles, iks, portals }) → [[x,y]…] náhľad zóny specialu (G = shared/geometry.js)
 //   sizeLevel      { stat, base } - veľkosť na ploche base·1.2^level podľa verejného stavu (Escanor pride, vlkolak moon)
 //   actionAnims    { melee?, shot?, recharge? } - kľúč ANIM_DEF pre malú postavu pri akcii (default attack2_loop / attack / aura)
 //   projectile     { orient?: "rotate", scale?, yOff?, explodeAtEnd? } - basic strela (Charge.png): orientácia čistou

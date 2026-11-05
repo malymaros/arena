@@ -161,7 +161,7 @@ const MAX_ROOMS = 2;                        // cap: max toľko bežných roomiek
 // stála AI roomka (docs/AI_PLAN.md): existuje vždy, hrá v nej najviac jeden človek proti botovi; po odchode hráča
 // alebo admin resete sa hneď vytvorí znova čistá. V zozname roomiek ide samostatne (rooms snapshot `aiRoom`).
 const AI_ROOM_ID = "ai";
-// stála TRAINING GROUND miestnosť (tutoriál, shared/training.js): jeden hráč proti Baby botovi so skriptovanými
+// stála TRAINING GROUNDS miestnosť (tutoriál, shared/training.js): jeden hráč proti Baby botovi so skriptovanými
 // (odhalenými) akciami; obsadená = ostatní ju môžu len sledovať. V zozname roomiek ide samostatne (`trainingRoom`).
 const TRAINING_ROOM_ID = "training";
 // AI bot (docs/AI_PLAN.md): čas na rozmýšľanie AI_THINK_MS (default 10 s, vlastník 2026-11-03 - 4× viac výpočtu
@@ -214,7 +214,7 @@ function createRoom(id, { ai = false, training = false, slot = null } = {}) {
   let lastRecordId = null;                    // id záznamu posledného zápasu (MATCHES) - hráč po reloade skončeného zápasu ho dostane znova
   const spectators = new Set();               // diváci tejto roomky (dostávajú nemaskovaný stav cez roomEmit)
 
-  // TRAINING GROUND: práve hraný scenár, fronty hráča po kolách (predpísané vs. kreatívne riešenie), výsledok
+  // TRAINING GROUNDS: práve hraný scenár, fronty hráča po kolách (predpísané vs. kreatívne riešenie), výsledok
   let trainSc = null, trainLocks = [], trainResult = null;
   const engine = createRecordedEngine({
     // tréning: koniec hry oznamuje training_result (okno s Baby botom), nie game over série
@@ -481,8 +481,11 @@ function onTurnTimeout() {
     // tréning: hráč si sadá vždy ako A (B je Baby bot) a hneď sa spustí zvolený scenár
     if (training) {
       if (!isFree("A")) { socket.emit("join_denied", "full"); return; }
-      seat(socket, "A");
+      // scenár sa pripraví PRED posadením - prvý stav, ktorý hráč dostane, je už hra (inak by preblikla obrazovka
+      // nastavenia zápasu, lebo engine je pred štartom vo fáze lobby); banner mu pošleme až po posadení
       startScenario(scenario);
+      seat(socket, "A");
+      socket.emit("training_start", { n: trainSc.n });
       broadcastRooms();
       return;
     }
@@ -607,14 +610,14 @@ function onTurnTimeout() {
     broadcastRooms();              // ostatní na room-browseri vidia aktuálny počet hráčov
   }
 
-  /* -------------------- TRAINING GROUND (shared/training.js) -------------------- */
+  /* -------------------- TRAINING GROUNDS (shared/training.js) -------------------- */
   // snapshot kľúč training: scenár + fronta bota v aktuálnom kole (hráč ju vidí v lište kola ešte pred plánovaním)
   function trainingInfo() {
     if (!training || !trainSc) return null;
     const g = engine.game;
     return { n: trainSc.n, rounds: trainSc.rounds.length, bot: trainSc.rounds[g.turn - 1]?.bot || null, done: !!trainResult };
   }
-  // spusti scenár n (vstup do miestnosti, TRY AGAIN, NEXT): čerstvý stav, klient zahrá banner TRAINING GROUND
+  // spusti scenár n (vstup do miestnosti, TRY AGAIN, NEXT): čerstvý stav, klient zahrá banner TRAINING GROUNDS
   function startScenario(n) {
     trainSc = trainingScenario(n) || TRAINING[0];
     trainLocks = []; trainResult = null;
@@ -793,7 +796,7 @@ function ensureAiRoom() {
   room.seatBot();
   broadcastRooms();
 }
-// stála TRAINING GROUND miestnosť: vytvor, ak chýba (štart servera, odchod hráča, admin reset)
+// stála TRAINING GROUNDS miestnosť: vytvor, ak chýba (štart servera, odchod hráča, admin reset)
 function ensureTrainingRoom() {
   if (rooms.has(TRAINING_ROOM_ID)) return;
   const room = createRoom(TRAINING_ROOM_ID, { training: true });
@@ -914,7 +917,7 @@ io.on("connection", (socket) => {
   socket.on("timestop_actions", (queue, ack) => roomForSocket(socket)?.onTimestopActions(socket, queue, ack));
   socket.on("draft_queue", (d) => roomForSocket(socket)?.onDraftQueue(socket, d));
   socket.on("retry", () => roomForSocket(socket)?.onRetry(socket));
-  // TRAINING GROUND: TRY AGAIN / NEXT (scenár n)
+  // TRAINING GROUNDS: TRY AGAIN / NEXT (scenár n)
   socket.on("training_play", (n) => roomForSocket(socket)?.onTrainingPlay(socket, n));
 
   // --- admin reset cez socket - len socket prihlásený admin heslom; globálny (všetky roomky)

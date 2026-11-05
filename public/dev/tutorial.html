@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/styles.css" />
 <style>
-  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): tutoriál - tlačidlo TRAINING GROUND v room browseri, okno TUTORIAL
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): tutoriál - tlačidlo TRAINING GROUNDS v room browseri, okno TUTORIAL
      so 6 scenármi a výsledné okno s Baby botom (prehra / výhra / kreatívne riešenie). Room browser, hlava bota
      a ikony dlaždíc sú ten istý kód ako v hre (room-tiles.js, bot-face.js, pix.js); zvyšok je zatiaľ len tu. */
   html, body { overflow: auto !important; height: auto !important; min-height: 100%; position: static !important; touch-action: auto !important; }
@@ -36,7 +36,7 @@
     calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n), 100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)),
     calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
 
-  /* ---------- TRAINING GROUND (pravý horný roh room browsera) ---------- */
+  /* ---------- TRAINING GROUNDS (pravý horný roh room browsera) ---------- */
   .tg-btn { position: absolute; right: 28px; top: 22px; z-index: 3; display: flex; align-items: center; gap: 12px;
     padding: 10px 16px 10px 12px; border: none; cursor: pointer; font-family: "Press Start 2P", monospace; text-align: left;
     color: #2b1a05; background: #e3b04b;
@@ -66,7 +66,7 @@
     font: 10px "Press Start 2P", monospace; box-shadow: 0 0 0 2px #7dff7a; }
   .busy-toggle { margin: 10px 0 0; padding: 8px 12px; border: 2px dashed #8b92a0; background: #101217; color: #dfe3ea; cursor: pointer; font: 9px "Press Start 2P", monospace; }
 
-  /* ---------- okno TRAINING GROUND (dizajn tlačidla: slama / drevo) ---------- */
+  /* ---------- okno TRAINING GROUNDS (dizajn tlačidla: slama / drevo) ---------- */
   .tut-back { position: absolute; inset: 0; z-index: 10001; background: rgba(4,6,10,.74);
     display: flex; align-items: center; justify-content: center; font-family: "Press Start 2P", monospace; }
   .hidden { display: none !important; }
@@ -138,18 +138,18 @@
 </head>
 <body>
 <header>
-  <h1>TRAINING GROUND: NÁVRH</h1>
-  <p>Vpravo hore v room browseri je tlačidlo <b>TRAINING GROUND</b> (cvičná figurína). Otvorí okno v tom istom dizajne: nadpis
-     TRAINING GROUND, pod ním <b>OBJECTIVE: Kill your opponent!</b> a čisté riadky so scenármi (číslo, názov, 1 / 2 ROUNDS).
+  <h1>TRAINING GROUNDS: NÁVRH</h1>
+  <p>Vpravo hore v room browseri je tlačidlo <b>TRAINING GROUNDS</b> (cvičná figurína). Otvorí okno v tom istom dizajne: nadpis
+     TRAINING GROUNDS, pod ním <b>OBJECTIVE: Kill your opponent!</b> a čisté riadky so scenármi (číslo, názov, 1 / 2 ROUNDS).
      Hrá sa normálna herná obrazovka so všetkými zvukmi (Fire vs Fire, v HUD súpera Baby bot so zvukmi nálad). Hore namiesto
-     <i>ROUND N</i> stojí <b>TRAINING GROUND</b>, démonie kolo je klasické <b>FINAL ROUND</b>. Na konci Baby bot v strede
+     <i>ROUND N</i> stojí <b>TRAINING GROUNDS</b>, démonie kolo je klasické <b>FINAL ROUND</b>. Na konci Baby bot v strede
      (smutný / šťastný / prekvapený, so zvukom): prehra = <b>LEAVE</b> / <b>TRY AGAIN</b>, úspech = <b>LEAVE</b> / <b>NEXT</b> (po 6 ide 1).
-     Na začiatku scenára banner TRAINING GROUND s názvom scenára pod ním. <b>Zvuky sa pustia po prvom kliknutí na stránku.</b></p>
+     Na začiatku scenára banner TRAINING GROUNDS s názvom scenára pod ním. <b>Zvuky sa pustia po prvom kliknutí na stránku.</b></p>
 </header>
 <main>
   <section class="big">
     <h2>1 · NAKLIKAJ SI TO</h2>
-    <p>TRAINING GROUND → scenár → banner TRAINING GROUND (zvuk ako ROUND N). Pri scenári 6 skús aj „2. KOLO (DÉMON)" = banner
+    <p>TRAINING GROUNDS → scenár → banner TRAINING GROUNDS (zvuk ako ROUND N). Pri scenári 6 skús aj „2. KOLO (DÉMON)" = banner
        FINAL ROUND s démonom a jeho zvukom. Prerušované tlačidlá nasimulujú koniec. Tlačidlom pod scénou prepneš, či je miestnosť obsadená (obsadená = Fire wizard mláti figurínu, klik = sledovať). LEAVE = späť do okna, TRY AGAIN = ten istý scenár odznova.</p>
     <figure><div class="screen" id="live"></div></figure>
     <button class="busy-toggle" type="button" id="busy-toggle">PREPNI: VOĽNÉ / OBSADENÉ</button>
@@ -268,17 +268,17 @@
     bot.querySelector("canvas").className = "lobby-bot-figure";
     draws.push({ cvs: bot.querySelector("canvas"), level: "normal", mood: () => "neutral" });
     const tg = document.createElement("button"); tg.type = "button"; tg.className = "tg-btn jag" + (sc.tgHover ? " hover" : "");
-    tg.innerHTML = `<span class="tg-free" style="display:contents">${DUMMY_SVG}<span class="tg-t">TRAINING<span>GROUND</span></span></span>
+    tg.innerHTML = `<span class="tg-free" style="display:contents">${DUMMY_SVG}<span class="tg-t">TRAINING<span>GROUNDS</span></span></span>
       <span class="tg-scene"><canvas width="80" height="80"></canvas>${DUMMY_SVG}<i class="pow"></i></span>`;
     scenes.push({ btn: tg, cvs: tg.querySelector(".tg-scene canvas"), dummy: tg.querySelector(".tg-scene svg"), pow: tg.querySelector(".pow"), last: -1 });
     const toast = document.createElement("div"); toast.className = "tg-toast hidden";
     const setBusy = (b) => { st.busy = b; tg.classList.toggle("busy", b); };
     rooms.append(bot, tg, toast);
 
-    // okno TRAINING GROUND
+    // okno TRAINING GROUNDS
     const tut = document.createElement("div"); tut.className = "tut-back";
     tut.innerHTML = `<div class="tut-win jag"><button class="tut-close" type="button" aria-label="Back">✕</button>
-      <div class="tut-top">${DUMMY_SVG}<h2 class="tut-title">TRAINING<br>GROUND</h2></div>
+      <div class="tut-top">${DUMMY_SVG}<h2 class="tut-title">TRAINING<br>GROUNDS</h2></div>
       <p class="tut-sub">OBJECTIVE: <b>Kill your opponent!</b></p>
       <div class="tut-list"></div></div>`;
     const list = tut.querySelector(".tut-list");
@@ -294,7 +294,7 @@
     const bannerEl = document.createElement("div"); bannerEl.className = "round-banner hidden";
     const res = document.createElement("div"); res.className = "res-back";
     const bannerHtml = (final) => final ? '<span>FINAL ROUND</span><span class="rb-demon"><img src="/assets/last_stand.png" alt="" /></span>'
-      : `<span>TRAINING GROUND</span><span class="rb-sub">${SCEN[st.scen - 1].n} · ${SCEN[st.scen - 1].name}</span>`;
+      : `<span>TRAINING GROUNDS</span><span class="rb-sub">${SCEN[st.scen - 1].n} · ${SCEN[st.scen - 1].name}</span>`;
     function banner(final) {
       play(final ? "round.final" : "round.start");
       bannerEl.innerHTML = bannerHtml(final);
@@ -307,7 +307,7 @@
       stage.classList.toggle("hidden", st.view !== "stage");
       res.classList.toggle("hidden", !(st.view === "stage" && st.result));
       const s = SCEN[st.scen - 1];
-      stage.innerHTML = `<div class="st-hud">${st.final ? "FINAL ROUND" : "TRAINING GROUND"}</div>
+      stage.innerHTML = `<div class="st-hud">${st.final ? "FINAL ROUND" : "TRAINING GROUNDS"}</div>
         <div class="st-t">${s.n} · ${s.name}</div>
         <div class="st-d">TU BEŽÍ NORMÁLNA HERNÁ OBRAZOVKA SO ZVUKMI<br>(FIRE VS FIRE, BABY V HUD SÚPERA, JEHO AKCIE ODHALENÉ V LIŠTE KOLA)</div>
         ${live ? `<div class="st-row">${s.rounds > 1 && !st.final ? `<button class="sim" data-r="final">2. KOLO (DÉMON)</button>` : ""}
@@ -366,10 +366,10 @@
     scen: 6, result: qp.get("result") || null, busy: qp.has("busy") });
 
   const SCENES = [
-    { t: "Room browser", d: "TRAINING GROUND vpravo hore; hover = figurína sa kýve", tgHover: true },
+    { t: "Room browser", d: "TRAINING GROUNDS vpravo hore; hover = figurína sa kýve", tgHover: true },
     { t: "Obsadené", d: "niekto trénuje: namiesto textu Fire wizard dáva figuríne melee; klik = sledovať (ako AI roomka)", busy: true },
-    { t: "Okno TRAINING GROUND", d: "dizajn tlačidla, OBJECTIVE, riadky s počtom kôl (hover = riadok sa posunie)", view: "tutorial", rowHover: 3 },
-    { t: "Začiatok scenára", d: "banner TRAINING GROUND + názov scenára (zvuk ako ROUND N), hore TRAINING GROUND", view: "stage", scen: 2, banner: "training" },
+    { t: "Okno TRAINING GROUNDS", d: "dizajn tlačidla, OBJECTIVE, riadky s počtom kôl (hover = riadok sa posunie)", view: "tutorial", rowHover: 3 },
+    { t: "Začiatok scenára", d: "banner TRAINING GROUNDS + názov scenára (zvuk ako ROUND N), hore TRAINING GROUNDS", view: "stage", scen: 2, banner: "training" },
     { t: "Démonie kolo (scenár 6)", d: "klasické FINAL ROUND s démonom, zvukom a finálovou hudbou", view: "stage", scen: 6, final: true, banner: "final" },
     { t: "Prehra", d: "smutný Baby (zvuk sad): LEAVE / TRY AGAIN", view: "stage", scen: 2, result: "fail" },
     { t: "Podarilo sa", d: "šťastný Baby poskakuje (zvuk happy): LEAVE / NEXT", view: "stage", scen: 1, result: "win" },

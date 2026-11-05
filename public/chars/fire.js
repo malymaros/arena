@@ -19,7 +19,8 @@ export default {
   buttons: {
     special: { title: `Special (−${SPECIAL_COST} mana, ${SPECIAL_ZONE_DMG.fire} dmg)`, cost: `−${SPECIAL_COST}{💧} ${SPECIAL_ZONE_DMG.fire}{☠️}`, label: `{💧}${SPECIAL_COST} {☠️}${SPECIAL_ZONE_DMG.fire}` },
   },
-  // náhľad zóny specialu: celý riadok; na Damage dlaždici riadky ±1 (server: fireOnDmgTile)
-  specialZone: ({ G, board, me, tiles }) =>
-    G.fireCells(board, me, (tiles || []).some(t => t.type === "dmg" && t.x === me.x && t.y === me.y)),
+  // náhľad zóny specialu: celý riadok; na Damage dlaždici riadky ±1 (server: fireOnDmgTile) - nie pod IK (prekrytá = neaktívna)
+  specialZone: ({ G, board, me, tiles, iks }) =>
+    G.fireCells(board, me, (tiles || []).some(t => t.type === "dmg" && t.x === me.x && t.y === me.y)
+      && !(iks || []).some(t => t.x === me.x && t.y === me.y)),
 };

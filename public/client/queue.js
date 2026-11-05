@@ -35,7 +35,7 @@ function markSpy(el) {
   el.insertAdjacentHTML("beforeend", SPY_HTML);
   el.title = "CHEATER saw this action";
 }
-// TRAINING GROUND: akcia bota pre beat b lišty (snapshot training.bot = jeho fronta tohto kola v tvare lock_in:
+// TRAINING GROUNDS: akcia bota pre beat b lišty (snapshot training.bot = jeho fronta tohto kola v tvare lock_in:
 // [golden pred-akcia] 3 akcie [golden mana / last stand]); počas prehrávania nič - odhaľuje ju animácia ako vždy
 function trainingBotAction(b) {
   const q = state?.training?.bot;
@@ -247,7 +247,7 @@ export function renderQueue() {
     // veľkosť = dôležitosť: 3 hlavné akcie "main" (veľké), golden "opt" (malé, voliteľné)
     el.className = "q-badge " + (mine ? "mine" : "opp") + " " + (b.kind === "act" ? "main" : "opt");
 
-    // TRAINING GROUND: fronta bota je hráčovi odhalená už pri plánovaní (cieľom je nájsť odpoveď na ňu)
+    // TRAINING GROUNDS: fronta bota je hráčovi odhalená už pri plánovaní (cieľom je nájsť odpoveď na ňu)
     const botA = !mine && b.owner !== me ? trainingBotAction(b) : null;
     if (botA) {
       const v = actionBadgeView(botA, b.owner);
@@ -255,7 +255,7 @@ export function renderQueue() {
       if (v.cls) el.classList.add(v.cls);
       // smer je v tréningu podstatný - šípku ukáž aj na dotyku (inde ju lišta na telefóne skrýva)
       if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text + (isTouch && botA.dir ? ARROW_DIR[botA.dir] || "" : "");
-      el.title = "Opponent (revealed - TRAINING GROUND)";
+      el.title = "Opponent (revealed - TRAINING GROUNDS)";
       queueEl.appendChild(el);
       qBeatEls[b.pos] = el;
       return;

@@ -251,7 +251,7 @@ function snapshot() {
     ...(io.vsAi?.() ? { vsAi: io.vsAi() } : {}),
     // obťažnosť bota v AI roomke ("normal" / "baby" / "cheater") - HUD a room browser kreslia podľa nej hlavu bota
     ...(io.aiLevel?.() ? { aiLevel: io.aiLevel() } : {}),
-    // TRAINING GROUND: číslo scenára + odhalená fronta bota v tomto kole (server.js); kľúč len v tréningovej miestnosti
+    // TRAINING GROUNDS: číslo scenára + odhalená fronta bota v tomto kole (server.js); kľúč len v tréningovej miestnosti
     ...(io.training?.() ? { training: io.training() } : {}),
     // Jotaro THE WORLD: kým čaká na 3 zmrazené akcie, klient (obaja) vie prepnúť UI mód (neutrálne - len slot)
     timestop: (game.timestop && game.timestop.mode === "waiting") ? { slot: game.timestop.slot } : null,
@@ -1891,7 +1891,7 @@ function startGame(gameIndex) {
   emitStateMasked(); // char-select potrebuje per-osoba mageHp (tournament)
 }
 
-// TRAINING GROUND (shared/training.js): pripravený scenár namiesto losovania - hráč (osoba A) je biely p1, Baby
+// TRAINING GROUNDS (shared/training.js): pripravený scenár namiesto losovania - hráč (osoba A) je biely p1, Baby
 // bot (osoba B) čierny p2, obaja Fire wizard; HP / mana / pozície / dlaždice / štartér zo scenára, bez portálov,
 // Shreka a náhodných dlaždíc (config.training → rollPendingTiles nežrebuje). Zmeny dlaždíc na koniec kola sú
 // napevno zo scenára (sc.rounds[0].next) a hráč ich vidí ako náhľad. Bot sa zamyká zo servera (server.js).

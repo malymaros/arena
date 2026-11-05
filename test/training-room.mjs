@@ -1,10 +1,13 @@
-// test/training-room.mjs - TRAINING GROUND cez reálny server (shared/training.js): stála miestnosť v zozname
+// test/training-room.mjs - TRAINING GROUNDS cez reálny server (shared/training.js): stála miestnosť v zozname
 // (rooms snapshot `trainingRoom`, 0/1), hráč vstúpi so scenárom (sedí ako A = biely, bot Baby = B), snapshot nesie
 // training (scenár + odhalená fronta bota), bot zamyká až po hráčovi, výsledok training_result: predpísané riešenie =
 // win, iné víťazné = creative, prehra = fail (aj keď obaja prežijú posledné kolo); TRY AGAIN / NEXT = training_play;
 // druhý človek môže len sledovať; game_result / game_over sa v tréningu neposielajú; po odchode je miestnosť čistá.
 import { spawn } from "child_process";
 import { io } from "socket.io-client";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const PORT = 3992;
 const URL = `http://localhost:${PORT}`;
@@ -20,9 +23,11 @@ async function until(fn, ms, what) {
 }
 const mv = (type, dir) => (dir ? { type, dir } : { type });
 
+// záznamy zápasov zapnuté - tréning sa do nich (ANALYZE MATCHES) zapisovať NESMIE
+const MDIR = fs.mkdtempSync(path.join(os.tmpdir(), "training-matches-"));
 try {
   server = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, PORT: String(PORT), PLAYER_KEYS: "testpass", ADMIN_KEY: "testadmin", ARENA_SEED: "3", TELEMETRY_DIR: "" },
+    env: { ...process.env, PORT: String(PORT), PLAYER_KEYS: "testpass", ADMIN_KEY: "testadmin", ARENA_SEED: "3", TELEMETRY_DIR: "", MATCHES_DIR: MDIR },
     stdio: ["ignore", "pipe", "pipe"],
   });
   server.stderr.on("data", d => { serverErr += d; });
@@ -40,10 +45,11 @@ try {
   sock.on("training_result", (r) => c.results.push(r));
   sock.on("game_result", () => c.gameEvents++);
   sock.on("game_over", () => c.gameEvents++);
+  sock.on("match_record", () => c.gameEvents++);
   if (!await until(() => c.rooms, 20000, "zoznam roomiek")) throw new Error("server nenaštartoval");
 
   const t0 = c.rooms.trainingRoom;
-  if (t0 && t0.players === 0 && t0.canJoin && t0.training && !c.rooms.rooms.some(r => r.training)) pass("stála TRAINING GROUND miestnosť v zozname: 0/1, mimo bežných roomiek");
+  if (t0 && t0.players === 0 && t0.canJoin && t0.training && !c.rooms.rooms.some(r => r.training)) pass("stála TRAINING GROUNDS miestnosť v zozname: 0/1, mimo bežných roomiek");
   else fail(`zoznam roomiek: ${JSON.stringify(c.rooms)}`);
 
   // scenár 2 - predpísané riešenie
@@ -68,7 +74,7 @@ try {
   sock2.emit("join_room", { roomId: t0?.id, scenario: 1 });
   await until(() => c2.denied, 3000, "druhý hráč odmietnutý");
   sock2.emit("spectate_room", { roomId: t0?.id });
-  if (await until(() => c2.spectator, 3000, "divák")) pass("obsadená TRAINING GROUND: vstup odmietnutý, sledovať sa dá");
+  if (await until(() => c2.spectator, 3000, "divák")) pass("obsadená TRAINING GROUNDS: vstup odmietnutý, sledovať sa dá");
 
   sock.emit("lock_in", [mv("shield"), mv("mirror"), mv("attack", "right")], 1);
   if (await until(() => c.results.length === 1, 5000, "výsledok scenára 2") && c.results[0].result === "win" && c.results[0].n === 2) pass("predpísané riešenie → win");
@@ -98,16 +104,20 @@ try {
   sock.emit("lock_in", [mv("move", "down"), mv("special"), mv("recharge")], 2);
   if (await until(() => c.results.length === 3, 8000, "výsledok scenára 6") && c.results[2].result === "creative") pass("iné víťazné riešenie → creative");
   else fail(`výsledok: ${JSON.stringify(c.results)}`);
-  if (c.gameEvents === 0) pass("game_result / game_over sa v tréningu neposielajú"); else fail(`game eventy: ${c.gameEvents}`);
+  if (c.gameEvents === 0) pass("game_result / game_over / match_record sa v tréningu neposielajú"); else fail(`game eventy: ${c.gameEvents}`);
+  // ANALYZE MATCHES: zoznam záznamov je po troch dohraných scenároch prázdny
+  const rows = await new Promise(r => sock.emit("matches_list", {}, (a) => r(a?.rows)));
+  if (Array.isArray(rows) && rows.length === 0) pass("tréning sa nezapisuje do ANALYZE MATCHES"); else fail(`matches_list: ${JSON.stringify(rows)}`);
 
   // odchod → miestnosť čistá (divák späť v room browseri)
   sock.emit("leave_room");
-  if (await until(() => c.rooms?.trainingRoom?.players === 0 && c.rooms?.trainingRoom?.canJoin, 5000, "miestnosť po odchode")) pass("po odchode hráča je TRAINING GROUND znova voľná");
+  if (await until(() => c.rooms?.trainingRoom?.players === 0 && c.rooms?.trainingRoom?.canJoin, 5000, "miestnosť po odchode")) pass("po odchode hráča je TRAINING GROUNDS znova voľná");
   sock.close(); sock2.close();
 } catch (e) {
   fail(e.stack || String(e));
 } finally {
   server?.kill();
+  setTimeout(() => { try { fs.rmSync(MDIR, { recursive: true, force: true }); } catch {} }, 500);
 }
 if (serverErr.trim()) { console.log(serverErr); }
 if (fails) { console.log(`training-room: ${fails} FAIL`); process.exit(1); }

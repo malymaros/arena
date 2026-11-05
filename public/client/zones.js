@@ -10,8 +10,8 @@ import { board, state } from "/client/session.js";
 // (inak by sa napr. dráha vlkolaka v Portal Realm „zalomila" cez skutočný portál na mini-doske)
 export function cellsForSpecialPreview(meState, dir, { abstract = false } = {}){
   if (!meState || !meState.char) return [];
-  const tiles = abstract ? [] : state?.tiles, portals = abstract ? null : (state?.portals || null);
-  return CHARS_BY_KEY[meState.char]?.specialZone?.({ G, board, me: meState, dir, tiles, portals }) || [];
+  const tiles = abstract ? [] : state?.tiles, iks = abstract ? [] : state?.iks, portals = abstract ? null : (state?.portals || null);
+  return CHARS_BY_KEY[meState.char]?.specialZone?.({ G, board, me: meState, dir, tiles, iks, portals }) || [];
 }
 // Jotarov Special 1 (mirror slot): obe diagonálne bunky zvolenej strany (x±dir, y±1) - zrkadlí jotaroS1Cells
 export function cellsForJotaroS1(p, dir){

@@ -1,8 +1,8 @@
-// shared/training.js - TRAINING GROUND (tutoriál): scenáre navrhol vlastník 2026-11-05, schválený vzhľad
+// shared/training.js - TRAINING GROUNDS (tutoriál): scenáre navrhol vlastník 2026-11-05, schválený vzhľad
 // public/dev/tutorial.html. Hráč (Fire wizard, biely, vľavo) hrá proti Baby botovi (Fire wizard, čierny) s
 // ODHALENÝMI akciami bota. Cieľ vždy: neumrieť a zabiť súpera. Výhra predpísaným ťahom = WELL DONE, výhra iným
 // ťahom = CREATIVE (hráč našiel vlastné riešenie). Čistý modul - číta ho server (engine/game.js startTraining,
-// server.js tréningová miestnosť) aj klient (okno TRAINING GROUND, lišta kola).
+// server.js tréningová miestnosť) aj klient (okno TRAINING GROUNDS, lišta kola).
 //
 // Doska 4×3: riadky A (hore) / B / C, stĺpce 1–4 (vľavo → vpravo); "B1" = { x: 0, y: 1 }.
 // rounds[k].bot = fronta bota v kole k+1 (ako lock_in: golden pred akcie, last_stand / golden_mana za ne)
