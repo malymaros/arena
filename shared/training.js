@@ -9,8 +9,9 @@
 // rounds[k].solution = predpísané riešenie hráča v rovnakom tvare; ANY = na tejto akcii nezáleží
 // rounds[k].next = zmeny dlaždíc na konci kola (ohlásené ako náhľad): ik = nové pozície IK (paralelne s tiles typu
 // "ik" v poradí zápisu), spawn = nové dlaždice. Bez next IK ostávajú, nič nepribudne a hráč nevidí žiadny náhľad.
-// rounds[k].variants = [{ when, bot, solution }] namiesto bot/solution: fronta bota (a predpísané riešenie) závisí od
-// pozície na začiatku kola - platí prvý variant, ktorého podmienka WHEN sedí (trainingRound).
+// rounds[k].variants = [{ id, when, bot, solution }] namiesto bot/solution: fronta bota (a predpísané riešenie) závisí
+// od stavu na začiatku kola - platí prvý variant, ktorého podmienka `when` sedí (whenOk, trainingRound). Variant bez
+// solution = koniec mimo predpísaného postupu (výhra je vždy CREATIVE).
 // Slot riešenia: akcia | ANY | pole akcií (ktorákoľvek z nich) | OPT(akcia) = posledná akcia, ktorú hráč smie vynechať.
 
 export const TRAINING_CHAR = "fire";
@@ -65,32 +66,50 @@ export const TRAINING = [
         solution: [a("recharge"), a("dash", "right"), [a("shield"), a("mirror")], OPT(a("last_stand"))],
         // staré IK sa vymenia medzi sebou (A1 → B3, B3 → C2, C2 → A1), nové IK na B1 a C4
         next: { ik: ["B3", "C2", "A1"], spawn: [{ type: "ik", at: "B1" }, { type: "ik", at: "C4" }] } },
+      // 2. kolo: pre každý koniec 1. kola najťažšia odpoveď bota (prepočet hrubou silou 2026-11-05, schválil
+      // vlastník): po predpísanom postupe čo najmenej výhier, ale riešiteľné; odchýlky čo najťažšie / bez výhry.
       { variants: [
-        // hráč a bot na rovnakom políčku: Last Hope dá manu na golden obranu proti melee, bota zabije doom
-        { when: "same", bot: [a("melee"), a("attack", "right"), a("recharge")],
-          solution: [a("last_hope"), [a("golden_shield"), a("golden_mirror")], ANY, ANY, ANY] },
-        // A) démon má hráč: bot (Last Hope) dashne na hráčovo políčko - démon by minul, rovno melee / special
-        { when: "youDemon", bot: [a("last_hope"), a("dash", "right"), a("mirror"), a("shield")],
-          solution: [[a("melee"), a("special")], ANY, ANY] },
-        // B) démon má bot: golden obrana proti démonovi, prežiť - bota zabije doom
-        { when: "else", bot: [a("demon"), a("recharge"), a("melee")],
-          solution: [[a("golden_shield"), a("golden_mirror")], ANY, ANY, ANY] },
+        // ★ C3, démon má hráč: bot Last Hope + shield na hráčovu 1. akciu → mirror (odrazí special 4×) alebo
+        // shield breaker (rozbije shield, bot má 1 HP) hneď v 1. akcii; démon / melee / special nevyhrajú
+        { id: "c3-demon", when: { you: "C3", youDemon: true }, bot: [a("last_hope"), a("shield"), a("special"), a("dash", "right")],
+          solution: [[a("mirror"), a("shield_breaker")], ANY, ANY] },
+        // ★ C3, démon má bot: special bije riadok C, hore je IK / dmg dlaždica → Last Hope (½ dmg = 0) + dash hore
+        // na A3, prežiť - bota zabije doom
+        { id: "c3", when: { you: "C3" }, bot: [a("shield"), a("special"), a("attack", "right")],
+          solution: [a("last_hope"), a("dash", "up"), ANY, ANY] },
+        // útek na B1 s démonom
+        { id: "b1-demon-8", when: { you: "B1", youDemon: true, botHp: 8 }, bot: [a("recharge"), a("dash", "right"), a("shield")] },
+        { id: "b1-demon", when: { you: "B1", youDemon: true }, bot: [a("last_hope"), a("dash", "right"), a("special"), a("mirror")] },
+        // útek na B1 bez démona: bot odíde z IK a démona zahrá až po golden obrane → istá prehra
+        { id: "b1", when: { you: "B1" }, bot: [a("move", "right"), a("demon"), a("attack", "up")] },
+        // rovnaké políčko (C1)
+        { id: "same-demon", when: { same: true, youDemon: true }, bot: [a("last_hope"), a("shield"), a("special"), a("attack", "right")] },
+        { id: "same-1hp", when: { same: true, youHp: 1 }, bot: [a("dash", "right"), a("special"), a("attack", "left")] },
+        { id: "same", when: { same: true }, bot: [a("shield"), a("special"), a("attack", "right")] },
+        // poistka (iný koniec 1. kola nie je možný - test/training.mjs)
+        { id: "else-demon", when: { youDemon: true }, bot: [a("last_hope"), a("shield"), a("special"), a("dash", "right")] },
+        { id: "else", when: {}, bot: [a("demon"), a("recharge"), a("melee")] },
       ] },
     ] },
 ];
 
-// podmienky variantov kola (pozícia na začiatku kola)
-const WHEN = {
-  same: (p1, p2) => p1.x === p2.x && p1.y === p2.y,
-  youDemon: (p1) => !!p1.lastStandBuff,
-  else: () => true,
-};
-// kolo `turn` scenára pre aktuálny stav hráčov ({ p1, p2 }): { bot, solution, next, ... } alebo null
+// podmienka variantu kola (stav na začiatku kola) - všetky uvedené musia sedieť: same = hráč a bot na jednom
+// políčku, you / bot = bunka, youDemon / botDemon = Last Stand buff, youHp / botHp / youMana = presná hodnota
+const cellIs = (p, at) => { const c = cellOf(at); return p.x === c.x && p.y === c.y; };
+function whenOk(w, p1, p2) {
+  return (w.same === undefined || (p1.x === p2.x && p1.y === p2.y) === w.same)
+    && (w.you === undefined || cellIs(p1, w.you)) && (w.bot === undefined || cellIs(p2, w.bot))
+    && (w.youDemon === undefined || !!p1.lastStandBuff === w.youDemon)
+    && (w.botDemon === undefined || !!p2.lastStandBuff === w.botDemon)
+    && (w.youHp === undefined || p1.hp === w.youHp) && (w.botHp === undefined || p2.hp === w.botHp)
+    && (w.youMana === undefined || p1.mana === w.youMana);
+}
+// kolo `turn` scenára pre aktuálny stav hráčov ({ p1, p2 }): { bot, solution, next, id, ... } alebo null
 export function trainingRound(sc, turn, players) {
   const r = sc?.rounds?.[turn - 1];
   if (!r) return null;
   if (!r.variants) return r;
-  const v = players && r.variants.find(x => WHEN[x.when]?.(players.p1, players.p2));
+  const v = players && r.variants.find(x => whenOk(x.when || {}, players.p1, players.p2));
   return v ? { ...r, ...v } : null;
 }
 

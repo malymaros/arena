@@ -9,12 +9,11 @@ const mv = (type, dir) => (dir ? { type, dir } : { type });
 // ANY v riešení nahradí bezpečná akcia (scenár:kolo:slot, pri kole s variantmi scenár:kolo:variant:slot; typ akcie
 // sa v kole nesmie opakovať)
 const FILL = { "4:0:3": mv("move", "up"), "6:0:2": mv("recharge"), "6:1:0": mv("move", "up"), "6:1:2": mv("recharge"),
-  "7:1:youDemon:1": mv("recharge"), "7:1:youDemon:2": mv("pass"),
-  "7:1:else:1": mv("recharge"), "7:1:else:2": mv("pass"), "7:1:else:3": mv("attack", "up"),
-  "7:1:same:2": mv("move", "down"), "7:1:same:3": mv("recharge"), "7:1:same:4": mv("pass") };
+  "7:1:c3-demon:1": mv("move", "up"), "7:1:c3-demon:2": mv("dash", "up"),
+  "7:1:c3:2": mv("move", "up"), "7:1:c3:3": mv("attack", "up") };
 // predpísané riešenie kola ako hrateľná fronta: ANY → FILL, alternatívy → prvá, OPT → vynechať (withOpt = zahrať)
 function solve(sc, k, round, withOpt = false) {
-  const key = (i) => (round.when ? `${sc.n}:${k}:${round.when}:${i}` : `${sc.n}:${k}:${i}`);
+  const key = (i) => (round.id ? `${sc.n}:${k}:${round.id}:${i}` : `${sc.n}:${k}:${i}`);
   return round.solution.flatMap((a, i) => (a === ANY ? [FILL[key(i)]] : Array.isArray(a) ? [a[0]] : a.opt ? (withOpt ? [a.opt] : []) : [a]));
 }
 
@@ -36,7 +35,7 @@ function play(sc, plays) {
     locks.push(q); played.push(round);
     let okB = null;
     e.lockIn("B", round.bot, g().turn, (r) => { okB = r; });
-    assert.ok(okB?.ok, `scenár ${sc.n} kolo ${k + 1}: engine odmietol frontu bota${round.when ? ` (variant ${round.when})` : ""} (${JSON.stringify(okB)})`);
+    assert.ok(okB?.ok, `scenár ${sc.n} kolo ${k + 1}: engine odmietol frontu bota${round.id ? ` (variant ${round.id})` : ""} (${JSON.stringify(okB)})`);
     const { p1, p2 } = g().players;
     if (p1.hp <= 0) return { result: "fail", locks, played };
     if (p2.hp <= 0) return { result: "win", locks, played };
@@ -82,13 +81,18 @@ const bad = [
   [6, [[mv("dash", "up"), mv("recharge"), mv("attack", "right"), mv("last_stand")]]], // bez štítu ho special zabije
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("demon"), mv("recharge"), mv("attack", "right")]]], // démon do golden štítu
   [7, [[mv("recharge"), mv("dash", "right"), mv("attack", "up")]]],          // bez obrany ho special v riadku C zabije
-  // A) démon v hociktorej akcii: 1. minie (bot na hráčovom políčku), 2. odrazí mirror, 3. zablokuje shield → doom
-  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("demon"), mv("move", "up"), mv("recharge")]]],
-  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("move", "up"), mv("demon"), mv("recharge")]]],
-  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("move", "up"), mv("recharge"), mv("demon")]]],
-  [7, [[mv("recharge"), mv("dash", "right"), mv("shield")], [mv("recharge"), mv("pass"), mv("attack", "up")]]], // B) bez golden obrany ho démon zabije
-  [7, [[mv("move", "up"), mv("recharge"), mv("dash", "down")], [mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]], // rovnaké políčko: 0 many na golden
   [7, [[mv("shield"), mv("recharge"), mv("melee")]]], // bez many shield nevyjde (0 many na štarte) → melee + dmg dlaždica
+  // C3, démon má hráč: démon / melee / special v 1. akcii narazia na botov shield, bot (Last Hope 4×) special → doom
+  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("demon"), mv("move", "up"), mv("recharge")]]],
+  [7, [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("melee"), mv("recharge"), mv("pass")]]],
+  [7, [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("special"), mv("recharge"), mv("pass")]]],
+  // C3, démon má bot: golden obrana nestačí (bot démona nehrá, special v riadku C), dash hore bez Last Hope = dmg dlaždica
+  [7, [[mv("recharge"), mv("dash", "right"), mv("shield")], [mv("golden_shield"), mv("recharge"), mv("pass"), mv("attack", "up")]]],
+  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror")], [mv("golden_mirror"), mv("recharge"), mv("pass"), mv("attack", "up")]]],
+  [7, [[mv("recharge"), mv("dash", "right"), mv("shield")], [mv("dash", "up"), mv("move", "up"), mv("attack", "up")]]],
+  // útek na B1 bez démona: bot odíde z IK a démona zahrá až po golden obrane → žiadna výhra
+  [7, [[mv("move", "up"), mv("dash", "up"), mv("recharge")], [mv("last_hope"), mv("golden_shield"), mv("move", "down"), mv("dash", "right"), mv("attack", "up")]]],
+  [7, [[mv("move", "up"), mv("dash", "up"), mv("recharge")], [mv("golden_shield"), mv("move", "down"), mv("dash", "right"), mv("attack", "up")]]],
 ];
 for (const [n, plays] of bad) {
   const r = play(trainingScenario(n), plays);
@@ -99,10 +103,12 @@ for (const [n, plays] of bad) {
 const creative = [
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("move", "down"), mv("special"), mv("recharge")]]], // IK na B1 s buffom + special
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("dash", "right"), mv("special"), mv("recharge")]]], // dmg dlaždica → special ±1 riadok
-  // útek hore na B1 (strela ho zrazí na 2 HP, v 2. kole tam pribudne IK): Last Hope + golden shield, preč z IK
-  [7, [[mv("move", "up"), mv("dash", "up"), mv("recharge")], [mv("last_hope"), mv("golden_shield"), mv("move", "down"), mv("dash", "right"), mv("attack", "up")]]],
-  // rovnaké políčko (odchýlka v 1. kole): Last Hope dá manu na golden shield proti melee, bota zabije doom
-  [7, [[mv("move", "up"), mv("recharge"), mv("dash", "down")], [mv("last_hope"), mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]],
+  // C3, démon má hráč: 1. akcia minie botov shield a uhne z riadku C (IK s buffom = −5), potom démon
+  [7, [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("move", "up"), mv("demon"), mv("dash", "up")]]],
+  // útek na B1 s démonom (bot 8 HP): proti recharge / dash / shield
+  [7, [[mv("move", "up"), mv("dash", "up"), mv("attack", "up"), mv("last_stand")], [mv("move", "right"), mv("special"), mv("dash", "up")]]],
+  // rovnaké políčko s démonom
+  [7, [[mv("move", "up"), mv("recharge"), mv("dash", "down"), mv("last_stand")], [mv("golden_shield"), mv("mirror"), mv("recharge"), mv("special")]]],
 ];
 for (const [n, plays] of creative) {
   const sc = trainingScenario(n);
@@ -111,29 +117,48 @@ for (const [n, plays] of creative) {
   assert.ok(!matchesSolution(sc, r.locks, r.played), `scenár ${n}: kreatívne riešenie sa nesmie rozpoznať ako predpísané`);
 }
 
-// scenár 7: alternatívy predpísaného riešenia (mirror namiesto shieldu, special namiesto melee, golden mirror) = WELL DONE
-// a správny variant 2. kola podľa toho, kde a s čím hráč skončil
+// scenár 7: alternatívy predpísaného riešenia (mirror / shield, shield breaker namiesto mirroru) = WELL DONE
 {
   const sc = trainingScenario(7);
   const well = [
-    [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("special"), mv("recharge"), mv("pass")], "youDemon"],
-    [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("melee"), mv("move", "up"), mv("shield_breaker")], "youDemon"],
-    [[mv("recharge"), mv("dash", "right"), mv("mirror")], [mv("golden_mirror"), mv("recharge"), mv("pass"), mv("attack", "left")], "else"],
+    [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("shield_breaker"), mv("move", "up"), mv("dash", "up")], "c3-demon"],
+    [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("mirror"), mv("move", "up"), mv("dash", "up")], "c3-demon"],
+    [[mv("recharge"), mv("dash", "right"), mv("mirror")], [mv("last_hope"), mv("dash", "up"), mv("move", "up"), mv("attack", "up")], "c3"],
   ];
-  for (const [r1, r2, when] of well) {
+  for (const [r1, r2, id] of well) {
     const r = play(sc, [r1, r2]);
     assert.equal(r.result, "win", `scenár 7: ${JSON.stringify([r1, r2])} malo vyhrať`);
-    assert.equal(r.played[1].when, when, "scenár 7: zlý variant 2. kola");
+    assert.equal(r.played[1].id, id, "scenár 7: zlý variant 2. kola");
     assert.ok(matchesSolution(sc, r.locks, r.played), `scenár 7: ${JSON.stringify([r1, r2])} je predpísané riešenie (WELL DONE)`);
   }
-  // rovnaké políčko → variant same, aj keď si hráč vzal démona (fronta bota melee / strela vpravo / recharge)
-  for (const r1 of [[mv("move", "up"), mv("recharge"), mv("dash", "down")], [mv("move", "up"), mv("recharge"), mv("dash", "down"), mv("last_stand")]]) {
+  // každý koniec 1. kola má svoj variant (nikdy poistku else) a engine prijme botovu frontu
+  const A = (t, d) => mv(t, d), D = ["up", "down", "left", "right"], S = [];
+  for (const t of ["move", "dash", "attack"]) for (const d of D) S.push(A(t, d));
+  for (const t of ["recharge", "melee", "special", "shield", "mirror", "shield_breaker", "mirror_breaker", "pass"]) S.push(A(t));
+  const seen = new Map();
+  for (const x of S) for (const y of S) for (const z of S) for (const sfx of [[], [mv("last_stand")], [mv("golden_mana")]]) {
     const e = createEngine({});
     e.startTraining(sc);
-    e.lockIn("A", r1, 1);
+    let ok = null;
+    e.lockIn("A", [x, y, z, ...sfx], 1, (r) => { ok = r; });
+    if (!ok?.ok) continue;
     e.lockIn("B", sc.rounds[0].bot, 1);
-    assert.equal(trainingRound(sc, 2, e.game.players).when, "same", `scenár 7: ${JSON.stringify(r1)} → variant same`);
+    const { p1, p2 } = e.game.players;
+    if (p1.hp <= 0 || p2.hp <= 0) continue;
+    const key = `${p1.x},${p1.y} ${p1.hp}/${p1.mana}${p1.lastStandBuff ? "D" : ""} | ${p2.x},${p2.y} ${p2.hp}/${p2.mana}`;
+    if (seen.has(key)) continue;
+    const round = trainingRound(sc, 2, e.game.players);
+    assert.ok(round && !round.id.startsWith("else"), `scenár 7: koniec 1. kola ${key} nemá vlastný variant (${round?.id})`);
+    let okB = null;
+    e.lockIn("A", [mv("pass"), mv("pass"), mv("pass")], 2);
+    e.lockIn("B", round.bot, 2, (r) => { okB = r; });
+    assert.ok(okB?.ok, `scenár 7: engine odmietol botovu frontu variantu ${round.id} (${key})`);
+    seen.set(key, round.id);
   }
+  assert.equal(seen.size, 22, `scenár 7: čakaných 22 koncov 1. kola, je ${seen.size}`);
+  const byId = {};
+  for (const id of seen.values()) byId[id] = (byId[id] || 0) + 1;
+  assert.deepEqual(byId, { "c3-demon": 2, c3: 2, "b1-demon-8": 1, "b1-demon": 2, b1: 12, "same-demon": 1, "same-1hp": 1, same: 1 }, `scenár 7: rozdelenie koncov ${JSON.stringify(byId)}`);
 }
 
 // scenár 6: zmeny dlaždíc na konci 1. kola zo scenára (IK A2 → B1, C4 → B3, mana na B4), žiadne náhodné dlaždice
