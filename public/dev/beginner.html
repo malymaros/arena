@@ -38,27 +38,27 @@
   /* ---------- prepínač BEGINNER (vľavo hore v room browseri) ---------- */
   .bg-btn { --n: 4px; clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0, calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n),
     100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)), calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n)));
-    position: absolute; left: 28px; top: 22px; z-index: 3; width: 214px; height: 74px; box-sizing: border-box;
-    display: flex; align-items: center; gap: 10px; padding: 0 12px; border: none; cursor: pointer; font-family: "Press Start 2P", monospace; text-align: left;
+    position: absolute; left: 28px; top: 22px; z-index: 3; width: 214px; height: 74px; box-sizing: border-box; /* = šírka TRAINING GROUNDS */
+    display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; border: none; cursor: pointer; font-family: "Press Start 2P", monospace; text-align: left;
     color: #9aa1ad; background: #2a2d34; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #3a3e47, inset 0 -4px 0 2px #1b1d22; transition: transform .1s; }
-  .bg-btn .heads { display: flex; flex: none; }
-  .bg-btn .heads canvas { width: 34px; height: 34px; image-rendering: pixelated; margin-left: -8px; filter: grayscale(1) brightness(.7); }
-  .bg-btn .heads canvas:first-child { margin-left: 0; }
-  .bg-btn .lbl { display: flex; flex-direction: column; gap: 7px; font-size: 10px; letter-spacing: 1px; }
+  /* hlavy v okienkach ako hlavy mágov v HUD (.series-crowns .mh-face) - rám nad spritom */
+  .bg-btn .heads { display: flex; gap: 4px; flex: none; }
+  .bg-face { position: relative; width: 32px; height: 32px; border-radius: 5px; overflow: hidden; background: rgba(12,14,18,.72); flex: none; }
+  .bg-face canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .bg-face::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none;
+    box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #000, inset 0 0 0 3px rgba(255,255,255,.12); }
+  .bg-btn .bg-face canvas { filter: grayscale(1) brightness(.7); }
+  .bg-btn .lbl { display: flex; flex-direction: column; gap: 7px; font-size: 9px; letter-spacing: 1px; }
   .bg-btn .sw { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; }
   .bg-btn .sw i { width: 22px; height: 10px; background: #15161a; box-shadow: inset 0 0 0 2px #000; position: relative; }
   .bg-btn .sw i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 8px; height: 6px; background: #6b7080; }
   .bg-btn:hover { filter: brightness(1.15); transform: translateY(-2px); }
   .bg-btn:active { transform: translateY(2px); }
   .bg-btn.on { color: #06200f; background: #3ddc84; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #8af0b5, inset 0 -4px 0 2px #1f8f52; }
-  .bg-btn.on .heads canvas { filter: none; }
+  .bg-btn.on .bg-face canvas { filter: none; }
   .bg-btn.on .sw i::after { left: 12px; background: #06200f; }
 
-  /* ---------- dlaždica roomky: znak BEGINNER + zamknutá pre druhý mód ---------- */
-  .room-tile .rt-beginner { position: absolute; left: 50%; top: 3px; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 0; padding: 1px 5px 1px 3px;
-    background: #3ddc84; box-shadow: inset 0 0 0 2px #000; }
-  .room-tile .rt-beginner canvas { width: 20px; height: 20px; image-rendering: pixelated; margin-left: -4px; }
-  .room-tile .rt-beginner canvas:first-child { margin-left: 0; }
+  /* ---------- dlaždica roomky zamknutá pre druhý mód (bez štítku - stačí nápis na tlačidle) ---------- */
   .room-btn.room-tile.mode-locked { cursor: not-allowed; }
   .room-btn.room-tile.mode-locked::before { content: ""; position: absolute; inset: 0; background: rgba(8,10,14,.62); z-index: 3; pointer-events: none; }
   .room-btn.room-tile.mode-locked::after { content: "🔒"; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); font-size: 26px; z-index: 4;
@@ -69,7 +69,7 @@
   /* lobby v beginner móde: štítok pod nadpisom */
   .lobby-beginner { display: inline-flex; align-items: center; gap: 6px; margin: 4px auto 0; padding: 4px 8px; font: 9px "Press Start 2P", monospace;
     color: #06200f; background: #3ddc84; box-shadow: 0 0 0 2px #000; }
-  .lobby-beginner canvas { width: 18px; height: 18px; image-rendering: pixelated; }
+  .lobby-beginner .bg-face { width: 22px; height: 22px; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -109,9 +109,8 @@
   <section>
     <h2>4 · NA ROZHODNUTIE</h2>
     <ul class="q">
-      <li><b>Sledovanie:</b> zamknutá je len hra (JOIN). Sledovať (SPECTATE) sa dá aj roomku druhého módu - alebo zamknúť aj to?</li>
-      <li><b>AI bot:</b> v beginner móde ide do AI roomky s rovnakými zákazmi (bot aj hráč len traja mágovia). AI roomka sa nezamyká -
-        je len jedna, kto ju má obsadenú, ten určuje mód. Divák vidí, či je to beginner hra.</li>
+      <li><b>Sledovanie</b> (rozhodnuté): zamknutý je len vstup do hry, sledovať sa dá aj roomka druhého módu.</li>
+      <li><b>AI bot</b> (rozhodnuté): mód určuje hráč, ktorý AI roomku obsadí; po jeho odchode vzniká nová čistá.</li>
       <li><b>TRAINING GROUNDS</b> ostáva dostupný v oboch módoch (aj tak sa tam hrá len Fire).</li>
       <li><b>Prepnutie počas čakania:</b> prepínač je len v room browseri - v roomke (lobby, hra) sa mód nedá zmeniť.</li>
       <li><b>Telefón:</b> prepínač len s hlavami a vypínačom (bez nápisu), rovnako široký ako TRAINING GROUNDS.</li>
@@ -131,6 +130,8 @@
   const heads = []; // { cvs, char }
   const headCanvas = (char, size = 52) => { const c = document.createElement("canvas"); c.width = size; c.height = size; heads.push({ cvs: c, char }); return c; };
   const bots = [];
+  // hlava mága v okienku (rám ako v HUD)
+  const face = (m) => { const w = document.createElement("span"); w.className = "bg-face"; w.append(headCanvas(m)); return w; };
   function loop(now) {
     for (const h of heads) if (h.cvs.isConnected && h.cvs.offsetParent !== null) drawMageHeadAnim(h.cvs, h.char, now);
     for (const b of bots) if (b.isConnected && b.offsetParent !== null) drawBotFigure(b, "neutral", now, {});
@@ -142,12 +143,6 @@
     { id: 1, slot: 1, players: 1, max: 2, canJoin: true, names: ["Tomi", null], beginner: true, info: { arena: "bridge", color: "random", chars: "manual", timer: "60" } },
     { id: 2, slot: 2, players: 1, max: 2, canJoin: true, names: ["Maros", null], info: { arena: "portal", color: "white", chars: "manual", timer: "off" } },
   ];
-
-  function beginnerBadge() {
-    const b = document.createElement("span"); b.className = "rt-beginner";
-    for (const m of MAGES) b.append(headCanvas(m, 52));
-    return b;
-  }
 
   function buildScene(screen, sc) {
     const st = { on: !!sc.on };
@@ -164,7 +159,7 @@
     rooms.append(bot);
     // prepínač BEGINNER
     const tg = document.createElement("button"); tg.type = "button"; tg.className = "bg-btn";
-    const hs = document.createElement("span"); hs.className = "heads"; MAGES.forEach(m => hs.append(headCanvas(m)));
+    const hs = document.createElement("span"); hs.className = "heads"; MAGES.forEach(m => hs.append(face(m)));
     tg.append(hs);
     tg.insertAdjacentHTML("beforeend", `<span class="lbl">BEGINNER<span class="sw"><i></i><b class="swt"></b></span></span>`);
     rooms.append(tg);
@@ -176,7 +171,6 @@
       const grid = buildRoomGrid({ rooms: ROOMS, slots: 2 }, () => {});
       grid.querySelectorAll(".room-tile").forEach((t, i) => {
         const r = ROOMS[i];
-        if (r.beginner) t.append(beginnerBadge()); // štítok na rohu badge arény (mimo badge - ten má vlastné prekrytie)
         if (!!r.beginner !== st.on) {
           t.classList.add("mode-locked");
           t.querySelector(".rt-cta").textContent = r.beginner ? "BEGINNERS ONLY" : "NO BEGINNERS";
@@ -215,7 +209,7 @@
       <button class="lobby-start">START</button></div>`;
     lobby.querySelectorAll(".arena-card canvas").forEach(c => drawArenaThumb(c, c.parentElement.dataset.arena));
     const chip = lobby.querySelector(".lobby-beginner");
-    MAGES.forEach(m => chip.prepend(headCanvas(m)));
+    [...MAGES].reverse().forEach(m => chip.prepend(face(m)));
     inner.append(lobby);
     screen.appendChild(inner);
     fit(screen, inner);
