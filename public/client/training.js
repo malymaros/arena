@@ -87,7 +87,8 @@ function show() {
     ? [[-150, -90], [150, -80], [-170, 30], [170, 40], [-110, 110], [120, 115], [0, -150]]
       .map(([dx, dy], i) => `<i style="--dx:${dx}px;--dy:${dy}px;animation-delay:${i * 0.22}s"></i>`).join("") : "";
   const again = back.querySelector(".again");
-  again.textContent = result.result === "fail" ? "TRY AGAIN" : "NEXT ▶";
+  // šípka = pixelový trojuholník v CSS (znak ▶ nie je v Press Start 2P - náhradný font ho kreslil nízko)
+  again.innerHTML = result.result === "fail" ? "TRY AGAIN" : `NEXT<i class="tr-arrow" aria-hidden="true"></i>`;
   again.classList.toggle("next", result.result !== "fail");
   back.querySelector(".tr-btns").classList.toggle("hidden", !!isSpectator); // divák má svoju lištu (LEAVE)
   if (cvs._botFace) cvs._botFace.mood = ""; // nálada (výkričník prekvapenia) sa rozbehne odznova
