@@ -2,6 +2,8 @@
 // tlačidlo vpravo hore (slamená cvičná figurína + TRAINING GROUNDS, pevná šírka). Voľná miestnosť → klik otvorí
 // okno TRAINING GROUNDS (v dizajne tlačidla: OBJECTIVE + riadky scenárov s počtom kôl) → join_room { scenario }.
 // Obsadená (niekto trénuje) → v tlačidle bez textu Fire wizard dáva figuríne melee, klik = sledovať (ako AI roomka).
+// Klik na voľnú miestnosť ju hneď zarezervuje (training_reserve) - kým je okno scenárov otvorené, je pre ostatných
+// obsadená; zavretie okna ju uvoľní (training_release), výber scenáru rezerváciu spotrebuje vstupom.
 // Telefón: len figurína / obsadená scéna, šírka rovnaká v oboch stavoch.
 import { TRAINING } from "/shared/training.js";
 import { sfx } from "/client/sound.js";
@@ -58,7 +60,11 @@ export const REOPEN_KEY = "arenaTrainingReopen";
 const SEQ = [0, 0, 0, 1, 2, 3, 3, 3]; // nápriahnutie, úder (index 4 = zásah figuríny), dobeh
 const STEP_MS = 110;
 
-let btn = null, cvs = null, dummyEl = null, powEl = null, room = null, onPick = null, raf = 0, lastStep = -1, clicked = false;
+let btn = null, cvs = null, dummyEl = null, powEl = null, room = null, raf = 0, lastStep = -1, clicked = false;
+let net = {};          // { pick(room, n), reserve(cb), release(), myId() } z net.js
+let reserved = false;  // táto záložka drží rezerváciu (okno scenárov je otvorené)
+// voľná pre mňa: nikto nehrá a nerezervoval, alebo rezervácia je moja
+const freeForMe = () => !!room && (room.canJoin || (!!room.reservedBy && room.reservedBy === net.myId?.()));
 function build(roomsEl) {
   btn = document.createElement("button");
   btn.type = "button";
@@ -72,8 +78,13 @@ function build(roomsEl) {
   btn.addEventListener("click", () => {
     if (!room || clicked) return;
     sfx("ui.click");
-    if (room.canJoin) openTraining((n) => { if (!room?.canJoin) return; clicked = true; onPick?.(room, n); });
-    else { clicked = true; onPick?.(room, null); } // obsadené → sledovať
+    if (freeForMe()) {
+      net.reserve?.((ok) => {
+        if (!ok) return; // medzitým ju obsadil niekto iný - prekreslí ju „rooms"
+        reserved = true;
+        openTraining((n) => { reserved = false; clicked = true; net.pick?.(room, n); });
+      });
+    } else { clicked = true; net.pick?.(room, null); } // obsadené → sledovať
   });
   roomsEl.appendChild(btn);
 }
@@ -95,21 +106,21 @@ function loop(now) {
   raf = requestAnimationFrame(loop);
 }
 
-// net.js pri každom `rooms`: trainingRoom = { id, players, canJoin, training } alebo null;
-// pick(room, n) - n = číslo scenára pri vstupe, null pri sledovaní
-export function setTrainingBtn(roomsEl, trainingRoom, pick) {
+// net.js pri každom `rooms`: trainingRoom = { id, players, canJoin, training, reservedBy? } alebo null;
+// cbs.pick(room, n) - n = číslo scenára pri vstupe, null pri sledovaní; cbs.reserve / release / myId - rezervácia
+export function setTrainingBtn(roomsEl, trainingRoom, cbs) {
   if (!roomsEl) return;
   if (!btn) build(roomsEl);
-  room = trainingRoom; onPick = pick; clicked = false;
+  room = trainingRoom; net = cbs || {}; clicked = false;
   btn.classList.toggle("hidden", !trainingRoom);
-  const busy = !!trainingRoom && !trainingRoom.canJoin;
+  const busy = !!trainingRoom && !freeForMe();
   btn.classList.toggle("busy", busy);
   btn.setAttribute("aria-label", busy ? "Watch training" : "Training grounds");
   if (busy) { closeTraining(); loadMelee(); if (!raf) raf = requestAnimationFrame(loop); } // obsadil ju niekto iný → okno preč
   // LEAVE z okna výsledku → po návrate do room browsera sa okno TRAINING GROUNDS otvorí znova
   let reopen = false;
   try { reopen = sessionStorage.getItem(REOPEN_KEY) === "1"; sessionStorage.removeItem(REOPEN_KEY); } catch { /* bez úložiska */ }
-  if (reopen && trainingRoom?.canJoin) btn.click();
+  if (reopen && freeForMe()) btn.click();
 }
 
 /* ---------- okno TRAINING GROUNDS ---------- */
@@ -127,7 +138,7 @@ function buildWindow() {
     </div>`;
   for (const row of back.querySelectorAll(".tg-row")) {
     row.addEventListener("mouseenter", () => sfx("ui.random_hop")); // zvuková odozva pri prejdení nad scenárom
-    row.addEventListener("click", () => { sfx("ui.click"); const cb = choose; closeTraining(); cb?.(Number(row.dataset.n)); });
+    row.addEventListener("click", () => { sfx("ui.click"); const cb = choose; reserved = false; closeTraining(); cb?.(Number(row.dataset.n)); }); // rezerváciu spotrebuje vstup
   }
   back.querySelector(".tg-close").addEventListener("click", () => { sfx("ui.click"); closeTraining(); });
   back.addEventListener("click", (e) => { if (e.target === back) closeTraining(); });
@@ -139,4 +150,8 @@ function openTraining(cb) {
   choose = cb;
   back.classList.remove("hidden");
 }
-export function closeTraining() { back?.classList.add("hidden"); choose = null; }
+// zatvorenie okna bez výberu scenára (✕, Escape, klik mimo, odchod z room browsera) uvoľní rezerváciu
+export function closeTraining() {
+  back?.classList.add("hidden"); choose = null;
+  if (reserved) { reserved = false; net.release?.(); }
+}

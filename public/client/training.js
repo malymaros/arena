@@ -12,6 +12,7 @@ import { sfx } from "/client/sound.js";
 import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
 import { TRAINING, trainingScenario } from "/shared/training.js";
 import { REOPEN_KEY } from "/client/training-btn.js";
+import { setTrainingDraft } from "/client/queue.js";
 
 const RESULT = {
   fail:     { mood: "sad",       badge: "FAILED",       text: "AWW... THAT DIDN'T WORK." },
@@ -103,8 +104,10 @@ export function trainingResultReady() { return !!state?.training && !!result && 
 export function trainingEnd() { show(); }
 
 /* ---------- socket ---------- */
+// divák: čo hráč práve plánuje (lišta kola)
+socket.on("training_draft", (d) => setTrainingDraft(d));
 socket.on("training_start", () => {
-  result = null; shown = false; hide();
+  result = null; shown = false; hide(); setTrainingDraft(null);
   playStartBanner();
 });
 socket.on("training_result", (r) => {

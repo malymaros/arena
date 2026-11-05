@@ -85,7 +85,12 @@ function renderRooms(info) {
   // obsadená (max 1 hra s AI na server) → sleduješ
   setLobbyBot(roomsEl, info?.aiRoom || null, (r, level) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id, ...(level ? { level } : {}) }));
   // TRAINING GROUNDS vpravo hore (training-btn.js): voľná → okno scenárov → vstup so scenárom; obsadená → sledovať
-  setTrainingBtn(roomsEl, info?.trainingRoom || null, (r, n) => socket.emit(n ? "join_room" : "spectate_room", { roomId: r.id, ...(n ? { scenario: n } : {}) }));
+  setTrainingBtn(roomsEl, info?.trainingRoom || null, {
+    pick: (r, n) => socket.emit(n ? "join_room" : "spectate_room", { roomId: r.id, ...(n ? { scenario: n } : {}) }),
+    reserve: (cb) => socket.emit("training_reserve", (a) => cb(!!a?.ok)), // klik = miestnosť je hneď obsadená
+    release: () => socket.emit("training_release"),
+    myId: () => socket.id,
+  });
   // pevné dlaždice ROOM 1…N (room-tiles.js): prázdna → CREATE, čaká na súpera → JOIN, plná → SPECTATE
   roomsListEl.appendChild(buildRoomGrid(info, (kind, slot, r) => {
     if (kind === "create") socket.emit("create_room", { slot });

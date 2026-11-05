@@ -3475,6 +3475,8 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 /* nadpis hore v tréningu: pod TRAINING GROUNDS názov scenára (mixed case ako v okne scenárov) */
 .hud-turn .hud-turn-sub{ display: block; margin-top: 10px; text-align: center; font-size: 15px; letter-spacing: 2px;
   text-transform: none; color: #fff; text-shadow: 2px 2px 0 #000, 4px 4px 0 rgba(0,0,0,.55); }
+/* divák tréningu: hráčov rozpracovaný plán v lište kola (ešte nezamknutý) */
+.q-badge.spec-draft{ opacity: .7; outline: 2px dashed rgba(255,255,255,.55); outline-offset: -4px; }
 /* banner kola v tréningu: TRAINING GROUNDS v jednom riadku, pod ním názov scenára */
 .round-banner .rb-main{ white-space: nowrap; }
 .round-banner .rb-sub{ font-size: 22px; letter-spacing: 2px; color: #fff; white-space: nowrap; text-shadow: 3px 3px 0 #000; }

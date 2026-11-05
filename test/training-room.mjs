@@ -52,6 +52,27 @@ try {
   if (t0 && t0.players === 0 && t0.canJoin && t0.training && !c.rooms.rooms.some(r => r.training)) pass("stála TRAINING GROUNDS miestnosť v zozname: 0/1, mimo bežných roomiek");
   else fail(`zoznam roomiek: ${JSON.stringify(c.rooms)}`);
 
+  // rezervácia: klik na TRAINING GROUNDS (okno scenárov) miestnosť hneď obsadí; zavretie / odpojenie ju uvoľní
+  {
+    const o = io(URL, { transports: ["websocket"], auth: { name: "other", pass: "testpass" } });
+    const co = { rooms: null, denied: null };
+    o.on("rooms", (r) => { co.rooms = r; });
+    o.on("join_denied", (r) => { co.denied = r; });
+    await until(() => co.rooms, 5000, "druhý v room browseri");
+    const okA = await new Promise(r => sock.emit("training_reserve", (a) => r(a?.ok)));
+    await until(() => co.rooms?.trainingRoom?.canJoin === false, 3000, "rezervácia viditeľná");
+    const okB = await new Promise(r => o.emit("training_reserve", (a) => r(a?.ok)));
+    o.emit("join_room", { roomId: t0?.id, scenario: 1 });
+    await until(() => co.denied, 3000, "vstup do rezervovanej miestnosti odmietnutý");
+    if (okA && !okB && co.rooms.trainingRoom.reservedBy === sock.id && co.denied) pass("rezervácia: miestnosť obsadená pre ostatných (rezervovať ani vstúpiť sa nedá)");
+    else fail(`rezervácia: ${JSON.stringify({ okA, okB, row: co.rooms?.trainingRoom, denied: co.denied })}`);
+    sock.emit("training_release");
+    if (await until(() => co.rooms?.trainingRoom?.canJoin === true, 3000, "uvoľnenie")) pass("zavretie okna rezerváciu uvoľní");
+    const okO = await new Promise(r => o.emit("training_reserve", (a) => r(a?.ok)));
+    o.close();
+    if (okO && await until(() => c.rooms?.trainingRoom?.canJoin === true, 3000, "odpojenie uvoľní rezerváciu")) pass("odpojenie rezerváciu uvoľní");
+  }
+
   // scenár 2 - predpísané riešenie
   sock.emit("join_room", { roomId: t0?.id, scenario: 2 });
   await until(() => c.state?.training?.n === 2 && c.starts.length === 1, 5000, "štart scenára 2");
@@ -70,12 +91,16 @@ try {
   sock2.on("join_denied", (r) => { c2.denied = r; });
   sock2.on("spectator", (r) => { c2.spectator = r; });
   sock2.on("training_result", (r) => c2.results.push(r));
+  sock2.on("training_draft", (d) => { c2.draft = d; });
   await until(() => c2.rooms?.trainingRoom?.canJoin === false, 5000, "obsadená miestnosť");
   sock2.emit("join_room", { roomId: t0?.id, scenario: 1 });
   await until(() => c2.denied, 3000, "druhý hráč odmietnutý");
   sock2.emit("spectate_room", { roomId: t0?.id });
   if (await until(() => c2.spectator, 3000, "divák")) pass("obsadená TRAINING GROUNDS: vstup odmietnutý, sledovať sa dá");
 
+  // divák vidí, čo hráč práve plánuje
+  sock.emit("draft_queue", { queue: [mv("shield"), mv("mirror")] });
+  if (await until(() => c2.draft?.queue?.[1]?.type === "mirror" && c2.draft.turn === 1, 3000, "divák dostal hráčov plán")) pass("divák dostáva hráčov rozpracovaný plán");
   sock.emit("lock_in", [mv("shield"), mv("mirror"), mv("attack", "right")], 1);
   if (await until(() => c.results.length === 1, 5000, "výsledok scenára 2") && c.results[0].result === "win" && c.results[0].n === 2) pass("predpísané riešenie → win");
   else fail(`výsledok: ${JSON.stringify(c.results)}`);

@@ -39,12 +39,22 @@ function markSpy(el) {
 // [golden pred-akcia] 3 akcie [golden mana / last stand]); počas prehrávania nič - odhaľuje ju animácia ako vždy
 function trainingBotAction(b) {
   const q = state?.training?.bot;
-  if (!Array.isArray(q) || playback.playing || state?.phase !== "playing") return null;
+  if (!Array.isArray(q) || playback.playing || state?.phase !== "playing" || b.owner !== state?.vsAi) return null; // len botova strana lišty
   const pre = q[0]?.type === "golden_shield" || q[0]?.type === "golden_mirror" ? q[0] : null;
   const rest = pre ? q.slice(1) : q;
   if (b.kind === "gshield") return pre;
   if (b.kind === "gmana") return rest[3]?.type === "golden_mana" || rest[3]?.type === "last_stand" ? rest[3] : null;
   return b.kind === "act" ? rest[b.idx] || null : null;
+}
+// TRAINING GROUNDS - divák: čo hráč práve plánuje (server preposiela jeho rozpracovanú frontu, training_draft)
+let trainingDraft = null;
+export function setTrainingDraft(d) { trainingDraft = d; renderQueue(); }
+function trainingDraftAction(b) {
+  const d = trainingDraft;
+  if (!isSpectator || !d || !state?.training || d.turn !== state?.turn || playback.playing || b.owner === state?.vsAi) return null;
+  if (b.kind === "gshield") return d.golden ? { type: "golden_shield" } : d.goldenMirror ? { type: "golden_mirror" } : null;
+  if (b.kind === "gmana") return d.goldenMana ? { type: "golden_mana" } : d.lastStand ? { type: "last_stand" } : null;
+  return b.kind === "act" ? d.queue?.[b.idx] || null : null;
 }
 // divák AI roomky: zvýrazní sa akcia človeka (slot, ktorý nie je bot)
 const spyHumanSlot = () => (state?.vsAi === "p1" ? "p2" : state?.vsAi === "p2" ? "p1" : null);
@@ -248,14 +258,16 @@ export function renderQueue() {
     el.className = "q-badge " + (mine ? "mine" : "opp") + " " + (b.kind === "act" ? "main" : "opt");
 
     // TRAINING GROUNDS: fronta bota je hráčovi odhalená už pri plánovaní (cieľom je nájsť odpoveď na ňu)
-    const botA = !mine && b.owner !== me ? trainingBotAction(b) : null;
-    if (botA) {
-      const v = actionBadgeView(botA, b.owner);
-      el.classList.add("revealed");
+    const botA = !mine ? trainingBotAction(b) : null;
+    const draftA = !mine && !botA ? trainingDraftAction(b) : null; // divák: hráčov rozpracovaný plán (polopriehľadný)
+    if (botA || draftA) {
+      const v = actionBadgeView(botA || draftA, b.owner);
+      el.classList.add(botA ? "revealed" : "spec-draft");
       if (v.cls) el.classList.add(v.cls);
       // smer je v tréningu podstatný - šípku ukáž aj na dotyku (inde ju lišta na telefóne skrýva)
-      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text + (isTouch && botA.dir ? ARROW_DIR[botA.dir] || "" : "");
-      el.title = "Opponent (revealed - TRAINING GROUNDS)";
+      const a = botA || draftA;
+      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text + (isTouch && a.dir ? ARROW_DIR[a.dir] || "" : "");
+      el.title = botA ? "Opponent (revealed - TRAINING GROUNDS)" : "Player is planning this";
       queueEl.appendChild(el);
       qBeatEls[b.pos] = el;
       return;
