@@ -11,7 +11,6 @@ import { NEW_ROUND_MS } from "/client/anim.js";
 import { sfx } from "/client/sound.js";
 import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
 import { TRAINING, trainingScenario } from "/shared/training.js";
-import { REOPEN_KEY } from "/client/training-btn.js";
 import { setTrainingDraft } from "/client/queue.js";
 
 const RESULT = {
@@ -55,7 +54,6 @@ function build() {
   back.querySelector(".leave").addEventListener("click", () => {
     sfx("ui.click");
     hide();
-    try { sessionStorage.setItem(REOPEN_KEY, "1"); } catch { /* bez úložiska */ } // room browser znova otvorí okno scenárov
     forgetSpectate();
     socket.emit("leave_room");
   });

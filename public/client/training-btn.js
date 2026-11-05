@@ -55,8 +55,6 @@ function loadMelee() {
   };
   im.src = "/assets/fire/Attack_2.png";
 }
-// sessionStorage: LEAVE z okna výsledku (training.js) → room browser znova otvorí okno scenárov
-export const REOPEN_KEY = "arenaTrainingReopen";
 const SEQ = [0, 0, 0, 1, 2, 3, 3, 3]; // nápriahnutie, úder (index 4 = zásah figuríny), dobeh
 const STEP_MS = 110;
 
@@ -117,10 +115,6 @@ export function setTrainingBtn(roomsEl, trainingRoom, cbs) {
   btn.classList.toggle("busy", busy);
   btn.setAttribute("aria-label", busy ? "Watch training" : "Training grounds");
   if (busy) { closeTraining(); loadMelee(); if (!raf) raf = requestAnimationFrame(loop); } // obsadil ju niekto iný → okno preč
-  // LEAVE z okna výsledku → po návrate do room browsera sa okno TRAINING GROUNDS otvorí znova
-  let reopen = false;
-  try { reopen = sessionStorage.getItem(REOPEN_KEY) === "1"; sessionStorage.removeItem(REOPEN_KEY); } catch { /* bez úložiska */ }
-  if (reopen && freeForMe()) btn.click();
 }
 
 /* ---------- okno TRAINING GROUNDS ---------- */
