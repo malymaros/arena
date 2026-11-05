@@ -36,6 +36,7 @@ import { soundForFrame, soundTimelineStart, syncMusic } from "/client/sound-map.
 import { perf } from "/client/perf.js";
 import { animatePortalWalk, followPortalWalk, spawnVoidHit } from "/client/portals.js";
 import { shrekEffect } from "/client/shrek.js";
+import { trainingBannerHtml, trainingResultReady, trainingEnd } from "/client/training.js";
 import { sideTag } from "/client/side-tag.js";
 
 /* ---------- GameOver sekvencia ---------- */
@@ -158,6 +159,8 @@ function playNewRoundTransition(nextTurn, done) {
   if (final) {
     roundBannerEl.innerHTML = 'FINAL ROUND<span class="rb-demon"><img src="/assets/last_stand.png" alt="" /></span>';
     playback.finalRoundActive = true; // text hore sa prepne až teraz (s bannerom)
+  } else if (state?.training) {
+    roundBannerEl.innerHTML = trainingBannerHtml(); // TRAINING GROUND (tréning, training.js) - démonie kolo je FINAL ROUND vyššie
   } else {
     roundBannerEl.textContent = `ROUND ${nextTurn}`;
   }
@@ -264,6 +267,8 @@ export function schedulePlayTimeline(timeline) {
         // banish/summon: démon ešte chvíľu drží, potom zmizne - stredový AJ ten za postavou
         // (koniec hry = žiadny démon na ploche, nech už jeho animácie dopadli akokoľvek)
         setTimeout(() => { hideDeathCenter(); hideDeathBehind(); }, 700);
+        // TRAINING GROUND: smrť + víťazná póza, potom okno výsledku s Baby botom (nie game over)
+        if (state?.training) { playGameEndAnim(winner, trainingEnd); return; }
         if (playback.serverGameResult && !playback.serverGameResult.matchOver) {
           playGameEndAnim(winner, () => showIntermission(winner, playback.serverGameResult.series, me));
         } else {
@@ -271,6 +276,9 @@ export function schedulePlayTimeline(timeline) {
         }
         return;
       }
+
+      // TRAINING GROUND: posledné kolo scenára dobehlo a obaja žijú → okno výsledku (FAILED), žiadne ďalšie kolo
+      if (trainingResultReady()) { clearRoundCursor(); trainingEnd(); return; }
 
       // bežný koniec kola: round-script (odhalení súperi + kurzor) nechaj vidieť, prehraj
       // „ROUND N" animáciu a až po nej resetuj lištu na ďalšie kolo

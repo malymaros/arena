@@ -5,6 +5,7 @@
 import { setAdmin, setMaintenanceFlag } from "/client/admin-state.js";
 import { showMaintenance, hideMaintenance } from "/client/maintenance.js";
 import { setLobbyBot } from "/client/lobby-bot.js";
+import { setTrainingBtn, closeTraining } from "/client/training-btn.js";
 import { buildRoomGrid } from "/client/room-tiles.js";
 
 // trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
@@ -76,13 +77,15 @@ socket.on("maintenance", () => {
 /* ---------- Room browser (po logine): zoznam roomiek - create / join / spectate ---------- */
 const roomsEl     = document.getElementById("rooms");
 const roomsListEl = document.getElementById("rooms-list");
-export function hideRooms() { roomsEl?.classList.add("hidden"); }
+export function hideRooms() { roomsEl?.classList.add("hidden"); closeTraining(); }
 function renderRooms(info) {
   if (!roomsListEl) return;
   roomsListEl.innerHTML = "";
   // stála AI roomka nie je v zozname - hrá sa cez postavičku bota vpravo dole (lobby-bot.js): voľná → sadneš si,
   // obsadená (max 1 hra s AI na server) → sleduješ
   setLobbyBot(roomsEl, info?.aiRoom || null, (r, level) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id, ...(level ? { level } : {}) }));
+  // TRAINING GROUND vpravo hore (training-btn.js): voľná → okno scenárov → vstup so scenárom; obsadená → sledovať
+  setTrainingBtn(roomsEl, info?.trainingRoom || null, (r, n) => socket.emit(n ? "join_room" : "spectate_room", { roomId: r.id, ...(n ? { scenario: n } : {}) }));
   // pevné dlaždice ROOM 1…N (room-tiles.js): prázdna → CREATE, čaká na súpera → JOIN, plná → SPECTATE
   roomsListEl.appendChild(buildRoomGrid(info, (kind, slot, r) => {
     if (kind === "create") socket.emit("create_room", { slot });
@@ -99,7 +102,7 @@ function respectateFrom(info) {
   try { id = sessionStorage.getItem(SPECTATE_KEY); } catch {}
   if (id == null) return false;
   forgetSpectate(); // „spectator" ho uloží znova; roomka zanikla → zoznam roomiek ako obvykle
-  const room = [...(info?.rooms || []), ...(info?.aiRoom ? [info.aiRoom] : [])].find(r => String(r.id) === id);
+  const room = [...(info?.rooms || []), ...(info?.aiRoom ? [info.aiRoom] : []), ...(info?.trainingRoom ? [info.trainingRoom] : [])].find(r => String(r.id) === id);
   if (!room) return false;
   respectating = true;
   socket.emit("spectate_room", { roomId: room.id });

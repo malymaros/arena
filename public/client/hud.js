@@ -78,7 +78,7 @@ export function renderHUD() {
   if (hudTurn && !playback.gameOverShown) {
     // posledné (buffnuté) kolo po Last Stand → „FINAL ROUND"; prepne sa až s bannerom (playback.finalRoundActive)
     hudTurn.textContent = (state?.phase === "playing")
-      ? (playback.finalRoundActive ? "FINAL ROUND" : `ROUND ${state.turn}`)
+      ? (playback.finalRoundActive ? "FINAL ROUND" : state.training ? "TRAINING GROUND" : `ROUND ${state.turn}`)
       : "";
   }
   updateTurnStatus();

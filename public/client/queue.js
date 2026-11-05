@@ -35,6 +35,17 @@ function markSpy(el) {
   el.insertAdjacentHTML("beforeend", SPY_HTML);
   el.title = "CHEATER saw this action";
 }
+// TRAINING GROUND: akcia bota pre beat b lišty (snapshot training.bot = jeho fronta tohto kola v tvare lock_in:
+// [golden pred-akcia] 3 akcie [golden mana / last stand]); počas prehrávania nič - odhaľuje ju animácia ako vždy
+function trainingBotAction(b) {
+  const q = state?.training?.bot;
+  if (!Array.isArray(q) || playback.playing || state?.phase !== "playing") return null;
+  const pre = q[0]?.type === "golden_shield" || q[0]?.type === "golden_mirror" ? q[0] : null;
+  const rest = pre ? q.slice(1) : q;
+  if (b.kind === "gshield") return pre;
+  if (b.kind === "gmana") return rest[3]?.type === "golden_mana" || rest[3]?.type === "last_stand" ? rest[3] : null;
+  return b.kind === "act" ? rest[b.idx] || null : null;
+}
 // divák AI roomky: zvýrazní sa akcia človeka (slot, ktorý nie je bot)
 const spyHumanSlot = () => (state?.vsAi === "p1" ? "p2" : state?.vsAi === "p2" ? "p1" : null);
 
@@ -235,6 +246,20 @@ export function renderQueue() {
     el.dataset.pos = String(b.pos);
     // veľkosť = dôležitosť: 3 hlavné akcie "main" (veľké), golden "opt" (malé, voliteľné)
     el.className = "q-badge " + (mine ? "mine" : "opp") + " " + (b.kind === "act" ? "main" : "opt");
+
+    // TRAINING GROUND: fronta bota je hráčovi odhalená už pri plánovaní (cieľom je nájsť odpoveď na ňu)
+    const botA = !mine && b.owner !== me ? trainingBotAction(b) : null;
+    if (botA) {
+      const v = actionBadgeView(botA, b.owner);
+      el.classList.add("revealed");
+      if (v.cls) el.classList.add(v.cls);
+      // smer je v tréningu podstatný - šípku ukáž aj na dotyku (inde ju lišta na telefóne skrýva)
+      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text + (isTouch && botA.dir ? ARROW_DIR[botA.dir] || "" : "");
+      el.title = "Opponent (revealed - TRAINING GROUND)";
+      queueEl.appendChild(el);
+      qBeatEls[b.pos] = el;
+      return;
+    }
 
     let filled = null;
     if (mine) {

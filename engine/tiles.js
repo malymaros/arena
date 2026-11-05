@@ -193,6 +193,8 @@ function commitPendingTiles() {
 // Všetky constraints sa vyhodnocujú proti BUDÚCEMU stavu dosky (ohlásené IK ciele + ohlásené spawny).
 function rollPendingTiles() {
   if (!E.game.config) return;
+  // TRAINING GROUND: žiadna náhoda - zmeny na koniec ďalšieho kola sú napevno zo scenára (index = práve končiace kolo)
+  if (E.game.config.training) { E.game.pending = E.trainingPending(E.game.trainingNext?.[E.game.turn]); return; }
   const ikMoves = [];
   for (const ik of E.game.iks) {
     const c = pickCell((x, y) => !ikMoves.some(m => m.x === x && m.y === y));

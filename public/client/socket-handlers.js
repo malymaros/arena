@@ -186,7 +186,7 @@ socket.on("state", (s) => {
     schedulePlayTimeline(s.timeline);
   } else if (!playback.playing) {
     // reload / nové pripojenie do skončeného zápasu → okno game over (PLAY AGAIN · ANALYZE · LEAVE ROOM)
-    if (s.phase === "match_over") showGameOverOnLoad(s);
+    if (s.phase === "match_over" && !s.training) showGameOverOnLoad(s); // tréning má vlastné okno výsledku (training.js)
     // reload počas čakania na súpera: server mi pošle moju locknutú voľbu → vráť ju do lišty kola
     if (s.myLock && !planning.myQueue.length) {
       planning.myQueue = s.myLock.queue.map(a => ({ ...a }));

@@ -3418,6 +3418,90 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .lobby-bot.busy .lobby-bot-bubble::after{ background: #c59bff; }
 @keyframes lobby-bot-bubble{ 0%, 100%{ transform: translateY(0); } 50%{ transform: translateY(-4px); } }
 .perf-lite .lobby-bot-bubble{ animation: none; }
+
+/* ---------- TRAINING GROUND (training-btn.js / training.js, schválený návrh public/dev/tutorial.html) ---------- */
+/* zubaté rohy po 4 px (ako dlaždice roomiek) */
+.tg-btn, .tg-win, .tg-row{ --n: 4px; clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0,
+  calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n), 100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)),
+  calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
+/* tlačidlo vpravo hore: pevná šírka aj výška vo voľnom aj obsadenom stave */
+.tg-btn{ position: absolute; right: 28px; top: 22px; z-index: 3; width: 236px; height: 74px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; padding: 0; border: none; cursor: pointer;
+  font-family: "Press Start 2P", monospace; text-align: left; color: #2b1a05; background: #e3b04b;
+  box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #f5d58c, inset 0 -4px 0 2px #a8741c; transition: transform .1s; }
+.tg-btn.hidden{ display: none; }
+.tg-btn .tg-free{ display: flex; align-items: center; gap: 12px; }
+.tg-btn svg{ width: 44px; height: 52px; display: block; flex: none; filter: drop-shadow(2px 2px 0 rgba(0,0,0,.35)); }
+.tg-btn .tg-t{ display: flex; flex-direction: column; gap: 6px; font-size: 11px; letter-spacing: 2px; text-shadow: 1px 1px 0 rgba(255,255,255,.35); }
+.tg-btn:hover{ filter: brightness(1.1); transform: translateY(-2px); }
+.tg-btn:not(.busy):hover .tg-free svg{ animation: tg-wobble .5s steps(2) infinite; }
+.tg-btn:active{ transform: translateY(2px); }
+@keyframes tg-wobble{ 0%, 100%{ transform: rotate(0); } 50%{ transform: rotate(-6deg); } }
+/* obsadené: bez textu, Fire wizard dáva figuríne melee (kreslí training-btn.js), klik = sledovať */
+.tg-btn .tg-scene{ display: none; position: relative; width: 98px; height: 56px; }
+.tg-btn.busy .tg-free{ display: none; }
+.tg-btn.busy .tg-scene{ display: block; }
+.tg-scene canvas{ position: absolute; left: 0; bottom: -4px; width: 80px; height: 80px; image-rendering: pixelated; }
+.tg-scene svg{ position: absolute; left: 50px; bottom: 0; transform-origin: 50% 100%; }
+.tg-scene svg.hit{ animation: tg-hit .32s steps(4); }
+@keyframes tg-hit{ 0%{ transform: rotate(0); } 30%{ transform: rotate(14deg) translateX(3px); } 70%{ transform: rotate(-5deg); } 100%{ transform: rotate(0); } }
+.tg-scene .tg-pow{ position: absolute; left: 46px; top: 10px; width: 16px; height: 16px; background: #fff; opacity: 0;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.tg-scene .tg-pow.on{ animation: tg-pow .3s steps(3); }
+@keyframes tg-pow{ 0%{ opacity: 1; transform: scale(.5); } 100%{ opacity: 0; transform: scale(1.4); } }
+/* okno TRAINING GROUND (dizajn tlačidla: slama / drevo) */
+.tg-back{ position: fixed; inset: 0; z-index: 10001; background: rgba(4,6,10,.74);
+  display: flex; align-items: center; justify-content: center; font-family: "Press Start 2P", monospace; }
+.tg-back.hidden{ display: none; }
+.tg-win{ position: relative; width: 640px; box-sizing: border-box; padding: 26px 30px 30px; background: #e3b04b; color: #2b1a05;
+  box-shadow: inset 0 0 0 3px #000, inset 0 6px 0 3px #f5d58c, inset 0 -6px 0 3px #a8741c; }
+.tg-top{ display: flex; align-items: center; justify-content: center; gap: 18px; }
+.tg-top svg{ width: 62px; height: 73px; flex: none; filter: drop-shadow(3px 3px 0 rgba(0,0,0,.3)); }
+.tg-title{ margin: 0; font-size: 26px; line-height: 1.3; letter-spacing: 3px; color: #2b1a05; text-shadow: 2px 2px 0 rgba(255,255,255,.35); }
+.tg-sub{ margin: 16px 0 20px; text-align: center; font-size: 11px; letter-spacing: 1px; color: #5a3a0c; }
+.tg-sub b{ color: #b3261e; font-weight: normal; }
+.tg-list{ display: flex; flex-direction: column; gap: 10px; }
+.tg-row{ display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: none; cursor: pointer; text-align: left;
+  font-family: inherit; color: #2b1a05; background: #f0cd6a;
+  box-shadow: inset 0 0 0 2px #000, inset 0 3px 0 2px #fbe4a6, inset 0 -3px 0 2px #c99a34; transition: transform .1s; }
+.tg-row:hover{ background: #fbe08e; transform: translateX(4px); }
+.tg-row:active{ transform: translate(4px, 2px); }
+.tg-num{ flex: none; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 13px;
+  color: #f4efe2; background: #9a6533; box-shadow: inset 0 0 0 2px #000, inset 0 3px 0 2px #b97c44, inset 0 -3px 0 2px #64401c; }
+.tg-name{ flex: 1; font-size: 11px; line-height: 1.5; letter-spacing: 1px; }
+.tg-rounds{ flex: none; font-size: 8px; letter-spacing: 1px; color: #5a3a0c; }
+.tg-close{ position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border: none; cursor: pointer;
+  font: 14px "Press Start 2P", monospace; color: #fff; background: #b3261e; box-shadow: inset 0 0 0 2px #000, inset 0 -4px 0 rgba(0,0,0,.35); }
+/* banner kola v tréningu: pod TRAINING GROUND názov scenára */
+.round-banner .rb-sub{ font-size: 22px; letter-spacing: 2px; color: #fff; white-space: nowrap; text-shadow: 3px 3px 0 #000; }
+/* okno výsledku scenára: Baby bot v strede (smutný / šťastný / prekvapený) */
+.tr-back{ position: fixed; inset: 0; z-index: 10002; background: rgba(4,6,10,.8);
+  display: flex; align-items: center; justify-content: center; font-family: "Press Start 2P", monospace; }
+.tr-back.hidden{ display: none; }
+.tr-res{ --mc: #8fbaff; position: relative; display: flex; flex-direction: column; align-items: center; }
+.tr-res.win{ --mc: #9dff9a; } .tr-res.creative{ --mc: #fff07a; }
+.tr-bubble{ position: relative; max-width: 620px; padding: 20px 26px; margin-bottom: 20px; text-align: center;
+  background: #fff; color: #10141a; font-size: 16px; line-height: 1.7; letter-spacing: 1px;
+  box-shadow: 0 0 0 4px #000, inset 0 0 0 4px var(--mc), 8px 8px 0 4px rgba(0,0,0,.45); animation: tr-pop .28s steps(4) both; }
+.tr-bubble::after{ content: ""; position: absolute; left: calc(50% - 12px); bottom: -22px; width: 24px; height: 22px;
+  background: #000; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.tr-bubble::before{ content: ""; position: absolute; left: calc(50% - 7px); bottom: -14px; width: 14px; height: 14px; z-index: 1;
+  background: var(--mc); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.tr-res canvas{ width: 256px; height: 272px; image-rendering: pixelated; display: block; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--mc) 40%, transparent)); }
+.tr-badge{ margin: 4px 0 20px; font-size: 22px; letter-spacing: 3px; color: var(--mc); text-shadow: 3px 3px 0 #000; }
+.tr-btns{ display: flex; gap: 20px; }
+.tr-btns.hidden{ display: none; }
+.tr-btn{ min-width: 220px; padding: 18px 20px; border: none; cursor: pointer; font: 13px "Press Start 2P", monospace; letter-spacing: 2px; }
+.tr-btn.leave{ color: #10141a; background: #7a7d86; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #a3a6ae, inset 0 -4px 0 2px #4d5058; }
+.tr-btn.again{ color: #2a1c00; background: #ffb300; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #ffd36a, inset 0 -4px 0 2px #b97f00; }
+.tr-btn.again.next{ color: #06200f; background: #3ddc84; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #8af0b5, inset 0 -4px 0 2px #1f8f52; }
+.tr-btn:hover{ filter: brightness(1.12); } .tr-btn:active{ transform: translateY(2px); }
+@keyframes tr-pop{ from{ transform: scale(.6); opacity: 0; } to{ transform: scale(1); opacity: 1; } }
+/* kreatívne riešenie: pixelové hviezdičky okolo hlavy */
+.tr-sparks{ position: absolute; left: 50%; top: 52%; width: 0; height: 0; }
+.tr-sparks i{ position: absolute; width: 10px; height: 10px; background: #fff07a; box-shadow: 0 0 0 2px #000; opacity: 0;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: tr-spark 1.6s steps(8) infinite; }
+@keyframes tr-spark{ 0%{ transform: translate(0,0) scale(.3); opacity: 0; } 30%{ opacity: 1; } 100%{ transform: translate(var(--dx), var(--dy)) scale(1.2); opacity: 0; } }
 /* okno CHOOSE DIFFICULTY po kliknutí na voľného bota (ai-difficulty.js; návrh public/dev/ai-difficulty.html) */
 .ai-diff{
   position: fixed; inset: 0; z-index: 10005; background: rgba(4,6,10,.72);

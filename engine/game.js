@@ -57,7 +57,7 @@ export function createEngine(io = {}) {
     get rand() { return rand; }, set rand(v) { rand = v; },
     pushStateFrame, beginAct, endAct, other, attackDirOk, special1ArgsOk, winnerNow, notePrideHit, doAction,
     runRoundLoop, finishRound, pushInvalid, killClone, breakTrap, strikeZone,
-    kitOf, trackCloneSteps, shrekTraps,
+    kitOf, trackCloneSteps, shrekTraps, trainingPending,
   };
   const { redactHunterActor, redactSnapshotFor, redactRosterMana, redactTimelineFor, labyrinthMul, endLabyrinths, revealLabyrinths, applyLabyrinth, loseInLabyrinth, trackSteps } = Object.assign(E, labyrinthModule(E));
   const { PAUSE, frozenActive, noteFrozenHit, noteFrozenClone, validTimestopQueue, doJotaroWorld, runTimestopActions } = Object.assign(E, timestopModule(E));
@@ -251,6 +251,8 @@ function snapshot() {
     ...(io.vsAi?.() ? { vsAi: io.vsAi() } : {}),
     // obťažnosť bota v AI roomke ("normal" / "baby" / "cheater") - HUD a room browser kreslia podľa nej hlavu bota
     ...(io.aiLevel?.() ? { aiLevel: io.aiLevel() } : {}),
+    // TRAINING GROUND: číslo scenára + odhalená fronta bota v tomto kole (server.js); kľúč len v tréningovej miestnosti
+    ...(io.training?.() ? { training: io.training() } : {}),
     // Jotaro THE WORLD: kým čaká na 3 zmrazené akcie, klient (obaja) vie prepnúť UI mód (neutrálne - len slot)
     timestop: (game.timestop && game.timestop.mode === "waiting") ? { slot: game.timestop.slot } : null,
     board: { ...game.board },
@@ -1889,6 +1891,51 @@ function startGame(gameIndex) {
   emitStateMasked(); // char-select potrebuje per-osoba mageHp (tournament)
 }
 
+// TRAINING GROUND (shared/training.js): pripravený scenár namiesto losovania - hráč (osoba A) je biely p1, Baby
+// bot (osoba B) čierny p2, obaja Fire wizard; HP / mana / pozície / dlaždice / štartér zo scenára, bez portálov,
+// Shreka a náhodných dlaždíc (config.training → rollPendingTiles nežrebuje). Zmeny dlaždíc na koniec kola sú
+// napevno zo scenára (sc.rounds[0].next) a hráč ich vidí ako náhľad. Bot sa zamyká zo servera (server.js).
+function startTraining(sc) {
+  clearTurnTimer();
+  game.config = { format: "single", tilesPerRound: 1, tileWeights: { dmg: 100, heal: 0, mana: 0, ik: 0, power: 0, block: 0 },
+    timer: "off", tilePreview: true, colorPref: "white", training: sc.n };
+  game.arena = "bridge";
+  game.seats = { p1: "A", p2: "B" };
+  game.series = { gameIndex: 1, needed: 1, format: "single" };
+  game.seriesWins = { A: 0, B: 0 };
+  game.roster = null; game.mageHp = null; game.mageMana = null;
+  for (const [slot, who] of [["p1", sc.you], ["p2", sc.bot]]) {
+    const p = game.players[slot] = newPlayer(slot);
+    const c = cellOfAt(who.at);
+    p.x = c.x; p.y = c.y; p.hp = who.hp; p.mana = who.mana;
+    p.char = "fire";
+    deployReset(slot);
+  }
+  game.roundCtx = null;
+  game.timestop = null;
+  game.turn = 1;
+  game.starter = sc.starter === "bot" ? "p2" : "p1";
+  game.tiles = sc.tiles.filter(t => t.type !== "ik").map(t => ({ ...cellOfAt(t.at), type: t.type }));
+  game.iks = sc.tiles.filter(t => t.type === "ik").map(t => cellOfAt(t.at));
+  // zmeny dlaždíc na koniec každého kola zo scenára (index = kolo − 1); rollPendingTiles ich v tréningu len prečíta
+  game.trainingNext = sc.rounds.map(r => r.next || null);
+  game.pending = trainingPending(game.trainingNext[0]);
+  game.portals = [];
+  game.shrek = null;
+  game.items = [];
+  game.phase = "playing";
+  emitYouAre();
+  emitStateMasked();
+}
+// ohlásené zmeny dlaždíc podľa scenára: next = { ik: [nové pozície IK], spawn: [{ type, at }] }; bez next IK ostávajú
+function trainingPending(next) {
+  return {
+    ikMoves: game.iks.map((ik, i) => (next?.ik?.[i] ? cellOfAt(next.ik[i]) : { x: ik.x, y: ik.y })),
+    spawns: (next?.spawn || []).map(s => ({ ...cellOfAt(s.at), type: s.type })),
+  };
+}
+const cellOfAt = (at) => ({ x: Number(at[1]) - 1, y: "ABC".indexOf(at[0]) });
+
 // všetky postavy, ktoré môže strana hrať: bežné + side-postavy viazané na túto stranu (ako mriežka losovania)
 function slotPool(slot) {
   return [...CHARS, ...Object.keys(SIDE_CHARS).filter(k => SIDE_CHARS[k] === slot)];
@@ -2153,7 +2200,7 @@ function autoLock() {
     get game() { return game; },
     exportState, loadState,
     newGame, snapshot, snapshotFor, redactTimelineFor, slotForPerson, otherPerson, seriesSnapshot,
-    sanitizeConfig, startMatch, autoLock, resolveTurn, validQueue, fillFromDraft,
+    sanitizeConfig, startMatch, startTraining, autoLock, resolveTurn, validQueue, fillFromDraft,
     chooseTeam, chooseCharacter, lockIn, timestopActions, draftQueue,
   };
 }

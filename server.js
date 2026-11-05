@@ -13,6 +13,7 @@ import { createJsonlStore } from "./telemetry/store.js";
 import { createMatchLog } from "./telemetry/match-log.js";
 import { MATCHES_SHOWN } from "./shared/match-record.js";
 import { createBotSeat } from "./engine/ai/seat.js";
+import { trainingScenario, matchesSolution, TRAINING } from "./shared/training.js";
 import { matchConfigCustom } from "./shared/arena-defaults.js";
 import { ARENA_ROLL_MS, COLOR_ROLL_MS, charRollMs } from "./shared/timing.js";
 
@@ -160,6 +161,9 @@ const MAX_ROOMS = 2;                        // cap: max toľko bežných roomiek
 // stála AI roomka (docs/AI_PLAN.md): existuje vždy, hrá v nej najviac jeden človek proti botovi; po odchode hráča
 // alebo admin resete sa hneď vytvorí znova čistá. V zozname roomiek ide samostatne (rooms snapshot `aiRoom`).
 const AI_ROOM_ID = "ai";
+// stála TRAINING GROUND miestnosť (tutoriál, shared/training.js): jeden hráč proti Baby botovi so skriptovanými
+// (odhalenými) akciami; obsadená = ostatní ju môžu len sledovať. V zozname roomiek ide samostatne (`trainingRoom`).
+const TRAINING_ROOM_ID = "training";
 // AI bot (docs/AI_PLAN.md): čas na rozmýšľanie AI_THINK_MS (default 10 s, vlastník 2026-11-03 - 4× viac výpočtu
 // = ~59 % proti 1× v duele). Bot rozmýšľa od začiatku kola (počas animácie a hráčovho plánovania), nie až po jeho
 // locku. Reálny čas, nie počet simulácií: e2-micro pri dlhej záťaži spomalí (burst CPU) a pevný počet simulácií
@@ -192,8 +196,8 @@ function okAdmin(keyFromClient) {
 // `turnTimer`… lexikálne - každá roomka má vlastnú kópiu. Globálne konštanty (HP/mana/CHARS/*_MS…) a
 // pure helpery (validateName, okAdmin, rollTileType…) sa čítajú z module scope cez closure.
 // ai = roomka proti AI botovi: bot sedí ako osoba B (virtuálny socket, engine/ai/seat.js)
-function createRoom(id, { ai = false, slot = null } = {}) {
-  const botPerson = ai ? "B" : null;
+function createRoom(id, { ai = false, training = false, slot = null } = {}) {
+  const botPerson = ai || training ? "B" : null;
   // obťažnosť bota (docs/AI_PLAN.md, „Obťažnosť BABY"): hráč ju vyberie pri vstupe (join_room { level }) -
   // okno CHOOSE DIFFICULTY po kliknutí na hlavu bota; platí, kým roomka žije (po odchode hráča vznikne nová, normal)
   let aiLevel = "normal";
@@ -210,9 +214,12 @@ function createRoom(id, { ai = false, slot = null } = {}) {
   let lastRecordId = null;                    // id záznamu posledného zápasu (MATCHES) - hráč po reloade skončeného zápasu ho dostane znova
   const spectators = new Set();               // diváci tejto roomky (dostávajú nemaskovaný stav cez roomEmit)
 
+  // TRAINING GROUND: práve hraný scenár, fronty hráča po kolách (predpísané vs. kreatívne riešenie), výsledok
+  let trainSc = null, trainLocks = [], trainResult = null;
   const engine = createRecordedEngine({
-    emit: (ev, payload) => { noteIntro(ev, payload); roomEmit(ev, payload); },
-    emitState: (timeline) => { noteWorldPause(timeline); emitStateMasked(timeline); },
+    // tréning: koniec hry oznamuje training_result (okno s Baby botom), nie game over série
+    emit: (ev, payload) => { if (training && (ev === "game_result" || ev === "game_over")) return; noteIntro(ev, payload); roomEmit(ev, payload); },
+    emitState: (timeline) => { noteWorldPause(timeline); emitStateMasked(timeline); if (training && timeline) afterTrainingRound(); },
     emitYouAre: () => emitYouAre(),
     clearTurnTimer: () => clearTurnTimer(),
     beginPlanningTimer: (extraMs) => beginPlanningTimer(extraMs),
@@ -220,11 +227,13 @@ function createRoom(id, { ai = false, slot = null } = {}) {
     timerRemainingMs: () => timerRemainingMs(),
     names: () => personNames,
     awaitingOpponent: () => pendingMatchConfig != null,
-    vsAi: () => (ai ? slotForPerson(botPerson) : null), // slot bota (snapshot vsAi)
-    aiLevel: () => (ai ? aiLevel : null),               // obťažnosť bota (snapshot aiLevel)
-  }, { sink: telemetry ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: botPerson, aiLevel: () => aiLevel,
+    vsAi: () => (ai ? slotForPerson(botPerson) : training ? "p2" : null), // slot bota (snapshot vsAi)
+    aiLevel: () => (ai ? aiLevel : training ? "baby" : null),            // obťažnosť bota (snapshot aiLevel); tréning = Baby
+    training: () => trainingInfo(),                                       // tréning: scenár + odhalená fronta bota
+  }, { // tréning sa nezapisuje do telemetrie ani do záznamov zápasov (nie je to zápas)
+    sink: telemetry && !training ? (rec) => telemetry.append(rec) : null, meta: telemetryMeta, aiPerson: training ? null : botPerson, aiLevel: () => aiLevel,
     // uložený záznam zápasu → hráčom a divákom roomky jeho id (tlačidlo ANALYZE na game over)
-    matchLog: matchLog && { save: (r) => { matchLog.save(r); lastRecordId = r.id; roomEmit("match_record", { id: r.id }); } } });
+    matchLog: matchLog && !training && { save: (r) => { matchLog.save(r); lastRecordId = r.id; roomEmit("match_record", { id: r.id }); } } });
   const { snapshot, snapshotFor, redactTimelineFor, slotForPerson, startMatch, newGame, sanitizeConfig } = engine;
 
   // per-room emit: nahrádza io.emit - pošle len hráčom A/B a divákom TEJTO roomky (nie cudzím)
@@ -371,6 +380,7 @@ function onTurnTimeout() {
   // riadok tejto roomky pre room-browser (počet hráčov, či sa dá pripojiť)
   function roomsRow() {
     if (ai) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), phase: engine.game.phase, ai: true, level: aiLevel };
+    if (training) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), training: true };
     const players = ["A", "B"].filter(personAlive).length;
     // slot = pevné miesto v room-browseri (ROOM 1…MAX_ROOMS, číslo sa nemení, kým roomka žije); mená sediacich hráčov
     // names = [host, druhý hráč] po stranách (prázdne miesto = null) - room browser ich píše vedľa štvorčekov
@@ -423,6 +433,7 @@ function onTurnTimeout() {
     spectators.clear();
     rooms.delete(id);
     if (ai) ensureAiRoom(); // stála AI roomka sa hneď vytvorí znova (čistá) - broadcastne aj zoznam
+    else if (training) ensureTrainingRoom(); // aj tréningová
     else broadcastRooms();
   }
   // ak host čaká (stlačil START pred príchodom súpera) a sú už obaja → spusti zápas (color roll)
@@ -454,18 +465,27 @@ function onTurnTimeout() {
     if (lastSpy && ai && p !== botPerson) socket.emit("cheater_spy", lastSpy);
     // reload skončeného zápasu: ANALYZE na game over potrebuje id jeho záznamu
     if (lastRecordId && engine.game.phase === "match_over") socket.emit("match_record", { id: lastRecordId });
+    if (trainResult) socket.emit("training_result", trainResult); // tréning: reload na okne výsledku
     if (p === "B") maybeStartPending(); // 2. hráč dorazil → ak host čakal, spusti zápas
     broadcastSpectators();
   }
 
   // oko s počtom divákov (hráči aj diváci) + či je voľné miesto (divák vidí TAKE SEAT)
   function broadcastSpectators() {
-    roomEmit("spectators", { count: spectators.size, seatFree: isFree("A") || isFree("B") });
+    roomEmit("spectators", { count: spectators.size, seatFree: training ? false : isFree("A") || isFree("B") }); // tréning: len 1 hráč
   }
 
   // pripoj sa do tejto roomky ako 2. hráč (osoba B; ak host odišiel a B ostal, obsadí A)
-  function join(socket, level) {
+  function join(socket, level, scenario) {
     if (socket.data.person) return;
+    // tréning: hráč si sadá vždy ako A (B je Baby bot) a hneď sa spustí zvolený scenár
+    if (training) {
+      if (!isFree("A")) { socket.emit("join_denied", "full"); return; }
+      seat(socket, "A");
+      startScenario(scenario);
+      broadcastRooms();
+      return;
+    }
     // AI roomka: hráč si sadá k botovi → nastav obťažnosť (len pred zápasom, keď je miesto hosta voľné)
     if (ai && isFree("A") && engine.game.phase === "lobby") setAiLevel(level);
     if (isFree("B")) { seat(socket, "B"); broadcastRooms(); }
@@ -484,12 +504,14 @@ function onTurnTimeout() {
     socket.emit("spectator", { roomId: id }); // roomId → klient sa po reloade vráti sledovať tú istú roomku
     socket.emit("state", spectatorView(snapshot()));
     if (lastSpy && ai) socket.emit("cheater_spy", lastSpy); // CHEATER: divák pripojený počas kola vidí, čo bot videl
+    if (trainResult) socket.emit("training_result", trainResult); // tréning: divák príde na okno výsledku
     broadcastSpectators();
   }
 
   // divák si sadne na voľné miesto (hráč odišiel / host čaká na súpera) - rovnaké pravidlá ako join z room-browsera
   function takeSeat(socket) {
     if (!spectators.has(socket)) return;
+    if (training) return; // tréning: sadá sa len z room browsera (výber scenára)
     const p = isFree("B") ? "B" : isFree("A") ? "A" : null;
     if (!p) { socket.emit("join_denied", "full"); return; }
     seat(socket, p); // vyradí ho z divákov a pošle you_are + state
@@ -549,6 +571,7 @@ function onTurnTimeout() {
   function onChooseCharacter(socket, key) { engine.chooseCharacter(socket.data.person, key); }
 
   function onLockIn(socket, queue, clientTurn, ack) {
+    if (training) { trainingLock(socket, queue, clientTurn, ack); return; }
     engine.lockIn(socket.data.person, queue, clientTurn, ack);
     if (!ai || socket.data.person === botPerson) return;
     if (aiLevel === "cheater") { spyOnLock(); return; } // CHEATER: bot rozhodne až s jednou hráčovou akciou
@@ -561,6 +584,7 @@ function onTurnTimeout() {
 
   function onRetry(socket) {
     if (!socket.data.person) return; // divák hru reštartovať nesmie
+    if (training) return;            // tréning: TRY AGAIN / NEXT = training_play
     clearTurnTimer();
     if (botTimer) { clearTimeout(botTimer); botTimer = null; } botPending = null; clearWorldTimer(); // starý podržaný ťah bota
     newGame();
@@ -582,6 +606,54 @@ function onTurnTimeout() {
     }
     broadcastRooms();              // ostatní na room-browseri vidia aktuálny počet hráčov
   }
+
+  /* -------------------- TRAINING GROUND (shared/training.js) -------------------- */
+  // snapshot kľúč training: scenár + fronta bota v aktuálnom kole (hráč ju vidí v lište kola ešte pred plánovaním)
+  function trainingInfo() {
+    if (!training || !trainSc) return null;
+    const g = engine.game;
+    return { n: trainSc.n, rounds: trainSc.rounds.length, bot: trainSc.rounds[g.turn - 1]?.bot || null, done: !!trainResult };
+  }
+  // spusti scenár n (vstup do miestnosti, TRY AGAIN, NEXT): čerstvý stav, klient zahrá banner TRAINING GROUND
+  function startScenario(n) {
+    trainSc = trainingScenario(n) || TRAINING[0];
+    trainLocks = []; trainResult = null;
+    clearTurnTimer();
+    roomEmit("reset");
+    engine.startTraining(trainSc);
+    roomEmit("training_start", { n: trainSc.n });
+  }
+  function onTrainingPlay(socket, n) {
+    if (!training || socket.data.person !== "A") return;
+    startScenario(n);
+  }
+  // hráč zamkol kolo → zapamätaj frontu a hneď zamkni skriptovanú frontu bota (bot nikdy nezamyká skôr - hráč by
+  // počas plánovania videl OPPONENT IS READY navyše; jeho akcie aj tak vidí v lište)
+  function trainingLock(socket, queue, clientTurn, ack) {
+    const g = engine.game, person = socket.data.person;
+    if (person !== "A" || !trainSc || trainResult) { if (typeof ack === "function") ack({ ok: false }); return; }
+    const turn = g.turn;
+    let ok = false;
+    engine.lockIn(person, queue, clientTurn, (r) => { ok = !!r?.ok; if (typeof ack === "function") ack(r); });
+    if (!ok || g.turn !== turn || g.players.p2.locked) return;
+    trainLocks[turn - 1] = Array.isArray(queue) ? queue.map(a => ({ ...a })) : queue;
+    const botQ = trainSc.rounds[turn - 1]?.bot;
+    if (botQ) engine.lockIn(botPerson, botQ.map(a => ({ ...a })), turn);
+  }
+  // po odohratom kole (timeline odišla): koniec scenára? hráč mŕtvy → FAILED; bot mŕtvy → WELL DONE (predpísané
+  // riešenie) / CREATIVE (iné); obaja žijú po poslednom kole scenára → FAILED. Klient okno ukáže po dohraní timeline.
+  function afterTrainingRound() {
+    if (!trainSc || trainResult) return;
+    const g = engine.game, you = g.players.p1, bot = g.players.p2;
+    let result = null;
+    if (you.hp <= 0) result = "fail";
+    else if (bot.hp <= 0) result = matchesSolution(trainSc, trainLocks) ? "win" : "creative";
+    else if (g.turn > trainSc.rounds.length) result = "fail";
+    if (!result) return;
+    trainResult = { n: trainSc.n, result };
+    roomEmit("training_result", trainResult);
+  }
+  if (training) personNames.B = "BABY"; // meno bota v HUD
 
   /* -------------------- AI bot (osoba B v AI roomke) -------------------- */
   // čiastočná timeline THE WORLD (končí timestop_wait): klient ju prehráva súčet delayMs (+ rezerva na úvod
@@ -698,7 +770,7 @@ function onTurnTimeout() {
   }
 
   return {
-    id, ai, slot, seatBot, roomsRow, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset, bugContext,
+    id, ai, training, slot, seatBot, roomsRow, onTrainingPlay, reclaimPersonFor, seat, join, spectate, takeSeat, leave, forceReset, bugContext,
     isEmpty: roomEmpty, onConfigure, onChooseTeam, onChooseCharacter, onLockIn, onTimestopActions, onDraftQueue, onRetry, onDisconnect,
   };
 }
@@ -708,9 +780,10 @@ function onTurnTimeout() {
 // zoznam roomiek pre room-browser + či sa dá vytvoriť nová (limit MAX_ROOMS)
 function roomsSnapshot() {
   const list = [];
-  for (const room of rooms.values()) if (!room.ai) list.push(room.roomsRow());
+  for (const room of rooms.values()) if (!room.ai && !room.training) list.push(room.roomsRow());
   list.sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
-  return { rooms: list, slots: MAX_ROOMS, canCreate: list.length < MAX_ROOMS, aiRoom: rooms.get(AI_ROOM_ID)?.roomsRow() || null };
+  return { rooms: list, slots: MAX_ROOMS, canCreate: list.length < MAX_ROOMS, aiRoom: rooms.get(AI_ROOM_ID)?.roomsRow() || null,
+    trainingRoom: rooms.get(TRAINING_ROOM_ID)?.roomsRow() || null };
 }
 // stála AI roomka: vytvor, ak chýba (štart servera, odchod hráča, admin reset); bot si v nej hneď sadne (osoba B)
 function ensureAiRoom() {
@@ -718,6 +791,13 @@ function ensureAiRoom() {
   const room = createRoom(AI_ROOM_ID, { ai: true });
   rooms.set(room.id, room);
   room.seatBot();
+  broadcastRooms();
+}
+// stála TRAINING GROUND miestnosť: vytvor, ak chýba (štart servera, odchod hráča, admin reset)
+function ensureTrainingRoom() {
+  if (rooms.has(TRAINING_ROOM_ID)) return;
+  const room = createRoom(TRAINING_ROOM_ID, { training: true });
+  rooms.set(room.id, room);
   broadcastRooms();
 }
 // pošli aktuálny zoznam roomiek všetkým na room-browseri (nie posadeným hráčom ani divákom)
@@ -730,6 +810,7 @@ function forceResetAll() {
   for (const room of rooms.values()) room.forceReset();
   rooms.clear();
   ensureAiRoom();
+  ensureTrainingRoom();
   for (const s of browsing) { try { s.emit("force_reload"); } catch {} } // reload aj pre ľudí na room-browseri
 }
 // admin reset: klient obnoví stránku; socket sa odpojí o chvíľu (emit musí odísť skôr než zatvorenie spojenia)
@@ -800,7 +881,7 @@ io.on("connection", (socket) => {
     if (socket.data.person || socket.data.roomId) return; // už niekde je
     if (maintBlocked(socket)) return;                    // údržba: nové roomky len admin
     if (!roomsSnapshot().canCreate) return;               // limit počtu (bežných) roomiek
-    const used = new Set([...rooms.values()].filter(r => !r.ai).map(r => r.slot));
+    const used = new Set([...rooms.values()].filter(r => !r.ai && !r.training).map(r => r.slot));
     const free = Array.from({ length: MAX_ROOMS }, (_, i) => i + 1).filter(n => !used.has(n));
     const slot = free.includes(arg?.slot) ? arg.slot : free[0];
     const room = createRoom(nextRoomId++, { slot });
@@ -813,7 +894,7 @@ io.on("connection", (socket) => {
     if (maintBlocked(socket)) return;
     const room = rooms.get(arg?.roomId);
     if (!room) return;
-    room.join(socket, arg?.level);
+    room.join(socket, arg?.level, arg?.scenario);
   });
   socket.on("spectate_room", (arg) => {
     if (socket.data.person || socket.data.roomId) return;
@@ -833,6 +914,8 @@ io.on("connection", (socket) => {
   socket.on("timestop_actions", (queue, ack) => roomForSocket(socket)?.onTimestopActions(socket, queue, ack));
   socket.on("draft_queue", (d) => roomForSocket(socket)?.onDraftQueue(socket, d));
   socket.on("retry", () => roomForSocket(socket)?.onRetry(socket));
+  // TRAINING GROUND: TRY AGAIN / NEXT (scenár n)
+  socket.on("training_play", (n) => roomForSocket(socket)?.onTrainingPlay(socket, n));
 
   // --- admin reset cez socket - len socket prihlásený admin heslom; globálny (všetky roomky)
   socket.on("admin_reset_all", () => { if (socket.data.isAdmin) forceResetAll(); });
@@ -892,6 +975,7 @@ io.on("connection", (socket) => {
     room.forceReset();         // odpojí hráčov + divákov, zruší časovače
     rooms.delete(room.id);     // vyradí roomku z registra
     ensureAiRoom();            // stála AI roomka sa vytvorí znova čistá
+    ensureTrainingRoom();      // aj tréningová
     broadcastRooms();          // ostatní na room-browseri uvidia aktuálny zoznam
   });
 
@@ -903,6 +987,7 @@ io.on("connection", (socket) => {
 });
 
 ensureAiRoom();
+ensureTrainingRoom();
 httpServer.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
 });
