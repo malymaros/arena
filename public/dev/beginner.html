@@ -50,13 +50,15 @@
   .bg-btn .bg-face canvas { filter: grayscale(1) brightness(.7); }
   .bg-btn .lbl { display: flex; flex-direction: column; gap: 7px; font-size: 9px; letter-spacing: 1px; }
   .bg-btn .sw { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; }
-  .bg-btn .sw i { width: 22px; height: 10px; background: #15161a; box-shadow: inset 0 0 0 2px #000; position: relative; }
-  .bg-btn .sw i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 8px; height: 6px; background: #6b7080; }
+  /* vypínač: tmavá dráha s čiernym rámom, jazdec vľavo (OFF) / vpravo a svetlý (ON) - viditeľný v oboch stavoch */
+  .bg-btn .sw i { width: 26px; height: 12px; background: #15161a; box-shadow: inset 0 0 0 2px #000; position: relative; }
+  .bg-btn .sw i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 8px; background: #6b7080; }
   .bg-btn:hover { filter: brightness(1.15); transform: translateY(-2px); }
   .bg-btn:active { transform: translateY(2px); }
-  .bg-btn.on { color: #06200f; background: #3ddc84; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #8af0b5, inset 0 -4px 0 2px #1f8f52; }
+  /* ON: tlmená zelená (nie žiarivá), text svetlý */
+  .bg-btn.on { color: #d6f2df; background: #2f5e44; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #437a5b, inset 0 -4px 0 2px #1f3f2e; }
   .bg-btn.on .bg-face canvas { filter: none; }
-  .bg-btn.on .sw i::after { left: 12px; background: #06200f; }
+  .bg-btn.on .sw i::after { left: 14px; background: #8fe0b0; }
 
   /* ---------- dlaždica roomky zamknutá pre druhý mód (bez štítku - stačí nápis na tlačidle) ---------- */
   .room-btn.room-tile.mode-locked { cursor: not-allowed; }
@@ -216,7 +218,7 @@
   const fig = (t, d) => { const f = document.createElement("figure"); f.innerHTML = `<figcaption>${t}<small>${d}</small></figcaption>`;
     const s = document.createElement("div"); s.className = "screen"; f.append(s); host.append(f); return s; };
   buildScene(fig("Beginner vypnutý", "bežný hráč: ROOM 1 (beginner) zamknutá - BEGINNERS ONLY"), { on: false });
-  buildScene(fig("Beginner zapnutý", "prepínač zelený, hlavy farebné; ROOM 2 (bežná) zamknutá - NO BEGINNERS"), { on: true });
+  buildScene(fig("Beginner zapnutý", "prepínač tlmene zelený s viditeľným vypínačom (ON), hlavy farebné; ROOM 2 (bežná) zamknutá - NO BEGINNERS"), { on: true });
   buildLobby(fig("Lobby v beginner móde", "bez štítku; Portal Realm, Shrek Swamp, kocka a ADVANCED SETTINGS zamknuté 🔒; ostatné voľby normálne (aj turnaj)"));
   requestAnimationFrame(loop);
 </script>
