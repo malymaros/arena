@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/styles-mobile.css" />
 <style>
   /* NÁVRHOVÁ stránka (nie je linkovaná z hry): BEGINNER mód - prepínač vľavo hore v room browseri (hlavy Fire,
      Lightning, Wanderer), zamknuté roomky druhého módu, zamknuté lobby (len Stone Bridge, bez ADVANCED SETTINGS),
@@ -29,6 +30,16 @@
   .screen .rooms, .screen .lobby { position: absolute; }
   .screen .lobby .lobby-card { zoom: 1.35; }
   .big .screen { max-width: 1280px; }
+  .phone-scenes .screen { aspect-ratio: 1800 / 830; }
+  .screen .inner.ph { width: 1800px; height: 830px; }
+  /* telefón: prepínač ako TRAINING GROUNDS na telefóne (164 × 120) - hlavy hore, vypínač pod nimi, bez nápisu */
+  .phone .bg-btn { left: 40px; top: 30px; width: 164px; height: 120px; flex-direction: column; gap: 10px; padding: 0; }
+  .phone .bg-btn .bg-face { width: 40px; height: 40px; }
+  .phone .bg-btn .lbl { font-size: 0; }
+  .phone .bg-btn .lbl .sw { font-size: 12px; gap: 8px; }
+  .phone .bg-btn .sw i { width: 34px; height: 16px; }
+  .phone .bg-btn .sw i::after { width: 14px; height: 12px; }
+  .phone .bg-btn.on .sw i::after { left: 18px; }
   .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 16px; }
   .shots img { width: 100%; border: 1px solid #262a33; border-radius: 6px; display: block; }
   ul.q { margin: 0; padding-left: 18px; color: #cfd2d6; max-width: 1000px; }
@@ -93,6 +104,13 @@
   </section>
 
   <section>
+    <h2>2b · TELEFÓN</h2>
+    <p>Telefón na šírku (virtuálna obrazovka hry ~1800 × 830, rovnaké telefónne štýly ako v hre). Prepínač je rovnako veľký ako
+       TRAINING GROUNDS (len figurína): tri hlavy v okienkach a pod nimi vypínač, bez nápisu BEGINNER.</p>
+    <div class="scenes phone-scenes" id="phone-scenes"></div>
+  </section>
+
+  <section>
     <h2>3 · CHAR-SELECT (skutočná hra, zákazy beginnera)</h2>
     <p>Rovnaký štýl ako BANNED CHARACTERS: prvá strana (Mages) sú traja povolení mágovia, ostatné strany zašednuté s krížikom a pásikom BANNED,
        na telefóne tlačidlo PICK zmení na BANNED.</p>
@@ -135,7 +153,9 @@
     for (const b of bots) if (b.isConnected && b.offsetParent !== null) drawBotFigure(b, "neutral", now, {});
     requestAnimationFrame(loop);
   }
-  const fit = (screen, inner) => { const f = () => { inner.style.transform = `scale(${screen.clientWidth / 1280})`; }; new ResizeObserver(f).observe(screen); f(); };
+  const fit = (screen, inner, w = 1280) => { const f = () => { inner.style.transform = `scale(${screen.clientWidth / w})`; }; new ResizeObserver(f).observe(screen); f(); };
+  // telefón: vnútro scény má veľkosť virtuálnej obrazovky telefónu a triedy .phone .touch (telefónne štýly hry)
+  const phoneInner = (inner, sc) => { if (sc?.phone) { inner.classList.add("ph", "phone", "touch"); return 1800; } return 1280; };
 
   const ROOMS = [
     { id: 1, slot: 1, players: 1, max: 2, canJoin: true, names: ["Tomi", null], beginner: true, info: { arena: "bridge", color: "random", chars: "manual", timer: "60" } },
@@ -145,6 +165,7 @@
   function buildScene(screen, sc) {
     const st = { on: !!sc.on };
     const inner = document.createElement("div"); inner.className = "inner";
+    const W = phoneInner(inner, sc);
     const rooms = document.createElement("div"); rooms.className = "rooms";
     rooms.innerHTML = `<div class="rooms-card"><h1 class="rooms-title">ARENA</h1><div class="rooms-list"></div></div>`;
     const list = rooms.querySelector(".rooms-list");
@@ -182,33 +203,9 @@
     sync();
     inner.append(rooms);
     screen.appendChild(inner);
-    fit(screen, inner);
+    fit(screen, inner, W);
   }
 
-  // lobby hosta v beginner móde (rovnaké triedy ako v hre; zamknutie = .ai-locked ako pri AI roomke / turnaji)
-  function buildLobby(screen) {
-    const inner = document.createElement("div"); inner.className = "inner";
-    const lobby = document.createElement("div"); lobby.className = "lobby";
-    lobby.innerHTML = `<div class="lobby-card">
-      <h1 class="lobby-title">ARENA</h1><p class="lobby-sub">Match setup</p>
-      <div class="lobby-section"><div class="lobby-label">ARENA</div><div class="arena-pick dice">
-        ${ARENA_KEYS.map(a => `<button class="arena-card${a === "bridge" ? " on" : " ai-locked"}" data-arena="${a}"><canvas width="320" height="180"></canvas><span>${ARENA_NAMES[a]}</span></button>`).join("")}
-        <button class="dice-btn ai-locked" data-arena="random" title="Random arena">${DICE_SVG}</button></div></div>
-      <div class="lobby-section"><button class="adv-open ai-locked"><span class="gear">⚙</span>ADVANCED SETTINGS<span class="adv-sum"></span></button></div>
-      <div class="lobby-section"><div class="lobby-label">FORMAT</div><div class="opt-row">
-        <button class="opt on">Single</button><button class="opt">Best of 3</button><button class="opt">Tournament</button></div></div>
-      <div class="lobby-section"><div class="lobby-label">YOUR COLOR</div><div class="opt-row">
-        <button class="opt on">Random</button><button class="opt">⚪ White</button><button class="opt">⚫ Black</button></div></div>
-      <div class="lobby-section"><div class="lobby-label">RANDOM CHARACTERS</div><div class="opt-row">
-        <button class="opt">On</button><button class="opt on">Off</button></div></div>
-      <div class="lobby-section"><div class="lobby-label">TURN TIMER</div><div class="opt-row">
-        <button class="opt">Off</button><button class="opt">30s</button><button class="opt on">60s</button><button class="opt">120s</button><button class="opt">60s after lock</button></div></div>
-      <button class="lobby-start">START</button></div>`;
-    lobby.querySelectorAll(".arena-card canvas").forEach(c => drawArenaThumb(c, c.parentElement.dataset.arena));
-    inner.append(lobby);
-    screen.appendChild(inner);
-    fit(screen, inner);
-  }
 
   buildScene(document.getElementById("live"), { interactive: true });
   document.getElementById("live").insertAdjacentHTML("afterend", `<button class="toggle-demo" id="toggle-demo" type="button">PREPNI BEGINNER</button>`);
@@ -219,7 +216,16 @@
     const s = document.createElement("div"); s.className = "screen"; f.append(s); host.append(f); return s; };
   buildScene(fig("Beginner vypnutý", "bežný hráč: ROOM 1 (beginner) zamknutá - BEGINNERS ONLY"), { on: false });
   buildScene(fig("Beginner zapnutý", "prepínač tlmene zelený s viditeľným vypínačom (ON), hlavy farebné; ROOM 2 (bežná) zamknutá - NO BEGINNERS"), { on: true });
-  buildLobby(fig("Lobby v beginner móde", "bez štítku; Portal Realm, Shrek Swamp, kocka a ADVANCED SETTINGS zamknuté 🔒; ostatné voľby normálne (aj turnaj)"));
+  // lobby = snímka skutočného lobby z hry so zámkami beginner módu (PC aj telefón)
+  const imgFig = (hostEl, t, d, src) => { const f = document.createElement("figure"); f.innerHTML = `<figcaption>${t}<small>${d}</small></figcaption><img src="${src}" style="width:100%;border:1px solid #262a33;border-radius:6px;display:block" alt="">`; hostEl.append(f); };
+  imgFig(host, "Lobby v beginner móde (skutočné lobby)", "Portal Realm, Shrek Swamp, kocka a ADVANCED SETTINGS zamknuté 🔒; ostatné voľby normálne (aj turnaj)", "/dev/beginner-preview/lobby-pc.png");
+  // telefón
+  const phost = document.getElementById("phone-scenes");
+  const pfig = (t, d) => { const f = document.createElement("figure"); f.innerHTML = `<figcaption>${t}<small>${d}</small></figcaption>`;
+    const s = document.createElement("div"); s.className = "screen"; f.append(s); phost.append(f); return s; };
+  buildScene(pfig("Telefón: beginner vypnutý", "sivé hlavy, vypínač vľavo; ROOM 1 (beginner) zamknutá"), { on: false, phone: true });
+  buildScene(pfig("Telefón: beginner zapnutý", "tlmená zelená, vypínač vpravo; ROOM 2 (bežná) zamknutá"), { on: true, phone: true });
+  imgFig(phost, "Telefón: lobby v beginner móde (skutočné lobby)", "zamknuté Portal Realm, Shrek Swamp, kocka a ADVANCED SETTINGS", "/dev/beginner-preview/lobby-phone.png");
   requestAnimationFrame(loop);
 </script>
 </body>
