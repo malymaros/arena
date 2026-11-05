@@ -40,8 +40,11 @@ function markSpy(el) {
 function trainingBotAction(b) {
   const q = state?.training?.bot;
   if (!Array.isArray(q) || playback.playing || state?.phase !== "playing" || b.owner !== state?.vsAi) return null; // len botova strana lišty
-  const pre = q[0]?.type === "golden_shield" || q[0]?.type === "golden_mirror" ? q[0] : null;
-  const rest = pre ? q.slice(1) : q;
+  const hope = q[0]?.type === "last_hope" ? q[0] : null; // [last_hope] úplne vpredu (final kolo, nebuffnutý bot)
+  const q2 = hope ? q.slice(1) : q;
+  const pre = q2[0]?.type === "golden_shield" || q2[0]?.type === "golden_mirror" ? q2[0] : null;
+  const rest = pre ? q2.slice(1) : q2;
+  if (b.kind === "lasthope") return hope;
   if (b.kind === "gshield") return pre;
   if (b.kind === "gmana") return rest[3]?.type === "golden_mana" || rest[3]?.type === "last_stand" ? rest[3] : null;
   return b.kind === "act" ? rest[b.idx] || null : null;
@@ -242,6 +245,11 @@ export function renderQueue() {
       if (mine && planning.lastHopeArmed) {
         el.innerHTML = LH_BADGE_IMG;
         el.title = "Last Hope (navolené)";
+      } else if (!mine && trainingBotAction(b)) {
+        // TRAINING GROUNDS: botova Last Hope je odhalená ako zvyšok jeho fronty
+        el.classList.add("revealed");
+        el.innerHTML = LH_BADGE_IMG;
+        el.title = "Opponent (revealed - TRAINING GROUNDS)";
       } else {
         el.classList.add("q-slot");
         el.innerHTML = '<span class="lh-dim">?</span>';

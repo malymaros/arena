@@ -13,7 +13,7 @@ import { createJsonlStore } from "./telemetry/store.js";
 import { createMatchLog } from "./telemetry/match-log.js";
 import { MATCHES_SHOWN } from "./shared/match-record.js";
 import { createBotSeat } from "./engine/ai/seat.js";
-import { trainingScenario, matchesSolution, TRAINING } from "./shared/training.js";
+import { trainingScenario, trainingRound, matchesSolution, TRAINING } from "./shared/training.js";
 import { matchConfigCustom } from "./shared/arena-defaults.js";
 import { ARENA_ROLL_MS, COLOR_ROLL_MS, charRollMs } from "./shared/timing.js";
 
@@ -219,7 +219,7 @@ function createRoom(id, { ai = false, training = false, slot = null, beginner: b
   const spectators = new Set();               // diváci tejto roomky (dostávajú nemaskovaný stav cez roomEmit)
 
   // TRAINING GROUNDS: práve hraný scenár, fronty hráča po kolách (predpísané vs. kreatívne riešenie), výsledok
-  let trainSc = null, trainLocks = [], trainResult = null, trainDraft = null;
+  let trainSc = null, trainLocks = [], trainRounds = [], trainResult = null, trainDraft = null;
   // tréning: kto má otvorené okno scenárov (klik na TRAINING GROUNDS) - miestnosť je pre ostatných obsadená
   let reservedBy = null;
   const engine = createRecordedEngine({
@@ -638,12 +638,12 @@ function onTurnTimeout() {
   function trainingInfo() {
     if (!training || !trainSc) return null;
     const g = engine.game;
-    return { n: trainSc.n, rounds: trainSc.rounds.length, bot: trainSc.rounds[g.turn - 1]?.bot || null, done: !!trainResult };
+    return { n: trainSc.n, rounds: trainSc.rounds.length, bot: trainingRound(trainSc, g.turn, g.players)?.bot || null, done: !!trainResult };
   }
   // spusti scenár n (vstup do miestnosti, TRY AGAIN, NEXT): čerstvý stav, klient zahrá banner TRAINING GROUNDS
   function startScenario(n) {
     trainSc = trainingScenario(n) || TRAINING[0];
-    trainLocks = []; trainResult = null; trainDraft = null;
+    trainLocks = []; trainRounds = []; trainResult = null; trainDraft = null;
     clearTurnTimer();
     roomEmit("reset");
     engine.startTraining(trainSc);
@@ -671,11 +671,13 @@ function onTurnTimeout() {
     const g = engine.game, person = socket.data.person;
     if (person !== "A" || !trainSc || trainResult) { if (typeof ack === "function") ack({ ok: false }); return; }
     const turn = g.turn;
+    const round = trainingRound(trainSc, turn, g.players); // variant kola podľa pozície na jeho začiatku
     let ok = false;
     engine.lockIn(person, queue, clientTurn, (r) => { ok = !!r?.ok; if (typeof ack === "function") ack(r); });
     if (!ok || g.turn !== turn || g.players.p2.locked) return;
     trainLocks[turn - 1] = Array.isArray(queue) ? queue.map(a => ({ ...a })) : queue;
-    const botQ = trainSc.rounds[turn - 1]?.bot;
+    trainRounds[turn - 1] = round;
+    const botQ = round?.bot;
     if (botQ) engine.lockIn(botPerson, botQ.map(a => ({ ...a })), turn);
   }
   // po odohratom kole (timeline odišla): koniec scenára? hráč mŕtvy → FAILED; bot mŕtvy → WELL DONE (predpísané
@@ -685,7 +687,7 @@ function onTurnTimeout() {
     const g = engine.game, you = g.players.p1, bot = g.players.p2;
     let result = null;
     if (you.hp <= 0) result = "fail";
-    else if (bot.hp <= 0) result = matchesSolution(trainSc, trainLocks) ? "win" : "creative";
+    else if (bot.hp <= 0) result = matchesSolution(trainSc, trainLocks, trainRounds) ? "win" : "creative";
     else if (g.turn > trainSc.rounds.length) result = "fail";
     if (!result) return;
     trainResult = { n: trainSc.n, result };

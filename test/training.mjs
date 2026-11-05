@@ -3,57 +3,72 @@
 // vyhrať. Zmeny dlaždíc medzi kolami idú zo scenára (žiadna náhoda).
 import assert from "node:assert/strict";
 import { createEngine } from "../engine/game.js";
-import { TRAINING, ANY, matchesSolution, trainingScenario } from "../shared/training.js";
+import { TRAINING, ANY, matchesSolution, trainingScenario, trainingRound } from "../shared/training.js";
 
 const mv = (type, dir) => (dir ? { type, dir } : { type });
-// ANY v riešení nahradí bezpečná akcia (scenár:kolo:slot; typ akcie sa v kole nesmie opakovať)
-const FILL = { "4:0:3": mv("move", "up"), "6:0:2": mv("recharge"), "6:1:0": mv("move", "up"), "6:1:2": mv("recharge") };
+// ANY v riešení nahradí bezpečná akcia (scenár:kolo:slot, pri kole s variantmi scenár:kolo:variant:slot; typ akcie
+// sa v kole nesmie opakovať)
+const FILL = { "4:0:3": mv("move", "up"), "6:0:2": mv("recharge"), "6:1:0": mv("move", "up"), "6:1:2": mv("recharge"),
+  "7:1:youDemon:1": mv("recharge"), "7:1:youDemon:2": mv("pass"),
+  "7:1:else:1": mv("recharge"), "7:1:else:2": mv("pass"), "7:1:else:3": mv("attack", "up"),
+  "7:1:same:2": mv("move", "down"), "7:1:same:3": mv("recharge"), "7:1:same:4": mv("pass") };
+// predpísané riešenie kola ako hrateľná fronta: ANY → FILL, alternatívy → prvá, OPT → vynechať (withOpt = zahrať)
+function solve(sc, k, round, withOpt = false) {
+  const key = (i) => (round.when ? `${sc.n}:${k}:${round.when}:${i}` : `${sc.n}:${k}:${i}`);
+  return round.solution.flatMap((a, i) => (a === ANY ? [FILL[key(i)]] : Array.isArray(a) ? [a[0]] : a.opt ? (withOpt ? [a.opt] : []) : [a]));
+}
 
-// zahrá scenár: plays[k] = hráčova fronta v kole k+1; vráti "win" | "fail" + fronty hráča
+// zahrá scenár: plays[k] = hráčova fronta v kole k+1, alebo funkcia (kolo) => fronta (kolo s variantmi - variant
+// určí pozícia na začiatku kola); vráti "win" | "fail" + fronty hráča + odohrané kolá
 function play(sc, plays) {
   const e = createEngine({});
   e.startTraining(sc);
   const g = () => e.game;
-  const locks = [];
+  const locks = [], played = [];
   for (let k = 0; k < sc.rounds.length; k++) {
-    const q = plays[k];
+    const round = trainingRound(sc, g().turn, g().players);
+    assert.ok(round, `scenár ${sc.n} kolo ${k + 1}: žiadny variant kola nesedí`);
+    const q = typeof plays[k] === "function" ? plays[k](round) : plays[k];
     if (!q) break;
     let ok = null;
     e.lockIn("A", q, g().turn, (r) => { ok = r; });
     assert.ok(ok?.ok, `scenár ${sc.n} kolo ${k + 1}: engine odmietol hráčovu frontu ${JSON.stringify(q)} (${JSON.stringify(ok)})`);
-    locks.push(q);
+    locks.push(q); played.push(round);
     let okB = null;
-    e.lockIn("B", sc.rounds[k].bot, g().turn, (r) => { okB = r; });
-    assert.ok(okB?.ok, `scenár ${sc.n} kolo ${k + 1}: engine odmietol frontu bota (${JSON.stringify(okB)})`);
+    e.lockIn("B", round.bot, g().turn, (r) => { okB = r; });
+    assert.ok(okB?.ok, `scenár ${sc.n} kolo ${k + 1}: engine odmietol frontu bota${round.when ? ` (variant ${round.when})` : ""} (${JSON.stringify(okB)})`);
     const { p1, p2 } = g().players;
-    if (p1.hp <= 0) return { result: "fail", locks };
-    if (p2.hp <= 0) return { result: "win", locks };
+    if (p1.hp <= 0) return { result: "fail", locks, played };
+    if (p2.hp <= 0) return { result: "win", locks, played };
   }
-  return { result: "fail", locks };
+  return { result: "fail", locks, played };
 }
-const solution = (sc) => sc.rounds.map((r, k) => r.solution.map((a, i) => (a === ANY ? FILL[`${sc.n}:${k}:${i}`] : a)));
+const solution = (sc, withOpt = false) => sc.rounds.map((_, k) => (round) => solve(sc, k, round, withOpt));
 
 for (const sc of TRAINING) {
-  const r = play(sc, solution(sc));
-  assert.equal(r.result, "win", `scenár ${sc.n} (${sc.name}): predpísané riešenie nevyhralo`);
-  assert.ok(matchesSolution(sc, r.locks), `scenár ${sc.n}: riešenie sa nerozpozná ako predpísané`);
+  for (const withOpt of [false, true]) {
+    const r = play(sc, solution(sc, withOpt));
+    assert.equal(r.result, "win", `scenár ${sc.n} (${sc.name}): predpísané riešenie${withOpt ? " s voliteľnou akciou" : ""} nevyhralo`);
+    assert.ok(matchesSolution(sc, r.locks, r.played), `scenár ${sc.n}: riešenie sa nerozpozná ako predpísané`);
+  }
 }
 
 // predpísané riešenie + koncová extra akcia (golden mana / Last Stand) v poslednom kole: hra skončí skôr, extra sa
 // nevykoná → stále WELL DONE, nie falošné CREATIVE (videné v hre na scenári 4)
 for (const sc of TRAINING) {
   const last = sc.rounds.length - 1;
-  if (["golden_mana", "last_stand"].includes(sc.rounds[last].solution.at(-1)?.type)) continue;
+  if (["golden_mana", "last_stand"].includes(sc.rounds[last].solution?.at(-1)?.type)) continue;
   for (const extra of ["golden_mana", "last_stand"]) {
     const plays = solution(sc);
-    plays[last] = [...plays[last], mv(extra)];
+    const lastFn = plays[last];
+    plays[last] = (round) => [...lastFn(round), mv(extra)];
     let r;
     try { r = play(sc, plays); } catch (err) {
       if (/odmietol hráčovu frontu/.test(err.message)) continue; // extra tu engine nepustí (napr. kolo s démonom)
       throw err;
     }
     assert.equal(r.result, "win", `scenár ${sc.n}: riešenie + ${extra} malo vyhrať`);
-    assert.ok(matchesSolution(sc, r.locks), `scenár ${sc.n}: riešenie + ${extra} sa musí rozpoznať ako predpísané (nie creative)`);
+    assert.ok(matchesSolution(sc, r.locks, r.played), `scenár ${sc.n}: riešenie + ${extra} sa musí rozpoznať ako predpísané (nie creative)`);
   }
 }
 
@@ -66,6 +81,13 @@ const bad = [
   [5, [[mv("move", "right"), mv("shield_breaker"), mv("mirror_breaker")]]],  // zlé breakery → odraz
   [6, [[mv("dash", "up"), mv("recharge"), mv("attack", "right"), mv("last_stand")]]], // bez štítu ho special zabije
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("demon"), mv("recharge"), mv("attack", "right")]]], // démon do golden štítu
+  [7, [[mv("recharge"), mv("dash", "right"), mv("attack", "up")]]],          // bez obrany ho special v riadku C zabije
+  // A) démon v hociktorej akcii: 1. minie (bot na hráčovom políčku), 2. odrazí mirror, 3. zablokuje shield → doom
+  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("demon"), mv("move", "up"), mv("recharge")]]],
+  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("move", "up"), mv("demon"), mv("recharge")]]],
+  [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("move", "up"), mv("recharge"), mv("demon")]]],
+  [7, [[mv("recharge"), mv("dash", "right"), mv("shield")], [mv("recharge"), mv("pass"), mv("attack", "up")]]], // B) bez golden obrany ho démon zabije
+  [7, [[mv("shield"), mv("recharge"), mv("mirror")], [mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]], // rovnaké políčko: 0 many na golden
 ];
 for (const [n, plays] of bad) {
   const r = play(trainingScenario(n), plays);
@@ -76,12 +98,40 @@ for (const [n, plays] of bad) {
 const creative = [
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("move", "down"), mv("special"), mv("recharge")]]], // IK na B1 s buffom + special
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("dash", "right"), mv("special"), mv("recharge")]]], // dmg dlaždica → special ±1 riadok
+  [7, [[mv("shield"), mv("recharge"), mv("melee")]]], // bot celé kolo na dmg dlaždici C1 (3×1) + melee 8 → mŕtvy už v 1. kole
+  // rovnaké políčko (odchýlka v 1. kole): Last Hope dá manu na golden shield proti melee, bota zabije doom
+  [7, [[mv("shield"), mv("recharge"), mv("mirror")], [mv("last_hope"), mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]],
 ];
 for (const [n, plays] of creative) {
   const sc = trainingScenario(n);
   const r = play(sc, plays);
   assert.equal(r.result, "win", `scenár ${n}: kreatívne riešenie ${JSON.stringify(plays)} malo vyhrať`);
-  assert.ok(!matchesSolution(sc, r.locks), `scenár ${n}: kreatívne riešenie sa nesmie rozpoznať ako predpísané`);
+  assert.ok(!matchesSolution(sc, r.locks, r.played), `scenár ${n}: kreatívne riešenie sa nesmie rozpoznať ako predpísané`);
+}
+
+// scenár 7: alternatívy predpísaného riešenia (mirror namiesto shieldu, special namiesto melee, golden mirror) = WELL DONE
+// a správny variant 2. kola podľa toho, kde a s čím hráč skončil
+{
+  const sc = trainingScenario(7);
+  const well = [
+    [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("special"), mv("recharge"), mv("pass")], "youDemon"],
+    [[mv("recharge"), mv("dash", "right"), mv("shield"), mv("last_stand")], [mv("melee"), mv("move", "up"), mv("shield_breaker")], "youDemon"],
+    [[mv("recharge"), mv("dash", "right"), mv("mirror")], [mv("golden_mirror"), mv("recharge"), mv("pass"), mv("attack", "left")], "else"],
+  ];
+  for (const [r1, r2, when] of well) {
+    const r = play(sc, [r1, r2]);
+    assert.equal(r.result, "win", `scenár 7: ${JSON.stringify([r1, r2])} malo vyhrať`);
+    assert.equal(r.played[1].when, when, "scenár 7: zlý variant 2. kola");
+    assert.ok(matchesSolution(sc, r.locks, r.played), `scenár 7: ${JSON.stringify([r1, r2])} je predpísané riešenie (WELL DONE)`);
+  }
+  // rovnaké políčko → variant same, aj keď si hráč vzal démona (fronta bota melee / strela vpravo / recharge)
+  for (const r1 of [[mv("shield"), mv("recharge"), mv("mirror")], [mv("shield"), mv("recharge"), mv("mirror"), mv("last_stand")]]) {
+    const e = createEngine({});
+    e.startTraining(sc);
+    e.lockIn("A", r1, 1);
+    e.lockIn("B", sc.rounds[0].bot, 1);
+    assert.equal(trainingRound(sc, 2, e.game.players).when, "same", `scenár 7: ${JSON.stringify(r1)} → variant same`);
+  }
 }
 
 // scenár 6: zmeny dlaždíc na konci 1. kola zo scenára (IK A2 → B1, C4 → B3, mana na B4), žiadne náhodné dlaždice
