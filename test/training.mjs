@@ -39,6 +39,24 @@ for (const sc of TRAINING) {
   assert.ok(matchesSolution(sc, r.locks), `scenár ${sc.n}: riešenie sa nerozpozná ako predpísané`);
 }
 
+// predpísané riešenie + koncová extra akcia (golden mana / Last Stand) v poslednom kole: hra skončí skôr, extra sa
+// nevykoná → stále WELL DONE, nie falošné CREATIVE (videné v hre na scenári 4)
+for (const sc of TRAINING) {
+  const last = sc.rounds.length - 1;
+  if (["golden_mana", "last_stand"].includes(sc.rounds[last].solution.at(-1)?.type)) continue;
+  for (const extra of ["golden_mana", "last_stand"]) {
+    const plays = solution(sc);
+    plays[last] = [...plays[last], mv(extra)];
+    let r;
+    try { r = play(sc, plays); } catch (err) {
+      if (/odmietol hráčovu frontu/.test(err.message)) continue; // extra tu engine nepustí (napr. kolo s démonom)
+      throw err;
+    }
+    assert.equal(r.result, "win", `scenár ${sc.n}: riešenie + ${extra} malo vyhrať`);
+    assert.ok(matchesSolution(sc, r.locks), `scenár ${sc.n}: riešenie + ${extra} sa musí rozpoznať ako predpísané (nie creative)`);
+  }
+}
+
 // zlé ťahy (prehra)
 const bad = [
   [1, [[mv("recharge"), mv("move", "up"), mv("attack", "right")]]],          // nabíja na B1 → strela ho zabije

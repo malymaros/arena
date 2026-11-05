@@ -54,11 +54,17 @@ export const trainingScenario = (n) => TRAINING.find(s => s.n === Number(n)) || 
 // "B1" → { x: 0, y: 1 }
 export function cellOf(at) { return { x: Number(at[1]) - 1, y: "ABC".indexOf(at[0]) }; }
 
-// zahral hráč predpísané riešenie? locks = jeho fronty (lock_in) po kolách; ANY = hocičo, smer len keď ho riešenie má
+// zahral hráč predpísané riešenie? locks = jeho fronty (lock_in) po kolách; ANY = hocičo, smer len keď ho riešenie má.
+// V poslednom kole (bot v ňom zomrel) sa koncová extra akcia (golden_mana / last_stand) nikdy nevykoná (ide až po
+// všetkých akciách a hra skončí skôr) - ak ju riešenie nemá, nesmie z predpísaného riešenia urobiť falošné CREATIVE.
+const TRAILING = new Set(["golden_mana", "last_stand"]);
 export function matchesSolution(sc, locks) {
   return sc.rounds.every((r, i) => {
-    const q = locks[i];
-    if (!Array.isArray(q) || q.length !== r.solution.length) return false;
-    return r.solution.every((s, k) => s === ANY || (q[k]?.type === s.type && (!s.dir || q[k]?.dir === s.dir)));
+    let q = locks[i];
+    if (!Array.isArray(q)) return false;
+    const last = i === sc.rounds.length - 1, sol = r.solution;
+    if (last && TRAILING.has(q[q.length - 1]?.type) && !TRAILING.has(sol[sol.length - 1]?.type)) q = q.slice(0, -1);
+    if (q.length !== sol.length) return false;
+    return sol.every((s, k) => s === ANY || (q[k]?.type === s.type && (!s.dir || q[k]?.dir === s.dir)));
   });
 }
