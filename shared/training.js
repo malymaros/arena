@@ -53,14 +53,15 @@ export const TRAINING = [
         solution: [ANY, a("demon"), ANY] },
     ] },
   // vlastník 2026-11-05: v 1. kole si hráč vyberie „jed" - démona (Last Stand) alebo nie; 2. kolo podľa toho, kde a
-  // s čím skončil. Bot v 1. kole: move dole = náraz do steny (ostáva na C1, special bije riadok C).
+  // s čím skončil. Bot v 1. kole ostáva na C1 (special bije riadok C); strela hore trestá útek na B1. Hráč začína
+  // bez many - najprv nabiť, mana dlaždica na C3 zaplatí obranu.
   { n: 7, name: "Pick your POISON", starter: "you",
-    you: { at: "C1", hp: 10, mana: 2 }, bot: { at: "C1", hp: 10, mana: 10 },
+    you: { at: "C1", hp: 10, mana: 0 }, bot: { at: "C1", hp: 10, mana: 10 },
     tiles: [{ type: "ik", at: "A1" }, { type: "ik", at: "B3" }, { type: "ik", at: "C2" },
       { type: "dmg", at: "A3" }, { type: "dmg", at: "A4" }, { type: "dmg", at: "B2" }, { type: "dmg", at: "C1" },
       { type: "block", at: "B4" }, { type: "mana", at: "C3" }, { type: "mana", at: "C4" }, { type: "heal", at: "B1" }],
     rounds: [
-      { bot: [a("melee"), a("move", "down"), a("special"), a("last_stand")],
+      { bot: [a("melee"), a("attack", "up"), a("special"), a("last_stand")],
         solution: [a("recharge"), a("dash", "right"), [a("shield"), a("mirror")], OPT(a("last_stand"))],
         // staré IK sa vymenia medzi sebou (A1 → B3, B3 → C2, C2 → A1), nové IK na B1 a C4
         next: { ik: ["B3", "C2", "A1"], spawn: [{ type: "ik", at: "B1" }, { type: "ik", at: "C4" }] } },

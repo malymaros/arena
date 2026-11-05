@@ -87,7 +87,8 @@ const bad = [
   [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("move", "up"), mv("demon"), mv("recharge")]]],
   [7, [[mv("recharge"), mv("dash", "right"), mv("mirror"), mv("last_stand")], [mv("move", "up"), mv("recharge"), mv("demon")]]],
   [7, [[mv("recharge"), mv("dash", "right"), mv("shield")], [mv("recharge"), mv("pass"), mv("attack", "up")]]], // B) bez golden obrany ho démon zabije
-  [7, [[mv("shield"), mv("recharge"), mv("mirror")], [mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]], // rovnaké políčko: 0 many na golden
+  [7, [[mv("move", "up"), mv("recharge"), mv("dash", "down")], [mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]], // rovnaké políčko: 0 many na golden
+  [7, [[mv("shield"), mv("recharge"), mv("melee")]]], // bez many shield nevyjde (0 many na štarte) → melee + dmg dlaždica
 ];
 for (const [n, plays] of bad) {
   const r = play(trainingScenario(n), plays);
@@ -98,9 +99,10 @@ for (const [n, plays] of bad) {
 const creative = [
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("move", "down"), mv("special"), mv("recharge")]]], // IK na B1 s buffom + special
   [6, [[mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], [mv("dash", "right"), mv("special"), mv("recharge")]]], // dmg dlaždica → special ±1 riadok
-  [7, [[mv("shield"), mv("recharge"), mv("melee")]]], // bot celé kolo na dmg dlaždici C1 (3×1) + melee 8 → mŕtvy už v 1. kole
+  // útek hore na B1 (strela ho zrazí na 2 HP, v 2. kole tam pribudne IK): Last Hope + golden shield, preč z IK
+  [7, [[mv("move", "up"), mv("dash", "up"), mv("recharge")], [mv("last_hope"), mv("golden_shield"), mv("move", "down"), mv("dash", "right"), mv("attack", "up")]]],
   // rovnaké políčko (odchýlka v 1. kole): Last Hope dá manu na golden shield proti melee, bota zabije doom
-  [7, [[mv("shield"), mv("recharge"), mv("mirror")], [mv("last_hope"), mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]],
+  [7, [[mv("move", "up"), mv("recharge"), mv("dash", "down")], [mv("last_hope"), mv("golden_shield"), mv("move", "down"), mv("recharge"), mv("pass")]]],
 ];
 for (const [n, plays] of creative) {
   const sc = trainingScenario(n);
@@ -125,7 +127,7 @@ for (const [n, plays] of creative) {
     assert.ok(matchesSolution(sc, r.locks, r.played), `scenár 7: ${JSON.stringify([r1, r2])} je predpísané riešenie (WELL DONE)`);
   }
   // rovnaké políčko → variant same, aj keď si hráč vzal démona (fronta bota melee / strela vpravo / recharge)
-  for (const r1 of [[mv("shield"), mv("recharge"), mv("mirror")], [mv("shield"), mv("recharge"), mv("mirror"), mv("last_stand")]]) {
+  for (const r1 of [[mv("move", "up"), mv("recharge"), mv("dash", "down")], [mv("move", "up"), mv("recharge"), mv("dash", "down"), mv("last_stand")]]) {
     const e = createEngine({});
     e.startTraining(sc);
     e.lockIn("A", r1, 1);
