@@ -66,16 +66,16 @@ for (const [n, plays] of creative) {
   assert.ok(!matchesSolution(sc, r.locks), `scenár ${n}: kreatívne riešenie sa nesmie rozpoznať ako predpísané`);
 }
 
-// scenár 6: zmeny dlaždíc na konci 1. kola zo scenára (IK A2 → B1, mana na B4), žiadne náhodné dlaždice
+// scenár 6: zmeny dlaždíc na konci 1. kola zo scenára (IK A2 → B1, C4 → B3, mana na B4), žiadne náhodné dlaždice
 {
   const e = createEngine({});
   e.startTraining(trainingScenario(6));
-  assert.deepEqual(e.game.pending, { ikMoves: [{ x: 0, y: 1 }], spawns: [{ x: 3, y: 1, type: "mana" }] });
+  assert.deepEqual(e.game.pending, { ikMoves: [{ x: 0, y: 1 }, { x: 2, y: 1 }], spawns: [{ x: 3, y: 1, type: "mana" }] });
   e.lockIn("A", [mv("dash", "up"), mv("shield"), mv("recharge"), mv("last_stand")], 1);
   e.lockIn("B", trainingScenario(6).rounds[0].bot, 1);
-  assert.deepEqual(e.game.iks, [{ x: 0, y: 1 }]);
+  assert.deepEqual(e.game.iks, [{ x: 0, y: 1 }, { x: 2, y: 1 }]);
   assert.ok(e.game.tiles.some(t => t.type === "mana" && t.x === 3 && t.y === 1));
-  assert.deepEqual(e.game.pending, { ikMoves: [{ x: 0, y: 1 }], spawns: [] });
+  assert.equal(e.game.pending, null, "posledné kolo bez zmien dlaždíc = žiadny náhľad");
   assert.ok(e.game.players.p1.lastStandBuff, "Last Stand mal vyjsť");
 }
 console.log(`training: ${TRAINING.length} scenárov OK (riešenia, ${bad.length} zlých ťahov, ${creative.length} kreatívne)`);

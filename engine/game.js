@@ -1927,8 +1927,10 @@ function startTraining(sc) {
   emitYouAre();
   emitStateMasked();
 }
-// ohlásené zmeny dlaždíc podľa scenára: next = { ik: [nové pozície IK], spawn: [{ type, at }] }; bez next IK ostávajú
+// ohlásené zmeny dlaždíc podľa scenára: next = { ik: [nové pozície IK], spawn: [{ type, at }] }; bez next žiadny
+// náhľad (IK ostávajú, nič nepribudne - commitPendingTiles bez pending nič nemení)
 function trainingPending(next) {
+  if (!next) return null;
   return {
     ikMoves: game.iks.map((ik, i) => (next?.ik?.[i] ? cellOfAt(next.ik[i]) : { x: ik.x, y: ik.y })),
     spawns: (next?.spawn || []).map(s => ({ ...cellOfAt(s.at), type: s.type })),

@@ -8,7 +8,7 @@
 // rounds[k].bot = fronta bota v kole k+1 (ako lock_in: golden pred akcie, last_stand / golden_mana za ne)
 // rounds[k].solution = predpísané riešenie hráča v rovnakom tvare; ANY = na tejto akcii nezáleží
 // rounds[k].next = zmeny dlaždíc na konci kola (ohlásené ako náhľad): ik = nové pozície IK (paralelne s tiles typu
-// "ik" v poradí zápisu), spawn = nové dlaždice. Bez next IK ostávajú a nič nepribudne.
+// "ik" v poradí zápisu), spawn = nové dlaždice. Bez next IK ostávajú, nič nepribudne a hráč nevidí žiadny náhľad.
 
 export const TRAINING_CHAR = "fire";
 export const ANY = "*";
@@ -39,11 +39,11 @@ export const TRAINING = [
   { n: 6, name: "Shinigami", starter: "bot",
     you: { at: "C1", hp: 1, mana: 6 }, bot: { at: "B4", hp: 10, mana: 10 },
     tiles: [{ type: "heal", at: "A1" }, { type: "dmg", at: "B1" }, { type: "dmg", at: "B2" }, { type: "dmg", at: "C1" },
-      { type: "dmg", at: "C2" }, { type: "dmg", at: "C3" }, { type: "dmg", at: "A3" }, { type: "ik", at: "A2" }],
+      { type: "dmg", at: "C2" }, { type: "dmg", at: "C3" }, { type: "dmg", at: "A3" }, { type: "ik", at: "A2" }, { type: "ik", at: "C4" }],
     rounds: [
       { bot: [a("move", "up"), a("attack", "left"), a("special")],
         solution: [a("dash", "up"), a("shield"), ANY, a("last_stand")],
-        next: { ik: ["B1"], spawn: [{ type: "mana", at: "B4" }] } },
+        next: { ik: ["B1", "B3"], spawn: [{ type: "mana", at: "B4" }] } },
       // 3. akcia bota bola shield - golden shield ho v tom istom kole vylučuje (validQueue); na výsledok nevplýva
       { bot: [a("golden_shield"), a("move", "down"), a("mirror"), a("recharge")],
         solution: [ANY, a("demon"), ANY] },
