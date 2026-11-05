@@ -16,6 +16,7 @@ import {
 } from "./constants.js";
 
 import * as G from "../shared/geometry.js";
+import { cellOf, TRAINING_CHAR } from "../shared/training.js";
 import { CHARACTERS } from "./characters/index.js";
 import { vampMeleeLand } from "./characters/vampires.js";
 import { labyrinthModule } from "./labyrinth.js";
@@ -1906,17 +1907,17 @@ function startTraining(sc) {
   game.roster = null; game.mageHp = null; game.mageMana = null;
   for (const [slot, who] of [["p1", sc.you], ["p2", sc.bot]]) {
     const p = game.players[slot] = newPlayer(slot);
-    const c = cellOfAt(who.at);
+    const c = cellOf(who.at);
     p.x = c.x; p.y = c.y; p.hp = who.hp; p.mana = who.mana;
-    p.char = "fire";
+    p.char = TRAINING_CHAR;
     deployReset(slot);
   }
   game.roundCtx = null;
   game.timestop = null;
   game.turn = 1;
   game.starter = sc.starter === "bot" ? "p2" : "p1";
-  game.tiles = sc.tiles.filter(t => t.type !== "ik").map(t => ({ ...cellOfAt(t.at), type: t.type }));
-  game.iks = sc.tiles.filter(t => t.type === "ik").map(t => cellOfAt(t.at));
+  game.tiles = sc.tiles.filter(t => t.type !== "ik").map(t => ({ ...cellOf(t.at), type: t.type }));
+  game.iks = sc.tiles.filter(t => t.type === "ik").map(t => cellOf(t.at));
   // zmeny dlaždíc na koniec každého kola zo scenára (index = kolo − 1); rollPendingTiles ich v tréningu len prečíta
   game.trainingNext = sc.rounds.map(r => r.next || null);
   game.pending = trainingPending(game.trainingNext[0]);
@@ -1932,11 +1933,10 @@ function startTraining(sc) {
 function trainingPending(next) {
   if (!next) return null;
   return {
-    ikMoves: game.iks.map((ik, i) => (next?.ik?.[i] ? cellOfAt(next.ik[i]) : { x: ik.x, y: ik.y })),
-    spawns: (next?.spawn || []).map(s => ({ ...cellOfAt(s.at), type: s.type })),
+    ikMoves: game.iks.map((ik, i) => (next?.ik?.[i] ? cellOf(next.ik[i]) : { x: ik.x, y: ik.y })),
+    spawns: (next?.spawn || []).map(s => ({ ...cellOf(s.at), type: s.type })),
   };
 }
-const cellOfAt = (at) => ({ x: Number(at[1]) - 1, y: "ABC".indexOf(at[0]) });
 
 // všetky postavy, ktoré môže strana hrať: bežné + side-postavy viazané na túto stranu (ako mriežka losovania)
 function slotPool(slot) {

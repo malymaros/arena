@@ -53,6 +53,8 @@ function loadMelee() {
   };
   im.src = "/assets/fire/Attack_2.png";
 }
+// sessionStorage: LEAVE z okna výsledku (training.js) → room browser znova otvorí okno scenárov
+export const REOPEN_KEY = "arenaTrainingReopen";
 const SEQ = [0, 0, 0, 1, 2, 3, 3, 3]; // nápriahnutie, úder (index 4 = zásah figuríny), dobeh
 const STEP_MS = 110;
 
@@ -109,7 +111,6 @@ export function setTrainingBtn(roomsEl, trainingRoom, pick) {
   try { reopen = sessionStorage.getItem(REOPEN_KEY) === "1"; sessionStorage.removeItem(REOPEN_KEY); } catch { /* bez úložiska */ }
   if (reopen && trainingRoom?.canJoin) btn.click();
 }
-export const REOPEN_KEY = "arenaTrainingReopen";
 
 /* ---------- okno TRAINING GROUNDS ---------- */
 let back = null, choose = null;
