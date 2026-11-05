@@ -149,8 +149,10 @@ export function drawBotFace(cvs, now) {
     lastBase = base;
   }
   const want = !review.active && face.transient && now < face.until ? face.transient : base;
-  const lv = botLevel(), src = lv === "cheater" ? foxBuffer() : off;
+  const lv = botLevel();
   if (!(lv === "cheater" ? paintFox : lv === "baby" ? paintBaby : paintFace)(face, want, now, cvs.width)) return;
+  // buffer až PO kreslení - pri úplne prvom kreslení (rovno do hry, napr. TRAINING GROUND) ešte neexistoval
+  const src = lv === "cheater" ? foxBuffer() : off;
   const ctx = cvs.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, cvs.width, cvs.height);

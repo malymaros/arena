@@ -16,6 +16,7 @@ import { HIDDEN_GLITCH_CHARS } from "/client/char-select.js";
 import { renderQueue } from "/client/queue.js";
 import { review } from "/client/review-state.js";
 import { SIDE_LABEL } from "/client/side-tag.js";
+import { trainingScenario } from "/shared/training.js";
 
 /* ---------- HUD ---------- */
 // spojitý bar s 10 zárezmi: hlavná výplň + biely „trail", ktorý sa pri strate stiahne s oneskorením
@@ -80,6 +81,9 @@ export function renderHUD() {
     hudTurn.textContent = (state?.phase === "playing")
       ? (playback.finalRoundActive ? "FINAL ROUND" : state.training ? "TRAINING GROUND" : `ROUND ${state.turn}`)
       : "";
+    // TRAINING GROUND: pod nadpisom názov scenára (podnadpis)
+    const sc = state?.phase === "playing" ? trainingScenario(state.training?.n) : null;
+    if (sc) hudTurn.insertAdjacentHTML("beforeend", `<span class="hud-turn-sub">${sc.n} · ${sc.name}</span>`);
   }
   updateTurnStatus();
   renderBar(hudP1Hp,   state?.p1?.hp);
