@@ -262,7 +262,7 @@
 /* okno CHOOSE DIFFICULTY: na telefóne celé zväčšené (karty ostanú vedľa seba) */
 .phone .ai-diff-win { zoom: 1.5; }
 /* TRAINING GROUND na telefóne: len figurína (voľné) / Fire wizard pri figuríne (obsadené) - šírka v oboch stavoch rovnaká */
-.phone .tg-btn { right: 40px; top: 30px; width: 180px; height: 120px; }
+.phone .tg-btn { right: 40px; top: 30px; width: 164px; height: 120px; }
 .phone .tg-btn .tg-t { display: none; }
 .phone .tg-btn .tg-free svg { width: 74px; height: 88px; }
 .phone .tg-btn .tg-scene { zoom: 1.2; }

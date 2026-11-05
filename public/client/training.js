@@ -25,7 +25,7 @@ let shown = false;
 /* ---------- banner ---------- */
 export function trainingBannerHtml() {
   const sc = trainingScenario(state?.training?.n);
-  return `<span>TRAINING GROUNDS</span>${sc ? `<span class="rb-sub">${sc.n} · ${sc.name}</span>` : ""}`;
+  return `<span class="rb-main">TRAINING GROUNDS</span>${sc ? `<span class="rb-sub">${sc.n} · ${sc.name}</span>` : ""}`;
 }
 let bannerTimer = 0;
 function playStartBanner() {

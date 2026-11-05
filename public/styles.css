@@ -3425,7 +3425,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
   calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n), 100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)),
   calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
 /* tlačidlo vpravo hore: pevná šírka aj výška vo voľnom aj obsadenom stave */
-.tg-btn{ position: absolute; right: 28px; top: 22px; z-index: 3; width: 236px; height: 74px; box-sizing: border-box;
+.tg-btn{ position: absolute; right: 28px; top: 22px; z-index: 3; width: 214px; height: 74px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; padding: 0; border: none; cursor: pointer;
   font-family: "Press Start 2P", monospace; text-align: left; color: #2b1a05; background: #e3b04b;
   box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #f5d58c, inset 0 -4px 0 2px #a8741c; transition: transform .1s; }
@@ -3475,7 +3475,8 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 /* nadpis hore v tréningu: pod TRAINING GROUNDS názov scenára (mixed case ako v okne scenárov) */
 .hud-turn .hud-turn-sub{ display: block; margin-top: 10px; text-align: center; font-size: 15px; letter-spacing: 2px;
   text-transform: none; color: #fff; text-shadow: 2px 2px 0 #000, 4px 4px 0 rgba(0,0,0,.55); }
-/* banner kola v tréningu: pod TRAINING GROUNDS názov scenára */
+/* banner kola v tréningu: TRAINING GROUNDS v jednom riadku, pod ním názov scenára */
+.round-banner .rb-main{ white-space: nowrap; }
 .round-banner .rb-sub{ font-size: 22px; letter-spacing: 2px; color: #fff; white-space: nowrap; text-shadow: 3px 3px 0 #000; }
 /* okno výsledku scenára: Baby bot v strede (smutný / šťastný / prekvapený) */
 .tr-back{ position: fixed; inset: 0; z-index: 10002; background: rgba(4,6,10,.8);
