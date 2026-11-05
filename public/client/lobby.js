@@ -14,6 +14,7 @@ import { DEF_ARENA, arenaRules as rulesOf } from "/shared/arena-defaults.js";
 import { LAYOUT } from "/client/char-roll.js";
 import { openBanScreen } from "/client/ban-screen.js";
 import { sideTag } from "/client/side-tag.js";
+import { isBeginner } from "/client/beginner.js";
 
 const STORE_KEY = "arena.lobby.v1"; // zmena tvaru uloženého stavu = nový kľúč (v2), starý sa ignoruje
 const TILE_DEF = {
@@ -84,11 +85,14 @@ const isValid = (a) => {
   const c = settings.arenas[a];
   return a === "swamp" ? sum(c.items) === 100 : sum(c.tiles) === 100 && (a !== "portal" || sum(c.portals) === 100);
 };
+// BEGINNER mód (beginner.js): len Stone Bridge s predvolenými pravidlami - uložená voľba arény sa neprepisuje,
+// len sa nepoužije; ostatné arény, kocka a ADVANCED SETTINGS sú zamknuté (zámok ako v AI roomke)
+const arenaSel = () => (isBeginner() ? "bridge" : main().arena);
 // arény, ktorých nastavenia sa pri štarte použijú (kocka = všetky tri)
-const arenasInPlay = () => main().arena === "random" ? ARENA_KEYS : [main().arena];
+const arenasInPlay = () => arenaSel() === "random" ? ARENA_KEYS : [arenaSel()];
 // zákazy nechajú niektorej farbe menej ako TEAM_SIZE postáv v niektorej z arén v hre (pri kocke stačí jedna) →
 // turnaj sa zamkne (zámok ako v AI roomke) a zvolený turnaj sa prepne na SINGLE
-const bansBlockTournament = () => arenasInPlay().some(a => SIDES.some(sl => POOL[sl].length - settings.arenas[a].bans[sl].length < TEAM_SIZE));
+const bansBlockTournament = () => !isBeginner() && arenasInPlay().some(a => SIDES.some(sl => POOL[sl].length - settings.arenas[a].bans[sl].length < TEAM_SIZE));
 
 /* ---------- config pre server ---------- */
 // pravidlá jednej arény v tvare configu (bez kľúča arena; zákazy len keď nejaké sú) - shared/arena-defaults.js
@@ -97,6 +101,7 @@ const arenaRules = (a) => rulesOf(a, settings.arenas[a]);
 function matchConfig() {
   const m = main();
   const common = { format: m.format, timer: m.timer, colorPref: m.color, randomChars: m.randomChars === "on" };
+  if (isBeginner()) return { ...common, beginner: true }; // arénu, pravidlá aj zákazy doplní server
   if (m.arena === "random") return { ...common, arena: "random", arenas: Object.fromEntries(ARENA_KEYS.map(a => [a, arenaRules(a)])) };
   return { ...common, ...(m.arena === "bridge" ? {} : { arena: m.arena }), ...arenaRules(m.arena) };
 }
@@ -104,17 +109,21 @@ function matchConfig() {
 /* ---------- hlavné lobby ---------- */
 function renderMain() {
   syncTournamentLock();
-  const m = main(), rnd = m.arena === "random";
-  $("lobby-arena").querySelectorAll("[data-arena]").forEach(c => c.classList.toggle("active", c.dataset.arena === m.arena));
+  const m = main(), sel = arenaSel(), rnd = sel === "random", beg = isBeginner();
+  $("lobby-arena").querySelectorAll("[data-arena]").forEach(c => {
+    c.classList.toggle("active", c.dataset.arena === sel);
+    c.classList.toggle("ai-locked", beg && c.dataset.arena !== "bridge"); // beginner: len Stone Bridge
+  });
+  $("lobby-adv-open").classList.toggle("ai-locked", beg);
   $("lobby-arena").classList.toggle("pool", rnd); // kocka: všetky tri arény sú „v losovaní"
   for (const [k, id] of Object.entries(MAIN_ROWS)) {
     $(id).querySelectorAll(".opt").forEach(o => o.classList.toggle("active", o.dataset.val === m[k]));
   }
   // štítok pri ADVANCED SETTINGS: DEFAULT, alebo CUSTOM (pri kocke + mená upravených arén)
-  const mod = arenasInPlay().filter(isCustom);
+  const mod = beg ? [] : arenasInPlay().filter(isCustom); // beginner: predvolené pravidlá
   $("lobby-adv-sum").innerHTML = !mod.length ? `<span class="adv-chip">DEFAULT</span>`
     : `<span class="adv-chip custom">CUSTOM${rnd ? ": " + mod.map(a => ARENA_NAMES[a].split(" ").pop()).join(", ") : ""}</span>`;
-  $("lobby-start").disabled = !arenasInPlay().every(isValid);
+  $("lobby-start").disabled = !beg && !arenasInPlay().every(isValid);
 }
 
 /* ---------- ADVANCED SETTINGS ---------- */
@@ -161,6 +170,7 @@ function renderAdv() {
   $("lobby-adv-done").disabled = !ARENA_KEYS.every(isValid); // zavrieť sa dá, až keď všetky súčty sedia
 }
 function openAdv() {
+  if (isBeginner()) return; // beginner: ADVANCED SETTINGS zamknuté
   tab = main().arena === "random" ? "bridge" : main().arena;
   $("lobby-adv").classList.remove("hidden");
   renderAdv();
@@ -194,7 +204,7 @@ function build() {
       if (key) { settings.main[key] = opt.dataset.val; save(); renderMain(); }
     }
     else if (e.target.closest("#lobby-adv-open")) openAdv();
-    else if (e.target.closest("#lobby-start") && arenasInPlay().every(isValid)) socket.emit("configure_match", matchConfig());
+    else if (e.target.closest("#lobby-start") && (isBeginner() || arenasInPlay().every(isValid))) socket.emit("configure_match", matchConfig());
   });
 
   const adv = $("lobby-adv");
@@ -231,7 +241,9 @@ function build() {
 const AI_LOCKED = '#lobby-format .opt[data-val="tournament"]';
 const LOCK_TITLE = "Not enough characters left (banned characters)";
 let banLocked = false;
-const aiLocked = (el) => banLocked && !!el?.closest?.(AI_LOCKED);
+// beginner: zamknuté ostatné arény, kocka a ADVANCED SETTINGS
+const BEGINNER_LOCKED = '#lobby-arena [data-arena]:not([data-arena="bridge"]), #lobby-adv-open';
+const aiLocked = (el) => (banLocked && !!el?.closest?.(AI_LOCKED)) || (isBeginner() && !!el?.closest?.(BEGINNER_LOCKED));
 function syncTournamentLock() {
   banLocked = !!settings && bansBlockTournament();
   if (banLocked && settings.main.format === "tournament") { settings.main.format = "single"; save(); }

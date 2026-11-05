@@ -7,6 +7,7 @@
 // perf-probe na ne klikajú).
 import { DICE_SVG } from "/client/pix.js";
 import { drawArenaThumb, ARENA_NAMES } from "/client/arena-thumbs.js";
+import { isBeginner } from "/client/beginner.js";
 
 // pixelové ikonky: riadky znakov → SVG (crispEdges), ako pix.js
 const PAL = { "#": "#000", g: "#3ddc84", G: "#1f8f52", w: "#f4f1e8", W: "#b9b5a8", b: "#2b2e36", B: "#5c606b", h: "#8a8f9a",
@@ -57,9 +58,11 @@ export function buildRoomGrid(info, pick) {
     const chars = !ri ? [DASH, DASH] : ri.chars === "random" ? [NO, YES] : [YES, NO];
     const timer = !ri ? `<span class="rt-tv">${DASH}</span>`
       : `<span class="rt-tv${ri.timer === "quickdraw" ? " long" : ""}">${CLOCK}${timerText(ri.timer)}</span>`;
-    const cta = kind === "create" ? "CREATE" : kind === "join" ? "JOIN" : "SPECTATE";
+    // BEGINNER mód: do roomky druhého módu sa pripojiť nedá (sledovať plnú áno) - stmavená, zámok, nápis na tlačidle
+    const modeLocked = kind === "join" && !!r.beginner !== isBeginner();
+    const cta = modeLocked ? (r.beginner ? "BEGINNERS ONLY" : "NO BEGINNERS") : kind === "create" ? "CREATE" : kind === "join" ? "JOIN" : "SPECTATE";
     const b = document.createElement("button");
-    b.className = `room-tile room-btn ${kind}`;
+    b.className = `room-tile room-btn ${kind}${modeLocked ? " mode-locked" : ""}`;
     b.dataset.slot = String(n);
     b.innerHTML = `${badge(ri, setting)}
       <span class="rt-tbl${ri ? "" : " dim"}"><span></span><span class="rt-h">MANUAL</span><span class="rt-h">RANDOM</span>
@@ -69,6 +72,7 @@ export function buildRoomGrid(info, pick) {
       <span class="rt-cta">${cta}</span>`;
     b.querySelectorAll(".rt-badge[data-arena] canvas").forEach(c => drawArenaThumb(c, c.parentElement.dataset.arena));
     b.addEventListener("click", () => {
+      if (modeLocked) return;
       b.disabled = true;
       pick?.(kind, n, r);
     });

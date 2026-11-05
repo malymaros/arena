@@ -3419,6 +3419,43 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 @keyframes lobby-bot-bubble{ 0%, 100%{ transform: translateY(0); } 50%{ transform: translateY(-4px); } }
 .perf-lite .lobby-bot-bubble{ animation: none; }
 
+/* ---------- BEGINNER mód (beginner.js, schválený návrh public/dev/beginner.html) ---------- */
+/* prepínač vľavo hore v room browseri - rovnako veľký ako TRAINING GROUNDS */
+.bg-btn{ --n: 4px; clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0, calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n),
+  100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)), calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n)));
+  position: absolute; left: 28px; top: 22px; z-index: 3; width: 214px; height: 74px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; border: none; cursor: pointer;
+  font-family: "Press Start 2P", monospace; text-align: left; color: #9aa1ad; background: #2a2d34;
+  box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #3a3e47, inset 0 -4px 0 2px #1b1d22; transition: transform .1s; }
+.bg-btn:hover{ filter: brightness(1.15); transform: translateY(-2px); }
+.bg-btn:active{ transform: translateY(2px); }
+/* hlavy v okienkach ako hlavy mágov v HUD (.series-crowns .mh-face) - rám nad spritom; vypnutý = sivé */
+.bg-heads{ display: flex; gap: 4px; flex: none; }
+.bg-face{ position: relative; width: 32px; height: 32px; border-radius: 5px; overflow: hidden; background: rgba(12,14,18,.72); flex: none; }
+.bg-face canvas{ width: 100%; height: 100%; display: block; image-rendering: pixelated; filter: grayscale(1) brightness(.7); }
+.bg-face::after{ content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none;
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #000, inset 0 0 0 3px rgba(255,255,255,.12); }
+.bg-lbl{ display: flex; flex-direction: column; gap: 7px; font-size: 9px; letter-spacing: 1px; }
+/* vypínač: tmavá dráha s čiernym rámom, jazdec vľavo (OFF) / vpravo a svetlý (ON) - viditeľný v oboch stavoch */
+.bg-sw{ display: inline-flex; align-items: center; gap: 6px; font-size: 8px; }
+.bg-sw i{ width: 26px; height: 12px; background: #15161a; box-shadow: inset 0 0 0 2px #000; position: relative; }
+.bg-sw i::after{ content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 8px; background: #6b7080; }
+.bg-sw b{ font-weight: normal; }
+/* ON: tlmená zelená, hlavy farebné */
+.bg-btn.on{ color: #d6f2df; background: #2f5e44; box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #437a5b, inset 0 -4px 0 2px #1f3f2e; }
+.bg-btn.on .bg-face canvas{ filter: none; }
+.bg-btn.on .bg-sw i::after{ left: 14px; background: #8fe0b0; }
+/* dlaždica roomky druhého módu: stmavená, zámok, nápis BEGINNERS ONLY / NO BEGINNERS (klik nič) */
+.room-btn.room-tile{ position: relative; }
+.room-btn.room-tile.mode-locked{ cursor: not-allowed; }
+.room-btn.room-tile.mode-locked:hover{ filter: none; }
+.room-btn.room-tile.mode-locked:active{ transform: none; }
+.room-btn.room-tile.mode-locked::before{ content: ""; position: absolute; inset: 0; background: rgba(8,10,14,.62); z-index: 3; pointer-events: none; }
+.room-btn.room-tile.mode-locked::after{ content: "🔒"; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); font-size: 26px; z-index: 4;
+  text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; }
+.room-btn.room-tile.mode-locked .rt-cta{ position: relative; z-index: 5; background: #4d5058; color: #c9ccd3;
+  box-shadow: inset 0 0 0 2px #000, inset 0 4px 0 2px #6b6f78, inset 0 -4px 0 2px #33363d; }
+
 /* ---------- TRAINING GROUNDS (training-btn.js / training.js, schválený návrh public/dev/tutorial.html) ---------- */
 /* zubaté rohy po 4 px (ako dlaždice roomiek) */
 .tg-btn, .tg-win, .tg-row{ --n: 4px; clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0,

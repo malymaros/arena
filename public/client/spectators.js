@@ -3,6 +3,7 @@
 // Server pošle `spectators` { count, seatFree } pri každej zmene; TAKE SEAT sa ukáže len pri voľnom mieste
 // (hráč odišiel / host čaká na súpera). Návrat do sledovania po reloade rieši net.js (rememberSpectate).
 import { socket, forgetSpectate } from "/client/net.js";
+import { isBeginner } from "/client/beginner.js";
 import { setSpectator } from "/client/session.js";
 
 // pixel-art oko 11×7 (w = bielko, g = dúhovka, k = zrenička)
@@ -39,7 +40,7 @@ socket.on("rooms", () => setCount(0));
 socket.on("disconnect", () => setCount(0));
 socket.on("join_denied", () => { if (takeBtn) takeBtn.disabled = false; });
 
-takeBtn?.addEventListener("click", () => { takeBtn.disabled = true; socket.emit("take_seat"); });
+takeBtn?.addEventListener("click", () => { takeBtn.disabled = true; socket.emit("take_seat", isBeginner() ? { beginner: true } : {}); }); // mód: server nepustí na miesto v roomke iného módu
 leaveBtn?.addEventListener("click", () => {
   forgetSpectate();     // dobrovoľný odchod → po reloade sa do roomky nevracať
   setSpectator(false);

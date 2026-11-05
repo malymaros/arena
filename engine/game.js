@@ -17,6 +17,8 @@ import {
 
 import * as G from "../shared/geometry.js";
 import { cellOf, TRAINING_CHAR } from "../shared/training.js";
+import { isBeginnerChar } from "../shared/beginner.js";
+import { DEF_ARENA, arenaRules } from "../shared/arena-defaults.js";
 import { CHARACTERS } from "./characters/index.js";
 import { vampMeleeLand } from "./characters/vampires.js";
 import { labyrinthModule } from "./labyrinth.js";
@@ -1967,6 +1969,14 @@ function rollTeam(slot) {
 // Kocka (arena "random"): raw.arenas = { bridge, portal, swamp } - nastavenia každej arény z ADVANCED SETTINGS;
 // každá sa overí ako samostatný config (zlý súčet v ktorejkoľvek = null) a startMatch z nich vylosuje jednu.
 function sanitizeConfig(raw) {
+  // BEGINNER mód (shared/beginner.js): Stone Bridge s predvolenými pravidlami, zakázané všetko okrem troch mágov
+  // (každej strane jej vlastné postavy); z klienta sa berú len spoločné voľby. Kľúč beginner len v tomto móde (goldeny).
+  if (raw?.beginner === true) {
+    const { format, timer, colorPref, randomChars } = raw;
+    const bans = { p1: slotPool("p1").filter(k => !isBeginnerChar(k)), p2: slotPool("p2").filter(k => !isBeginnerChar(k)) };
+    const cfg = sanitizeArenaConfig({ format, timer, colorPref, randomChars, ...arenaRules("bridge", DEF_ARENA.bridge), bans });
+    return cfg && { ...cfg, beginner: true };
+  }
   if (raw?.arena !== "random") return sanitizeArenaConfig(raw);
   const arenas = {};
   for (const key of ARENA_KEYS) {

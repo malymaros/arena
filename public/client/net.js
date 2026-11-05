@@ -6,6 +6,7 @@ import { setAdmin, setMaintenanceFlag } from "/client/admin-state.js";
 import { showMaintenance, hideMaintenance } from "/client/maintenance.js";
 import { setLobbyBot } from "/client/lobby-bot.js";
 import { setTrainingBtn, closeTraining } from "/client/training-btn.js";
+import { isBeginner, onBeginnerChange, showBeginnerBtn } from "/client/beginner.js";
 import { buildRoomGrid } from "/client/room-tiles.js";
 
 // trvalá identita prehliadača: po výpadku spojenia si vďaka nej vyžiadame späť svoj hráčsky slot
@@ -78,12 +79,19 @@ socket.on("maintenance", () => {
 const roomsEl     = document.getElementById("rooms");
 const roomsListEl = document.getElementById("rooms-list");
 export function hideRooms() { roomsEl?.classList.add("hidden"); closeTraining(); }
+// BEGINNER mód (beginner.js): ide so sebou pri vytvorení / vstupe do roomky (server podľa neho zamyká roomky)
+const mode = () => (isBeginner() ? { beginner: true } : {});
+let lastInfo = null;
+// prepnutie módu → dlaždice sa prekreslia (zamknuté roomky druhého módu)
+onBeginnerChange(() => { if (lastInfo && !roomsEl?.classList.contains("hidden")) renderRooms(lastInfo); });
 function renderRooms(info) {
   if (!roomsListEl) return;
+  lastInfo = info;
   roomsListEl.innerHTML = "";
+  showBeginnerBtn(roomsEl); // prepínač BEGINNER vľavo hore
   // stála AI roomka nie je v zozname - hrá sa cez postavičku bota vpravo dole (lobby-bot.js): voľná → sadneš si,
   // obsadená (max 1 hra s AI na server) → sleduješ
-  setLobbyBot(roomsEl, info?.aiRoom || null, (r, level) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id, ...(level ? { level } : {}) }));
+  setLobbyBot(roomsEl, info?.aiRoom || null, (r, level) => socket.emit(r.canJoin ? "join_room" : "spectate_room", { roomId: r.id, ...(level ? { level } : {}), ...mode() }));
   // TRAINING GROUNDS vpravo hore (training-btn.js): voľná → okno scenárov → vstup so scenárom; obsadená → sledovať
   setTrainingBtn(roomsEl, info?.trainingRoom || null, {
     pick: (r, n) => socket.emit(n ? "join_room" : "spectate_room", { roomId: r.id, ...(n ? { scenario: n } : {}) }),
@@ -93,8 +101,8 @@ function renderRooms(info) {
   });
   // pevné dlaždice ROOM 1…N (room-tiles.js): prázdna → CREATE, čaká na súpera → JOIN, plná → SPECTATE
   roomsListEl.appendChild(buildRoomGrid(info, (kind, slot, r) => {
-    if (kind === "create") socket.emit("create_room", { slot });
-    else socket.emit(kind === "join" ? "join_room" : "spectate_room", { roomId: r.id });
+    if (kind === "create") socket.emit("create_room", { slot, ...mode() });
+    else socket.emit(kind === "join" ? "join_room" : "spectate_room", { roomId: r.id, ...mode() });
   }));
 }
 // divák: roomka, ktorú sledujem (sessionStorage) - po RELOAD GAME / výpadku spojenia sa do nej vrátim sledovať
@@ -110,7 +118,7 @@ function respectateFrom(info) {
   const room = [...(info?.rooms || []), ...(info?.aiRoom ? [info.aiRoom] : []), ...(info?.trainingRoom ? [info.trainingRoom] : [])].find(r => String(r.id) === id);
   if (!room) return false;
   respectating = true;
-  socket.emit("spectate_room", { roomId: room.id });
+  socket.emit("spectate_room", { roomId: room.id, ...mode() });
   return true;
 }
 function showRooms(info) { hideMaintenance(); renderRooms(info); roomsEl?.classList.remove("hidden"); }

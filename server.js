@@ -196,8 +196,12 @@ function okAdmin(keyFromClient) {
 // `turnTimer`… lexikálne - každá roomka má vlastnú kópiu. Globálne konštanty (HP/mana/CHARS/*_MS…) a
 // pure helpery (validateName, okAdmin, rollTileType…) sa čítajú z module scope cez closure.
 // ai = roomka proti AI botovi: bot sedí ako osoba B (virtuálny socket, engine/ai/seat.js)
-function createRoom(id, { ai = false, training = false, slot = null } = {}) {
+function createRoom(id, { ai = false, training = false, slot = null, beginner: beginnerAtCreate = false } = {}) {
   const botPerson = ai || training ? "B" : null;
+  // BEGINNER mód (shared/beginner.js): roomku vytvoril beginner → pripojiť sa smie len beginner (a naopak); sledovať
+  // smie každý. AI roomka mód preberá od hráča, ktorý si ju obsadí (po odchode vzniká nová čistá).
+  let beginner = !!beginnerAtCreate;
+  const modeOk = (want) => ai || training || !!want === beginner;
   // obťažnosť bota (docs/AI_PLAN.md, „Obťažnosť BABY"): hráč ju vyberie pri vstupe (join_room { level }) -
   // okno CHOOSE DIFFICULTY po kliknutí na hlavu bota; platí, kým roomka žije (po odchode hráča vznikne nová, normal)
   let aiLevel = "normal";
@@ -381,14 +385,14 @@ function onTurnTimeout() {
   function roomEmpty() { return ["A", "B"].filter(p => p !== botPerson).every(p => !personAlive(p)); } // bot sa nepočíta
   // riadok tejto roomky pre room-browser (počet hráčov, či sa dá pripojiť)
   function roomsRow() {
-    if (ai) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), phase: engine.game.phase, ai: true, level: aiLevel };
+    if (ai) return { id, players: personAlive("A") ? 1 : 0, max: 1, canJoin: isFree("A"), phase: engine.game.phase, ai: true, level: aiLevel, ...(beginner ? { beginner: true } : {}) };
     if (training) return { id, players: personAlive("A") || reservedBy ? 1 : 0, max: 1, canJoin: isFree("A") && !reservedBy, training: true,
       ...(reservedBy ? { reservedBy: reservedBy.id } : {}) }; // reservedBy = socket.id - vlastník rezervácie ju vidí ako svoju
     const players = ["A", "B"].filter(personAlive).length;
     // slot = pevné miesto v room-browseri (ROOM 1…MAX_ROOMS, číslo sa nemení, kým roomka žije); mená sediacich hráčov
     // names = [host, druhý hráč] po stranách (prázdne miesto = null) - room browser ich píše vedľa štvorčekov
     const names = ["A", "B"].map(p => (personAlive(p) ? personNames[p] || null : null));
-    return { id, slot, players, max: 2, canJoin: players < 2, phase: engine.game.phase, names, info: roomInfo() };
+    return { id, slot, players, max: 2, canJoin: players < 2, phase: engine.game.phase, names, info: roomInfo(), ...(beginner ? { beginner: true } : {}) };
   }
   // nastavenia zápasu pre dlaždicu v room-browseri (public/client/room-tiles.js): známe, keď host stlačil START
   // (čaká na súpera - pendingMatchConfig) alebo zápas beží (game.config); kým host nastavuje, null = SETTING UP…
@@ -399,7 +403,7 @@ function onTurnTimeout() {
     const color = cfg.colorPref === "white" ? "black" : cfg.colorPref === "black" ? "white" : "random";
     // custom = aréna má zmenené ADVANCED SETTINGS (hocičo, aj zákazy postáv) → oranžový štvorček na badge arény
     return { arena: cfg.arena === "random" ? "random" : cfg.arena || "bridge", color, chars: cfg.randomChars ? "random" : "manual", timer: cfg.timer ?? "off",
-      ...(matchConfigCustom(cfg) ? { custom: true } : {}) };
+      ...(matchConfigCustom(cfg) && !cfg.beginner ? { custom: true } : {}) }; // beginner zákazy nie sú „custom"
   }
   // voľné miesto (nie je obsadené živým socketom ani grace-held tokenom)
   function isFree(p) { return !personSockets[p] && (!personIds[p] || Date.now() - personFreedAt[p] > RECLAIM_GRACE_MS); }
@@ -475,12 +479,16 @@ function onTurnTimeout() {
 
   // oko s počtom divákov (hráči aj diváci) + či je voľné miesto (divák vidí TAKE SEAT)
   function broadcastSpectators() {
-    roomEmit("spectators", { count: spectators.size, seatFree: training ? false : isFree("A") || isFree("B") }); // tréning: len 1 hráč
+    const free = training ? false : isFree("A") || isFree("B"); // tréning: len 1 hráč
+    for (const p of ["A", "B"]) { const s = personSockets[p]; if (s) { try { s.emit("spectators", { count: spectators.size, seatFree: free }); } catch {} } }
+    // divák iného módu (beginner / bežný) TAKE SEAT nevidí - sadnúť si by mu aj tak server nedovolil
+    for (const s of spectators) { try { s.emit("spectators", { count: spectators.size, seatFree: free && modeOk(s.data.beginner) }); } catch {} }
   }
 
   // pripoj sa do tejto roomky ako 2. hráč (osoba B; ak host odišiel a B ostal, obsadí A)
-  function join(socket, level, scenario) {
+  function join(socket, level, scenario, wantBeginner) {
     if (socket.data.person) return;
+    if (!modeOk(wantBeginner)) { socket.emit("join_denied", "mode"); return; } // roomka iného módu (beginner / bežný)
     // tréning: hráč si sadá vždy ako A (B je Baby bot) a hneď sa spustí zvolený scenár
     if (training) {
       if (!isFree("A") || (reservedBy && reservedBy !== socket)) { socket.emit("join_denied", "full"); return; }
@@ -494,15 +502,16 @@ function onTurnTimeout() {
       return;
     }
     // AI roomka: hráč si sadá k botovi → nastav obťažnosť (len pred zápasom, keď je miesto hosta voľné)
-    if (ai && isFree("A") && engine.game.phase === "lobby") setAiLevel(level);
+    if (ai && isFree("A") && engine.game.phase === "lobby") { setAiLevel(level); beginner = !!wantBeginner; }
     if (isFree("B")) { seat(socket, "B"); broadcastRooms(); }
     else if (isFree("A")) { seat(socket, "A"); broadcastRooms(); }
     else socket.emit("join_denied", "full");
   }
 
   // sleduj túto roomku ako divák
-  function spectate(socket) {
+  function spectate(socket, wantBeginner) {
     if (socket.data.person) return;
+    socket.data.beginner = !!wantBeginner; // mód diváka (TAKE SEAT len v roomke jeho módu)
     browsing.delete(socket);
     spectators.add(socket);
     socket.data.roomId = id;
@@ -517,9 +526,10 @@ function onTurnTimeout() {
   }
 
   // divák si sadne na voľné miesto (hráč odišiel / host čaká na súpera) - rovnaké pravidlá ako join z room-browsera
-  function takeSeat(socket) {
+  function takeSeat(socket, wantBeginner) {
     if (!spectators.has(socket)) return;
     if (training) return; // tréning: sadá sa len z room browsera (výber scenára)
+    if (!modeOk(wantBeginner)) { socket.emit("join_denied", "mode"); return; } // divák iného módu si nesadne
     const p = isFree("B") ? "B" : isFree("A") ? "A" : null;
     if (!p) { socket.emit("join_denied", "full"); return; }
     seat(socket, p); // vyradí ho z divákov a pošle you_are + state
@@ -563,7 +573,8 @@ function onTurnTimeout() {
     if (engine.game.phase !== "lobby") return;        // len pred začiatkom zápasu
     lastSpy = null;                                   // CHEATER: odhalenie z predošlého zápasu neplatí
     // proti AI: všetky arény (aj kocka) aj všetky formáty vrátane turnaja (bot draftuje tím a swapuje - docs/AI_PLAN.md 8d)
-    const config = sanitizeConfig(raw);
+    // mód roomky platí, nech klient pošle čokoľvek (beginner: len Stone Bridge + traja mágovia)
+    const config = sanitizeConfig(raw && typeof raw === "object" ? { ...raw, beginner: beginner || undefined } : raw);
     if (!config) return;
     if (personAlive("B")) {
       startMatch(config);                       // súper je tu → rovno štart (color roll)
@@ -911,7 +922,7 @@ io.on("connection", (socket) => {
     const used = new Set([...rooms.values()].filter(r => !r.ai && !r.training).map(r => r.slot));
     const free = Array.from({ length: MAX_ROOMS }, (_, i) => i + 1).filter(n => !used.has(n));
     const slot = free.includes(arg?.slot) ? arg.slot : free[0];
-    const room = createRoom(nextRoomId++, { slot });
+    const room = createRoom(nextRoomId++, { slot, beginner: arg?.beginner === true });
     rooms.set(room.id, room);
     room.seat(socket, "A"); // tvorca = host (osoba A) a nastaví parametre zápasu
     broadcastRooms();
@@ -921,16 +932,16 @@ io.on("connection", (socket) => {
     if (maintBlocked(socket)) return;
     const room = rooms.get(arg?.roomId);
     if (!room) return;
-    room.join(socket, arg?.level, arg?.scenario);
+    room.join(socket, arg?.level, arg?.scenario, arg?.beginner === true);
   });
   socket.on("spectate_room", (arg) => {
     if (socket.data.person || socket.data.roomId) return;
     if (maintBlocked(socket)) return;
     const room = rooms.get(arg?.roomId);
     if (!room) return;
-    room.spectate(socket);
+    room.spectate(socket, arg?.beginner === true);
   });
-  socket.on("take_seat", () => { if (socket.data.spectating && !maintBlocked(socket)) roomForSocket(socket)?.takeSeat(socket); });
+  socket.on("take_seat", (arg) => { if (socket.data.spectating && !maintBlocked(socket)) roomForSocket(socket)?.takeSeat(socket, arg?.beginner === true); });
   socket.on("leave_room", () => { roomForSocket(socket)?.leave(socket); });
 
   // --- Herné eventy (dispatch do roomky socketu) ---
