@@ -3813,3 +3813,10 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 #peek .char-ability { height: auto; }
 #peek.pk-portrait .ca-title { display: none; } /* okno z portrétu: nadpis = meno postavy */
 #peek.p2-side .mini-caster { transform: scaleX(-1); }
+/* ▶ / ✕ v tlačidlách konca hry a LEAVE ROOM: CSS/SVG ikony - glyfy chýbajú v Press Start 2P a náhradný font ich kreslil nižšie než text */
+.go-buttons .retry, .room-leave{ display: inline-flex; align-items: center; justify-content: center; gap: 12px; }
+.px-x{ width: 10px; height: 10px; fill: currentColor; flex: none; position: relative; top: -1px; }
+.go-buttons .px-x, .room-leave .px-x{ width: .77em; height: .77em; }
+.go-buttons .tr-arrow{ border-width: .46em 0 .46em .7em; }
+.go-buttons .retry{ gap: .9em; }
+.go-buttons .px-x, .go-buttons .tr-arrow{ filter: drop-shadow(2px 2px 0 rgba(0,0,0,.55)); }
