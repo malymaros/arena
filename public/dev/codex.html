@@ -124,7 +124,7 @@
   /* NÁSTENKA: fotka s bielym okrajom pripnutá špendlíkom, meno na prúžku papiera */
   .card.pinned .ph { width: 80px; height: 80px; background: #2a2d34; box-shadow: 0 0 0 3px #f4ead0, 0 0 0 5px #000, 3px 4px 0 4px rgba(60,40,10,.3); }
   .card.pinned .pin { position: absolute; left: 50%; top: -9px; width: 8px; height: 8px; margin-left: -4px; background: #c0283a; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #7a1622; z-index: 1; }
-  .card.pinned .nm { margin-top: 4px; padding: 3px 5px; background: #f4ead0; box-shadow: 0 0 0 2px #000; }
+  .card.pinned .nm { margin-top: 4px; padding: 3px 5px; background: #e6d59e; box-shadow: 0 0 0 2px #000; } /* základné: nažltnutý papierik (skryté: .w / .b) */
   /* POLAROIDY: biely rám so širším spodkom, meno napísané v ráme, prilepené páskou */
   .card.polaroid { padding: 6px 6px 0; background: #f4ead0; box-shadow: 0 0 0 2px #000, 3px 4px 0 2px rgba(60,40,10,.3); gap: 4px; }
   .card.polaroid .ph { width: 78px; height: 78px; background: #2a2d34; box-shadow: 0 0 0 2px #000; }
@@ -168,6 +168,269 @@
   .card.pinned.b .pin { background: #1a1a1a; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #000; }
   .card.pinned.b .nm { background: #161218; color: #c8b8c8; }
   .cards.side .card.soon .nm { color: #9a8aa0; }
+  /* ---- zápis postavy = rýchla referencia: pasívky / odlišné akcie vľavo, špeciál vpravo, mini-dosky atramentom ---- */
+  .tagline { font-size: 8px; line-height: 14px; color: var(--ink); margin-top: 4px; }
+  .sec h3 { margin: 6px 0 6px; }
+  .ent { margin-bottom: 12px; }
+  .ent .eh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ent .en { font-size: 10px; color: var(--ink); letter-spacing: 1px; }
+  .ent .slot { font-size: 6px; color: var(--faded); }
+  .ent .chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px; font-size: 8px; color: var(--red); box-shadow: 0 0 0 2px rgba(42,26,16,.55); }
+  .ent .chip .pix-ico.mini { width: 12px; height: 12px; }
+  .ent p { margin: 6px 0 0; font-size: 8px; line-height: 14px; }
+  .ent p b { color: var(--red); font-weight: 400; }
+  .ent p .pix-ico.mini { width: 11px; height: 11px; vertical-align: -2px; }
+  .std { font-size: 8px; line-height: 14px; color: var(--faded); }
+  .boards { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 10px; }
+  .mbw { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .mbw figcaption { font-size: 6px; color: var(--faded); display: flex; align-items: center; gap: 3px; }
+  .mbw figcaption img { width: 12px; height: 12px; image-rendering: pixelated; }
+  .mb { display: grid; grid-template-columns: repeat(4, 26px); grid-auto-rows: 20px; gap: 2px; padding: 3px; box-shadow: 0 0 0 2px var(--ink); background: rgba(42,26,16,.18); }
+  .mbw.sm .mb { grid-template-columns: repeat(4, 15px); grid-auto-rows: 12px; }
+  .boards:has(.mbw.sm) { gap: 10px 10px; }
+  .mb i { position: relative; display: grid; place-items: center; background: rgba(233,216,172,.22); font-style: normal; }
+  .mb i.dk { background: rgba(42,26,16,.28); }
+  .mb i.path { background: rgba(122,22,34,.22); }
+  .mb i.hit { background: repeating-linear-gradient(45deg, rgba(122,22,34,.9) 0 2px, rgba(150,30,44,.6) 2px 4px); }
+  .mb i .n { font-size: 7px; color: #f4ead0; text-shadow: 1px 1px 0 #2a0810; }
+  .mbw.sm .mb i .n { font-size: 5px; }
+  .mb i .mk { font-size: 8px; color: var(--ink); position: relative; z-index: 1; }
+  .mb i.hit .mk { color: #f4ead0; }
+  .mb i .pix-ico.mini { width: 12px; height: 12px; }
+  .mb canvas.hd { position: absolute; inset: 0; margin: auto; width: 18px; height: 18px; image-rendering: pixelated; }
+  .mbw.sm .mb canvas.hd { width: 12px; height: 12px; }
+  .mb canvas.hd.cl { opacity: .55; }
+  .mb canvas.hd.cl.st { transform: translate(5px, 1px); }
+  .mb i .tl { position: absolute; left: 1px; top: 1px; width: 8px; height: 8px; }
+  .mb i .tl svg { width: 100%; height: 100%; display: block; }
+  .mb i .cr { position: absolute; inset: 3px; border: 2px solid #f4ead0; border-radius: 50%; }
+  .moons { display: flex; gap: 10px; margin-top: 8px; }
+  .moons span { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 6px; color: var(--faded); }
+  .moons img { width: 22px; height: 22px; image-rendering: pixelated; }
+  .moons b { font-weight: 400; font-size: 8px; color: var(--red); }
+  /* ---- návrh portrétu na stránke postavy: spoločný základ = fotka ako na obsahu (tmavé pozadie, svetlý okraj) ---- */
+  .portrait { position: relative; width: 176px; height: 196px; margin: 18px 0 0 22px; }
+  .portrait .photo { position: absolute; inset: 0; background: #2a2d34; }
+  .portrait .photo canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  .portrait > span { position: absolute; display: none; }
+  /* menovka ako na obsahu (prúžok papiera pod fotkou), väčšia; základné postavy nažltnutý papier, skryté podľa strany */
+  .portrait .pn { display: block; position: absolute; left: 50%; top: calc(100% + 16px); transform: translateX(-50%); white-space: nowrap; padding: 5px 9px;
+    font-size: 11px; line-height: 12px; letter-spacing: 2px; color: var(--ink); background: #e6d59e; box-shadow: 0 0 0 3px #000; z-index: 2; }
+  .portrait .pn.long { font-size: 9px; letter-spacing: 1px; } /* dlhé meno (WANDERER MAGICIAN) sa zmestí pod fotku */
+  .portrait.w .pn { background: #fffaf0; color: #2a1a10; }
+  .portrait.b .pn { background: #161218; color: #c8b8c8; }
+  /* A: pripnutá špendlíkom ako na obsahu, len väčšia */
+  .portrait.pin { transform: rotate(-2deg); }
+  .portrait.pin .photo { box-shadow: 0 0 0 5px #f4ead0, 0 0 0 7px #000, 5px 6px 0 6px rgba(40,24,8,.35); }
+  .portrait.pin .d1 { display: block; left: 50%; top: -14px; width: 14px; height: 14px; margin-left: -7px; background: #c0283a; box-shadow: 0 0 0 3px #000, inset -3px -3px 0 #7a1622, inset 3px 3px 0 #e04a5a; z-index: 2; }
+  /* skryté postavy: biela strana svetlý rám + biely špendlík, čierna tmavý rám s červenou žiarou (ako na obsahu); meno fialovo žiari */
+  .portrait.pin.w .photo { box-shadow: 0 0 0 5px #fffaf0, 0 0 0 7px #000, 0 0 18px 6px rgba(255,250,230,.5); }
+  .portrait.pin.w .d1 { background: #f4f4f4; box-shadow: 0 0 0 3px #000, inset -3px -3px 0 #9a9aa0; }
+  .portrait.pin.b .photo { box-shadow: 0 0 0 5px #161218, 0 0 0 7px #000, 0 0 18px 6px rgba(200,30,60,.5); }
+  .portrait.pin.b .d1 { background: #1a1a1a; box-shadow: 0 0 0 3px #000, inset -3px -3px 0 #000, inset 3px 3px 0 #3a3a3a; }
+  /* B: prilepená voskovou pečaťou hore, cez okraj */
+  .portrait.wax { transform: rotate(1.5deg); }
+  .portrait.wax .photo { box-shadow: 0 0 0 5px #e8dcbc, 0 0 0 7px #000, 5px 6px 0 6px rgba(40,24,8,.35); }
+  .portrait.wax .d1 { display: block; left: 50%; top: -22px; width: 40px; height: 40px; margin-left: -20px; background: #8a1a24; z-index: 2;
+    clip-path: polygon(30% 0, 70% 0, 85% 6%, 94% 15%, 100% 30%, 100% 70%, 94% 85%, 85% 94%, 70% 100%, 30% 100%, 15% 94%, 6% 85%, 0 70%, 0 30%, 6% 15%, 15% 6%);
+    box-shadow: inset 0 0 0 4px #6a0e18, inset 6px 6px 0 #a52a3a; }
+  .portrait.wax .d2 { display: block; left: 50%; top: -12px; width: 20px; height: 20px; margin-left: -10px; z-index: 3; box-shadow: 0 0 0 3px #5a0c14; transform: rotate(45deg); }
+  .portrait.wax .d3 { display: block; left: calc(50% + 12px); top: 14px; width: 6px; height: 14px; background: #8a1a24; z-index: 2; box-shadow: 0 6px 0 -1px #8a1a24; }
+  /* C: prilepená dvoma pásikmi starej pásky v horných rohoch */
+  .portrait.tape { transform: rotate(-1deg); }
+  .portrait.tape .photo { box-shadow: 0 0 0 5px #f4ead0, 0 0 0 7px #000, 5px 6px 0 6px rgba(40,24,8,.35); }
+  .portrait.tape .d1, .portrait.tape .d2 { display: block; top: -12px; width: 64px; height: 22px; background: rgba(214,196,140,.82); z-index: 2;
+    box-shadow: 0 0 0 2px rgba(60,40,10,.25); clip-path: polygon(0 10%, 6% 0, 12% 12%, 20% 0, 100% 0, 96% 50%, 100% 100%, 0 100%, 4% 50%); }
+  .portrait.tape .d1 { left: -24px; transform: rotate(-38deg); }
+  .portrait.tape .d2 { right: -24px; transform: rotate(38deg); }
+  /* D: zasunutá do čiernych rožkov fotoalbumu */
+  .portrait.corners .photo { box-shadow: 0 0 0 5px #f4ead0, 0 0 0 7px #000, 5px 6px 0 6px rgba(40,24,8,.3); }
+  .portrait.corners > span { display: block; width: 30px; height: 30px; background: #1a120c; z-index: 2; }
+  .portrait.corners .d1 { left: -9px; top: -9px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+  .portrait.corners .d2 { right: -9px; top: -9px; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+  .portrait.corners .d3 { left: -9px; bottom: -9px; clip-path: polygon(0 0, 100% 100%, 0 100%); }
+  .portrait.corners .d4 { right: -9px; bottom: -9px; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+  /* E: pribitá hrdzavým klincom, okraje obhorené */
+  .portrait.nail { transform: rotate(2.5deg); }
+  .portrait.nail .photo { box-shadow: 0 0 0 5px #c9b07a, 0 0 0 7px #2a1608, 5px 6px 0 6px rgba(40,24,8,.4);
+    clip-path: polygon(-4% -3%, 20% -4%, 24% -1%, 60% -4%, 104% -3%, 103% 30%, 105% 36%, 104% 104%, 70% 103%, 64% 105%, 10% 104%, -4% 105%, -3% 60%, -5% 54%); }
+  .portrait.nail .photo::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 18px 6px rgba(30,12,2,.7); pointer-events: none; }
+  .portrait.nail .d1 { display: block; left: 50%; top: -8px; width: 14px; height: 14px; margin-left: -7px; background: #6a5a4a; z-index: 2;
+    box-shadow: 0 0 0 3px #1a120c, inset -3px -3px 0 #3a2a1a, inset 3px 3px 0 #9a8a7a; }
+  .portrait.nail .d2 { display: block; left: calc(50% + 2px); top: 6px; width: 4px; height: 18px; background: rgba(110,50,20,.6); z-index: 1; }
+  /* F: prišitá fialovou nitou krížikmi v rohoch (ako steh na väzbe knihy) */
+  .portrait.stitch .photo { box-shadow: 0 0 0 5px #f4ead0, 0 0 0 7px #000, 5px 6px 0 6px rgba(40,24,8,.3); }
+  .portrait.stitch > span { display: block; width: 18px; height: 18px; z-index: 2;
+    background: linear-gradient(45deg, transparent 40%, #6a2c8a 40% 60%, transparent 60%), linear-gradient(-45deg, transparent 40%, #6a2c8a 40% 60%, transparent 60%); }
+  .portrait.stitch .d1 { left: -11px; top: -11px; } .portrait.stitch .d2 { right: -11px; top: -11px; }
+  .portrait.stitch .d3 { left: -11px; bottom: -11px; } .portrait.stitch .d4 { right: -11px; bottom: -11px; }
+  /* ---- stránka postavy: pasívky pod portrétom, špeciál vpravo (animovaná mini-doska ako pri výbere postavy) ---- */
+  .pv { position: absolute; left: 0; right: 0; top: 300px; padding: 0 18px; }
+  /* čitateľnosť: väčšie písmo, tmavší atrament, riadkovanie */
+  .pv h3 { margin: 0 0 12px; font-size: 13px; color: #6a0e18; letter-spacing: 2px; }
+  .pv p { margin: 0 0 10px; font-size: 11px; line-height: 24px; color: #1a0e06; letter-spacing: .5px; }
+  .pv p b { color: #6a0e18; font-weight: 400; }
+  /* dlaždica v texte = zmenšená herná bunka (tmavé pole, podfarbenie + rámik typu, ikona) */
+  .drop-ico { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; } .drop-ico svg { display: block; width: 100%; height: 100%; }
+  .tile-ico { display: inline-block; position: relative; width: 30px; height: 22px; vertical-align: -6px; background: #2b2e34; box-shadow: 0 0 0 2px #000; }
+  .tile-ico > span { position: absolute; inset: 0; display: grid; place-items: center; }
+  .tile-ico.dmg > span { background: rgba(255,80,0,.14); box-shadow: inset 0 0 0 2px #cc5a1f; }
+  .tile-ico.heal > span { background: rgba(40,200,90,.13); box-shadow: inset 0 0 0 2px #2e9e54; }
+  .tile-ico svg { width: 14px; height: 14px; display: block; filter: drop-shadow(0 1px 0 rgba(0,0,0,.5)); }
+  .spp { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-top: 40px; }
+  .sp-head { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #6a0e18; letter-spacing: 2px; }
+  .sp-head .sp-ico { width: 34px; height: 34px; }
+  .sp-board { display: grid; grid-template-columns: repeat(4, 60px); grid-auto-rows: 44px; gap: 4px; padding: 8px; background: rgba(12,14,18,.75); box-shadow: 0 0 0 3px #000, 4px 5px 0 3px rgba(40,24,8,.35); }
+  .sp-board i { position: relative; background: #2b2e34; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5); }
+  .sp-board i.hit { animation: mini-hit-pulse 1s ease-in-out infinite; }
+  .sp-board i.caster { background: #ffb300; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), inset 0 0 0 3px rgba(0,0,0,.25); }
+  .sp-board i canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  .sp-stats { display: flex; gap: 22px; font-size: 16px; color: #1a0e06; }
+  .sp-stats > span { display: flex; align-items: center; gap: 6px; }
+  /* ikony ako v hre: ✨ z tlačidla špeciálu, 💧 / ☠️ z cenovky (pixelizované emoji, mini = hrubé pixely) */
+  .sp-stats .pix-ico.mini { width: 24px; height: 24px; margin: 0; vertical-align: 0; }
+  .pv.act { top: 290px; }
+  .pv.act .sp-head { font-size: 13px; margin-bottom: 10px; }
+  .pv.act .sp-head .sp-ico { width: 30px; height: 30px; }
+  .sp-row { display: flex; align-items: center; gap: 16px; }
+  .sp-board.sm { grid-template-columns: repeat(4, 42px); grid-auto-rows: 31px; gap: 3px; padding: 6px; }
+  .sp-side { display: flex; flex-direction: column; gap: 10px; }
+  .sp-side .sp-text { text-align: left; font-size: 10px; line-height: 20px; }
+  .sp-board.th { position: relative; grid-template-columns: repeat(4, 34px); grid-auto-rows: 25px; padding: 5px; }
+  .th-row { gap: 12px; margin-top: 2px; }
+  .spp.tight { padding-top: 6px; gap: 12px; }
+  .spp .th-row { align-self: stretch; padding: 0 4px; gap: 10px; }
+  .spp .th-row .sp-text { font-size: 9px; line-height: 16px; letter-spacing: 0; }
+  .th-row .sp-text { font-size: 9px; line-height: 17px; }
+  .sp-board.th i.thread { box-shadow: inset 0 0 0 2px rgba(232,178,60,.45); }
+  .sp-board.th i.torch { background: #5a4a2a; box-shadow: inset 0 0 0 2px #e8b23c, 0 0 10px rgba(232,178,60,.6); }
+  .sp-board.th i canvas { position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; z-index: 2; }
+  .sp-board.cl i.from { box-shadow: inset 0 0 0 2px rgba(255,179,0,.5); }
+  .sp-board.cl i .ar { position: absolute; right: 2px; top: 1px; font-size: 9px; color: #ffb300; z-index: 3; }
+  .sp-board.cl i .ar.dim { inset: 0; display: grid; place-items: center; font-size: 12px; opacity: .6; }
+  .sp-board.cl canvas[data-cl="clone"] { opacity: .6; }
+  .pv.ab { top: 292px; display: flex; flex-direction: column; align-items: flex-start; }
+  .pv.ab h3 { margin-bottom: 10px; }
+  /* záznam (ako text pasívky), nie nadpis: obyčajné písmo, atramentová odrážka */
+  .ab-name { position: relative; padding-left: 16px; font-size: 11px; line-height: 24px; color: #1a0e06; letter-spacing: .5px; }
+  .ab-name::before { content: ""; position: absolute; left: 2px; top: 10px; width: 6px; height: 2px; background: #6a0e18; box-shadow: 2px -2px 0 #6a0e18, 2px 2px 0 #6a0e18; }
+  .ab-note { margin: 4px 0 0 16px !important; font-size: 10px !important; line-height: 20px !important; }
+  .ab-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .ab-row .ab-note { margin-left: 0 !important; }
+  .ab-name { white-space: nowrap; }
+  .pv.ab canvas.summon { flex: none; width: 136px; height: 118px; image-rendering: pixelated; margin-top: 2px; }
+  .th-svg { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; }
+  .sp-cycle { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #1a0e06; letter-spacing: 1px; height: 30px; }
+  .sp-cycle img { width: 30px; height: 30px; image-rendering: pixelated; }
+  .sp-cycle .pix-ico.mini { width: 20px; height: 20px; margin: 0 0 0 6px; vertical-align: 0; }
+  .pk-row { display: flex; align-items: center; gap: 22px; }
+  .cx-picker { position: static; transform: none; font-family: var(--px-font); }
+  .cx-picker { gap: 3px; padding: 5px; }
+  .cx-picker .btn.arrow { background: #6a1b9a; cursor: default; padding: 3px 5px; font-size: 10px; }
+  .spp.fill { height: 100%; box-sizing: border-box; padding-top: 22px; padding-bottom: 8px; gap: 14px; }
+  .pk-bottom { margin-top: auto; align-self: stretch; display: flex; align-items: center; gap: 14px; padding: 0 12px; }
+  .pk-note { margin: 0; font-size: 10px; line-height: 19px; color: #1a0e06; }
+  .pk-note b { color: #6a0e18; font-weight: 400; }
+  .pk-note .warn { color: #6a0e18; }
+  .warn-row { margin-top: auto; padding: 0 6px; } /* varovanie úplne na spodku pravej strany */
+  .spp.dense { height: 100%; box-sizing: border-box; padding-bottom: 8px; }
+  .board-wrap { position: relative; }
+  /* čierny skin základnej postavy: malá fotka v čiernom ráme s červenou žiarou (ako čierne karty na obsahu) */
+  .skin-b { position: absolute; left: 254px; top: 70px; width: 76px; height: 76px; background: #2a2d34; transform: rotate(3deg); z-index: 2;
+    box-shadow: 0 0 0 3px #161218, 0 0 0 5px #000, 0 0 14px 4px rgba(200,30,60,.5); }
+  .skin-b canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; transform: scaleX(-1); } /* zrkadlovo - čierna strana hrá sprava */
+  .tw { position: absolute; z-index: 3; font-size: 10px; color: #6a0e18; pointer-events: none; }
+  .tw svg { display: block; }
+  .tw-a { left: 214px; top: 120px; } .tw-a svg { position: absolute; left: 30px; top: -10px; } .tw-a span { position: absolute; left: -6px; top: 54px; white-space: nowrap; transform: rotate(-6deg); }
+  .tw-b { left: 232px; top: 16px; display: flex; align-items: flex-end; gap: 0; } .tw-b span { transform: rotate(-5deg); white-space: nowrap; } .tw-b svg { margin-bottom: -18px; }
+  .tw-e { left: 236px; top: 162px; display: flex; align-items: flex-start; } .tw-e span { margin-top: 24px; transform: rotate(-20deg); white-space: nowrap; } /* text kolmo na začiatok šípky */ .tw-e svg { position: absolute; left: 35px; top: -6px; transform-origin: 6px 13px; transform: rotate(-18deg) scale(1, -1); } /* chvost šípky v strede textu */
+  .tw-c { left: 236px; top: 52px; } .tw-c svg { position: absolute; left: 0; top: 0; } .tw-c span { position: absolute; left: 26px; top: 112px; white-space: nowrap; transform: rotate(-4deg); }
+  .tw-d { left: 312px; top: 120px; } .tw-d svg { position: absolute; left: -20px; top: -26px; }
+  .tw-d span { display: block; padding: 4px 6px 4px 12px; background: #e6d59e; color: #2a1a10; font-size: 8px; box-shadow: 0 0 0 2px #000; transform: rotate(8deg);
+    clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%); }
+  .skin-note { position: absolute; left: 248px; top: 164px; width: 100px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: #6a0e18; transform: rotate(-4deg); z-index: 2; }
+  .skin-note .ar { font-family: var(--px-font); font-size: 16px; }
+  .skin-b .cx-pin { position: absolute; left: 50%; top: -9px; width: 8px; height: 8px; margin-left: -4px; background: #1a1a1a; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #000; z-index: 1; }
+  .board-wrap .play-fx { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3; image-rendering: pixelated; }
+  .board-wrap .cast-art { visibility: hidden; } .board-wrap:hover .cast-art { visibility: visible; } /* veľký Star Platinum len pri hoveri (ako karta vo výbere), inak len Jotaro na ploche */
+  .board-wrap .cast-art { position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; transform: translate(-50%, -56%); image-rendering: pixelated; pointer-events: none; z-index: 3; }
+  .cast-row { align-self: stretch; display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+  .cast-row .cast-art { flex: none; width: 100px; height: 104px; image-rendering: pixelated; }
+  .cast-side { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .cast-side .sp-text { text-align: left; }
+  .spp.dense { gap: 8px; padding-top: 2px; }
+  .spp.dense .sp-head { font-size: 13px; } .spp.dense .sp-head .sp-ico { width: 28px; height: 28px; }
+  .spp.dense > .sp-board { grid-template-columns: repeat(4, 48px); grid-auto-rows: 34px; gap: 3px; padding: 6px; }
+  .spp.dense .sp-stats { font-size: 14px; } .spp.dense .sp-stats .pix-ico.mini { width: 20px; height: 20px; }
+  .warn-row .pk-note { font-size: 8px; line-height: 14px; }
+  .warn-row { gap: 10px; }
+  .warn-row .ls-btn { position: relative; flex: none; width: 36px; height: 30px; padding: 0; display: grid; place-items: center; cursor: default; }
+  .codex .warn-row .btn.act.demon.ls-btn { width: 36px !important; height: 30px !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; }
+  .warn-row .ls-btn .ls-ico { width: 22px; height: 22px; image-rendering: pixelated; }
+  .codex.dark-page .pk-note { color: #e6dcc6; } .codex.dark-page .pk-note .warn { color: #ff6a7a; } .codex.dark-page .pk-note b { color: #e0a0ff; }
+  .sp-board i .ar8 { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; color: #f2e6c9; text-shadow: 2px 2px 0 #000; z-index: 1; }
+  .sp-board i.no .nox { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; color: #c0283a; }
+  .pv h3.ih { display: flex; align-items: center; gap: 8px; }
+  .pv h3.ih .pix-ico { width: 24px; height: 24px; }
+  .rule-li { position: relative; padding-left: 16px; }
+  .rule-li::before { content: ""; position: absolute; left: 2px; top: 11px; width: 6px; height: 2px; background: #6a0e18; box-shadow: 2px -2px 0 #6a0e18, 2px 2px 0 #6a0e18; }
+  .pv.pv-moon { top: 284px; } .pv.pv-moon h3 { margin-bottom: 8px; } .pv.pv-moon p { margin-bottom: 4px; } /* vlkolak: text + tabuľka mesiacov sa musia zmestiť */
+  .moon-tab { display: flex; justify-content: space-between; margin-top: 0; padding: 0 4px; }
+  .moon-tab > div { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .moon-tab img { width: 26px; height: 26px; image-rendering: pixelated; }
+  .moon-tab .hp { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #1a0e06; }
+  .moon-tab .dm { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #1a0e06; }
+  .moon-tab .dm .pix-ico.mini { width: 16px; height: 16px; margin: 0; vertical-align: 0; }
+  /* zmutované akcie (skryté postavy): ikona tlačidla + názov, malá doska + cena + krátky text */
+  .pv.mu { top: 272px; }
+  .pv.mu h3 { margin-bottom: 8px; }
+  .mut { margin-bottom: 6px; }
+  .mut + .mut { margin-top: 20px; }
+  .mut.line { margin-top: 12px !important; }
+  .pv.mu.three { top: 262px; } .pv.mu.three .mut + .mut { margin-top: 10px; } .pv.mu.three .mut.line { margin-top: 8px !important; }
+  .mut-h .weak { font-size: 9px; color: #a898b0; }
+  .mut-h { white-space: nowrap; }
+  .pv-r.after .mut-h { font-size: 9px; }
+  .sp-board i.frozen { background: #3a4a5a; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), inset 0 0 8px rgba(160,200,255,.25); }
+  .pv-r.after { padding: 0 6px; } .pv-r.after .mut { margin: 0; }
+  .mut + .mut .sp-board.tiny { margin-top: 4px; } /* mapka charge trochu nižšie */
+  .mut-row p { letter-spacing: 0 !important; } /* medzera medzi sekciami zmutovaných akcií */
+  .mut-h .repl { position: relative; display: inline-flex; opacity: .75; }
+  .mut-h .repl::after { content: ""; position: absolute; left: -2px; right: -2px; top: 50%; height: 3px; margin-top: -1px; background: #c0283a; transform: rotate(-35deg); box-shadow: 0 0 0 1px #000; }
+  .mut-h .ra { font-family: var(--px-font); font-size: 10px; }
+  .mut-h .vq { display: inline-flex; padding: 1px; background: #4a1a6a; box-shadow: 0 0 0 2px #000, 0 0 6px rgba(170,90,255,.7); }
+  .mut-h .vq .pix-ico { width: 18px; height: 18px; }
+  /* vpravo od fotky: čisto vizuálne - skutočné tlačidlo dashu (prečiarknuté) ↓ jej blikajúce ??? tlačidlo CHARGE z hry */
+  .swap-vis { position: absolute; left: 236px; top: 26px; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2; }
+  .swap-vis .btn { position: relative; width: 74px; height: 50px; padding: 0; display: grid; place-items: center; cursor: default; }
+  .swap-vis .btn .pix-ico { width: 30px; height: 30px; }
+  .swap-vis .x-out::before, .swap-vis .x-out::after { content: ""; position: absolute; left: -6px; right: -6px; top: 50%; height: 4px; margin-top: -2px; background: #c0283a; box-shadow: 0 0 0 2px #000; }
+  .swap-vis .x-out::before { transform: rotate(34deg); } .swap-vis .x-out::after { transform: rotate(-34deg); }
+  .swap-vis .lbl.dash { color: #e6dcc6; text-shadow: none; margin-top: -2px; }
+  .swap-vis .down { font-family: var(--px-font); font-size: 18px; color: #e6dcc6; text-shadow: 2px 2px 0 #000; margin-bottom: 6px; } /* rovnaká medzera šípka → ??? ako DASH → šípka (tlačidlo ??? má hrubší obrys) */
+  .swap-vis .lbl { font-size: 9px; color: #c9a0ff; letter-spacing: 1px; text-shadow: 0 0 6px rgba(170,90,255,.6); }
+  .mut-h { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #1a0e06; letter-spacing: 1px; }
+  .mut-h .pix-ico { width: 20px; height: 20px; }
+  .mut-h .ms { font-size: 7px; color: var(--faded); }
+  .mut-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 2px; } /* doska prilepená hore k názvu akcie */
+  .mut-row p { margin: 0 !important; font-size: 9px !important; line-height: 16px !important; }
+  .mchips { display: flex; gap: 8px; margin-left: 6px; font-size: 10px; color: #1a0e06; }
+  .mchip { display: flex; align-items: center; gap: 3px; }
+  .mchip .pix-ico.mini { width: 14px; height: 14px; margin: 0; vertical-align: 0; }
+  .sp-board.tiny { grid-template-columns: repeat(4, 18px); grid-auto-rows: 13px; gap: 2px; padding: 4px; flex: none; box-shadow: 0 0 0 2px #000; }
+  .sp-board.tiny i.path { background: #7a2a1c; }
+  .sp-board.tiny canvas.tb-hd { position: absolute; inset: 0; margin: auto; width: 13px; height: 13px; }
+  .pv-r { align-self: stretch; padding: 0 18px; }
+  .pv-r h3 { margin: 0 0 6px; font-size: 13px; color: #6a0e18; letter-spacing: 2px; }
+  .pv-r p { margin: 0; font-size: 10px; line-height: 20px; color: #1a0e06; }
+  .pv-r p b { color: #6a0e18; font-weight: 400; }
+  .codex.dark-page .pv p, .codex.dark-page .sp-text, .codex.dark-page .pv-r p, .codex.dark-page .mut-h, .codex.dark-page .mchips, .codex.dark-page .sp-stats { color: #e6dcc6; }
+  .codex.dark-page .pv h3, .codex.dark-page .pv-r h3, .codex.dark-page .sp-head { color: #c9a0ff; text-shadow: 0 0 6px rgba(170,90,255,.6); }
+  .codex.dark-page .pv p b, .codex.dark-page .sp-text b, .codex.dark-page .pv-r p b { color: #e0a0ff; }
+  .codex.dark-page .mut-h .ms { color: #a898b0; }
+  .sp-text { margin: 0; font-size: 11px; line-height: 24px; color: #1a0e06; letter-spacing: .5px; text-align: center; }
+  .sp-text b { color: #6a0e18; font-weight: 400; }
+  .sp-text .nw, .pv .nw { white-space: nowrap; } /* slová spolu na jednom riadku */
   .notes { max-width: 900px; margin: 0 auto; padding: 16px 20px 40px; color: #9aa1ad; }
   .notes li { margin: 4px 0; }
 </style>
@@ -183,7 +446,6 @@
   <canvas class="book" width="300" height="196"></canvas>
   <button class="x" type="button" title="Zavrieť">✕</button>
   <button class="back hidden" type="button" id="back">↩ CONTENTS</button>
-  <button class="turn prev hidden" type="button" id="prev">◀</button><button class="turn next hidden" type="button" id="next">▶</button>
   <div class="pg l" id="pl"></div><div class="pg r" id="pr"></div><canvas class="spill hidden" id="spill"></canvas><div class="torn hidden" id="torn"></div>
   <span class="pno l" id="nl"></span><span class="pno r" id="nr"></span>
   <div class="seal" id="seal"></div>
@@ -197,77 +459,123 @@
 import { CHAR_LIST, HEAD_CROP } from "/chars/index.js";
 import * as B from "/shared/balance.js";
 
-const fall = [1, 2, 3].map(d => Math.max(1, B.BASIC_DMG_MAX - d)).join("/");
-const diag = `Diagonal shot that bounces once off a wall (${fall} by distance).`;
-// spisy: návrh textov z pravidiel (CLAUDE.md), čísla z balance.js
-const FILES = {
-  fire: { cls: "Mage", attack: "Straight shot", threat: 2,
-    traits: ["Steady all-rounder - nothing hidden.", "Loves standing in fire."],
-    passive: ["On a <b>damage tile</b> his special covers his row <b>±1</b> - the tile burns up."],
-    special: [`<b>Flame jet</b> - his whole row, <b>${B.SPECIAL_ZONE_DMG.fire} dmg</b>.`] },
-  lightning: { cls: "Mage", attack: "Straight shot", threat: 2,
-    traits: ["Every step flips which cells he can hit."],
-    passive: ["A <b>heal tile</b> heals him to <b>full HP</b>."],
-    special: [`<b>Storm</b> - every cell of the opposite colour (half the board), <b>${B.SPECIAL_ZONE_DMG.lightning} dmg</b>.`] },
-  wanderer: { cls: "Mage", attack: "Straight shot", threat: 2,
-    traits: ["Patient - gets stronger the longer it lasts."],
-    passive: [`<b>+${B.WANDERER_MANA_REGEN} mana</b> each round he doesn't use a mirror.`],
-    special: [`<b>Diagonal blast</b> - the 4 diagonal neighbours, <b>${B.SPECIAL_ZONE_DMG.wanderer} dmg</b>.`] },
-  medusa: { cls: "Gorgon", attack: "Straight shot", threat: 3,
-    traits: ["Don't look her in the eyes."],
-    passive: [`Wide melee: own cell + diagonals, <b>${B.MEDUSA_MELEE_DMG} dmg</b>.`],
-    special: [`<b>Petrify</b> - one direction, no dmg: target skips its next <b>${B.STONE_ACTIONS}</b> actions.`] },
-  minotaur: { cls: "Beast", attack: "Straight shot", threat: 3,
-    traits: ["A hunter in his own maze."],
-    passive: [`While his labyrinth holds: <b>${B.MAZE_DEAL_MUL}× dmg</b>.`],
-    special: ["<b>Labyrinth</b> - whole board, no dmg: the foe goes blind until any hit lands."] },
-  naruto: { cls: "Ninja", attack: "Straight shot", threat: 3,
-    traits: ["Never alone for long."],
-    passive: ["His clone copies his moves (up/down mirrored) and deals the same dmg."],
-    special: ["<b>Shadow clone</b> - must stand alone on his cell; the clone vanishes on any hit."] },
-  escanor: { cls: "Knight", attack: "Straight shot", threat: 4,
-    traits: ["Grows with his pride - you can see it in his size."],
-    passive: ["<b>Pride 0-3</b>: +1 each round without a defense or a hit taken, −1 otherwise."],
-    special: [`<b>Cruel sun</b> - left/right, zone grows with pride, <b>${B.SPECIAL_ZONE_DMG.escanor} dmg</b>.`] },
-  soldier: { cls: "Sniper", attack: "Rolling grenade", threat: 3,
-    traits: ["Shoots where you will be, not where you are."],
-    passive: ["Melee is a point-blank shot."],
-    special: [`<b>Sniper beam</b> - any cell except his own and the foe's, <b>${B.SOLDIER_SPECIAL_DMG} dmg</b>.`] },
-  werewolf: { cls: "Beast", attack: "Straight shot", threat: 4,
-    traits: ["The more wounded, the more dangerous."],
-    passive: ["<b>Moon phase</b> from his HP - lower HP, fuller moon, bigger wolf."],
-    special: [`<b>Charge</b> - 8 directions to the first foe, <b>${B.WOLF_MOON_DMG.join("/")} dmg</b> by moon.`] },
-  countess: { cls: "Vampire", attack: "Diagonal shot", threat: 4, side: "WHITE ONLY",
-    traits: [diag, "Immune to mirrors - they only block her."],
-    passive: [`Charge (dash slot): <b>${B.VAMP_CHARGE_DMG} dmg</b> and heals <b>${B.VAMP_CHARGE_BONUS} HP</b>.`, `Melee on her own cell: <b>${B.VAMP_MELEE_DMG} dmg</b>.`],
-    special: [`<b>Blood trap</b> - hidden cell; when the foe steps in she teleports and strikes, <b>${B.VAMP_TRAP_DMG} dmg</b> + heals <b>${B.VAMP_TRAP_BONUS} HP</b>.`] },
-  onre: { cls: "Ghost", attack: "Diagonal shot", threat: 4, side: "BLACK ONLY",
-    traits: [diag, "Immune to mirrors - they only block her."],
-    passive: [`Charge (dash slot): <b>${B.VAMP_CHARGE_DMG} dmg</b> and drains <b>${B.VAMP_CHARGE_BONUS} mana</b>.`, `Melee on her own cell: <b>${B.VAMP_MELEE_DMG} dmg</b>.`],
-    special: [`<b>Cursed trap</b> - hidden cell; when the foe steps in she teleports and strikes, <b>${B.VAMP_TRAP_DMG} dmg</b> + drains <b>${B.VAMP_TRAP_BONUS} mana</b>.`] },
-  jotaro: { cls: "Stand user", attack: "Diagonal shot", threat: 5, side: "BLACK ONLY",
-    traits: [diag, "Star Platinum always at his side."],
-    passive: [`No mirror - instead <b>Special 1</b>: both diagonal cells on one side, <b>${B.JOTARO_S1_DMG} dmg</b>.`],
-    special: ["<b>THE WORLD</b> (once per game) - time stops, he takes 3 extra actions.", `Then <b>Special 2</b>: adjacent cell, <b>${B.JOTARO_S2_DMG} dmg</b>.`] },
-  luffy: { cls: "Pirate", attack: "Diagonal shot", threat: 5, side: "WHITE ONLY",
-    traits: [diag, "Rubber body - reaches anywhere."],
-    passive: [`No mirror - instead <b>Gomu Gomu Pistol</b>: any cell, <b>${B.LUFFY_S1_DMG} dmg</b>.`],
-    special: [`<b>Balloon</b> (once per game) - rolls 1 cell and bursts 3×3, <b>${B.LUFFY_BALL_DMG} dmg</b>.`, `Then <b>Special 2</b>: adjacent cell, <b>${B.LUFFY_S2_DMG} dmg</b>.`] },
+import * as G from "/shared/geometry.js";
+import { hydratePix, pixSvg, tileSvg } from "/client/pix.js";
+
+// ---- zápisy postáv: RÝCHLA REFERENCIA pre súpera (vlastník 2026-11-06) - len pasívky, špeciál a akcie, ktoré sa
+// líšia od štandardu; čísla zo shared/balance.js, zóny mini-dosiek zo shared/geometry.js (tá istá geometria ako hra)
+const BOARD = { w: 4, h: 3 };
+const ic = (e) => `<span class="pix-ico mini" data-emoji="${e}"></span>`;
+const mana = (n) => `<span class="chip">${ic("💧")}${n}</span>`, dmg = (n) => `<span class="chip">${ic("☠️")}${n}</span>`;
+const cells = (arr) => arr.map(([x, y]) => `${x},${y}`);
+// mini-doska: me = bunka mága (hlava), hit = zasiahnuté bunky (+ num), path = dráha, mark = { "x,y": html }, chess = šachovnica
+const mb = (o) => o;
+const ENTRIES = {
+  fire: {
+    tag: "Burns a whole row at once.",
+    special: { name: "FLAME ROW", cost: [mana(B.SPECIAL_COST), dmg(B.SPECIAL_ZONE_DMG.fire)],
+      text: "Hits every cell of his row. Cast from a <b>damage tile</b>: his row <b>±1</b> - and the tile burns up.",
+      boards: [mb({ me: [0, 1], hit: cells(G.fireCells(BOARD, { x: 0, y: 1 }, false)), num: B.SPECIAL_ZONE_DMG.fire, cap: "normal" }),
+        mb({ me: [0, 1], tile: [0, 1], hit: cells(G.fireCells(BOARD, { x: 0, y: 1 }, true)), num: B.SPECIAL_ZONE_DMG.fire, cap: "on a damage tile" })] },
+  },
+  lightning: {
+    tag: "Strikes half the board - which half depends on where he stands.",
+    passive: [{ name: "STORM BORN", text: `A <b>heal tile</b> ${ic("❤️")} heals him to <b>full HP</b> (others get +1).` }],
+    special: { name: "STORM", cost: [mana(B.SPECIAL_COST), dmg(B.SPECIAL_ZONE_DMG.lightning)],
+      text: "Hits every cell of the <b>opposite colour</b> to his own (like a chessboard). Every step flips it.",
+      boards: [mb({ me: [1, 1], chess: true, hit: cells(G.lightningCells(BOARD, { x: 1, y: 1 })), num: B.SPECIAL_ZONE_DMG.lightning, cap: "standing here" }),
+        mb({ me: [2, 1], chess: true, hit: cells(G.lightningCells(BOARD, { x: 2, y: 1 })), num: B.SPECIAL_ZONE_DMG.lightning, cap: "one step later" })] },
+  },
+  wanderer: {
+    tag: "Patient - his mana keeps flowing.",
+    passive: [{ name: "WANDERING MIND", text: `<b>+${B.WANDERER_MANA_REGEN} mana</b> ${ic("💧")} at the end of every round in which he queued <b>no mirror</b>.` }],
+    special: { name: "DIAGONAL BLAST", cost: [mana(B.SPECIAL_COST), dmg(B.SPECIAL_ZONE_DMG.wanderer)],
+      text: "Hits the <b>4 diagonal</b> neighbours of his cell.",
+      boards: [mb({ me: [1, 1], hit: cells(G.diagNeighbors(BOARD, { x: 1, y: 1 })), num: B.SPECIAL_ZONE_DMG.wanderer, cap: "diagonals" })] },
+  },
+  medusa: {
+    tag: "One look and you skip your turn.",
+    actions: [{ name: "TAIL SWEEP", slot: "melee", cost: [mana(B.MELEE_COST), dmg(B.MEDUSA_MELEE_DMG)],
+      text: `Her melee hits her own cell <b>and the 4 diagonals</b> - wider, but only <b>${B.MEDUSA_MELEE_DMG} dmg</b>.`,
+      boards: [mb({ me: [1, 1], hit: cells(G.meleeCells(BOARD, { x: 1, y: 1 }, "medusa")), num: B.MEDUSA_MELEE_DMG, cap: "melee" })] }],
+    special: { name: "PETRIFYING GAZE", cost: [mana(B.SPECIAL_COST), `<span class="chip">${ic("🗿")}${B.STONE_ACTIONS}×</span>`],
+      text: `Left or right: her cell and everything that way, rows ±1. <b>No dmg</b> - the target is petrified and skips its next <b>${B.STONE_ACTIONS} actions</b>.`,
+      boards: [mb({ me: [1, 1], hit: cells(G.medusaCells(BOARD, { x: 1, y: 1 }, "right")), icon: "🗿", cap: "gaze right" })] },
+  },
+  minotaur: {
+    tag: "Drags you into his maze and hunts you there.",
+    passive: [{ name: "THE HUNT", text: `While the labyrinth he cast holds, he deals <b>${B.MAZE_DEAL_MUL}× dmg</b>.` }],
+    special: { name: "LABYRINTH", cost: [mana(B.SPECIAL_COST), `<span class="chip">${ic("🌀")}</span>`],
+      text: "Whole board, <b>no dmg</b>: the foe sees only their own cell until <b>any hit</b> lands (a blocked or mirrored one too). Their steps weave a thread - stepping on it shows his silhouette.",
+      boards: [mb({ me: [1, 1], hit: cells(G.allCells(BOARD)), icon: "🌀", cap: "whole board" })] },
+  },
+  naruto: {
+    tag: "Never alone for long.",
+    passive: [{ name: "SHADOW CLONE", text: "The clone copies <b>every action</b> with him - <b>up/down mirrored</b> - and deals the same dmg (double when stacked on his cell). Shares his shield/mirror; <b>any hit</b> makes it vanish. You never know which one is real." }],
+    special: { name: "SHADOW CLONE", cost: [mana(B.SPECIAL_COST), `<span class="chip">CLONE</span>`],
+      text: "Summons a clone on his cell. He must stand <b>alone</b> - the foe on his cell blocks it. Recasting replaces the clone.",
+      boards: [mb({ me: [1, 1], clone: [1, 1], cap: "summon" }),
+        mb({ me: [1, 0], clone: [1, 2], mark: { "1,1": "↑↓" }, cap: "he goes up, clone down" })] },
+  },
+  escanor: {
+    tag: "His pride grows each round - you can see it in his size.",
+    passive: [{ name: "PRIDE", text: "Pride <b>0-3</b> (his size shows it): <b>+1</b> every round, <b>-1</b> if he queued a shield/mirror or took a hit." }],
+    special: { name: "CRUEL SUN", cost: [mana(B.SPECIAL_COST), dmg(B.SPECIAL_ZONE_DMG.escanor)],
+      text: "Left or right - the zone grows with his pride. Thrown off the board it hits nothing.",
+      boards: [0, 1, 2, 3].map(p => mb({ me: [1, 1], hit: cells(G.escanorCells(BOARD, { x: 1, y: 1, pride: p }, "right")),
+        num: B.SPECIAL_ZONE_DMG.escanor, cap: `PRIDE ${p}`, lion: p, small: true })) },
+  },
+  soldier: {
+    tag: "Shoots where you will be, not where you are.",
+    special: { name: "SNIPER BEAM", cost: [mana(B.SPECIAL_COST), dmg(B.SOLDIER_SPECIAL_DMG)],
+      text: "He picks <b>any cell</b> except his own and yours - the beam hits whoever stands there when it fires. Don't walk onto it.",
+      boards: [mb({ me: [0, 1], hit: ["2,0"], num: B.SOLDIER_SPECIAL_DMG, cross: "2,0", cap: "picked cell" })] },
+  },
+  werewolf: {
+    tag: "The more wounded, the more dangerous.",
+    passive: [{ name: "MOON PHASE", text: "His HP sets the moon (his size shows it) - <b>the lower his HP, the fuller the moon</b> and the harder his charge.", moons: true }],
+    special: { name: "CHARGE", cost: [mana(B.SPECIAL_COST), dmg(B.WOLF_MOON_DMG.join("/"))],
+      text: "Runs in one of <b>8 directions</b> to the first foe (or the edge) and stays on that cell. Dmg by moon, no falloff.",
+      boards: [mb({ me: [0, 1], path: ["1,1", "2,1"], hit: ["3,1"], num: "!", mark: { "1,1": "→", "2,1": "→" }, cap: "charge right" }),
+        mb({ me: [0, 2], path: ["1,1"], hit: ["2,0"], num: "!", mark: { "1,1": "↗" }, cap: "or diagonal" })] },
+  },
 };
+const MOONS = [["10", 0], ["9-7", 1], ["6-4", 2], ["3-1", 3]];
 
-
+function miniBoard(b, c) {
+  let h = "";
+  for (let y = 0; y < BOARD.h; y++) for (let x = 0; x < BOARD.w; x++) {
+    const k = `${x},${y}`, cls = [];
+    if (b.chess && (x + y) % 2) cls.push("dk");
+    if (b.path?.includes(k)) cls.push("path");
+    if (b.hit?.includes(k)) cls.push("hit");
+    let inner = "";
+    if (b.tile && b.tile[0] === x && b.tile[1] === y) inner += `<span class="tl">${pixSvg("flame")}</span>`;
+    if (b.me && b.me[0] === x && b.me[1] === y) inner += `<canvas class="hd" width="16" height="16" data-k="${c.key}"></canvas>`;
+    if (b.clone && b.clone[0] === x && b.clone[1] === y) inner += `<canvas class="hd cl${b.clone[0] === b.me?.[0] && b.clone[1] === b.me?.[1] ? " st" : ""}" width="16" height="16" data-k="${c.key}"></canvas>`;
+    if (b.mark?.[k]) inner += `<span class="mk">${b.mark[k]}</span>`;
+    if (b.hit?.includes(k) && !inner) inner = b.icon ? `<span class="pix-ico mini" data-emoji="${b.icon}"></span>` : `<span class="n">${b.num}</span>`;
+    if (b.cross === k) inner += `<span class="cr"></span>`;
+    h += `<i class="${cls.join(" ")}">${inner}</i>`;
+  }
+  const cap = b.lion != null ? `<img src="/assets/pride_lion_${b.lion}.png" alt="">${b.cap}` : b.cap;
+  return `<figure class="mbw${b.small ? " sm" : ""}"><div class="mb">${h}</div><figcaption>${cap}</figcaption></figure>`;
+}
+const block = (a, c) => `<div class="ent"><div class="eh"><span class="en">${a.name}</span>${a.slot ? `<span class="slot">replaces ${a.slot.toUpperCase()}</span>` : ""}${(a.cost || []).join("")}</div>
+  <p>${a.text}</p>${a.moons ? `<div class="moons">${MOONS.map(([hp, l]) => `<span><img src="/assets/moon_${l}.png" alt=""><b>${B.WOLF_MOON_DMG[l]}</b><small>HP ${hp}</small></span>`).join("")}</div>` : ""}
+  ${a.boards ? `<div class="boards">${a.boards.map(b => miniBoard(b, c)).join("")}</div>` : ""}</div>`;
 
 const ui = { i: -1, sealed: true, style: "pinned" }; // -1 = obsah (úvodná dvojstrana)
 const sealed = (c) => ui.sealed && !!c.side;
 const imgs = {};
 const load = (src) => imgs[src] ||= new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
-async function drawHead(cv, c, bust = false) {
-  const im = await load(`/assets/${c.meta.dir}/${c.headIdleFile || "Idle.png"}`); if (!im) return; // ako HUD hlava (Escanor zo slabej formy)
+async function drawHead(cv, c, bust = false, reveal = false, dir = c.meta.dir) {
+  const im = await load(`/assets/${dir}/${c.headIdleFile || "Idle.png"}`); if (!im) return; // ako HUD hlava (Escanor zo slabej formy)
   const h = im.height, cr = HEAD_CROP[c.key] || { cx: .5, cy: .5, size: .3 }, ctx = cv.getContext("2d");
   const s = cr.size * h * (bust ? 1.6 : 1), cx = cr.cx * h, cy = cr.cy * h + (bust ? cr.size * h * .28 : 0);
   ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.drawImage(im, cx - s / 2, cy - s / 2, s, s, 0, 0, cv.width, cv.height);
-  if (sealed(c)) { ctx.globalCompositeOperation = "source-atop"; ctx.fillStyle = "#1a1008"; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = "source-over"; }
+  if (sealed(c) && !reveal) { ctx.globalCompositeOperation = "source-atop"; ctx.fillStyle = "#1a1008"; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = "source-over"; }
 }
 
 // ======================= kniha (canvas, umelecký pixel = 3 px) =======================
@@ -294,8 +602,9 @@ function drawBook() {
   [PAGE2, PAGE2, PAGE3, PAGE3, PAGE4, "#8a7650"].forEach((c, i) => { px(GL - 6 + i, PT, 1, PB - PT, c); px(GR + 5 - i, PT, 1, PB - PT, c); });
   px(GL, PT - 1, GR - GL, PB - PT + 3, "#3a2a18"); px(GL + 1, PT - 1, 2, PB - PT + 3, "#1a1008");
   [[40, 150], [41, 150], [40, 151], [120, 30], [121, 31]].forEach(([x, y]) => px(x, y, 1, 1, "rgba(120,80,30,.35)"));
-  grimoirePage(PL, GL, true, false);
-  grimoirePage(GR, PR, false, ui.i < 0); // pravá strana obsahu = zakázaná (HIDDEN)
+  const dark = ui.i >= 0 && !!CHAR_LIST[ui.i].side; // zápis skrytej postavy: obe strany temné ako HIDDEN strana, fialový pentagram
+  grimoirePage(PL, GL, true, dark);
+  grimoirePage(GR, PR, false, ui.i < 0 || dark); // pravá strana obsahu = zakázaná (HIDDEN)
 
 }
 
@@ -316,7 +625,8 @@ function grimoirePage(x0, x1, left, forbidden) {
   // kúzelný kruh s päťcípou hviezdou, pretiahnutý atramentom: vľavo čiernym, vpravo (zakázaná strana) žiarivo fialovým;
   // ľavý je vycentrovaný na mriežku postáv (stred strednej fotky)
   const cx = (x0 + x1) / 2, cy = 91, R = 46; // obe strany v rovnakej výške
-  const inkCol = forbidden ? "rgba(176,96,255,.62)" : "rgba(18,10,8,.5)", halo = forbidden ? "rgba(150,70,240,.16)" : "rgba(18,10,8,.08)";
+  const faint = ui.i >= 0; // zápis postavy: len slabý vodotlač, nech sa text dobre číta
+  const inkCol = forbidden ? "rgba(176,96,255,.62)" : faint ? "rgba(18,10,8,.1)" : "rgba(18,10,8,.5)", halo = forbidden ? "rgba(150,70,240,.16)" : faint ? "rgba(0,0,0,0)" : "rgba(18,10,8,.08)";
   const dots = new Map(), dot = (x, y) => dots.set(`${Math.round(x)},${Math.round(y)}`, 1);
   for (let a = 0; a < 360; a += .5) { const r = a * Math.PI / 180; dot(cx + Math.cos(r) * R, cy + Math.sin(r) * R); dot(cx + Math.cos(r) * (R - 5), cy + Math.sin(r) * (R - 5)); }
   const star = [0, 2, 4, 1, 3, 0].map(k => [cx + Math.cos(-Math.PI / 2 + k * 2 * Math.PI / 5) * (R - 6), cy + Math.sin(-Math.PI / 2 + k * 2 * Math.PI / 5) * (R - 6)]);
@@ -455,6 +765,7 @@ function drawSpill(cv) {
   candle(cx - 39, true); candle(cx + 39, false);
 }
 function renderContents() {
+  document.getElementById("codex").classList.remove("dark-page");
   const style = ui.style, main = CHAR_LIST.filter(c => !c.side), white = CHAR_LIST.filter(c => c.side === "p1"), black = CHAR_LIST.filter(c => c.side === "p2");
   const rowOf = (arr, off, side) => [...arr, null, null, null].slice(0, 3).map((c, k) => card(c, off + k, style).replace('class="card ', `class="card ${side} `)).join("");
   document.getElementById("pl").innerHTML = `
@@ -473,36 +784,397 @@ function renderContents() {
     drawHead(pt, c, style === "mugshot");
   });
 }
-function renderEntry() {
-  const c = CHAR_LIST[ui.i], f = FILES[c.key] || { traits: [], passive: [], special: [] }, hide = sealed(c);
-  const hid = (txt, w) => (hide ? `<span class="scrawl">${"x".repeat(w)}</span>` : txt);
-  const row = (k, v) => `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-  const stars = "★".repeat(f.threat || 1) + "☆".repeat(5 - (f.threat || 1));
-  document.getElementById("pl").innerHTML = `<div class="top">
-      <div class="illu"><span class="orn a"></span><span class="orn b"></span><span class="orn c"></span><span class="orn d"></span><canvas width="64" height="64"></canvas></div>
-      <div><div class="name">${hide ? hid("", 9) : shortName(c)}</div><div class="epithet">${hide ? "a page sealed by the author" : "as written by the archmage"}</div>
-        <div class="facts">${row("CLASS", hid(f.cls || "-", 7))}${row("ATTACK", hid(f.attack || "-", 12))}${row("SIDE", f.side || "ANY")}${row("DANGER", `<b style="color:var(--red);font-weight:400">${stars}</b>`)}</div></div></div>
-    <div class="rule"></div>${sec("CHARACTERISTICS", f.traits, hide)}`;
-  document.getElementById("pr").innerHTML = `${sec("PASSIVE ABILITIES", f.passive, hide)}<div class="rule"></div>${sec("SPECIAL ACTIONS", f.special, hide)}`;
+// predošlý návrh obsahu zápisu (vlastník ho zamietol - zatiaľ sa ladí len portrét)
+function renderEntryDraft() {
+  const c = CHAR_LIST[ui.i], e = ENTRIES[c.key], hide = sealed(c);
+  const pl = document.getElementById("pl"), pr = document.getElementById("pr");
+  if (!e) { // skryté postavy prídu neskôr (vlastné sekcie pre zmutované akcie)
+    pl.innerHTML = `<div class="top"><div class="illu"><span class="orn a"></span><span class="orn b"></span><span class="orn c"></span><span class="orn d"></span><canvas width="64" height="64"></canvas></div>
+      <div><div class="name">${shortName(c)}</div><div class="epithet">a page not yet written</div></div></div>`;
+    pr.innerHTML = "";
+  } else {
+    const left = [...(e.passive || []).map(a => ["PASSIVE", a]), ...(e.actions || []).map(a => ["DIFFERENT ACTION", a])];
+    const sections = (arr) => arr.map(([h, a], k) => `${k === 0 || arr[k - 1][0] !== h ? `<h3>${h === "PASSIVE" ? (arr.filter(x => x[0] === h).length > 1 ? "PASSIVE ABILITIES" : "PASSIVE ABILITY") : "DIFFERENT ACTIONS"}</h3>` : ""}${block(a, c)}`).join("");
+    pl.innerHTML = `<div class="top"><div class="illu"><span class="orn a"></span><span class="orn b"></span><span class="orn c"></span><span class="orn d"></span><canvas width="64" height="64"></canvas></div>
+      <div><div class="name">${shortName(c)}</div><div class="epithet">as written by the archmage</div><div class="tagline">${e.tag}</div></div></div>
+      <div class="rule"></div><div class="sec">${left.length ? sections(left) : `<h3>OTHER ACTIONS</h3><p class="std">Every other action is standard - nothing to fear but the special.</p>`}</div>`;
+    pr.innerHTML = `<div class="sec"><h3>SPECIAL ACTION</h3>${block(e.special, c)}</div>`;
+  }
   const seal = document.getElementById("seal"); seal.style.display = ""; seal.textContent = hide ? "?" : "✦";
-  document.getElementById("nl").textContent = ui.i * 2 + 3; document.getElementById("nr").textContent = ui.i * 2 + 4;
   drawHead(document.querySelector(".illu canvas"), c, true);
+  document.querySelectorAll(".mb canvas.hd").forEach(cv => drawHead(cv, CHAR_LIST.find(x => x.key === cv.dataset.k)));
+  hydratePix(document.getElementById("codex"));
+}
+// ---- návrh: ako je portrét prilepený na stránke postavy (vlastník 2026-11-06: najprv len obrázok) ----
+ui.pstyle = "pin"; // schválené 2026-11-06: portrét pripnutý špendlíkom (ako fotky na obsahu)
+// ---- stránka postavy (vlastník 2026-11-06, začíname Fire Wizardom): vľavo portrét + PASSIVE ABILITIES pod ním,
+// vpravo ŠPECIÁL s ikonou špeciálu a animovaným náhľadom ako pri výbere postavy (mini-doska, mág castí, zóna pulzuje)
+const SPECIAL_FPS = 6; // = public/chars/common.js SPECIAL_FPS
+// dlaždica ako v hre: bunka s podfarbením a rámikom typu + pixel ikona (tileSvg) v rohu
+const tileIco = (type) => `<span class="tile-ico ${type}"><span>${tileSvg(type)}</span></span>`;
+const PAGES = {
+  fire: {
+    passive: [`Consumes ${tileIco("dmg")} <b>damage tiles</b> with his special action - it gives him <b>±1 row</b> range.`],
+    special: { caster: { x: 0, y: 1 }, cells: G.fireCells({ w: 4, h: 3 }, { x: 0, y: 1 }, false), dmg: B.SPECIAL_ZONE_DMG.fire, mana: B.SPECIAL_COST,
+      text: "Range: his <b>whole row</b>." },
+  },
+  // texty z náhľadu pri výbere postavy (abilityPreview.desc v public/chars/lightning.js)
+  lightning: {
+    passive: [`${tileIco("heal")} <b>Heal tiles</b> heal her to <b>full HP</b>.`],
+    special: { caster: { x: 1, y: 1 }, cells: G.lightningCells({ w: 4, h: 3 }, { x: 1, y: 1 }), dmg: B.SPECIAL_ZONE_DMG.lightning, mana: B.SPECIAL_COST,
+      text: "Range: every cell of the <b>opposite colour</b>." },
+  },
+  // melee z tlačidla v hre (Tail sweep), špeciál z náhľadu pri výbere postavy (public/chars/medusa.js)
+  medusa: {
+    melee: { caster: { x: 1, y: 1 }, cells: G.meleeCells({ w: 4, h: 3 }, { x: 1, y: 1 }, "medusa"), dmg: B.MEDUSA_MELEE_DMG, mana: B.MELEE_COST,
+      anim: { file: "Attack_1.png" }, fps: 10, text: "Range: her cell + all <b>4 diagonal neighbours</b>." },
+    special: { caster: { x: 1, y: 1 }, cells: G.medusaCells({ w: 4, h: 3 }, { x: 1, y: 1 }, "right"), dmg: null, mana: B.SPECIAL_COST, effect: { emoji: "🗿", num: `${B.STONE_ACTIONS}×` },
+      text: `Range: her cell + everything <b>one way</b> (row ±1). <b>No damage</b> - petrifies: the target skips <b class="nw">${B.STONE_ACTIONS} actions</b>.` },
+  },
+  // pasívka podľa vlastníka; niť a špeciál z náhľadu pri výbere postavy (public/chars/minotaur.js)
+  minotaur: {
+    passive: [`In the labyrinth he created he deals <b>${B.MAZE_DEAL_MUL}× dmg</b>.`],
+    thread: { path: [[0, 2], [1, 2], [2, 2], [2, 1]], meet: [1, 2], foe: [2, 1],
+      text: "<b>Ariadne's thread</b>: the foe's steps weave it. Where the Minotaur steps on it, the foe sees<br><span class='nw'>his <b>silhouette</b>.</span>" },
+    special: { caster: { x: 1, y: 1 }, cells: G.allCells({ w: 4, h: 3 }), dmg: null, mana: B.SPECIAL_COST, effect: { emoji: "🌀", num: "" },
+      text: "Range: <b>whole board</b>. <b>No damage</b> - banishes the foe into the labyrinth until <b>any hit</b> lands." },
+  },
+  // špeciál + ako funguje klon (z náhľadu pri výbere postavy, public/chars/naruto.js)
+  naruto: {
+    special: { caster: { x: 1, y: 1 }, cells: [[1, 1]], dmg: null, mana: B.SPECIAL_COST, effect: { emoji: "👥", num: "" },
+      text: "Range: <b>his own cell</b> - he must stand <b>alone</b>. <b>No damage</b> - summons a <b>shadow clone</b>." },
+    ability: { title: "SPECIAL ABILITY", name: "Shadow Clone Jutsu", note: "The clone is <b>indistinguishable from Naruto</b> for the foe.", summon: true },
+    clone: { from: [1, 1], me: [1, 0], clone: [1, 2],
+      text: "The clone <b>copies his moves</b> - <b>up/down inverted</b>. Same dmg as Naruto, <b>double</b> when stacked on his cell. <b>Vanishes</b> on any hit." },
+  },
+  // Escanor: pride (pasívka) + špeciál, ktorého zóna cyklí pride 0→3 (ako náhľad vo výbere postáv)
+  escanor: {
+    passive: ["<b>Pride</b> rises each round he doesn't use <b>shield/mirror</b>, and falls when he uses them or <b>takes a hit</b>."],
+    special: { caster: { x: 1, y: 1 }, cells: [], dmg: B.SPECIAL_ZONE_DMG.escanor, mana: B.SPECIAL_COST,
+      cycle: { levels: 4, ms: 1500, cells: (lvl) => G.escanorCells({ w: 4, h: 3 }, { x: 1, y: 1, pride: lvl }, "right"),
+        label: (lvl) => `<img src="/assets/pride_lion_${lvl}.png" alt=""><span>PRIDE ${lvl}</span>` },
+      text: "Range: <b>one way</b> (left/right) - the zone grows with his <b>Pride</b>." },
+  },
+  // Soldier: špeciál = zvolená bunka; obmedzenia výberu vľavo (vlastná bunka, súperova bunka = ✕ na doske)
+  soldier: {
+    rules: { icon: "✨", title: "SPECIAL RESTRICTIONS", items: ["He <b>can't pick his own cell</b>.", "He <b>can't pick the foe's current cell</b> - the foe is hit only if they <b>move onto</b> the picked cell."] },
+    special: { caster: { x: 0, y: 1 }, cells: [[2, 0]], dmg: B.SOLDIER_SPECIAL_DMG, mana: B.SPECIAL_COST,
+      text: "Range: <b>any cell</b> he picks - a sniper beam hits whoever stands there when it fires." },
+  },
+  // Werewolf: charge (texty z náhľadu pri výbere postavy) - dráha je stála, cyklí fáza mesiaca + dmg ako vo výbere postáv;
+  werewolf: {
+    passive: [`<b>Moon phase</b> changes at the start of each round: it grows as his <b>HP drops</b>, and wanes when he <b>heals</b>.`],
+    moons: [["10", 0], ["9-7", 1], ["6-4", 2], ["3-1", 3]],
+    special: { caster: { x: 0, y: 1 }, cells: G.runPath({ w: 4, h: 3 }, 0, 1, G.DIR8.right).path, dmg: null, mana: B.SPECIAL_COST, picker: "wolf", pickerNote: "<span class='warn'>WARNING:</span><br>the werewolf can hit you from <b>many sides</b>.",
+      cycle: { levels: 4, ms: 1500, cells: () => G.runPath({ w: 4, h: 3 }, 0, 1, G.DIR8.right).path,
+        label: (lvl) => `<img src="/assets/moon_${lvl}.png" alt=""><span class="pix-ico mini" data-emoji="☠️"></span><span>${B.WOLF_MOON_DMG[lvl]}</span>` },
+      inline: true, text: `Range: <b>charge</b> in <b>8 directions</b> to the first foe (or the edge). Lower HP = <b>fuller moon</b> = more dmg.` },
+  },
+  countess: {
+    mutated: [
+      { icon: "🏹", name: "RANGE ATTACK", mana: B.BASIC_COST, dmg: [1, 2, 3].map(d => Math.max(1, B.BASIC_DMG_MAX - d)).join("/"),
+        text: "Shoots <b>diagonally</b> and bounces once off a wall.",
+        board: { me: [0, 1], hit: G.vampShotRoute({ w: 4, h: 3 }, 0, 1, "up_right").map(c => [c.x, c.y]) } },
+      { icon: "🏃", name: "CHARGE", slot: "DASH", swapVisual: true, mana: B.DASH_COST, dmg: B.VAMP_CHARGE_DMG, heal: B.VAMP_CHARGE_BONUS,
+        text: "Rushes <b>up, down, left or<br>right</b> to the first foe<br>(or the edge) and strikes;<br>a hit <b>heals</b> her.",
+        board: { me: [0, 1], path: [[1, 1], [2, 1]], hit: [[3, 1]] } },
+    ],
+    passiveRight: ["Mirrors are mere <b>shields</b> against her - they never reflect her damage."],
+    special: { caster: { x: 0, y: 1 }, cells: [[2, 0]], dmg: B.VAMP_TRAP_DMG, heal: B.VAMP_TRAP_BONUS, mana: B.SPECIAL_COST,
+      text: "<span style='letter-spacing:0;font-size:10px'>Range: a hidden trap on <b>any cell</b>.<br>When the foe <b>enters or crosses</b><br>it, she teleports there and<br>strikes; a hit <b>heals</b> her.</span>" },
+  },
+  onre: {
+    mutated: [
+      { icon: "🏹", name: "RANGE ATTACK", mana: B.BASIC_COST, dmg: [1, 2, 3].map(d => Math.max(1, B.BASIC_DMG_MAX - d)).join("/"),
+        text: "Shoots <b>diagonally</b> and bounces once off a wall.",
+        board: { me: [0, 1], hit: G.vampShotRoute({ w: 4, h: 3 }, 0, 1, "up_right").map(c => [c.x, c.y]) } },
+      { icon: "🏃", name: "CHARGE", slot: "DASH", swapVisual: true, mana: B.DASH_COST, dmg: B.VAMP_CHARGE_DMG, drain: B.VAMP_CHARGE_BONUS,
+        text: "Rushes <b>up, down, left or<br>right</b> to the first foe<br>(or the edge) and strikes;<br>a hit <b>drains</b> their mana.",
+        board: { me: [0, 1], path: [[1, 1], [2, 1]], hit: [[3, 1]] } },
+    ],
+    passiveRight: ["Mirrors are mere <b>shields</b> against her - they never reflect her damage."],
+    special: { caster: { x: 0, y: 1 }, cells: [[2, 0]], dmg: B.VAMP_TRAP_DMG, drain: B.VAMP_TRAP_BONUS, mana: B.SPECIAL_COST,
+      text: "<span style='letter-spacing:0;font-size:10px'>Range: a hidden trap on <b>any cell</b>.<br>When the foe <b>enters or crosses</b><br>it, she teleports there and<br>strikes; a hit <b>drains</b> their mana.</span>" },
+  },
+  jotaro: {
+    swap: { from: "🪞", fromLabel: "MIRROR", toLabel: "PUNCH", skin: "jotaro-s1" }, // Special 1 = PUNCH (vlastník: aj pre Luffyho)
+    mutated: [
+      { icon: "🏹", name: "RANGE ATTACK", mana: B.BASIC_COST, dmg: [1, 2, 3].map(d => Math.max(1, B.BASIC_DMG_MAX - d)).join("/"),
+        text: "Shoots <b>diagonally</b> and bounces once off a wall.",
+        board: { me: [0, 1], hit: G.vampShotRoute({ w: 4, h: 3 }, 0, 1, "up_right").map(c => [c.x, c.y]) } },
+      { icon: "🪞", name: "PUNCH", slot: "MIRROR", mana: B.JOTARO_S1_COST, dmg: B.JOTARO_S1_DMG,
+        text: "Hits <b>both diagonal cells</b><br>on the left or right side.",
+        board: { me: [1, 1], hit: G.jotaroS1Cells({ w: 4, h: 3 }, { x: 1, y: 1 }, "right") } },
+      { icon: "🗡️", name: "MELEE", mana: B.MELEE_COST, dmg: B.JOTARO_MELEE_DMG, line: true },
+    ],
+    special: { caster: { x: 1, y: 1 }, cells: G.allCells({ w: 4, h: 3 }), idle: true, castArt: true, dmg: null, mana: B.SPECIAL_COST, effect: { emoji: "⏱", num: "" },
+      text: "<span style='letter-spacing:0;font-size:9px'><b>THE WORLD</b> (once per game): time stops,<br>he takes <b>3 extra actions</b> - all effects<br>resolve when time restarts.</span><br><span style='letter-spacing:0;font-size:10px'>Range: <b>whole board</b>.</span>" },
+    after: { icon: "✨", name: "SPECIAL after THE WORLD", mana: B.JOTARO_S2_COST, dmg: B.JOTARO_S2_DMG,
+      text: "After THE WORLD: the<br><b>adjacent cell</b> left or right.",
+      board: { me: [1, 1], hit: [[2, 1]] } },
+    warn: "after THE WORLD is used, he is <b>weak against Shinigami</b>.",
+  },
+  luffy: {
+    swap: { from: "🪞", fromLabel: "MIRROR", toLabel: "PUNCH", skin: "luffy-s1" },
+    mutated: [
+      { icon: "🏹", name: "RANGE ATTACK", mana: B.BASIC_COST, dmg: [1, 2, 3].map(d => Math.max(1, B.BASIC_DMG_MAX - d)).join("/"),
+        text: "Shoots <b>diagonally</b> and bounces once off a wall.",
+        board: { me: [0, 1], hit: G.vampShotRoute({ w: 4, h: 3 }, 0, 1, "up_right").map(c => [c.x, c.y]) } },
+      { icon: "🪞", name: "PUNCH", slot: "MIRROR", mana: B.LUFFY_S1_COST, dmg: B.LUFFY_S1_DMG,
+        text: "Stretches an arm to<br><b>any cell</b> except his own.",
+        board: { me: [0, 1], hit: [[2, 0]] } },
+      { icon: "🗡️", name: "MELEE", mana: B.MELEE_COST, dmg: B.LUFFY_MELEE_DMG, line: true },
+    ],
+    special: { caster: { x: 1, y: 1 }, cells: G.luffyBallCells({ w: 4, h: 3 }, { x: 1, y: 1 }, "right"), idle: true, hoverPlay: { to: [2, 1] }, dmg: B.LUFFY_BALL_DMG, mana: B.SPECIAL_COST,
+      text: "<span style='letter-spacing:0;font-size:9px'><b>BALLOON</b> (once per game): inflates,<br>rolls one cell left or right and<br>bursts on <b>everything around</b>.</span><br><span style='letter-spacing:0;font-size:10px'>Range: <b>3×3</b> around the landing.</span>" },
+    after: { icon: "✨", name: "SPECIAL after BALLOON", mana: B.LUFFY_S2_COST, dmg: B.LUFFY_S2_DMG,
+      text: "After BALLOON: the<br><b>adjacent cell</b> left or right.",
+      board: { me: [1, 1], hit: [[2, 1]] } },
+    warn: "after BALLOON is used, he is <b>weak against Shinigami</b>.",
+  },
+  // texty z náhľadu pri výbere postavy (abilityPreview.desc v public/chars/wanderer.js)
+  wanderer: {
+    passive: [`<b>+${B.WANDERER_MANA_REGEN}</b> <span class="drop-ico">${pixSvg("drop")}</span> <b>mana</b> each round he doesn't use <b>mirror</b>.`],
+    special: { caster: { x: 1, y: 1 }, cells: G.diagNeighbors({ w: 4, h: 3 }, { x: 1, y: 1 }), dmg: B.SPECIAL_ZONE_DMG.wanderer, mana: B.SPECIAL_COST,
+      text: "Range: <b>diagonal neighbours</b>." },
+  },
+};
+// animovaný mág v bunke castera: efektový sprite špeciálu (ako drawAbilityCaster vo výbere postáv: fill 1.1, stred)
+function animateCaster(cv, c, anim = c.specialAnim, fps = SPECIAL_FPS) {
+  if (!cv || !anim) return;
+  const offX = anim === c.specialAnim ? (c.fxOffsetX || 0) * cv.width : 0;
+  load(`/assets/${c.meta.dir}/${anim.file}`).then(im => {
+    if (!im) return;
+    const fh = im.height, fw = fh, total = Math.max(1, Math.round(im.width / fw)), x = cv.getContext("2d");
+    const tick = (t) => {
+      if (!cv.isConnected) return;
+      const idx = Math.floor(t / (1000 / fps)) % total, sc = Math.min(cv.width / fw, cv.height / fh) * 1.1;
+      x.clearRect(0, 0, cv.width, cv.height); x.imageSmoothingEnabled = false;
+      x.drawImage(im, idx * fw, 0, fw, fh, (cv.width - fw * sc) / 2 + offX, (cv.height - fh * sc) / 2, fw * sc, fh * sc);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+const ARROW8 = { "-1,-1": "↖", "0,-1": "↑", "1,-1": "↗", "-1,0": "←", "1,0": "→", "-1,1": "↙", "0,1": "↓", "1,1": "↘" }; // smery vlkolakovho chargu
+function actionBlock(sp, { icon = "✨", title = "SPECIAL ACTION", compact = false, key = "sp" } = {}) {
+  const hit = new Set(sp.cells.map(([x, y]) => `${x},${y}`));
+  let cells = "";
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 4; x++) {
+    const me = sp.caster.x === x && sp.caster.y === y;
+    const no = (sp.blocked || []).some(([bx, by]) => bx === x && by === y);
+    const fz = sp.frozen && !me ? " frozen" : "";
+    const ar = sp.arrows && !me && Math.abs(x - sp.caster.x) <= 1 && Math.abs(y - sp.caster.y) <= 1 ? ARROW8[`${x - sp.caster.x},${y - sp.caster.y}`] : "";
+    cells += `<i class="${me ? "caster" : hit.has(`${x},${y}`) ? "hit" : no ? "no" : ""}${fz}">${me ? `<canvas data-act="${key}" width="48" height="34"></canvas>` : no ? "<span class=\"nox\">✕</span>" : ar ? `<span class="ar8">${ar}</span>` : ""}</i>`;
+  }
+  const cyc = sp.cycle ? `<div class="sp-cycle" data-cyc="${key}"></div>` : "";
+  const stats = `<div class="sp-stats"><span><span class="pix-ico mini" data-emoji="💧"></span>${sp.mana}</span>${sp.dmg != null ? `<span><span class="pix-ico mini" data-emoji="☠️"></span>${sp.dmg}</span>` : ""}${sp.heal ? `<span><span class="pix-ico mini" data-emoji="❤️"></span>${sp.heal}</span>` : ""}${sp.drain ? `<span><span class="pix-ico mini" data-emoji="💧"></span>${sp.drain}</span>` : ""}${sp.effect ? `<span><span class="pix-ico mini" data-emoji="${sp.effect.emoji}"></span>${sp.effect.num}</span>` : ""}${sp.inline ? cyc : ""}</div>`;
+  const text = (sp.inline ? "" : cyc) + (sp.text ? `<p class="sp-text">${sp.text}</p>` : "");
+  const picker = sp.picker === "wolf" ? `<div class="dir-picker wolf-picker cx-picker">${[["ul", "↖"], ["up", "↑"], ["ur", "↗"], ["left", "←"]].map(([c, a]) => `<span class="btn arrow ${c}">${a}</span>`).join("")}<span class="wolf-center"></span>${[["right", "→"], ["dl", "↙"], ["down", "↓"], ["dr", "↘"]].map(([c, a]) => `<span class="btn arrow ${c}">${a}</span>`).join("")}</div>` : "";
+  if (sp.hoverPlay && !compact) return `<div class="sp-head"><span class="pix-ico sp-ico" data-emoji="${icon}"></span><span>${title}</span></div><div class="board-wrap play"><div class="sp-board">${cells}</div><canvas class="play-fx"></canvas></div>${stats}${text}`;
+  if (sp.castArt && !compact) return `<div class="sp-head"><span class="pix-ico sp-ico" data-emoji="${icon}"></span><span>${title}</span></div><div class="board-wrap"><div class="sp-board">${cells}</div><canvas class="cast-art" width="220" height="220"></canvas></div>${stats}${text}`;
+  if (picker && !compact) return `<div class="sp-head"><span class="pix-ico sp-ico" data-emoji="${icon}"></span><span>${title}</span></div><div class="sp-board">${cells}</div>${stats}${text}<div class="pk-bottom">${picker}${sp.pickerNote ? `<p class="pk-note">${sp.pickerNote}</p>` : ""}</div>`;
+  return `<div class="sp-head"><span class="pix-ico sp-ico" data-emoji="${icon}"></span><span>${title}</span></div>`
+    + (compact ? `<div class="sp-row"><div class="sp-board sm">${cells}</div><div class="sp-side">${stats}${text}</div></div>` : `<div class="sp-board">${cells}</div>${stats}${text}`);
+}
+const TB = { cw: 34, ch: 25, gap: 3, pad: 5 };
+function threadBoard(t) {
+  const on = new Set(t.path.map(([x, y]) => `${x},${y}`));
+  let cells = "";
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 4; x++) {
+    const k = `${x},${y}`, foe = t.foe[0] === x && t.foe[1] === y, meet = t.meet[0] === x && t.meet[1] === y;
+    cells += `<i class="${foe ? "torch" : on.has(k) ? "thread" : ""}">${foe ? '<canvas data-th="foe" width="24" height="24"></canvas>' : meet ? '<canvas data-th="meet" width="24" height="24"></canvas>' : ""}</i>`;
+  }
+  const pt = ([x, y]) => [TB.pad + x * (TB.cw + TB.gap) + TB.cw / 2, TB.pad + y * (TB.ch + TB.gap) + TB.ch / 2];
+  const pts = t.path.map(pt), W = TB.pad * 2 + 4 * TB.cw + 3 * TB.gap, H = TB.pad * 2 + 3 * TB.ch + 2 * TB.gap;
+  const svg = `<svg class="th-svg" width="${W}" height="${H}"><polyline points="${pts.map(q => q.join(",")).join(" ")}" fill="none" stroke="#e8b23c" stroke-width="3" stroke-dasharray="8 6" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/><circle cx="${pts[0][0]}" cy="${pts[0][1]}" r="5" fill="#e8b23c"/></svg>`;
+  return `<div class="sp-row th-row"><div class="sp-board sm th">${cells}${svg}</div><div class="sp-side"><p class="sp-text">${t.text}</p></div></div>`;
+}
+function cloneBoard(t) {
+  let cells = "";
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 4; x++) {
+    const at = (q) => q[0] === x && q[1] === y;
+    cells += `<i class="${at(t.from) ? "from" : ""}">${at(t.me) ? '<canvas data-cl="me" width="24" height="24"></canvas><span class="ar">↑</span>' : at(t.clone) ? '<canvas data-cl="clone" width="24" height="24"></canvas><span class="ar">↓</span>' : at(t.from) ? '<span class="ar dim">↕</span>' : ""}</i>`;
+  }
+  return `<div class="sp-row th-row"><div class="sp-board sm th cl">${cells}</div><div class="sp-side"><p class="sp-text">${t.text}</p></div></div>`;
+}
+function animateSummon(cv, c) {
+  if (!cv) return;
+  load(`/assets/${c.meta.dir}/Special_2.png`).then(im => {
+    if (!im) return;
+    const fh = im.height, fw = fh, total = Math.max(1, Math.round(im.width / fw)), x = cv.getContext("2d"), crop = Math.round(fw * 0.24);
+    const cellW = cv.width * 0.62, sc = 172 / fh, dw = (fw - 2 * crop) * sc, dh = fh * sc, off = 34;
+    const tick = (t) => {
+      if (!cv.isConnected) return;
+      const idx = Math.floor(t / (1000 / 6)) % total, top = cv.height - dh - 2; // celá postava aj s nohami
+      x.clearRect(0, 0, cv.width, cv.height); x.imageSmoothingEnabled = false;
+      x.save(); x.translate(cv.width / 2 + off, 0); x.scale(-1, 1); // klon vyzerá rovnako ako Naruto // klon: zrkadlo, hľadí na Naruta
+      x.drawImage(im, idx * fw + crop, 0, fw - 2 * crop, fh, -dw / 2, top, dw, dh); x.restore();
+      x.drawImage(im, idx * fw + crop, 0, fw - 2 * crop, fh, cv.width / 2 - off - dw / 2, top, dw, dh); // Naruto
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+function runCycle(sp, key) {
+  const board = document.querySelector(`canvas[data-act="${key}"]`)?.closest(".sp-board"), lab = document.querySelector(`[data-cyc="${key}"]`);
+  if (!board || !sp.cycle) return;
+  const cells = [...board.querySelectorAll("i")];
+  let lvl = -1, last = 0;
+  const tick = (t) => {
+    if (!board.isConnected) return;
+    if (lvl < 0 || t - last >= sp.cycle.ms) {
+      lvl = (lvl + 1) % sp.cycle.levels; last = t;
+      const hit = new Set(sp.cycle.cells(lvl).map(([x, y]) => `${x},${y}`));
+      // pulz ide synchrónne ďalej: delay sa nastaví LEN pri pridaní bunky (fáza podľa globálnych hodín), bežiaca bunka sa nereštartuje
+      cells.forEach((el, i) => {
+        if (el.classList.contains("caster")) return;
+        const on = hit.has(`${i % 4},${Math.floor(i / 4)}`);
+        if (on && !el.classList.contains("hit")) { el.style.animationDelay = -(performance.now() % 1000) + "ms"; el.classList.add("hit"); }
+        else if (!on) el.classList.remove("hit");
+      });
+      if (lab) { lab.innerHTML = sp.cycle.label(lvl); hydratePix(lab); }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+// póza z karty výberu postavy (previewCast: framy prehrá raz, potom drží loopFrom; po pauze znova)
+function animateCast(cv, c) {
+  const pc = c.previewCast; if (!cv || !pc) return;
+  load(`/assets/${c.meta.dir}/${pc.file}`).then(im => {
+    if (!im) return;
+    const total = pc.frames, fw = Math.round(im.width / total), fh = im.height, x = cv.getContext("2d");
+    let t0 = performance.now();
+    cv.parentElement.addEventListener("mouseenter", () => { t0 = performance.now(); });
+    const tick = (t) => {
+      if (!cv.isConnected) return;
+      const fi = Math.floor(Math.max(0, t - t0) / 1000 * pc.fps), idx = fi < total ? fi : pc.loopFrom + ((fi - total) % (total - pc.loopFrom));
+      const sc = Math.min(cv.width / fw, cv.height / fh) * 1.05;
+      x.clearRect(0, 0, cv.width, cv.height); x.imageSmoothingEnabled = false;
+      x.drawImage(im, idx * fw, 0, fw, fh, (cv.width - fw * sc) / 2, cv.height - fh * sc, fw * sc, fh * sc);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+// Luffyho guľa na doske ako v hre (anims v public/chars/luffy.js): Special_1 premena (8 fps, potom f7-8),
+// kotúľ o bunku (f7-8, 12 fps), Special_2 výbuch raz na dopadovej bunke; spustí sa pri nadídení myšou na dosku
+function animateHoverPlay(wrap, c, hp, sp) {
+  const cv = wrap?.querySelector("canvas.play-fx"), board = wrap?.querySelector(".sp-board"); if (!cv || !board) return;
+  const casterCv = board.querySelector(".caster canvas");
+  const cellAt = (x, y) => board.children[y * 4 + x];
+  const ctr = (x, y) => { const el = cellAt(x, y); return { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2, h: el.offsetHeight }; };
+  Promise.all([load(`/assets/${c.meta.dir}/Special_1.png`), load(`/assets/${c.meta.dir}/Special_2.png`)]).then(([s1, s2]) => {
+    if (!s1 || !s2) return;
+    cv.width = board.offsetWidth; cv.height = board.offsetHeight;
+    const x = cv.getContext("2d"), n1 = Math.round(s1.width / s1.height), n2 = Math.round(s2.width / s2.height);
+    const FORM = n1 / 8 * 1000, ROLL = 600, BURST = n2 / 8 * 1000;
+    let t0 = -1;
+    wrap.addEventListener("mouseenter", () => { t0 = performance.now(); });
+    wrap.addEventListener("mouseleave", () => { t0 = -1; });
+    const draw = (im, n, idx, at) => {
+      const f = im.height, sc = at.h * 1.5 / f, dw = f * sc;
+      x.drawImage(im, idx * f, 0, f, f, at.x - dw / 2, at.y + at.h / 2 - dw * .9, dw, dw);
+    };
+    const tick = (t) => {
+      if (!cv.isConnected) return;
+      x.clearRect(0, 0, cv.width, cv.height); x.imageSmoothingEnabled = false;
+      if (t0 >= 0 && t - t0 > FORM + ROLL + BURST + 900) t0 = t; // kým je myš nad doskou, útok sa opakuje
+      const e = t0 < 0 ? -1 : t - t0, a = ctr(sp.caster.x, sp.caster.y), b = ctr(hp.to[0], hp.to[1]);
+      if (casterCv) casterCv.style.visibility = e < 0 || e > FORM + ROLL + BURST ? "" : "hidden";
+      if (e >= 0 && e < FORM) { const f = Math.floor(e / 125); draw(s1, n1, f < n1 ? f : 7 + ((f - n1) % 2), a); }
+      else if (e >= FORM && e < FORM + ROLL) { const k = (e - FORM) / ROLL; draw(s1, n1, 7 + Math.floor((e - FORM) / 83) % 2, { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, h: a.h }); }
+      else if (e >= FORM + ROLL && e < FORM + ROLL + BURST) draw(s2, n2, Math.min(n2 - 1, Math.floor((e - FORM - ROLL) / 125)), b);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+function swapVisual(v) {
+  const slot = v.slot || "mirror";
+  return `<div class="swap-vis"><span class="btn act ${slot} x-out"><span class="pix-ico" data-emoji="${v.from}"></span></span><span class="lbl dash">${v.fromLabel}</span><span class="down">↓</span><span class="btn act ${slot} ${v.skin}"><span class="pix-ico charge-mark">???</span></span><span class="lbl">${v.toLabel}</span></div>`;
+}
+function tinyBoard(b) {
+  const at = (arr, x, y) => (arr || []).some(([a, c]) => a === x && c === y);
+  let cells = "";
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 4; x++) {
+    const me = b.me[0] === x && b.me[1] === y;
+    cells += `<i class="${me ? "caster" : at(b.hit, x, y) ? "hit" : at(b.path, x, y) ? "path" : ""}">${me ? '<canvas class="tb-hd" width="24" height="24"></canvas>' : ""}</i>`;
+  }
+  return `<div class="sp-board tiny">${cells}</div>`;
+}
+function mutatedBlock(m) {
+  const chip = (e, v) => `<span class="mchip"><span class="pix-ico mini" data-emoji="${e}"></span>${v}</span>`;
+  const head = m.replaces
+    ? `<span class="repl"><span class="pix-ico" data-emoji="${m.replaces}"></span></span><span class="ra">→</span><span class="vq"><span class="pix-ico" data-emoji="${m.icon}"></span></span>`
+    : `<span class="pix-ico" data-emoji="${m.icon}"></span>`;
+  if (m.line) return `<div class="mut line"><div class="mut-h">${head}<span class="mn">${m.name}</span><span class="mchips">${chip("💧", m.mana)}${chip("☠️", m.dmg)}</span><span class="weak">- weaker</span></div></div>`;
+  return `<div class="mut"><div class="mut-h">${head}<span class="mn">${m.name}</span>${m.slot ? `<span class="ms">(${m.slot} SLOT)</span>` : ""}<span class="mchips">${chip("💧", m.mana)}${m.dmg != null ? chip("☠️", m.dmg) : ""}${m.heal ? chip("❤️", m.heal) : ""}${m.drain ? chip("💧", m.drain) : ""}</span></div>
+    <div class="mut-row">${tinyBoard(m.board)}<div><p>${m.text}</p></div></div></div>`;
+}
+async function drawSilhouette(cv, c) { await drawHead(cv, c, false, true); const x = cv.getContext("2d"); x.globalCompositeOperation = "source-atop"; x.fillStyle = "#000"; x.fillRect(0, 0, cv.width, cv.height); x.globalCompositeOperation = "source-over"; }
+// menovka na stránke postavy = celé meno (na obsahu skrátené); Onryō bez dĺžňa (pixel font)
+const fullName = (c) => c.key === "onre" ? "ONRYO" : c.meta.name.toUpperCase();
+// A = zahnutá ručne kreslená šípka zľava zdola, B = text nad fotkou + šípka dole, C = červený atramentový krúžok + text,
+// D = papierový štítok na špagáte
+const NOTES = [["A", "A · ZAHNUTÁ ŠÍPKA"], ["B", "B · NAD FOTKOU"], ["C", "C · KRÚŽOK"], ["D", "D · ŠTÍTOK"]];
+ui.note = "E"; // vlastník: text pod fotkou + zahnutá šípka nahor (štýl B)
+const notesEl = document.createElement("span");
+const syncNotes = () => { notesEl.innerHTML = NOTES.map(([k, n]) => `<button type="button" data-nt="${k}" class="${ui.note === k ? "on" : ""}">${n}</button>`).join(""); };
+notesEl.addEventListener("click", (e) => { const b = e.target.closest("[data-nt]"); if (b) { ui.note = b.dataset.nt; if (ui.i < 0) ui.i = 0; syncNotes(); render(); } });
+syncNotes();
+const INK = "#6a0e18";
+function twinNote() {
+  if (ui.note === "E") return `<div class="tw tw-e"><span>evil twin</span><svg width="30" height="26" viewBox="0 0 30 26"><path d="M6 2 C 4 10, 10 16, 20 20" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><path d="M12 22 L21 21 L18 12" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
+  if (ui.note === "A") return `<div class="tw tw-a"><svg width="70" height="60" viewBox="0 0 70 60"><path d="M6 54 C 10 30, 30 12, 58 10" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><path d="M48 3 L60 10 L49 18" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>evil twin</span></div>`;
+  if (ui.note === "B") return `<div class="tw tw-b"><span>evil twin</span><svg width="30" height="26" viewBox="0 0 30 26"><path d="M6 2 C 4 10, 10 16, 20 20" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><path d="M12 22 L21 21 L18 12" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
+  if (ui.note === "C") return `<div class="tw tw-c"><svg width="112" height="112" viewBox="0 0 112 112"><path d="M60 6 C 100 4, 110 40, 104 66 C 98 96, 60 108, 30 100 C 6 92, 2 56, 10 34 C 18 14, 40 6, 70 8" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/></svg><span>evil twin!</span></div>`;
+  return `<div class="tw tw-d"><svg width="40" height="40" viewBox="0 0 40 40"><path d="M4 2 C 10 20, 20 26, 34 30" fill="none" stroke="#3a2a18" stroke-width="2"/></svg><span>EVIL TWIN</span></div>`;
+}
+const BLACK_SKIN = new Set(["fire", "lightning", "wanderer", "medusa", "minotaur", "naruto", "escanor", "soldier", "werewolf"]); // čierny skin vedľa portrétu - všetky základné postavy (schválené na Fire Wizardovi)
+function renderEntry() {
+  document.getElementById("codex").classList.toggle("dark-page", !!CHAR_LIST[ui.i].side);
+  const c = CHAR_LIST[ui.i], pg = PAGES[c.key], side = c.side === "p1" ? " w" : c.side === "p2" ? " b" : "";
+  document.getElementById("pl").innerHTML = `<div class="portrait ${ui.pstyle}${side}"><div class="photo"><canvas width="64" height="64"></canvas></div>
+    <span class="d1"></span><span class="d2"></span><span class="d3"></span><span class="d4"></span><span class="pn${fullName(c).length > 13 ? " long" : ""}">${fullName(c)}</span></div>
+    ${pg?.passive ? `<div class="pv${pg.moons ? " pv-moon" : ""}"><h3>PASSIVE ABILITIES</h3>${pg.passive.map(t => `<p>${t}</p>`).join("")}${pg.moons ? `<div class="moon-tab">${pg.moons.map(([hp, l]) => `<div><img src="/assets/moon_${l}.png" alt=""><span class="hp"><span class="drop-ico">${pixSvg("heart")}</span>${hp}</span><span class="dm"><span class="pix-ico mini" data-emoji="☠️"></span>${B.WOLF_MOON_DMG[l]}</span></div>`).join("")}</div>` : ""}</div>` : ""}
+    ${!c.side && c.meta.dirP2 && BLACK_SKIN.has(c.key) ? `<div class="skin-b"><span class="cx-pin"></span><canvas width="48" height="48"></canvas></div>${twinNote()}` : ""}
+    ${pg?.swap || pg?.mutated?.some(m => m.swapVisual) ? swapVisual(pg.swap || { from: "🏃", fromLabel: "DASH", toLabel: "CHARGE", skin: "vamp-charge", slot: "dash" }) : ""}
+    ${pg?.mutated ? `<div class="pv mu${pg.mutated.length > 2 ? " three" : ""}"><h3>MUTATED ACTIONS</h3>${pg.mutated.map(mutatedBlock).join("")}</div>` : ""}
+    ${pg?.rules ? `<div class="pv"><h3 class="ih">${pg.rules.icon ? `<span class="pix-ico" data-emoji="${pg.rules.icon}"></span>` : ""}${pg.rules.title}</h3>${pg.rules.items.map(t => `<p class="rule-li">${t}</p>`).join("")}</div>` : ""}
+    ${pg?.ability ? `<div class="pv ab"><h3>${pg.ability.title}</h3><div class="ab-name">${pg.ability.name}</div><div class="ab-row"><canvas class="summon" width="136" height="118"></canvas><div>${pg.ability.note ? `<p class="ab-note">${pg.ability.note}</p>` : ""}</div></div></div>` : ""}
+    ${pg?.melee ? `<div class="pv act">${actionBlock(pg.melee, { icon: "🗡️", title: "MELEE", compact: true, key: "melee" })}</div>` : ""}`;
+  // Ariadnina niť (Minotaur) na pravej strane pod špeciálom - blok špeciálu je vtedy tesnejší
+  document.getElementById("pr").innerHTML = pg?.special ? `<div class="spp${pg.thread || pg.clone || pg.passiveRight || pg.after ? " tight" : ""}${pg.warn ? " dense" : ""}${pg.special.picker ? " fill" : ""}">${actionBlock(pg.special)}${pg.thread ? threadBoard(pg.thread) : ""}${pg.clone ? cloneBoard(pg.clone) : ""}${pg.after ? `<div class="pv-r after">${mutatedBlock(pg.after)}</div>` : ""}${pg.warn ? `<div class="pk-bottom warn-row"><span class="btn act demon ls-btn"><img class="ls-ico" src="/assets/last_stand.png" alt="Shinigami"></span><p class="pk-note"><span class="warn">WARNING:</span><br>${pg.warn}</p></div>` : ""}${pg.passiveRight ? `<div class="pv-r"><h3>PASSIVE ABILITIES</h3>${pg.passiveRight.map(t => `<p>${t}</p>`).join("")}</div>` : ""}</div>` : "";
+  hydratePix(document.getElementById("codex"));
+  animateCaster(document.querySelector('canvas[data-act="sp"]'), c, pg?.special?.idle ? { file: "Idle.png" } : c.specialAnim, pg?.special?.idle ? 8 : SPECIAL_FPS);
+  if (pg?.special?.cycle) runCycle(pg.special, "sp");
+  const skb = document.querySelector(".skin-b canvas"); if (skb) drawHead(skb, c, false, true, c.meta.dirP2);
+  if (pg?.special?.hoverPlay) animateHoverPlay(document.querySelector(".board-wrap.play"), c, pg.special.hoverPlay, pg.special);
+  if (pg?.special?.castArt) animateCast(document.querySelector("canvas.cast-art"), c);
+  if (pg?.thread) { drawHead(document.querySelector('canvas[data-th="foe"]'), CHAR_LIST[0], false, true); drawSilhouette(document.querySelector('canvas[data-th="meet"]'), c); }
+  if (pg?.ability?.summon) animateSummon(document.querySelector("canvas.summon"), c);
+  if (pg?.mutated || pg?.after) document.querySelectorAll("canvas.tb-hd").forEach(cv => drawHead(cv, c, false, true));
+  if (pg?.clone) document.querySelectorAll("canvas[data-cl]").forEach(cv => drawHead(cv, c, false, true));
+  if (pg?.melee) animateCaster(document.querySelector('canvas[data-act="melee"]'), c, pg.melee.anim, pg.melee.fps);
+  document.getElementById("seal").style.display = "none";
+  drawHead(document.querySelector(".portrait canvas"), c, false, true); // ten istý výrez ako na obsahu, len väčší; skrytá postava bez siluety
 }
 function render() {
   if (ui.i < 0) renderContents(); else renderEntry();
   const entry = ui.i >= 0;
   document.getElementById("torn").classList.toggle("hidden", entry); document.getElementById("spill").classList.toggle("hidden", entry);
-  ["back", "prev", "next"].forEach(id => document.getElementById(id).classList.toggle("hidden", !entry));
-  document.getElementById("prev").style.visibility = ui.i > 0 ? "" : "hidden";
-  document.getElementById("next").style.visibility = ui.i < CHAR_LIST.length - 1 ? "" : "hidden";
+  document.getElementById("back").classList.toggle("hidden", !entry);
   drawBook();
 }
 const go = (i) => { ui.i = Math.max(-1, Math.min(CHAR_LIST.length - 1, i)); render(); };
+// listovanie medzi stránkami postáv zatiaľ nie je (vlastník 2026-11-06): obsah → klik na postavu → jej stránka,
+// späť cez ↩ CONTENTS alebo Esc
 document.getElementById("back").onclick = () => go(-1);
-document.getElementById("prev").onclick = () => go(ui.i - 1);
-document.getElementById("next").onclick = () => go(ui.i + 1);
 document.getElementById("codex").addEventListener("click", (e) => { const m = e.target.closest(".pg [data-i]"); if (m) go(+m.dataset.i); });
-document.addEventListener("keydown", (e) => { if (e.key === "ArrowRight") go(ui.i + 1); if (e.key === "ArrowLeft") go(ui.i - 1); if (e.key === "Escape") go(-1); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") go(-1); });
+
 const stylesEl = document.getElementById("styles");
 const syncStyles = () => { stylesEl.innerHTML = STYLES.map(([k, n]) => `<button type="button" data-st="${k}" class="${ui.style === k ? "on" : ""}">${n}</button>`).join(""); };
 stylesEl.addEventListener("click", (e) => { const b = e.target.closest("[data-st]"); if (b) { ui.style = b.dataset.st; ui.i = -1; syncStyles(); render(); } });

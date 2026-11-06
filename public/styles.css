@@ -3931,7 +3931,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .codex-book .cx-ph canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .codex-book .cx-pin { position: absolute; left: 50%; top: -9px; width: 8px; height: 8px; margin-left: -4px; background: #c0283a;
   box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #7a1622; z-index: 1; }
-.codex-book .cx-nm { margin-top: 4px; padding: 3px 5px; background: #f4ead0; box-shadow: 0 0 0 2px #000; }
+.codex-book .cx-nm { margin-top: 4px; padding: 3px 5px; background: #e6d59e; box-shadow: 0 0 0 2px #000; } /* základné postavy: nažltnutý papierik */
 .codex-book .cx-q { width: 100%; height: 100%; display: grid; place-items: center; font-size: 16px; color: var(--faded); background: #d6c18e; }
 .codex-book .cx-card.sealed .cx-ph { background: radial-gradient(circle at 50% 40%, #6a5a7e, #2e2438 75%); }
 .codex-book .cx-card.sealed.w .cx-ph { background: radial-gradient(circle at 50% 40%, #e8e0cc, #8a8070 80%); }
