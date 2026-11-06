@@ -4124,9 +4124,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .codex-book .swap-vis { position: absolute; left: 236px; top: 26px; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2; }
 .codex-book .swap-vis .btn { position: relative; width: 74px !important; height: 50px !important; padding: 0; display: grid; place-items: center; cursor: default; } /* !important: veľkosť tlačidiel v hre na dotyku (.touch .btn.act) sa sem nesmie dostať */
 .codex-book .swap-vis .btn .pix-ico { width: 30px !important; height: 30px !important; }
-.codex-book .swap-vis .x-out::before, .codex-book .swap-vis .x-out::after { content: ""; position: absolute; left: -6px; right: -6px; top: 50%; height: 4px; margin-top: -2px; background: #c0283a; box-shadow: 0 0 0 2px #000; }
-.codex-book .swap-vis .x-out::before { transform: rotate(34deg); }
-.codex-book .swap-vis .x-out::after { transform: rotate(-34deg); }
+.codex-book .swap-vis .x-out .xo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; } /* prečiarknuté X presne z rohu do rohu */
 .codex-book .swap-vis .lbl.dash { color: #e6dcc6; text-shadow: none; margin-top: -2px; }
 .codex-book .swap-vis .down { font-family: var(--px-font); font-size: 18px; color: #e6dcc6; text-shadow: 2px 2px 0 #000; margin-bottom: 6px; }
 .codex-book .swap-vis .lbl { font-size: 9px; color: #c9a0ff; letter-spacing: 1px; text-shadow: 0 0 6px rgba(170,90,255,.6); }

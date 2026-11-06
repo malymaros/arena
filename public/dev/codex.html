@@ -404,8 +404,7 @@
   .swap-vis { position: absolute; left: 236px; top: 26px; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2; }
   .swap-vis .btn { position: relative; width: 74px; height: 50px; padding: 0; display: grid; place-items: center; cursor: default; }
   .swap-vis .btn .pix-ico { width: 30px; height: 30px; }
-  .swap-vis .x-out::before, .swap-vis .x-out::after { content: ""; position: absolute; left: -6px; right: -6px; top: 50%; height: 4px; margin-top: -2px; background: #c0283a; box-shadow: 0 0 0 2px #000; }
-  .swap-vis .x-out::before { transform: rotate(34deg); } .swap-vis .x-out::after { transform: rotate(-34deg); }
+  .swap-vis .x-out .xo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; } /* X z rohu do rohu */
   .swap-vis .lbl.dash { color: #e6dcc6; text-shadow: none; margin-top: -2px; }
   .swap-vis .down { font-family: var(--px-font); font-size: 18px; color: #e6dcc6; text-shadow: 2px 2px 0 #000; margin-bottom: 6px; } /* rovnaká medzera šípka → ??? ako DASH → šípka (tlačidlo ??? má hrubší obrys) */
   .swap-vis .lbl { font-size: 9px; color: #c9a0ff; letter-spacing: 1px; text-shadow: 0 0 6px rgba(170,90,255,.6); }
@@ -1093,7 +1092,7 @@ function animateHoverPlay(wrap, c, hp, sp) {
 }
 function swapVisual(v) {
   const slot = v.slot || "mirror";
-  return `<div class="swap-vis"><span class="btn act ${slot} x-out"><span class="pix-ico" data-emoji="${v.from}"></span></span><span class="lbl dash">${v.fromLabel}</span><span class="down">↓</span><span class="btn act ${slot} ${v.skin}"><span class="pix-ico charge-mark">???</span></span><span class="lbl">${v.toLabel}</span></div>`;
+  return `<div class="swap-vis"><span class="btn act ${slot} x-out"><span class="pix-ico" data-emoji="${v.from}"></span><svg class="xo" viewBox="0 0 100 100" preserveAspectRatio="none"><g stroke-linecap="square"><line x1="4" y1="6" x2="96" y2="94" stroke="#000" stroke-width="7" vector-effect="non-scaling-stroke"/><line x1="96" y1="6" x2="4" y2="94" stroke="#000" stroke-width="7" vector-effect="non-scaling-stroke"/><line x1="4" y1="6" x2="96" y2="94" stroke="#c0283a" stroke-width="3" vector-effect="non-scaling-stroke"/><line x1="96" y1="6" x2="4" y2="94" stroke="#c0283a" stroke-width="3" vector-effect="non-scaling-stroke"/></g></svg></span><span class="lbl dash">${v.fromLabel}</span><span class="down">↓</span><span class="btn act ${slot} ${v.skin}"><span class="pix-ico charge-mark">???</span></span><span class="lbl">${v.toLabel}</span></div>`;
 }
 function tinyBoard(b) {
   const at = (arr, x, y) => (arr || []).some(([a, c]) => a === x && c === y);

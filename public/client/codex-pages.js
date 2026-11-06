@@ -306,7 +306,7 @@ function animateHoverPlay(wrap, c, hp, sp) {
 }
 function swapVisual(v) {
   const slot = v.slot || "mirror";
-  return `<div class="swap-vis"><span class="btn act ${slot} x-out"><span class="pix-ico" data-emoji="${v.from}"></span></span><span class="lbl dash">${v.fromLabel}</span><span class="down">↓</span><span class="btn act ${slot} ${v.skin}"><span class="pix-ico charge-mark">???</span></span><span class="lbl">${v.toLabel}</span></div>`;
+  return `<div class="swap-vis"><span class="btn act ${slot} x-out"><span class="pix-ico" data-emoji="${v.from}"></span><svg class="xo" viewBox="0 0 100 100" preserveAspectRatio="none"><g stroke-linecap="square"><line x1="4" y1="6" x2="96" y2="94" stroke="#000" stroke-width="7" vector-effect="non-scaling-stroke"/><line x1="96" y1="6" x2="4" y2="94" stroke="#000" stroke-width="7" vector-effect="non-scaling-stroke"/><line x1="4" y1="6" x2="96" y2="94" stroke="#c0283a" stroke-width="3" vector-effect="non-scaling-stroke"/><line x1="96" y1="6" x2="4" y2="94" stroke="#c0283a" stroke-width="3" vector-effect="non-scaling-stroke"/></g></svg></span><span class="lbl dash">${v.fromLabel}</span><span class="down">↓</span><span class="btn act ${slot} ${v.skin}"><span class="pix-ico charge-mark">???</span></span><span class="lbl">${v.toLabel}</span></div>`;
 }
 function tinyBoard(b) {
   const at = (arr, x, y) => (arr || []).some(([a, c]) => a === x && c === y);
