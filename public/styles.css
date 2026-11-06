@@ -1,3 +1,13 @@
+/* Pixelové symboly (✕ ✓ šípky ◀ ▶ ▲ … ⚠ −), ktoré Press Start 2P nemá (font: node tools/pixel-glyphs/build.mjs).
+   Samostatná rodina "Arena Pixel" - zapína sa LEN v schválených častiach UI (var(--px-font), sekcia „Jednotné pixel UI"
+   na konci súboru); lobby, ADVANCED SETTINGS, GET READY a dlaždice roomiek ostávajú po starom (vlastník 2026-11-06). */
+:root { --px-font: "Arena Pixel", "Press Start 2P", monospace; }
+@font-face {
+  font-family: "Arena Pixel"; font-display: block;
+  src: url("/fonts/arena-pixel.ttf") format("truetype");
+  unicode-range: U+2022, U+2026, U+2190-2199, U+21A9, U+2212, U+25B2, U+25B6, U+25BA, U+25BC, U+25C0, U+25C4, U+25CB, U+25CF,
+    U+2605, U+2699, U+26A0, U+26AA, U+26AB, U+2713-2718, U+FE0E, U+FE0F;
+}
 :root { --tile-w: 260px; --tile-h: 185px; --gap: 10px; }
 
 * { box-sizing: border-box; }
@@ -3820,3 +3830,25 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .go-buttons .tr-arrow{ border-width: .46em 0 .46em .7em; }
 .go-buttons .retry{ gap: .9em; }
 .go-buttons .px-x, .go-buttons .tr-arrow{ filter: drop-shadow(2px 2px 0 rgba(0,0,0,.55)); }
+
+/* ---------- Jednotné pixel UI: herné ovládanie, HUD a lišta kola v pixel fonte (predtým Arial / system-ui) ---------- */
+.btn, .golden-half, .q-badge, .a-badge, .bar-num { font-family: var(--px-font); font-synthesis: none; font-weight: 400; }
+/* schválené časti s pixelovými symbolmi (hláška, výber postáv, menu + zvuk, čakacie obrazovky) */
+.turn-status, .char-arrow, .ui-modal, #host-wait, #lobby-wait, #team-wait { font-family: var(--px-font); }
+.btn.act .cost, .golden-half .cost { font-size: 8px; font-weight: 400; letter-spacing: 0; }
+.golden-half.gm-half .cost { font-size: 8px; }
+.btn.act.demon .cost { font-size: 9px; font-weight: 400; }
+.btn-lock { font-size: 12px; letter-spacing: 0; padding: 16px 14px; }
+.btn.arrow { font-size: 16px; }
+#undo { font-size: 16px; }
+.bar-num { font-size: 18px; font-weight: 400; min-width: 38px; }
+.q-badge { font-size: 10px; font-weight: 400; }
+.q-badge.main { font-size: 12px; }
+.q-badge.opt { font-size: 9px; }
+.q-badge.main.mine.q-slot { font-size: 16px; font-weight: 400; }
+.q-badge.lasthope .lh-dim { font-size: 14px; font-weight: 400; }
+.a-badge { font-weight: 400; }
+/* ikony akcií v lište kola a v zázname = pixelizované emoji ako na tlačidlách (pix.js setPixText) */
+.pix-ico.px-txt { width: 22px; height: 22px; flex: none; }
+.q-badge.opt .pix-ico.px-txt { width: 16px; height: 16px; }
+.a-badge .pix-ico.px-txt { width: 18px; height: 18px; }

@@ -262,6 +262,21 @@ function noirTone(ctx, res) {
 }
 // Shield/Mirror Breaker: ikona obrany v tóne „noir" (čiernobielo, rám zrkadla ebenový) - spolu s farbou tlačidla
 export const breakerIco = (emoji, cls = "") => `<span class="brk-ico ${cls}"><span class="pix-ico" data-emoji="${emoji}" data-tone="noir"></span></span>`;
+// text s emoji (ikona akcie „🚶↑") → emoji ako pixelové ikony (rovnaké ako na tlačidlách), zvyšok ostáva text v pixel fonte
+// šípky/symboly, ktoré kreslí pixelový doplnok fontu (tools/pixel-glyphs) - ostávajú textom
+const FONT_SYM = /^[←-⇿■-◿★⚙⚠⚪⚫✓-✘]/u;
+const EMOJI_RE = /\p{Extended_Pictographic}️?/gu;
+export function setPixText(el, text) {
+  const esc = (t) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[c]);
+  let html = "", last = 0;
+  for (const m of text.matchAll(EMOJI_RE)) {
+    if (FONT_SYM.test(m[0])) continue;
+    html += esc(text.slice(last, m.index)) + `<span class="pix-ico px-txt" data-emoji="${m[0]}"></span>`;
+    last = m.index + m[0].length;
+  }
+  el.innerHTML = html + esc(text.slice(last));
+  hydratePix(el);
+}
 export function hydratePix(root = document) {
   root.querySelectorAll(".pix-ico[data-emoji]").forEach(el => pixelizeEmoji(el));
 }

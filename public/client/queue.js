@@ -1,7 +1,7 @@
 // public/client/queue.js - lišta kola (round-script): naplánované akcie oboch strán po beatoch, kurzor počas
 // prehrávania, varovania plánu, LOCK IN tlačidlo a odomykanie UI.
 import { ARROW_DIR, displayDir } from "/client/action-log.js";
-import { LS_BADGE_IMG, LH_BADGE_IMG, breakerIco, hydratePix } from "/client/pix.js";
+import { LS_BADGE_IMG, LH_BADGE_IMG, breakerIco, hydratePix, setPixText } from "/client/pix.js";
 import { mageHeadHtml } from "/client/mage-head.js";
 import { usesAltColor } from "/client/sprites.js";
 import { ghostPos, ghostShrek, showPreviewCells, cellsForAimPreview, ghostCharAt, clearPreviewCells, planWarnings, foeMirrorImmune, MIRROR_IMMUNE_WARN } from "/client/ghost.js";
@@ -82,9 +82,9 @@ export function actionBadgeView(a, ownerSlot) {
     // Shield/Mirror Breaker (návrh): ikona obrany preškrtnutá čiernou trhlinou, farba svojej obrany
     case "shield_breaker":        return { cls: "breaker", html: breakerIco("🛡️") };
     case "mirror_breaker":        return { cls: "breaker", html: breakerIco("🪞") };
-    case "golden_shield": return { cls: "golden",  html: '<span class="g-ico">🛡️</span>' };
-    case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror">🪞</span>' };
-    case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico">🙏</span>' };
+    case "golden_shield": return { cls: "golden",  html: '<span class="g-ico pix-ico px-txt" data-emoji="🛡️"></span>' };
+    case "golden_mirror": return { cls: "golden",  html: '<span class="g-ico mirror pix-ico px-txt" data-emoji="🪞"></span>' };
+    case "golden_mana":   return { cls: "golden",  html: '<span class="g-ico pix-ico px-txt" data-emoji="🙏"></span>' };
     case "last_stand":    return { cls: "golden",   html: LS_BADGE_IMG };
     case "demon":         return { cls: "demon",    html: LS_BADGE_IMG };
     case "stoned":        return { cls: "stoned",   text: "🗿" };
@@ -182,7 +182,7 @@ function renderTsQueue() {
     if (a) {
       const v = actionBadgeView(a, me);
       el.classList.add(v.cls);
-      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text;
+      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else setPixText(el, v.text);
     } else { el.classList.add("empty"); el.textContent = String(i + 1); }
     slots.appendChild(el);
   }
@@ -274,7 +274,7 @@ export function renderQueue() {
       if (v.cls) el.classList.add(v.cls);
       // smer je v tréningu podstatný - šípku ukáž aj na dotyku (inde ju lišta na telefóne skrýva)
       const a = botA || draftA;
-      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text + (isTouch && a.dir ? ARROW_DIR[a.dir] || "" : "");
+      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else setPixText(el, v.text + (isTouch && a.dir ? ARROW_DIR[a.dir] || "" : ""));
       el.title = botA ? "Opponent (revealed - TRAINING GROUNDS)" : "Player is planning this";
       queueEl.appendChild(el);
       qBeatEls[b.pos] = el;
@@ -291,7 +291,7 @@ export function renderQueue() {
     if (filled) {
       const v = actionBadgeView(filled, me);
       if (v.cls) el.classList.add(v.cls);
-      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text;
+      if (v.html) { el.innerHTML = v.html; hydratePix(el); } else setPixText(el, v.text);
       if (b.kind === "act") attachQueueHover(el, filled, b.idx);
       if (b.kind === "act" && spiedNow(b.idx)) markSpy(el);
       // akcia podľa plánu nebude mať efekt → žltý ⚠ v rohu + dôvod v tooltipe
@@ -311,11 +311,11 @@ export function renderQueue() {
       // ukáž 🗿 na presných akciách, ktoré súper vynechá, nech kaster Medúzy vidí dokedy súper stojí
       const oppStone = (!mine && b.kind === "act") ? Math.min(3, state?.[b.owner]?.stone || 0) : 0;
       const oppStoned = oppStone > 0 && b.idx < oppStone;
-      if (b.kind === "gshield")    el.innerHTML = '<span class="g-ico dim">🛡️</span>';
-      else if (b.kind === "gmana") el.innerHTML = '<span class="g-ico dim">🙏</span>';
-      else if (oppStoned) { el.classList.add("stoned"); el.textContent = "🗿"; }
-      // ja kružok, súper holé cifry; telefón holé cifry obom (krúžky sú tam nečitateľné - odlíši zlatý rámik)
-      else el.textContent = mine && !isTouch ? ["①", "②", "③"][b.idx] : String(b.idx + 1);
+      if (b.kind === "gshield")    el.innerHTML = '<span class="g-ico dim pix-ico px-txt" data-emoji="🛡️"></span>', hydratePix(el);
+      else if (b.kind === "gmana") el.innerHTML = '<span class="g-ico dim pix-ico px-txt" data-emoji="🙏"></span>', hydratePix(el);
+      else if (oppStoned) { el.classList.add("stoned"); setPixText(el, "🗿"); }
+      // holé cifry v pixel fonte - moje odlíši zlatý čiarkovaný rámik a väčšie číslo
+      else el.textContent = String(b.idx + 1);
       el.title = oppStoned ? "Opponent is petrified - this action is skipped (carry-over stun)"
         : mine ? "Your action (required)" : "Opponent (hidden until it resolves)";
     }
@@ -355,7 +355,7 @@ export function highlightRoundBeat(from, action, counts, starterSlot) {
     el.classList.remove("q-slot");
     el.classList.add("revealed");
     if (v.cls) el.classList.add(v.cls);
-    if (v.html) { el.innerHTML = v.html; hydratePix(el); } else el.textContent = v.text; // pixelové ikony (breaker)
+    if (v.html) { el.innerHTML = v.html; hydratePix(el); } else setPixText(el, v.text); // pixelové ikony (breaker)
     el.title = "Opponent"; // swap badge hlavu animuje raf (canvas.mage-head)
     // divák: odhalená akcia človeka, ktorú CHEATER videl - zvýraznenie ostáva aj po odhalení
     if (isSpectator && from === spyHumanSlot() && actIdx != null && spiedNow(actIdx)) markSpy(el);

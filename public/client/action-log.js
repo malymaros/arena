@@ -1,7 +1,7 @@
 // public/client/action-log.js - záznam akcií kola pod HUD widgetom oboch hráčov.
 import { me, state } from "/client/session.js";
 import { logP1, logP2 } from "/client/dom.js";
-import { LS_BADGE_IMG, breakerIco, hydratePix } from "/client/pix.js";
+import { LS_BADGE_IMG, breakerIco, hydratePix, setPixText } from "/client/pix.js";
 import { isPhone } from "/client/viewport.js";
 
 /* ---------- záznam akcií kola pod widgetom ---------- */
@@ -59,6 +59,7 @@ function buildActionLogSkeleton(log) {
     const el = document.createElement("span");
     el.className = `a-badge a-slot ${cls}`;
     el.innerHTML = inner;
+    hydratePix(el);
     log.appendChild(el);
   };
   const mkDivider = () => {
@@ -66,11 +67,11 @@ function buildActionLogSkeleton(log) {
     d.className = "log-divider";
     log.appendChild(d);
   };
-  mkSlot("slot-pre", '<span class="g-ico dim">🛡️</span>');
+  mkSlot("slot-pre", '<span class="g-ico dim pix-ico px-txt" data-emoji="🛡️"></span>');
   mkDivider();
   for (let i = 0; i < 3; i++) mkSlot("slot-act", String(i + 1));
   mkDivider();
-  mkSlot("slot-post", '<span class="g-ico dim">🙏</span>');
+  mkSlot("slot-post", '<span class="g-ico dim pix-ico px-txt" data-emoji="🙏"></span>');
 }
 
 // akcie postupne vypĺňajú placeholder sloty (golden pre/post, bežné zľava doprava); vráti vyplnený slot
@@ -85,7 +86,7 @@ export function appendActionLog(slot, action) {
     if (el) {
       const mirror = action.type === "golden_mirror";
       el.className = "a-badge " + (maskedBeat ? "unknown" : action.type);
-      el.innerHTML = maskedBeat ? '<span class="g-ico">❓</span>' : mirror ? '<span class="g-ico mirror">🪞</span>' : '<span class="g-ico">🛡️</span>';
+      setPixText(el, maskedBeat ? "❓" : mirror ? "🪞" : "🛡️");
     }
     return el;
   }
@@ -93,7 +94,7 @@ export function appendActionLog(slot, action) {
     const el = log.querySelector(".a-slot.slot-post");
     if (el) {
       el.className = "a-badge " + (maskedBeat ? "unknown" : action.type);
-      el.innerHTML = maskedBeat ? '<span class="g-ico">❓</span>' : action.type === "last_stand" ? LS_BADGE_IMG : '<span class="g-ico">🙏</span>';
+      if (action.type === "last_stand" && !maskedBeat) el.innerHTML = LS_BADGE_IMG; else setPixText(el, maskedBeat ? "❓" : "🙏");
     }
     return el;
   }
@@ -104,7 +105,7 @@ export function appendActionLog(slot, action) {
     if (action?.type === "shield_breaker" || action?.type === "mirror_breaker") {
       el.innerHTML = breakerIco(action.type === "shield_breaker" ? "🛡️" : "🪞");
       hydratePix(el);
-    } else el.textContent = actionIcon(action, slot);
+    } else setPixText(el, actionIcon(action, slot));
   }
   return el;
 }
