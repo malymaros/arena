@@ -33,7 +33,7 @@ súperova akcia bez dmg. Breaker ju trestá, ak súper obranu prečíta.
   Breaker do ich mirroru sa normálne odrazí, Mirror Breaker ich mirror rozbije.
 - **Jotaro, Luffy:** nemajú mirror → nemajú Mirror Breaker (mirror slot = Special 1). Shield Breaker majú.
 - **Narutov klon:** zdieľaná obrana — dmg ide na majiteľa, klon zásahom zaniká (any damage dissolves the clone).
-- **Naruto útočí (vlastník 2026-11-03):** breaker castuje aj jeho klon (ako basic strela, mana raz) — rozbitá obrana dostane dmg breakera **len raz** bez ohľadu na počet casterov (max 2 / 4, vlastník 2026-11-06: dmg pochádza z rozbitia obrany, nie z útoku); nezhodný mirror vráti odraz každej figúre zvlášť (Naruto 1× dmg, klon zanikne), štít zablokuje oba. Lúče idú vždy z oboch / do oboch figúr a nezhodná obrana reaguje vizuálne aj na súperovom klonovi (echo bez dmg) — lúč nesmie prezradiť pravého Naruta.
+- **Naruto útočí (vlastník 2026-11-03):** breaker castuje aj jeho klon (ako basic strela, mana raz) — každá figúra 1× dmg, rozbitá obrana dostane 2×; nezhodný mirror vráti odraz každej figúre zvlášť (Naruto 1× dmg, klon zanikne), štít zablokuje oba. Lúče idú vždy z oboch / do oboch figúr a nezhodná obrana reaguje vizuálne aj na súperovom klonovi (echo bez dmg) — lúč nesmie prezradiť pravého Naruta.
 - **Labyrint:** zásah (aj blokovaný / odrazený) labyrint ukončí ako každý zásah; reveal pred animáciou.
 - **Escanor:** zásah breakerom aj odrazený Shield Breaker = zásah od súpera → −1 pride.
 - **THE WORLD:** Jotaro smie Shield Breaker aj v zmrazených akciách (súperova obrana trvá celé zamrazenie).
