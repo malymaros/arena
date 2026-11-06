@@ -3773,35 +3773,36 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .ui-modal.tome .rbook span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } /* nápis CODEX je nakreslený v .rb-art; text len pre čítačky */
 .ui-modal.tome .rbook:hover .rb-art { filter: brightness(1.15); }
 
-/* zvukové okno: MUTE + 3 riadky [label][−][posuvník][+][%] */
-#sound-win .snd-mute { display: flex; align-items: center; gap: 12px; min-height: 40px; cursor: pointer; text-shadow: 2px 2px 0 #000; }
-#sound-win .snd-mute input {
-  appearance: none; -webkit-appearance: none; margin: 0; width: 24px; height: 24px; cursor: pointer;
-  background: #120d09; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #000;
-}
-#sound-win .snd-mute input:checked { background: #e0402f; box-shadow: 0 0 0 2px #000, inset 0 0 0 4px #120d09; }
-#sound-win .snd-row { display: flex; align-items: center; gap: 10px; min-height: 48px; text-shadow: 2px 2px 0 #000; }
-#sound-win .snd-label { width: 72px; flex: none; font-size: 10px; }
-#sound-win .snd-val { width: 48px; flex: none; text-align: right; font-size: 10px; color: #ffd24a; }
-#sound-win .snd-step { width: 40px; height: 40px; flex: none; font-size: 18px; background: #3a2f25;
-  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610; }
-#sound-win .snd-step:active { box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #1c1610, inset -2px -2px 0 #6b5843; }
-/* pixel posuvník: segmentovaná lišta (zlatá výplň po --pct zo sound-ui.js) + hranatý jazdec - veľký na prst */
-#sound-win input[type=range] {
-  appearance: none; -webkit-appearance: none; flex: 1; min-width: 60px; height: 16px; margin: 0; cursor: pointer;
-  background:
-    repeating-linear-gradient(to right, transparent 0 8px, #120d09 8px 10px),
-    linear-gradient(to right, #d4a017 0 var(--pct, 50%), #3a2f25 var(--pct, 50%) 100%);
-  box-shadow: 0 0 0 2px #000;
-}
-#sound-win input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 18px; height: 34px; background: #f2e6c9; border: none; border-radius: 0;
-  box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a;
-}
-#sound-win input[type=range]::-moz-range-thumb {
-  width: 18px; height: 34px; background: #f2e6c9; border: none; border-radius: 0;
-  box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a;
-}
+/* zvukové okno ako kniha (sound-ui.js, schválený návrh public/dev/sound-tome.html): .ui-modal.tome + knižky pod sebou -
+   MUTE (oválny výrez prázdny / červený) a 3 posuvníky [label][−][posuvník][+][% vo výreze]; stlmené = knižky hlasitosti pohasnú */
+#sound-win .snd-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; position: relative; z-index: 1; }
+#sound-win .snd-book { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px 6px 34px; box-sizing: border-box;
+  color: var(--bone); background: #1e1519; box-shadow: 0 0 0 2px #000; text-shadow: 2px 2px 0 #000; font: 10px var(--px-font); text-align: left; }
+#sound-win .snd-book > :not(.ib-art) { position: relative; }
+#sound-win .snd-book .ib-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+#sound-win .snd-book:hover .ib-art { filter: brightness(1.18) saturate(1.25); }
+#sound-win .snd-mute { cursor: pointer; border: none; width: 100%; }
+#sound-win .snd-mute-lbl { flex: 1; }
+#sound-win .snd-label { width: 64px; flex: none; }
+#sound-win .slot { margin-left: auto; width: 40px; height: 24px; flex: none; display: flex; align-items: center; justify-content: center;
+  font-size: 8px; letter-spacing: 0; background: #000; color: #ffd24a; text-shadow: 0 0 6px rgba(255,210,74,.5);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 2px, calc(100% - 4px) 2px, calc(100% - 4px) 4px, calc(100% - 2px) 4px, calc(100% - 2px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 2px) calc(100% - 6px), calc(100% - 2px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 2px), calc(100% - 6px) calc(100% - 2px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 2px), 4px calc(100% - 2px), 4px calc(100% - 4px), 2px calc(100% - 4px), 2px calc(100% - 6px), 0 calc(100% - 6px),
+    0 6px, 2px 6px, 2px 4px, 4px 4px, 4px 2px, 6px 2px); }
+#sound-win .slot.mute.on { background: #c0283a; box-shadow: inset 0 0 6px rgba(255,90,110,.8); }
+#sound-win .snd-list.muted .snd-row { filter: grayscale(.85) brightness(.55); }
+#sound-win .snd-step { width: 30px; height: 30px; flex: none; padding: 0; font: 14px var(--px-font); color: var(--bone); background: #3d3036;
+  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a52, inset -2px -2px 0 #171114; }
+#sound-win .snd-step:active { box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #171114, inset -2px -2px 0 #5a4a52; }
+/* posuvník: fialová lišta so zlatou výplňou (--pct zo sound-ui.js), jazdec = kostená svorka - veľký na prst */
+#sound-win input[type=range] { appearance: none; -webkit-appearance: none; flex: 1; min-width: 60px; height: 12px; margin: 0; cursor: pointer;
+  background: repeating-linear-gradient(to right, transparent 0 8px, #120d09 8px 10px),
+    linear-gradient(to right, #b8862b 0 var(--pct, 50%), #2a1830 var(--pct, 50%) 100%);
+  box-shadow: 0 0 0 2px #000, 0 0 0 4px #4a2a5a; }
+#sound-win input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 28px; background: #e8dcc0; border: none; border-radius: 0;
+  box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a, 0 0 8px rgba(170,90,255,.6); }
+#sound-win input[type=range]::-moz-range-thumb { width: 14px; height: 28px; background: #e8dcc0; border: none; border-radius: 0; box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a; }
 #sound-win input[type=range]::-moz-range-track { background: transparent; }
 
 /* oko s počtom divákov hneď vpravo od menu ☰ (spectators.js) - rovnaký pixel štýl, skryté pri 0 divákoch */

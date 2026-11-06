@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>SOUND — okno ako kniha (návrh)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): zvukové okno (sound-ui.js) v dizajne knihy-menu (.ui-modal.tome).
+     Vľavo dnešné okno, vpravo návrh: koža s fialovým stehom, oko pri nadpise, zuby z rohu; MUTE a každý posuvník
+     = grimoárová knižka (kreslí tome.js do .ib-art); stav ON/OFF a % v oválnom výreze ako oko / MAINTENANCE. */
+  html, body { overflow: auto !important; height: auto !important; min-height: 100%; position: static !important; touch-action: auto !important; }
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 700 18px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0; color: #8b92a0; max-width: 1100px; }
+  .stage { padding: 50px 20px 90px; display: flex; justify-content: center; gap: 90px; flex-wrap: wrap; align-items: flex-start;
+    background: rgba(0,0,0,.55) url(/arenas/bridge/thumb.png) center/cover; background-blend-mode: multiply; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .cap { font: 9px "Press Start 2P", monospace; color: #8b92a0; }
+  .stage .ui-modal { position: relative; left: auto; top: auto; transform: none; z-index: 1; }
+
+  /* ---- návrh: zvukové okno ako kniha ---- */
+  #snd-new { width: 452px; }
+  #snd-new .snd-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; position: relative; z-index: 1; }
+  #snd-new .snd-book { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px 6px 34px;
+    color: var(--bone); background: #1e1519; box-shadow: 0 0 0 2px #000; text-shadow: 2px 2px 0 #000; font-size: 10px; }
+  #snd-new .snd-book > :not(.ib-art) { position: relative; }
+  #snd-new .snd-book .ib-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  #snd-new .snd-book:hover .ib-art { filter: brightness(1.18) saturate(1.25); }
+  #snd-new .snd-label { width: 64px; flex: none; }
+  #snd-new .snd-mute-lbl { flex: 1; cursor: pointer; }
+  /* oválny výrez (ako oko / MAINTENANCE): ON/OFF pri MUTE, % pri posuvníkoch */
+  #snd-new .slot { margin-left: auto; width: 40px; height: 24px; flex: none; display: flex; align-items: center; justify-content: center;
+    font-size: 8px; letter-spacing: 0; background: #000; color: #ffd24a; text-shadow: 0 0 6px rgba(255,210,74,.5);
+    clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 2px, calc(100% - 4px) 2px, calc(100% - 4px) 4px, calc(100% - 2px) 4px, calc(100% - 2px) 6px, 100% 6px,
+      100% calc(100% - 6px), calc(100% - 2px) calc(100% - 6px), calc(100% - 2px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 2px), calc(100% - 6px) calc(100% - 2px), calc(100% - 6px) 100%,
+      6px 100%, 6px calc(100% - 2px), 4px calc(100% - 2px), 4px calc(100% - 4px), 2px calc(100% - 4px), 2px calc(100% - 6px), 0 calc(100% - 6px),
+      0 6px, 2px 6px, 2px 4px, 4px 4px, 4px 2px, 6px 2px); }
+  /* MUTE: bez textu - prázdny výrez = vypnuté, vyplnený červenou = stlmené */
+  /* stlmené: knižky MASTER / MUSIC / SFX pohasnú (stmavnú, vyblednú, zlatá výplň zosivie) */
+  #snd-new .snd-list.muted .snd-book:not([data-k=muted]) { filter: grayscale(.85) brightness(.55); }
+  #snd-new .slot.mute.on { background: #c0283a; box-shadow: inset 0 0 6px rgba(255,90,110,.8); }
+  /* −/+ : malé kožené tlačidlá ako ✕ v hlavičke */
+  #snd-new .snd-step { width: 30px; height: 30px; flex: none; padding: 0; font: 14px var(--px-font); color: var(--bone); background: #3d3036; border: none; cursor: pointer;
+    box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a52, inset -2px -2px 0 #171114; }
+  #snd-new .snd-step:active { box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #171114, inset -2px -2px 0 #5a4a52; }
+  /* posuvník: fialová atramentová lišta so zlatou výplňou, jazdec = kostená svorka */
+  #snd-new input[type=range] { appearance: none; -webkit-appearance: none; flex: 1; min-width: 60px; height: 12px; margin: 0; cursor: pointer;
+    background: repeating-linear-gradient(to right, transparent 0 8px, #120d09 8px 10px),
+      linear-gradient(to right, #b8862b 0 var(--pct, 50%), #2a1830 var(--pct, 50%) 100%);
+    box-shadow: 0 0 0 2px #000, 0 0 0 4px #4a2a5a; }
+  #snd-new input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 28px; background: #e8dcc0; border: none; border-radius: 0;
+    box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a, 0 0 8px rgba(170,90,255,.6); }
+  #snd-new input[type=range]::-moz-range-thumb { width: 14px; height: 28px; background: #e8dcc0; border: none; border-radius: 0; box-shadow: 0 0 0 2px #000, inset -3px -3px 0 #8a7f6a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SOUND — okno ako kniha (návrh)</h1>
+  <p>Vľavo dnešné zvukové okno, vpravo návrh v dizajne knihy-menu: koža s fialovým stehom, oko pri nadpise, zuby z rohu,
+    MUTE a každý posuvník je grimoárová knižka (ako položky menu), stav ON/OFF a percentá sú v oválnom výreze ako oko.
+    Posuvníky a −/+ fungujú (len na tejto stránke).</p>
+</header>
+<div class="stage">
+  <div class="col"><div class="cap">TERAZ</div><div id="snd-old" class="ui-modal"></div></div>
+  <div class="col"><div class="cap">NÁVRH</div><div id="snd-new" class="ui-modal tome"></div></div>
+</div>
+<script type="module">
+import { tomeReady, tomeWidgets } from "/client/tome.js";
+
+const ROWS = [["master", "MASTER"], ["music", "MUSIC"], ["sfx", "SFX"]];
+const st = { muted: false, master: .8, music: .6, sfx: .9 };
+// dnešné okno (kópia markupu zo sound-ui.js, štýly #sound-win zo styles.css)
+const old = document.getElementById("snd-old");
+old.id = "sound-win";
+old.innerHTML = `<div class="um-head"><span>SOUND</span><button type="button" class="um-close">✕</button></div>
+  <label class="snd-mute"><input type="checkbox" /> MUTE</label>
+  ${ROWS.map(([k, l]) => `<div class="snd-row"><span class="snd-label">${l}</span><button type="button" class="snd-step">−</button>
+    <input type="range" min="0" max="1" step="0.05" value="${st[k]}" style="--pct:${st[k] * 100}%" /><button type="button" class="snd-step">+</button>
+    <span class="snd-val">${Math.round(st[k] * 100)}%</span></div>`).join("")}`;
+
+const win = document.getElementById("snd-new");
+function render() {
+  win.innerHTML = `<div class="um-head"><span class="ttl"><canvas class="eye"></canvas>SOUND</span><button type="button" class="um-close" aria-label="Close">✕</button></div>
+    <div class="snd-list${st.muted ? " muted" : ""}">
+      <div class="snd-book" data-k="muted"><canvas class="ib-art"></canvas><span class="snd-mute-lbl">MUTE</span><span class="slot mute${st.muted ? " on" : ""}"></span></div>
+      ${ROWS.map(([k, l]) => `<div class="snd-book"><canvas class="ib-art"></canvas><span class="snd-label">${l}</span>
+        <button type="button" class="snd-step" data-k="${k}" data-d="-0.1">−</button>
+        <input type="range" min="0" max="1" step="0.05" data-k="${k}" value="${st[k]}" style="--pct:${st[k] * 100}%" />
+        <button type="button" class="snd-step" data-k="${k}" data-d="0.1">+</button>
+        <span class="slot" data-v="${k}">${Math.round(st[k] * 100)}%</span></div>`).join("")}
+    </div>`;
+  widgets = tomeWidgets(win);
+}
+let widgets = [];
+win.addEventListener("click", (e) => {
+  if (e.target.closest("[data-k=muted]")) { st.muted = !st.muted; render(); return; }
+  const b = e.target.closest(".snd-step"); if (!b) return;
+  const k = b.dataset.k; st[k] = Math.max(0, Math.min(1, Math.round((st[k] + +b.dataset.d) * 20) / 20)); render();
+});
+win.addEventListener("input", (e) => {
+  const i = e.target.closest("input[type=range]"); if (!i) return;
+  st[i.dataset.k] = +i.value; i.style.setProperty("--pct", `${i.value * 100}%`);
+  win.querySelector(`[data-v="${i.dataset.k}"]`).textContent = `${Math.round(i.value * 100)}%`;
+});
+tomeReady.then(() => { render(); const loop = (t) => { for (const f of widgets) f?.(t); requestAnimationFrame(loop); }; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
