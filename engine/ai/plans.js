@@ -4,7 +4,7 @@
 // Hodnotí ich mapami zásahov z threat.js (čo kto komu vie dať z ktorej bunky). Bot ich vždy pridá do hry kola
 // (za seba aj za súpera), aby mu nechýbali zjavné hrozby a odpovede; presné ohodnotenie urobí až simulácia.
 import { actionHits, bestHit, reach } from "./threat.js";
-import { actionCost, extraVariants } from "./candidates.js";
+import { actionCost, actionOptions, extraVariants } from "./candidates.js";
 import { MAX_MANA, RECHARGE_GAIN, GOLDEN_COST } from "../../shared/balance.js";
 import { seededRng } from "../constants.js";
 import { portalStep } from "../../shared/geometry.js";
@@ -210,6 +210,55 @@ export function wastedOpener(sim, state, slot) {
     }
     cache.set(k, !touched);
     return !touched;
+  };
+}
+
+// ZBYTOČNÁ OBRANA (bug report 2026-11-05: Jotaro dal shield, hoci ho Fire prvou akciou nemal ako trafiť): obrana, ktorá
+// kryje súperovu PRVÚ akciu kola - moja prvá akcia, keď začínam, alebo golden predťah, keď nezačínam - a súper zo svojej
+// známej bunky žiadnou jednou akciou (so svojou manou) mňa ani môjho klona nezasiahne, je vyhodená mana: obranu tá akcia
+// zje tak či tak. Sonda = simulácia každej súperovej prvej akcie, ja stojím; „zásah" = efekt na mňa v rámci jeho akcie
+// (pred koncom kroku - Shrekov rev po kroku už obrana nekryje, zje ju súperova akcia). Breakery: shieldu nepomôže
+// žiadny (Shield Breaker ho rozbije, Mirror Breaker bez obrany nič nespraví), mirror odrazí Shield Breaker - ten sa
+// ráta len mirroru. THE WORLD aj neúspešná simulácia = zásah (opatrne). Neplatí v kole s démonom ani pri skrytom súperovi.
+export function wastedDefense(sim, state, slot) {
+  const opp = other(slot), foe = state.players[opp], me = state.players[slot];
+  if (foe.x == null || foe.hp <= 0 || me.lastStandBuff || foe.lastStandBuff) return () => false;
+  const starter = state.starter === slot;
+  const DEFS = new Set(["shield", "mirror"]), GOLD = new Set(["golden_shield", "golden_mirror"]);
+  // typ obrany, ktorá kryje súperovu prvú akciu (shield / mirror), alebo null
+  const firstDef = (q) => {
+    const t = starter ? q.find(a => !BASE_SKIP.has(a.type))?.type : q.find(a => GOLD.has(a.type))?.type;
+    return DEFS.has(t) ? t : GOLD.has(t) ? t.slice(7) : null;
+  };
+  let touch = null; // { hit, shieldBreaker }
+  const probe = () => {
+    if (touch) return touch;
+    touch = { hit: false, shieldBreaker: false };
+    if ((foe.stone || 0) > 0) return touch; // skamenený súper prvou akciou nič nespraví
+    const cells = [];
+    for (let y = 0; y < state.board.h; y++) for (let x = 0; x < state.board.w; x++) cells.push({ x, y });
+    const PASS = { type: "pass" };
+    for (const a of actionOptions(sim, state, opp, [], cells)) {
+      if (actionCost(a, foe.char) > foe.mana) continue;
+      if (a.type === "shield_breaker") { touch.shieldBreaker = true; continue; }
+      if (a.type === "mirror_breaker") continue;
+      if (!sim.play(state, { [slot]: [PASS, PASS, PASS], [opp]: [a, PASS, PASS] }, seededRng(1))) { touch.hit = true; break; }
+      let his = false;
+      scan: for (const f of sim.lastTimeline()) for (const e of f.effects || []) {
+        if (e.kind === "action") { if (his) break scan; if (e.from === opp) his = true; continue; }
+        if (!his) continue;
+        if (e.kind === "shrek_call" || e.kind === "shrek_jump") break scan; // koniec kroku
+        if (e.kind === "timestop_start" || (e.kind !== "breaker" && TOUCH.has(e.kind) && e.target === slot)) { touch.hit = true; break scan; }
+      }
+      if (touch.hit) break;
+    }
+    return touch;
+  };
+  return (q) => {
+    const d = firstDef(q);
+    if (!d) return false;
+    const t = probe();
+    return !t.hit && !(d === "mirror" && t.shieldBreaker);
   };
 }
 

@@ -57,6 +57,7 @@ for (const r of recs) {
       bot.onYouAre({ slot: SLOT[botSide] });
       bot.onState(engine.snapshotFor(person(botSide)));
       break;
+    case "team": if (!r.random) engine.chooseTeam(person(r.side), r.team); break; // turnaj: draft (inak sa zápas zasekne v team_select)
     case "pick": if (!r.random) engine.chooseCharacter(person(r.side), r.char); break;
     case "lock":
       if (r.g === G && r.turn === T) { done = true; break; }

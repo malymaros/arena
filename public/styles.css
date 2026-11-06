@@ -968,7 +968,7 @@ body.timestop-mode #arena { filter: grayscale(1) contrast(1.25) brightness(.7); 
 .q-badge.main.mine.q-slot{ font-weight: 900; font-size: 26px; line-height: 1; }
 /* CHEATER videl túto moju akciu (queue.js setCheaterSpy; schválený návrh public/dev/cheater-spy.html, variant A):
    polopriehľadné neónovo blikajúce oranžové pozadie + líščie uši z horných rohov; bliká len opacity (aj perf-lite) */
-.q-badge.spied{ position: relative; overflow: visible; }
+.q-badge.spied, .q-badge.demon.spied, .q-badge.swap.spied{ position: relative; overflow: visible; } /* démon / swap bunka má overflow: hidden - uši by orezala */
 .q-badge.spied .spy-cover{
   position: absolute; inset: 0; pointer-events: none;
   background: rgba(255,122,20,.5);

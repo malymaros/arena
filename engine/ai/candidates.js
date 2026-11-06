@@ -75,6 +75,12 @@ export function dominatedShot(board, x, y, dir) {
   return false;
 }
 
+// Def-blocker tile na bunke (pod IK neaktívny - engine/tiles.js defenseBlockedBy): shield / mirror (aj golden) sa tam
+// prečiarkne bez many - premárnený slot, a zvyšok fronty počíta s manou, ktorú neminie (napr. recharge pri plnej mane)
+export const onBlockTile = (state, x, y) =>
+  !(state.iks || []).some(t => t.x === x && t.y === y) && (state.tiles || []).some(t => t.type === "block" && t.x === x && t.y === y);
+const DEF_TYPES = new Set(["shield", "mirror"]);
+
 const keyOf = (a) => a.type + (a.dir ? ":" + a.dir : "") + (a.cell ? `@${a.cell.x},${a.cell.y}` : "");
 
 // sonda: jedna akcia z bunky (x, y) → { wall, x, y } (náraz do steny? kde figúra skončí); súper len čaká
@@ -126,6 +132,7 @@ export function baseQueues(sim, state, slot) {
     }
     for (const a of opts) {
       if (used.has(a.type) || (DEFENSE_SLOT[a.type] && used.has("def:" + DEFENSE_SLOT[a.type]))) continue;
+      if (DEF_TYPES.has(a.type) && onBlockTile(state, x, y)) continue; // obrana na Def-blocker tile
       const r = probe(x, y, a);
       if (r.wall) continue; // akcia do steny z tejto bunky
       if (a.type === "attack" && dominatedShot(state.board, x, y, a.dir)) continue;
@@ -147,6 +154,7 @@ export function extraVariants(sim, state, slot, base) {
   const hopes = [null, { type: "last_hope" }];
   for (const hope of hopes) for (const [pre, preCost] of pres) for (const tail of tails) {
     if (!hope && !pre && !tail) continue;
+    if (pre && onBlockTile(state, p.x, p.y)) continue; // golden obrana na Def-blocker tile
     // golden mana stojí (refills + 1) HP - nesmie zabiť (engine by ju odmietol)
     if (tail?.type === "golden_mana" && p.hp <= (p.manaRefills || 0) + 1) continue;
     const q = [...(hope ? [hope] : []), ...(pre ? [pre] : []), ...base, ...(tail ? [tail] : [])];

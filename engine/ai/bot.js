@@ -13,7 +13,7 @@ import { evaluate, desperate } from "./eval.js";
 import { WEIGHTS } from "./weights.js";
 import { solveMatrix, sampleMix } from "./solve.js";
 import { createOpponentModel } from "./model.js";
-import { seedPlans, doomPlans, sureHitPlans, wastedOpener } from "./plans.js";
+import { seedPlans, doomPlans, sureHitPlans, wastedOpener, wastedDefense } from "./plans.js";
 
 const other = (s) => (s === "p1" ? "p2" : "p1");
 // Baby bot: podiel času / simulácií normálneho bota, šanca prehliadnuť istú výhru (vedie / prehráva), penalizácia
@@ -225,6 +225,9 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
     let myPool = shuffle(baseQueues(sim, s0, me));
     // začínam kolo a súper stojí na známej bunke: fronty, ktoré otvárajú isto minutým útokom, preč (zostanú, keby nič iné nebolo)
     if (D === 1) { const wasted = wastedOpener(sim, s0, me); const kept = myPool.filter(q => !wasted(q)); if (kept.length) myPool = kept; }
+    // obrana, ktorá kryje súperovu prvú akciu, hoci ma ňou nemá ako zasiahnuť (vyhodená mana) - preč, aj golden predťah
+    const uselessDef = D === 1 ? wastedDefense(sim, s0, me) : () => false;
+    { const kept = myPool.filter(q => !uselessDef(q)); if (kept.length) myPool = kept; }
     let oppPool = shuffle(baseQueues(sim, s0, opp));
     // CHEATER: súper hrá len fronty, ktoré majú v odhalenom slote presne odhalenú akciu (žiadna nesedí = bez zúženia)
     const fits = spy ? (q) => actKey(baseActions(q)[spy.idx]) === actKey(spy.action) : null;
@@ -264,7 +267,7 @@ export function createBot({ seed = 1, budgetMs = 5000, budgetSims = null, weight
       const out = [...top];
       const demonOk = desperate(s0, slot);
       for (const q of top.slice(0, Math.ceil(K / 4)))
-        out.push(...extraVariants(sim, s0, slot, q).filter(v => demonOk || !v.some(a => a.type === "last_stand")));
+        out.push(...extraVariants(sim, s0, slot, q).filter(v => (demonOk || !v.some(a => a.type === "last_stand")) && (slot !== me || !uselessDef(v))));
       return out;
     };
     const lead = (seeds, rest) => [...seeds, ...rest.filter(q => !seeds.includes(q))];
