@@ -2,10 +2,12 @@
 // kniha CODEX v menu (menu.js). Zatiaľ len úvodná dvojstrana: vľavo 9 základných postáv (fotky pripnuté špendlíkom,
 // meno na prúžku papiera), vpravo zakázaná strana so skrytými postavami (siluety, mená normálne; hore biela strana,
 // dole čierna), pravá časť listu je odtrhnutá (pod ňou runové zápisky mága) a dole symbol svetla a tmy.
-// Klik na postavu zatiaľ nič nerobí (zápisy postáv prídu neskôr). Kreslí sa raz pri prvom otvorení (statické).
+// Klik na postavu otvorí jej dvojstranu (codex-pages.js), späť ↩ CONTENTS alebo Esc; listovanie medzi postavami zatiaľ
+// nie je (vlastník). Obsah sa kreslí raz pri prvom otvorení (statické); stránka postavy pri otvorení.
 // Kniha je 900×588 px (umelecký pixel = 3 px), na stred, zväčšená podľa voľného miesta (appSize).
 import { CHAR_LIST, HEAD_CROP } from "/chars/index.js";
 import { appSize } from "/client/viewport.js";
+import { renderEntry } from "/client/codex-pages.js";
 
 const SHORT = { lightning: "LIGHTNING", wanderer: "WANDERER", onre: "ONRYO" }; // dlhé mená skrátene, Onryō bez dĺžňa (pixel font)
 const shortName = (c) => SHORT[c.key] || c.meta.name.toUpperCase();
@@ -31,7 +33,7 @@ const W = 300, H = 196;
 const OUT = "#0a0708", GOLD = "#b8862b", GHI = "#f2c14e";
 const PAGE = "#b2925f", PAGE2 = "#a08050", PAGE3 = "#8c6c40", PAGE4 = "#745632", EDGE = "#c4a874", EDGE2 = "#7e6440"; // tmavý, starý pergamen
 const PL = 12, PR = 288, PT = 10, PB = 184, GL = 148, GR = 152;
-function drawBook(cvs) {
+function drawBook(cvs, entry = null) {
   cvs.width = W; cvs.height = H;
   const ctx = cvs.getContext("2d"), px = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
   px(0, 2, W, H - 4, OUT);
@@ -50,13 +52,14 @@ function drawBook(cvs) {
   [PAGE2, PAGE2, PAGE3, PAGE3, PAGE4, "#8a7650"].forEach((c, i) => { px(GL - 6 + i, PT, 1, PB - PT, c); px(GR + 5 - i, PT, 1, PB - PT, c); });
   px(GL, PT - 1, GR - GL, PB - PT + 3, "#3a2a18"); px(GL + 1, PT - 1, 2, PB - PT + 3, "#1a1008");
   [[40, 150], [41, 150], [40, 151], [120, 30], [121, 31]].forEach(([x, y]) => px(x, y, 1, 1, "rgba(120,80,30,.35)"));
-  grimoirePage(px, PL, GL, true, false);
-  grimoirePage(px, GR, PR, false, true); // pravá strana = zakázaná (skryté postavy)
+  const dark = !!entry?.side; // zápis skrytej postavy: obe strany temné ako HIDDEN strana, fialový pentagram
+  grimoirePage(px, PL, GL, true, dark, !!entry);
+  grimoirePage(px, GR, PR, false, !entry || dark, !!entry); // obsah: pravá strana = zakázaná (skryté postavy)
 }
 
 // strana grimoáru: obhorené vonkajšie okraje, kúzelný kruh s hviezdou pretiahnutý atramentom (vľavo čiernym,
 // vpravo fialovým), drobné runy pri okrajoch; forbidden = temná, fialová
-function grimoirePage(px, x0, x1, left, forbidden) {
+function grimoirePage(px, x0, x1, left, forbidden, faint = false) { // faint = stránka postavy: pentagram len slabý vodotlač
   const outer = left ? x0 : x1 - 1;
   if (forbidden) {
     for (let y = PT; y < PB; y++) for (let x = x0; x < x1; x++) {
@@ -70,7 +73,7 @@ function grimoirePage(px, x0, x1, left, forbidden) {
   }
   // kruh s päťcípou hviezdou - na oboch stranách v rovnakej výške, vycentrovaný na strednú fotku vľavo
   const cx = (x0 + x1) / 2, cy = 91, R = 46;
-  const inkCol = forbidden ? "rgba(176,96,255,.62)" : "rgba(18,10,8,.5)", halo = forbidden ? "rgba(150,70,240,.16)" : "rgba(18,10,8,.08)";
+  const inkCol = forbidden ? "rgba(176,96,255,.62)" : faint ? "rgba(18,10,8,.1)" : "rgba(18,10,8,.5)", halo = forbidden ? "rgba(150,70,240,.16)" : faint ? "rgba(0,0,0,0)" : "rgba(18,10,8,.08)";
   const dots = new Set(), dot = (x, y) => dots.add(`${Math.round(x)},${Math.round(y)}`);
   for (let a = 0; a < 360; a += .5) { const r = a * Math.PI / 180; dot(cx + Math.cos(r) * R, cy + Math.sin(r) * R); dot(cx + Math.cos(r) * (R - 5), cy + Math.sin(r) * (R - 5)); }
   const star = [0, 2, 4, 1, 3, 0].map(k => [cx + Math.cos(-Math.PI / 2 + k * 2 * Math.PI / 5) * (R - 6), cy + Math.sin(-Math.PI / 2 + k * 2 * Math.PI / 5) * (R - 6)]);
@@ -170,7 +173,7 @@ function drawBalance(cv) {
 function card(c, n, side = "") {
   const cls = `cx-card${side ? " " + side : ""}${!c ? " soon" : c.side ? " sealed" : ""}`;
   const ph = c ? `<canvas width="48" height="48" data-k="${c.key}"></canvas>` : `<span class="cx-q">?</span>`;
-  return `<div class="${cls}" style="--r:${tilt(n)}deg"><span class="cx-ph"><span class="cx-pin"></span>${ph}</span><span class="cx-nm">${c ? shortName(c) : "COMING SOON"}</span></div>`;
+  return `<div class="${cls}"${c ? ` data-k="${c.key}"` : ""} style="--r:${tilt(n)}deg"><span class="cx-ph"><span class="cx-pin"></span>${ph}</span><span class="cx-nm">${c ? shortName(c) : "COMING SOON"}</span></div>`;
 }
 
 function build() {
@@ -180,24 +183,43 @@ function build() {
   root.className = "codex-wrap hidden";
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-label", "Codex");
-  root.innerHTML = `<div class="codex-book"><canvas class="cx-book"></canvas><button type="button" class="cx-x" aria-label="Close">✕</button>
+  root.innerHTML = `<div class="codex-book"><canvas class="cx-book"></canvas><button type="button" class="cx-back">↩ CONTENTS</button><button type="button" class="cx-x" aria-label="Close">✕</button>
     <div class="cx-pg l"></div><div class="cx-pg r"></div><canvas class="cx-balance"></canvas>
     <div class="cx-torn"><div class="cx-fiber"></div><canvas class="cx-under"></canvas></div></div>`;
   document.body.append(backdrop, root);
   book = root.querySelector(".codex-book");
   backdrop.addEventListener("click", closeCodex);
-  root.addEventListener("click", (e) => { if (e.target === root || e.target.closest(".cx-x")) closeCodex(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) closeCodex(); });
+  root.addEventListener("click", (e) => {
+    if (e.target === root || e.target.closest(".cx-x")) { closeCodex(); return; }
+    if (e.target.closest(".cx-back")) { showContents(); return; }
+    const k = !book.classList.contains("entry") && e.target.closest(".cx-card[data-k]")?.dataset.k;
+    if (k) openEntry(k);
+  });
+  // Esc: zo stránky postavy späť na obsah, z obsahu zavrieť
+  document.addEventListener("keydown", (e) => { if (e.key !== "Escape" || !isOpen()) return; if (book.classList.contains("entry")) showContents(); else closeCodex(); });
   window.addEventListener("resize", () => { if (isOpen()) fit(); });
 }
 
-function draw() {
+function contents() {
   const main = CHAR_LIST.filter(c => !c.side), white = CHAR_LIST.filter(c => c.side === "p1"), black = CHAR_LIST.filter(c => c.side === "p2");
   const row = (arr, off, side) => [...arr, null, null, null].slice(0, 3).map((c, k) => card(c, off + k, side)).join("");
   book.querySelector(".cx-pg.l").innerHTML = `<div class="cx-cards">${main.map((c, n) => card(c, n)).join("")}</div>`;
   book.querySelector(".cx-pg.r").innerHTML = `<div class="cx-cards">${row(white, 9, "w")}${row(black, 12, "b")}</div>`;
   book.querySelectorAll("canvas[data-k]").forEach(cv => drawHead(cv, CHAR_LIST.find(c => c.key === cv.dataset.k)));
+}
+function showContents() {
+  book.classList.remove("entry", "dark-page");
+  contents();
   drawBook(book.querySelector(".cx-book"));
+}
+function openEntry(key) {
+  const c = CHAR_LIST.find(x => x.key === key); if (!c) return;
+  book.classList.add("entry");
+  renderEntry(book, c);
+  drawBook(book.querySelector(".cx-book"), c);
+}
+function draw() {
+  showContents();
   drawBalance(book.querySelector(".cx-balance"));
   drawUnderPage(book.querySelector(".cx-under"));
   book.querySelector(".cx-torn").style.setProperty("--tp", tornPolygon(3));
@@ -214,7 +236,7 @@ function fit() {
 const isOpen = () => !!root && !root.classList.contains("hidden");
 export function openCodex() {
   if (!root) build();
-  if (!built) draw();
+  if (!built) draw(); else showContents(); // vždy od obsahu
   fit();
   backdrop.classList.remove("hidden");
   root.classList.remove("hidden");
