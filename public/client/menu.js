@@ -3,7 +3,7 @@
 // animácia PREBÚDZANIE): v hre 96×112, v room browseri vľavo dole 144×168 (oproti hlave bota). Okno = knihy pod
 // sebou: RELOAD GAME (= obnovenie stránky; server hráča vráti na jeho miesto), celá obrazovka (kde to prehliadač vie),
 // zvuk (okno zo sound-ui.js), GRAPHICS (úsporná grafika LITE ↔ FULL, perf.js; kým hráč neklikne, platí auto),
-// REPORT BUG (okno z bug-report.js); vpravo zvislá kniha CODEX (zatiaľ nič nerobí). Admin (prihlásený admin heslom)
+// REPORT BUG (okno z bug-report.js); vpravo zvislá kniha CODEX (otvorí knihu postáv, codex.js). Admin (prihlásený admin heslom)
 // má v hlavičke prepínač ADMIN: admin knihy (stiahnutie dát, MAINTENANCE, reset roomky / všetkých) namiesto bežných -
 // menu sa tak vojde aj na telefón bez rolovania; bežný hráč prepínač nevidí. Na dotyku sa menu kreslí vo veľkosti
 // displeja (--ui-k, viewport.js).
@@ -15,6 +15,7 @@ import { openBugWindow } from "/client/bug-report.js";
 import { perf, setPerfMode } from "/client/perf.js";
 import { menuIcon } from "/client/menu-icons.js";
 import { tomeReady, bookButton, tomeWidgets } from "/client/tome.js";
+import { openCodex } from "/client/codex.js";
 
 const btn = document.createElement("button");
 btn.id = "menu-btn";
@@ -36,10 +37,14 @@ document.body.append(backdrop, panel, btn);
 const roomsEl = document.getElementById("rooms"), loginEl = document.getElementById("login");
 const inRoom = () => roomsEl?.classList.contains("hidden") !== false && loginEl?.classList.contains("hidden") !== false && socket.connected;
 
-// v room browseri je kniha veľká (vľavo dole oproti hlave bota), inde malá
-function syncBig() { btn.classList.toggle("big", !!roomsEl && !roomsEl.classList.contains("hidden")); }
-if (roomsEl) new MutationObserver(syncBig).observe(roomsEl, { attributes: true, attributeFilter: ["class"] });
-syncBig();
+// v room browseri je kniha veľká (vľavo dole oproti hlave bota), inde malá; na prihlasovacej obrazovke menu nie je
+function syncBig() {
+  btn.classList.toggle("big", !!roomsEl && !roomsEl.classList.contains("hidden"));
+  const onLogin = !!loginEl && !loginEl.classList.contains("hidden");
+  btn.style.display = onLogin ? "none" : "";
+  if (onLogin) closeMenu();
+}
+for (const el of [roomsEl, loginEl]) if (el) new MutationObserver(syncBig).observe(el, { attributes: true, attributeFilter: ["class"] });
 
 let adminOn = false; // admin: prepínač ADMIN zapnutý = admin knihy namiesto bežných
 
@@ -93,6 +98,7 @@ tomeReady.then(() => { bookTick = bookButton(btnCvs, btn); if (!panel.classList.
 
 export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
 export function closeMenu() { backdrop.classList.add("hidden"); panel.classList.add("hidden"); }
+syncBig();
 
 btn.addEventListener("click", () => {
   if (!panel.classList.contains("hidden")) { closeMenu(); return; }
@@ -108,7 +114,7 @@ panel.addEventListener("click", (ev) => {
   if (ev.target.closest(".menu-admin")) { adminOn = !adminOn; render(); return; }
   const act = ev.target.closest("[data-act]")?.dataset.act;
   if (!act) return;
-  if (act === "codex") return; // CODEX zatiaľ nič nerobí
+  if (act === "codex") { closeMenu(); openCodex(); return; } // CODEX = kniha postáv (codex.js)
   if (act === "reload") { location.reload(); return; }
   if (act === "fullscreen") { toggleFullscreen(); closeMenu(); return; }
   if (act === "sound") { closeMenu(); openSoundWindow(); return; }

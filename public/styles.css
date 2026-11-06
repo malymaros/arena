@@ -3908,3 +3908,40 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .pix-ico.px-txt { width: 22px; height: 22px; flex: none; }
 .q-badge.opt .pix-ico.px-txt { width: 16px; height: 16px; }
 .a-badge .pix-ico.px-txt { width: 18px; height: 18px; }
+
+/* ===== CODEX (codex.js, schválený návrh public/dev/codex.html): otvorená pixel-art kniha 900×588 px, na stred,
+   zväčšená o --cx-k; obsah = postavy (vľavo základné, vpravo skryté na zakázanej strane), pravá časť listu odtrhnutá ===== */
+.codex-wrap { position: fixed; inset: 0; z-index: 100004; display: flex; align-items: center; justify-content: center; }
+.codex-wrap.hidden { display: none; }
+.codex-book { --ink: #2a1a10; --faded: #4a3418; position: relative; flex: none; width: 900px; height: 588px; transform: scale(var(--cx-k, 1));
+  font-family: var(--px-font); color: var(--ink); }
+.codex-book .cx-book { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.codex-book .cx-x { position: absolute; right: -14px; top: -14px; width: 40px; height: 40px; border: none; border-radius: 0; cursor: pointer; padding: 0;
+  font: 14px var(--px-font); color: #e8dcc0; background: #3d3036; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a52, inset -2px -2px 0 #171114; z-index: 2; }
+.codex-book .cx-x:hover { color: #fff; background: #4a3a42; }
+.codex-book .cx-pg { position: absolute; top: 46px; height: 480px; overflow: hidden; z-index: 0; }
+.codex-book .cx-pg.l { left: 54px; width: 376px; }
+.codex-book .cx-pg.r { left: 484px; width: 352px; }
+.codex-book .cx-cards { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); height: 100%; column-gap: 12px;
+  align-items: center; justify-items: center; }
+.codex-book .cx-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; transform: rotate(var(--r, 0deg));
+  font: 7px var(--px-font); line-height: 9px; color: var(--ink); letter-spacing: 1px; text-align: center; }
+.codex-book .cx-ph { position: relative; display: block; width: 80px; height: 80px; background: #2a2d34;
+  box-shadow: 0 0 0 3px #f4ead0, 0 0 0 5px #000, 3px 4px 0 4px rgba(60,40,10,.3); }
+.codex-book .cx-ph canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.codex-book .cx-pin { position: absolute; left: 50%; top: -9px; width: 8px; height: 8px; margin-left: -4px; background: #c0283a;
+  box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #7a1622; z-index: 1; }
+.codex-book .cx-nm { margin-top: 4px; padding: 3px 5px; background: #f4ead0; box-shadow: 0 0 0 2px #000; }
+.codex-book .cx-q { width: 100%; height: 100%; display: grid; place-items: center; font-size: 16px; color: var(--faded); background: #d6c18e; }
+.codex-book .cx-card.sealed .cx-ph { background: radial-gradient(circle at 50% 40%, #6a5a7e, #2e2438 75%); }
+.codex-book .cx-card.sealed.w .cx-ph { background: radial-gradient(circle at 50% 40%, #e8e0cc, #8a8070 80%); }
+.codex-book .cx-card.w .cx-ph { box-shadow: 0 0 0 3px #fffaf0, 0 0 0 5px #000, 0 0 14px 4px rgba(255,250,230,.55); }
+.codex-book .cx-card.w .cx-pin { background: #f4f4f4; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #9a9aa0; }
+.codex-book .cx-card.w .cx-nm { background: #fffaf0; color: #2a1a10; }
+.codex-book .cx-card.b .cx-ph { box-shadow: 0 0 0 3px #161218, 0 0 0 5px #000, 0 0 14px 4px rgba(200,30,60,.5); }
+.codex-book .cx-card.b .cx-pin { background: #1a1a1a; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #000; }
+.codex-book .cx-card.b .cx-nm { background: #161218; color: #c8b8c8; }
+.codex-book .cx-balance { position: absolute; left: 456px; top: 330px; width: 408px; height: 228px; image-rendering: pixelated; pointer-events: none; z-index: 1; }
+.codex-book .cx-torn { position: absolute; left: 456px; top: 30px; width: 408px; height: 522px; pointer-events: none; z-index: 1; }
+.codex-book .cx-fiber { position: absolute; inset: 0; background: #d2b886; clip-path: var(--tp); transform: translate(-3px, -3px); }
+.codex-book .cx-under { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; clip-path: var(--tp); }

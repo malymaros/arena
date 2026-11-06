@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>CODEX — kniha postáv (návrh)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): CODEX = otvorená pixel-art kniha (kreslí canvas, 1 umelecký pixel = 3 px).
+     Úvod = obsah: vľavo 9 postáv, vpravo skryté (WHITE / BLACK + coming soon); klik na hlavu = zápis postavy (ako ho
+     zapísal čarodejník) na dvojstrane. ↩ = späť na obsah, rohy strán / šípky = listovanie. */
+  html, body { overflow: auto !important; height: auto !important; min-height: 100%; position: static !important; touch-action: auto !important; }
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 700 18px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0; color: #8b92a0; max-width: 1100px; }
+  .ctl { display: flex; gap: 10px; padding: 12px 20px 0; }
+  .ctl button { padding: 8px 12px; border: 2px dashed #8b92a0; background: #101217; color: #dfe3ea; cursor: pointer; font: 9px "Press Start 2P", monospace; }
+  .ctl button.on { border-style: solid; border-color: #ffb300; color: #ffb300; }
+  .stage { padding: 40px 20px 60px; display: flex; justify-content: center; background: rgba(0,0,0,.55) url(/arenas/bridge/thumb.png) center/cover; background-blend-mode: multiply; }
+
+  .codex { --ink: #2a1a10; --red: #7a1622; --faded: #4a3418; position: relative; width: 900px; height: 588px; font-family: var(--px-font); color: var(--ink); }
+  .codex canvas.book { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  .codex .x { position: absolute; right: -14px; top: -14px; width: 40px; height: 40px; border: none; cursor: pointer; font: 14px var(--px-font); color: #e8dcc0;
+    background: #3d3036; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a52, inset -2px -2px 0 #171114; z-index: 2; }
+  /* obsah: ľavá strana (px 54-430) a ľavá polovica pravej strany (px 486-654) */
+  .pg { position: absolute; top: 46px; height: 480px; overflow: hidden; font-size: 9px; line-height: 16px; }
+  .pg.l { left: 54px; width: 376px; }
+  .pg.r { left: 484px; width: 352px; }
+  .codex .back { position: absolute; right: 34px; top: -14px; height: 40px; padding: 0 12px; border: none; cursor: pointer; font: 10px var(--px-font); color: #e8dcc0;
+    background: #3d3036; box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a52, inset -2px -2px 0 #171114; z-index: 2; }
+  .turn { position: absolute; bottom: 36px; width: 32px; height: 32px; border: none; background: none; cursor: pointer; padding: 0; font: 12px var(--px-font); color: var(--red); z-index: 1; }
+  .turn.prev { left: 44px; } .turn.next { left: 822px; }
+  .turn:hover { color: var(--ink); }
+  .hidden { display: none !important; }
+  .pno { display: none; }
+  .pno.l { left: 238px; } .pno.r { left: 566px; }
+  /* zápis: ilustrácia v ručne kreslenom ráme vľavo hore, údaje vedľa */
+  .top { display: grid; grid-template-columns: 150px 1fr; gap: 16px; }
+  .illu { position: relative; width: 150px; height: 168px; padding: 8px; box-sizing: border-box; }
+  .illu::before { content: ""; position: absolute; inset: 0; border: 3px solid var(--ink); box-shadow: inset 0 0 0 3px #b2925f, inset 0 0 0 5px var(--ink); pointer-events: none; }
+  .illu .orn { position: absolute; width: 10px; height: 10px; background: var(--red); box-shadow: 0 0 0 2px var(--ink); z-index: 1; }
+  .illu .orn.a { left: -4px; top: -4px; } .illu .orn.b { right: -4px; top: -4px; } .illu .orn.c { left: -4px; bottom: -4px; } .illu .orn.d { right: -4px; bottom: -4px; }
+  .illu canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; background: #a8895a; filter: sepia(.3) saturate(.9); }
+  .name { font-size: 14px; color: var(--red); letter-spacing: 2px; line-height: 20px; margin-top: 2px; }
+  .epithet { color: var(--faded); font-size: 8px; margin: 2px 0 8px; }
+  .facts .row { display: flex; gap: 8px; padding: 3px 0; }
+  .facts .k { color: var(--red); flex: none; }
+  .facts .k::after { content: " ~"; color: var(--faded); }
+  .rule { height: 6px; margin: 12px 0 10px; background:
+    repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px) 0 2px / 100% 2px no-repeat,
+    linear-gradient(var(--red), var(--red)) 50% 0 / 6px 6px no-repeat; opacity: .8; }
+  .sec { margin-top: 4px; }
+  .sec h3 { margin: 0 0 6px; font-size: 9px; color: var(--red); letter-spacing: 2px; }
+  .sec h3::first-letter { font-size: 14px; }
+  .sec ul { margin: 0; padding: 0; list-style: none; }
+  .sec li { margin: 0 0 7px; padding-left: 14px; position: relative; }
+  .sec li::before { content: ""; position: absolute; left: 2px; top: 5px; width: 6px; height: 2px; background: var(--ink); box-shadow: 2px -2px 0 var(--ink), 2px 2px 0 var(--ink); }
+  .sec li b { color: var(--red); font-weight: 400; }
+  .scrawl { display: inline-block; background: var(--ink); color: transparent; user-select: none; clip-path: polygon(0 20%, 4% 0, 100% 10%, 98% 85%, 92% 100%, 0 90%); }
+  /* vosková pečať dole v ľavej polovici pravej strany */
+  .seal { position: absolute; left: 780px; top: 460px; width: 44px; height: 44px; background: #8a1a24;
+    clip-path: polygon(30% 0, 70% 0, 85% 6%, 94% 15%, 100% 30%, 100% 70%, 94% 85%, 85% 94%, 70% 100%, 30% 100%, 15% 94%, 6% 85%, 0 70%, 0 30%, 6% 15%, 15% 6%);
+    box-shadow: inset 0 0 0 4px #6a0e18; display: grid; place-items: center; font-size: 12px; color: #c0404c; text-shadow: 1px 1px 0 #4a0810; }
+  .title { text-align: center; margin: 2px 0 2px; font-size: 16px; color: var(--red); letter-spacing: 3px; }
+  .subtitle { text-align: center; color: var(--faded); font-size: 8px; }
+  .medals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px 10px; margin-top: 22px; }
+  .medal { border: none; background: none; cursor: pointer; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; font: 8px var(--px-font); color: var(--ink); letter-spacing: 1px; }
+  .medal .fr { position: relative; width: 92px; height: 92px; padding: 5px; box-sizing: border-box; background: var(--ink); display: grid; place-items: center;
+    clip-path: polygon(30% 0, 70% 0, 85% 6%, 94% 15%, 100% 30%, 100% 70%, 94% 85%, 85% 94%, 70% 100%, 30% 100%, 15% 94%, 6% 85%, 0 70%, 0 30%, 6% 15%, 15% 6%); }
+  .medal .fr canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; background: #d8c495; filter: sepia(.35) saturate(.85);
+    clip-path: polygon(30% 0, 70% 0, 85% 6%, 94% 15%, 100% 30%, 100% 70%, 94% 85%, 85% 94%, 70% 100%, 30% 100%, 15% 94%, 6% 85%, 0 70%, 0 30%, 6% 15%, 15% 6%); }
+  .medal:hover { color: var(--red); } .medal:hover .fr { background: var(--red); } .medal:hover canvas { filter: none; }
+  .medal .nm { text-align: center; min-height: 16px; line-height: 9px; }
+  .medal.sealed .fr canvas { background: #2a1a10; }
+  .medal.soon { cursor: default; color: var(--faded); }
+  .medal.soon .fr { background: rgba(42,26,16,.35); }
+  .medal.soon .q { width: 100%; height: 100%; display: grid; place-items: center; background: #dcc898; font-size: 12px; color: var(--faded);
+    clip-path: polygon(30% 0, 70% 0, 85% 6%, 94% 15%, 100% 30%, 100% 70%, 94% 85%, 85% 94%, 70% 100%, 30% 100%, 15% 94%, 6% 85%, 0 70%, 0 30%, 6% 15%, 15% 6%); }
+  .side-h { margin-top: 14px; font-size: 8px; color: var(--ink); letter-spacing: 2px; }
+  .side-h.dark { margin-top: 20px; }
+  .medals.side { margin-top: 10px; }
+  .medals.side .medal .fr { width: 108px; height: 108px; padding: 6px; }
+  .side-h { margin-top: 22px !important; }
+  .medal.soon .q { font-size: 18px !important; }
+  /* zápis postavy = policajný spis vlepený do knihy */
+  .dcard { position: relative; display: grid; grid-template-columns: 168px 1fr; gap: 14px; padding: 16px 14px 14px; margin: 2px 0 14px; background: #d9c28e;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' shape-rendering='crispEdges'%3E%3Crect x='2' y='3' width='2' height='2' fill='%23cfb682'/%3E%3Crect x='8' y='9' width='2' height='2' fill='%23e2cd9c'/%3E%3C/svg%3E");
+    box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #c4ab76, 4px 5px 0 2px rgba(60,40,10,.3); transform: rotate(-.6deg); }
+  .mug { position: relative; }
+  .mug .shot { position: relative; width: 160px; height: 160px; background: #8a8f99; box-shadow: 0 0 0 4px #f4ead0, 0 0 0 6px #000, 4px 5px 0 5px rgba(60,40,10,.35); overflow: hidden; transform: rotate(-1.5deg); }
+  .mug .shot canvas.bg, .mug .shot canvas.pt { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  .mug .plate { position: absolute; left: 30px; bottom: 8px; width: 100px; padding: 3px 0; background: #111; color: #e8e8e8; text-align: center; font-size: 6px; line-height: 9px; letter-spacing: 1px; box-shadow: 0 0 0 2px #444; }
+  .mug .clip { position: absolute; left: 14px; top: -22px; width: 12px; height: 36px; border: 3px solid #8a909a; border-bottom: none; box-sizing: border-box; z-index: 2; box-shadow: 1px 1px 0 #000; }
+  .dfacts { align-self: start; font-size: 8px; }
+  .drow { display: flex; flex-direction: column; padding: 3px 0 4px; border-bottom: 2px dotted rgba(42,26,16,.3); }
+  .drow .k { color: #6a5434; font-size: 7px; }
+  .drow .v { color: var(--ink); }
+  .drow .v b { color: var(--red); font-weight: 400; }
+  .dstamp { position: absolute; right: 6px; bottom: 10px; padding: 5px 8px; font-size: 11px; letter-spacing: 2px; color: rgba(170,30,40,.75);
+    border: 3px solid rgba(170,30,40,.75); transform: rotate(-12deg); pointer-events: none; }
+  .dsec { margin-bottom: 14px; }
+  .dsec h3 { margin: 0 0 8px; padding-bottom: 4px; font-size: 9px; color: var(--red); letter-spacing: 2px; border-bottom: 3px solid var(--ink); }
+  .dsec ul { margin: 0; padding: 0; list-style: none; }
+  .dsec li { margin: 0 0 8px; padding-left: 12px; position: relative; }
+  .dsec li::before { content: ""; position: absolute; left: 0; top: 5px; width: 5px; height: 5px; background: var(--red); }
+  .dsec li b { color: var(--red); font-weight: 400; }
+  .redact { display: inline-block; background: #111; color: transparent; user-select: none; }
+  /* ---- obsah: varianty zobrazenia postáv ---- */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px 12px; margin-top: 18px; justify-items: center; }
+  .cards.side { margin-top: 8px; gap: 12px; }
+  .side-h { margin-top: 18px; font-size: 8px; letter-spacing: 2px; }
+  .card { position: relative; border: none; background: none; cursor: pointer; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    font: 7px var(--px-font); color: var(--ink); letter-spacing: 1px; text-align: center; transform: rotate(var(--r, 0deg)); }
+  .card.soon { cursor: default; color: var(--faded); }
+  .card .ph { position: relative; display: block; }
+  .card canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  .card .q { width: 100%; height: 100%; display: grid; place-items: center; font-size: 16px; color: var(--faded); background: #d6c18e; }
+  .card .nm { line-height: 9px; }
+  .card:not(.soon):hover { color: var(--red); }
+  /* NÁSTENKA: fotka s bielym okrajom pripnutá špendlíkom, meno na prúžku papiera */
+  .card.pinned .ph { width: 80px; height: 80px; background: #2a2d34; box-shadow: 0 0 0 3px #f4ead0, 0 0 0 5px #000, 3px 4px 0 4px rgba(60,40,10,.3); }
+  .card.pinned .pin { position: absolute; left: 50%; top: -9px; width: 8px; height: 8px; margin-left: -4px; background: #c0283a; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #7a1622; z-index: 1; }
+  .card.pinned .nm { margin-top: 4px; padding: 3px 5px; background: #f4ead0; box-shadow: 0 0 0 2px #000; }
+  /* POLAROIDY: biely rám so širším spodkom, meno napísané v ráme, prilepené páskou */
+  .card.polaroid { padding: 6px 6px 0; background: #f4ead0; box-shadow: 0 0 0 2px #000, 3px 4px 0 2px rgba(60,40,10,.3); gap: 4px; }
+  .card.polaroid .ph { width: 78px; height: 78px; background: #2a2d34; box-shadow: 0 0 0 2px #000; }
+  .card.polaroid .nm { height: 24px; display: grid; place-items: center; width: 78px; }
+  .card.polaroid .tape { position: absolute; left: 50%; top: -8px; width: 40px; height: 12px; margin-left: -20px; background: rgba(214,196,140,.85); box-shadow: 0 0 0 1px rgba(0,0,0,.25); transform: rotate(-4deg); }
+  .cards.side .card.polaroid .ph { width: 88px; height: 88px; } .cards.side .card.polaroid .nm { width: 88px; }
+  /* POLICAJNÉ FOTKY: výšková stupnica, tabuľka s číslom a menom */
+  .card.mugshot .ph { width: 96px; height: 96px; background: #8a8f99; box-shadow: 0 0 0 3px #f4ead0, 0 0 0 5px #000, 3px 4px 0 4px rgba(60,40,10,.3); overflow: hidden; }
+  .card.mugshot .ph canvas { position: absolute; inset: 0; }
+  .card.mugshot .plate { position: absolute; left: 10px; right: 10px; bottom: 5px; padding: 2px 0; background: #111; color: #e8e8e8; font-size: 5px; line-height: 7px; box-shadow: 0 0 0 1px #444; z-index: 1; }
+  .card.mugshot.soon .q { background: #8a8f99; color: #e8e8e8; }
+  .cards.side .card.mugshot .ph { width: 100px; height: 100px; }
+  /* PLAGÁTY WANTED: malý žltkastý plagát */
+  .card.wanted { padding: 6px 7px 7px; background: #e8d49a; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #c9b070, 3px 4px 0 2px rgba(60,40,10,.3); gap: 4px; }
+  .card.wanted .hd { font-size: 9px; color: #7a1622; letter-spacing: 2px; }
+  .card.wanted .ph { width: 72px; height: 72px; background: #c9b384; box-shadow: 0 0 0 2px var(--ink); }
+  .card.wanted canvas { filter: sepia(.6) contrast(1.05); }
+  .cards.side .card.wanted .ph { width: 80px; height: 80px; }
+  /* zapečatené (skryté) postavy: čierna silueta */
+  .card.sealed .ph { background: radial-gradient(circle at 50% 40%, #6a5a7e, #2e2438 75%); }
+  .card.sealed.w .ph { background: radial-gradient(circle at 50% 40%, #e8e0cc, #8a8070 80%); }
+  /* ODTRHNUTÁ časť pravej strany (coming soon): pod ňou ďalšia strana, zubatý okraj s vláknami papiera */
+  .spill { position: absolute; left: 456px; top: 330px; width: 408px; height: 228px; image-rendering: pixelated; pointer-events: none; z-index: 1; }
+  .torn { position: absolute; left: 456px; top: 30px; width: 408px; height: 522px; pointer-events: none; z-index: 1; }
+  .torn .fiber { position: absolute; inset: 0; background: #d2b886; clip-path: var(--tp); transform: translate(-3px, -3px); }
+  .torn .under { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; clip-path: var(--tp); }
+  .torn-old::after { content: ""; position: absolute; inset: 0; clip-path: var(--tp);
+    background: repeating-linear-gradient(180deg, transparent 0 15px, rgba(90,60,30,.18) 15px 17px), linear-gradient(90deg, #a8926a 0 10px, #cdb784 10px 22px, #d6c18e 22px); }
+  .pg.r { z-index: 0; }
+  /* HIDDEN strana: zakázaná - nadpis fialovo žiari, biele postavy svetlé rámy a špendlíky, čierne tmavé s červenou žiarou */
+  .title.forbidden { color: #c9a0ff; text-shadow: 0 0 8px rgba(170,90,255,.8), 2px 2px 0 #1a0820; }
+  .cards.side { margin-top: 26px !important; }
+  .cards.side.b { margin-top: 30px !important; }
+  /* obsah bez nadpisov: postavy rovnomerne po celej strane; vpravo 2 riadky nad symbolom svetla a tmy */
+  .pg > .cards { margin: 0; height: 100%; grid-template-rows: repeat(3, 1fr); align-items: center; row-gap: 0; } /* rovnaké 3 riadky na oboch stranách */
+
+  .card.pinned.w .ph { box-shadow: 0 0 0 3px #fffaf0, 0 0 0 5px #000, 0 0 14px 4px rgba(255,250,230,.55); }
+  .card.pinned.w .pin { background: #f4f4f4; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #9a9aa0; }
+  .card.pinned.w .nm { background: #fffaf0; color: #2a1a10; }
+  .card.pinned.b .ph { box-shadow: 0 0 0 3px #161218, 0 0 0 5px #000, 0 0 14px 4px rgba(200,30,60,.5); }
+  .card.pinned.b .pin { background: #1a1a1a; box-shadow: 0 0 0 2px #000, inset -2px -2px 0 #000; }
+  .card.pinned.b .nm { background: #161218; color: #c8b8c8; }
+  .cards.side .card.soon .nm { color: #9a8aa0; }
+  .notes { max-width: 900px; margin: 0 auto; padding: 16px 20px 40px; color: #9aa1ad; }
+  .notes li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CODEX — kniha postáv (návrh)</h1>
+  <p>Otvorená pixel-art kniha. Úvod: vľavo 9 postáv, vpravo skryté postavy. Klik na hlavu otvorí zápis postavy - ako ho do knihy zapísal
+    čarodejník. ↩ (vedľa ✕) = späť na obsah, ◀ ▶ v rohoch strán alebo šípky na klávesnici = listovanie.</p>
+</header>
+<div class="ctl"><span id="styles" style="display:none"></span><button type="button" id="t-hidden" class="on">SKRYTÉ POSTAVY: ZAPEČATENÉ</button></div>
+<div class="stage"><div class="codex" id="codex">
+  <canvas class="book" width="300" height="196"></canvas>
+  <button class="x" type="button" title="Zavrieť">✕</button>
+  <button class="back hidden" type="button" id="back">↩ CONTENTS</button>
+  <button class="turn prev hidden" type="button" id="prev">◀</button><button class="turn next hidden" type="button" id="next">▶</button>
+  <div class="pg l" id="pl"></div><div class="pg r" id="pr"></div><canvas class="spill hidden" id="spill"></canvas><div class="torn hidden" id="torn"></div>
+  <span class="pno l" id="nl"></span><span class="pno r" id="nr"></span>
+  <div class="seal" id="seal"></div>
+</div></div>
+<ul class="notes">
+  <li>Texty zápisov sú môj návrh z pravidiel hry (čísla zo shared/balance.js) - prejdi ich, upravím podľa teba.</li>
+  <li>Skryté postavy: zapečatená strana (čierna silueta, text začmáraný atramentom); v registri majú čiernu hlavu a „? ? ?“.</li>
+</ul>
+
+<script type="module">
+import { CHAR_LIST, HEAD_CROP } from "/chars/index.js";
+import * as B from "/shared/balance.js";
+
+const fall = [1, 2, 3].map(d => Math.max(1, B.BASIC_DMG_MAX - d)).join("/");
+const diag = `Diagonal shot that bounces once off a wall (${fall} by distance).`;
+// spisy: návrh textov z pravidiel (CLAUDE.md), čísla z balance.js
+const FILES = {
+  fire: { cls: "Mage", attack: "Straight shot", threat: 2,
+    traits: ["Steady all-rounder - nothing hidden.", "Loves standing in fire."],
+    passive: ["On a <b>damage tile</b> his special covers his row <b>±1</b> - the tile burns up."],
+    special: [`<b>Flame jet</b> - his whole row, <b>${B.SPECIAL_ZONE_DMG.fire} dmg</b>.`] },
+  lightning: { cls: "Mage", attack: "Straight shot", threat: 2,
+    traits: ["Every step flips which cells he can hit."],
+    passive: ["A <b>heal tile</b> heals him to <b>full HP</b>."],
+    special: [`<b>Storm</b> - every cell of the opposite colour (half the board), <b>${B.SPECIAL_ZONE_DMG.lightning} dmg</b>.`] },
+  wanderer: { cls: "Mage", attack: "Straight shot", threat: 2,
+    traits: ["Patient - gets stronger the longer it lasts."],
+    passive: [`<b>+${B.WANDERER_MANA_REGEN} mana</b> each round he doesn't use a mirror.`],
+    special: [`<b>Diagonal blast</b> - the 4 diagonal neighbours, <b>${B.SPECIAL_ZONE_DMG.wanderer} dmg</b>.`] },
+  medusa: { cls: "Gorgon", attack: "Straight shot", threat: 3,
+    traits: ["Don't look her in the eyes."],
+    passive: [`Wide melee: own cell + diagonals, <b>${B.MEDUSA_MELEE_DMG} dmg</b>.`],
+    special: [`<b>Petrify</b> - one direction, no dmg: target skips its next <b>${B.STONE_ACTIONS}</b> actions.`] },
+  minotaur: { cls: "Beast", attack: "Straight shot", threat: 3,
+    traits: ["A hunter in his own maze."],
+    passive: [`While his labyrinth holds: <b>${B.MAZE_DEAL_MUL}× dmg</b>.`],
+    special: ["<b>Labyrinth</b> - whole board, no dmg: the foe goes blind until any hit lands."] },
+  naruto: { cls: "Ninja", attack: "Straight shot", threat: 3,
+    traits: ["Never alone for long."],
+    passive: ["His clone copies his moves (up/down mirrored) and deals the same dmg."],
+    special: ["<b>Shadow clone</b> - must stand alone on his cell; the clone vanishes on any hit."] },
+  escanor: { cls: "Knight", attack: "Straight shot", threat: 4,
+    traits: ["Grows with his pride - you can see it in his size."],
+    passive: ["<b>Pride 0-3</b>: +1 each round without a defense or a hit taken, −1 otherwise."],
+    special: [`<b>Cruel sun</b> - left/right, zone grows with pride, <b>${B.SPECIAL_ZONE_DMG.escanor} dmg</b>.`] },
+  soldier: { cls: "Sniper", attack: "Rolling grenade", threat: 3,
+    traits: ["Shoots where you will be, not where you are."],
+    passive: ["Melee is a point-blank shot."],
+    special: [`<b>Sniper beam</b> - any cell except his own and the foe's, <b>${B.SOLDIER_SPECIAL_DMG} dmg</b>.`] },
+  werewolf: { cls: "Beast", attack: "Straight shot", threat: 4,
+    traits: ["The more wounded, the more dangerous."],
+    passive: ["<b>Moon phase</b> from his HP - lower HP, fuller moon, bigger wolf."],
+    special: [`<b>Charge</b> - 8 directions to the first foe, <b>${B.WOLF_MOON_DMG.join("/")} dmg</b> by moon.`] },
+  countess: { cls: "Vampire", attack: "Diagonal shot", threat: 4, side: "WHITE ONLY",
+    traits: [diag, "Immune to mirrors - they only block her."],
+    passive: [`Charge (dash slot): <b>${B.VAMP_CHARGE_DMG} dmg</b> and heals <b>${B.VAMP_CHARGE_BONUS} HP</b>.`, `Melee on her own cell: <b>${B.VAMP_MELEE_DMG} dmg</b>.`],
+    special: [`<b>Blood trap</b> - hidden cell; when the foe steps in she teleports and strikes, <b>${B.VAMP_TRAP_DMG} dmg</b> + heals <b>${B.VAMP_TRAP_BONUS} HP</b>.`] },
+  onre: { cls: "Ghost", attack: "Diagonal shot", threat: 4, side: "BLACK ONLY",
+    traits: [diag, "Immune to mirrors - they only block her."],
+    passive: [`Charge (dash slot): <b>${B.VAMP_CHARGE_DMG} dmg</b> and drains <b>${B.VAMP_CHARGE_BONUS} mana</b>.`, `Melee on her own cell: <b>${B.VAMP_MELEE_DMG} dmg</b>.`],
+    special: [`<b>Cursed trap</b> - hidden cell; when the foe steps in she teleports and strikes, <b>${B.VAMP_TRAP_DMG} dmg</b> + drains <b>${B.VAMP_TRAP_BONUS} mana</b>.`] },
+  jotaro: { cls: "Stand user", attack: "Diagonal shot", threat: 5, side: "BLACK ONLY",
+    traits: [diag, "Star Platinum always at his side."],
+    passive: [`No mirror - instead <b>Special 1</b>: both diagonal cells on one side, <b>${B.JOTARO_S1_DMG} dmg</b>.`],
+    special: ["<b>THE WORLD</b> (once per game) - time stops, he takes 3 extra actions.", `Then <b>Special 2</b>: adjacent cell, <b>${B.JOTARO_S2_DMG} dmg</b>.`] },
+  luffy: { cls: "Pirate", attack: "Diagonal shot", threat: 5, side: "WHITE ONLY",
+    traits: [diag, "Rubber body - reaches anywhere."],
+    passive: [`No mirror - instead <b>Gomu Gomu Pistol</b>: any cell, <b>${B.LUFFY_S1_DMG} dmg</b>.`],
+    special: [`<b>Balloon</b> (once per game) - rolls 1 cell and bursts 3×3, <b>${B.LUFFY_BALL_DMG} dmg</b>.`, `Then <b>Special 2</b>: adjacent cell, <b>${B.LUFFY_S2_DMG} dmg</b>.`] },
+};
+
+
+
+const ui = { i: -1, sealed: true, style: "pinned" }; // -1 = obsah (úvodná dvojstrana)
+const sealed = (c) => ui.sealed && !!c.side;
+const imgs = {};
+const load = (src) => imgs[src] ||= new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+async function drawHead(cv, c, bust = false) {
+  const im = await load(`/assets/${c.meta.dir}/${c.headIdleFile || "Idle.png"}`); if (!im) return; // ako HUD hlava (Escanor zo slabej formy)
+  const h = im.height, cr = HEAD_CROP[c.key] || { cx: .5, cy: .5, size: .3 }, ctx = cv.getContext("2d");
+  const s = cr.size * h * (bust ? 1.6 : 1), cx = cr.cx * h, cy = cr.cy * h + (bust ? cr.size * h * .28 : 0);
+  ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(im, cx - s / 2, cy - s / 2, s, s, 0, 0, cv.width, cv.height);
+  if (sealed(c)) { ctx.globalCompositeOperation = "source-atop"; ctx.fillStyle = "#1a1008"; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = "source-over"; }
+}
+
+// ======================= kniha (canvas, umelecký pixel = 3 px) =======================
+const W = 300, H = 196, cvs = document.querySelector("canvas.book"), ctx = cvs.getContext("2d");
+const px = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+const OUT = "#0a0708", GOLD = "#b8862b", GHI = "#f2c14e";
+const PAGE = "#b2925f", PAGE2 = "#a08050", PAGE3 = "#8c6c40", PAGE4 = "#745632", EDGE = "#c4a874", EDGE2 = "#7e6440"; // tmavý, starý pergamen grimoáru
+const PL = 12, PR = 288, PT = 10, PB = 184, GL = 148, GR = 152;
+function drawBook() {
+  ctx.clearRect(0, 0, W, H);
+  px(0, 2, W, H - 4, OUT);
+  for (let y = 3; y < H - 3; y++) for (let x = 1; x < W - 1; x++) { const v = (x * 7 + y * 13 + x * y) % 17; px(x, y, 1, 1, v < 3 ? "#1e1519" : v > 14 ? "#30242a" : "#271c21"); }
+  for (let x = 4; x < W - 4; x += 4) { px(x, 5, 2, 1, "#6a2c8a"); px(x, H - 6, 2, 1, "#6a2c8a"); }
+  for (let y = 6; y < H - 6; y += 4) { px(3, y, 1, 2, "#6a2c8a"); px(W - 4, y, 1, 2, "#6a2c8a"); }
+  const corner = (x, y, sx, sy) => { for (let i = 0; i < 6; i++) px(sx > 0 ? x : x - (6 - i) + 1, y + sy * i, 6 - i, 1, GOLD); px(sx > 0 ? x : x - 5, y, 6, 1, GHI); };
+  corner(1, 3, 1, 1); corner(W - 2, 3, -1, 1); corner(1, H - 4, 1, -1); corner(W - 2, H - 4, -1, -1);
+  for (let i = 0; i < 4; i++) { px(PL - 2 + i, PB + i, GL - PL + 2 - i, 1, i % 2 ? EDGE2 : EDGE); px(GR, PB + i, PR - GR + 2 - i, 1, i % 2 ? EDGE2 : EDGE); }
+  for (let i = 0; i < 3; i++) { px(PL - 3 + i, PT + 2, 1, PB - PT, i % 2 ? EDGE2 : EDGE); px(PR + 2 - i, PT + 2, 1, PB - PT, i % 2 ? EDGE2 : EDGE); }
+  for (const [x0, x1] of [[PL, GL], [GR, PR]]) {
+    px(x0, PT, x1 - x0, PB - PT, PAGE);
+    for (let y = PT; y < PB; y++) for (let x = x0; x < x1; x++) { const v = (x * 11 + y * 7 + x * y * 3) % 23; if (v === 0) px(x, y, 1, 1, PAGE2); }
+    px(x0, PT, x1 - x0, 1, EDGE); px(x0, PB - 1, x1 - x0, 1, PAGE3);
+  }
+  [PAGE2, PAGE2, PAGE3, PAGE3, PAGE4, "#8a7650"].forEach((c, i) => { px(GL - 6 + i, PT, 1, PB - PT, c); px(GR + 5 - i, PT, 1, PB - PT, c); });
+  px(GL, PT - 1, GR - GL, PB - PT + 3, "#3a2a18"); px(GL + 1, PT - 1, 2, PB - PT + 3, "#1a1008");
+  [[40, 150], [41, 150], [40, 151], [120, 30], [121, 31]].forEach(([x, y]) => px(x, y, 1, 1, "rgba(120,80,30,.35)"));
+  grimoirePage(PL, GL, true, false);
+  grimoirePage(GR, PR, false, ui.i < 0); // pravá strana obsahu = zakázaná (HIDDEN)
+
+}
+
+// strana grimoáru: obhorené vonkajšie okraje, vyblednutý kúzelný kruh s hviezdou, runy na okrajoch; forbidden = temná, fialová
+function grimoirePage(x0, x1, left, forbidden) {
+  const outer = left ? x0 : x1 - 1;
+  if (forbidden) {
+    for (let y = PT; y < PB; y++) for (let x = x0; x < x1; x++) {
+      const v = (x * 13 + y * 7 + x * y) % 19, d = Math.min(y - PT, PB - 1 - y, Math.abs(x - outer));
+      px(x, y, 1, 1, `rgba(${v < 2 ? "20,6,28" : "34,12,44"},${(.42 + Math.max(0, 6 - d) * .06 + (v < 2 ? .1 : 0)).toFixed(2)})`);
+    }
+  }
+  // obhorené okraje (hore, dole, vonkajší bok)
+  for (let y = PT; y < PB; y++) for (let x = x0; x < x1; x++) {
+    const d = Math.min(y - PT, PB - 1 - y, Math.abs(x - outer)); if (d > 5) continue;
+    const n = (x * 31 + y * 17) % 7; px(x, y, 1, 1, `rgba(${forbidden ? "10,2,14" : "60,32,10"},${((6 - d) * .08 + (n === 0 ? .08 : 0)).toFixed(2)})`);
+  }
+  // kúzelný kruh s päťcípou hviezdou, pretiahnutý atramentom: vľavo čiernym, vpravo (zakázaná strana) žiarivo fialovým;
+  // ľavý je vycentrovaný na mriežku postáv (stred strednej fotky)
+  const cx = (x0 + x1) / 2, cy = 91, R = 46; // obe strany v rovnakej výške
+  const inkCol = forbidden ? "rgba(176,96,255,.62)" : "rgba(18,10,8,.5)", halo = forbidden ? "rgba(150,70,240,.16)" : "rgba(18,10,8,.08)";
+  const dots = new Map(), dot = (x, y) => dots.set(`${Math.round(x)},${Math.round(y)}`, 1);
+  for (let a = 0; a < 360; a += .5) { const r = a * Math.PI / 180; dot(cx + Math.cos(r) * R, cy + Math.sin(r) * R); dot(cx + Math.cos(r) * (R - 5), cy + Math.sin(r) * (R - 5)); }
+  const star = [0, 2, 4, 1, 3, 0].map(k => [cx + Math.cos(-Math.PI / 2 + k * 2 * Math.PI / 5) * (R - 6), cy + Math.sin(-Math.PI / 2 + k * 2 * Math.PI / 5) * (R - 6)]);
+  for (let k = 0; k < 5; k++) { const [ax, ay] = star[k], [bx, by] = star[k + 1], n = Math.ceil(Math.hypot(bx - ax, by - ay)) * 2; for (let t = 0; t <= n; t++) dot(ax + (bx - ax) * t / n, ay + (by - ay) * t / n); }
+  const halos = new Set();
+  for (const key of dots.keys()) { const [x, y] = key.split(",").map(Number); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const h = `${x + dx},${y + dy}`; if (!dots.has(h)) halos.add(h); } }
+  for (const h of halos) { const [x, y] = h.split(",").map(Number); px(x, y, 1, 1, halo); }
+  for (const key of dots.keys()) { const [x, y] = key.split(",").map(Number); px(x, y, 1, 1, inkCol); }
+  // kvapky atramentu na hrotoch hviezdy
+  for (let k = 0; k < 5; k++) { const [sx, sy] = star[k]; if (k % 2) continue; px(Math.round(sx), Math.round(sy) + 1, 1, 2, inkCol); px(Math.round(sx) + 1, Math.round(sy) + 3, 1, 1, inkCol); }
+  // drobné runy pri hornom a dolnom okraji
+  const rc = forbidden ? "rgba(170,90,255,.35)" : "rgba(60,32,10,.3)", G = [[1, 0, 1, 1, 1, 2, 0, 1, 2, 1], [0, 0, 2, 0, 1, 1, 0, 2, 2, 2], [0, 0, 1, 0, 2, 0, 1, 1, 1, 2]];
+  for (let x = x0 + 10, k = 0; x < x1 - 12; x += 9, k++) for (const yy of [PT + 4, PB - 7]) { const g = G[k % 3]; for (let q = 0; q < g.length; q += 2) px(x + g[q], yy + g[q + 1], 1, 1, rc); }
+}
+
+// ======================= obsah (úvodná dvojstrana) + zápis postavy + register =======================
+const list = (arr, hide) => `<ul>${arr.map(t => `<li>${hide ? `<span class="scrawl">${t.replace(/<[^>]+>/g, "")}</span>` : t}</li>`).join("")}</ul>`;
+const sec = (t, arr, hide) => `<div class="sec"><h3>${t}</h3>${list(arr, hide)}</div>`;
+const medal = (c, small) => !c
+  ? `<div class="medal soon${small ? " sm" : ""}"><span class="fr"><span class="q">?</span></span><span class="nm">COMING SOON</span></div>`
+  : `<button type="button" class="medal${small ? " sm" : ""}${sealed(c) ? " sealed" : ""}" data-i="${CHAR_LIST.indexOf(c)}"><span class="fr"><canvas width="40" height="40"></canvas></span><span class="nm">${sealed(c) ? "? ? ?" : c.meta.name.toUpperCase()}</span></button>`;
+// výšková stupnica (pozadie policajnej fotky)
+function drawChart(cv) {
+  const x = cv.getContext("2d"), W = cv.width, H = cv.height;
+  x.fillStyle = "#9aa0aa"; x.fillRect(0, 0, W, H);
+  for (let y = 4; y < H; y += 10) { x.fillStyle = "#5a5f68"; x.fillRect(0, y, W, 1); if (y % 20 === 4) x.fillRect(0, y - 1, 8, 2); }
+  x.fillStyle = "#b0b5be"; x.fillRect(0, H - 22, W, 22);
+}
+// ---- varianty zobrazenia postáv na obsahu (prepínač na stránke) ----
+const STYLES = [["pinned", "NÁSTENKA"], ["polaroid", "POLAROIDY"], ["mugshot", "POLICAJNÉ FOTKY"], ["wanted", "PLAGÁTY WANTED"], ["medal", "MEDAILÓNY"]];
+const SHORT = { lightning: "LIGHTNING", wanderer: "WANDERER", onre: "ONRYO" }; // dlhé mená skrátene, Onryō bez dĺžňa (pixel font)
+const shortName = (c) => SHORT[c.key] || c.meta.name.toUpperCase();
+const tilt = (n) => [-3, 2, -1.5, 3, -2.5, 1, 2.5, -2, 1.5, -1, 3, -3][n % 12]; // „ručne" pripnuté nakrivo
+function card(c, n, style) {
+  const soon = !c, i = soon ? -1 : CHAR_LIST.indexOf(c), hide = !soon && sealed(c);
+  const nm = soon ? "COMING SOON" : shortName(c); // skryté: silueta, ale meno normálne
+  const cls = `card ${style}${soon ? " soon" : ""}${hide ? " sealed" : ""}`, data = soon ? "" : ` data-i="${i}"`, tag = soon ? "div" : "button type=\"button\"";
+  const ph = soon ? `<span class="q">?</span>` : `<canvas class="pt" width="48" height="48"></canvas>`;
+  if (style === "medal") return medal(c, false);
+  if (style === "pinned") return `<${tag} class="${cls}"${data} style="--r:${tilt(n)}deg"><span class="ph"><span class="pin"></span>${ph}</span><span class="nm">${nm}</span></${tag.split(" ")[0]}>`;
+  if (style === "polaroid") return `<${tag} class="${cls}"${data} style="--r:${tilt(n + 3)}deg"><span class="tape"></span><span class="ph">${ph}</span><span class="nm">${nm}</span></${tag.split(" ")[0]}>`;
+  if (style === "mugshot") return `<${tag} class="${cls}"${data}><span class="ph">${soon ? "" : '<canvas class="bg" width="60" height="60"></canvas>'}${ph}<span class="plate">#${String(i + 1).padStart(3, "0")}<br>${nm}</span></span></${tag.split(" ")[0]}>`;
+  return `<${tag} class="${cls}"${data} style="--r:${tilt(n + 6) / 2}deg"><span class="hd">WANTED</span><span class="ph">${ph}</span><span class="nm">${nm}</span></${tag.split(" ")[0]}>`;
+}
+// zubatý okraj odtrhnutej strany: body polygónu (x v % šírky plochy, y zhora nadol)
+// trhlina (súradnice v px knihy): chýba pravá časť listu zhora až dole (celé coming soon v 1. rade, polovica v 2.);
+// body sa medzi kľúčovými bodmi zubato rozkmitajú
+const TORN_BOX = { x: 456, y: 30, w: 408, h: 522 };
+const TORN_KEYS = [[748, 30], [734, 90], [740, 150], [718, 205], [722, 270], [714, 330], [736, 400], [748, 470], [742, 552]];
+function tornPolygon(seed) {
+  const pts = [], jit = (k) => Math.sin(k * 2.7 + seed) * 4 + Math.cos(k * 1.3 + seed * 2) * 3;
+  for (let k = 0; k < TORN_KEYS.length - 1; k++) {
+    const [ax, ay] = TORN_KEYS[k], [bx, by] = TORN_KEYS[k + 1], n = Math.max(2, Math.round(Math.hypot(bx - ax, by - ay) / 9));
+    for (let t = 0; t < n; t++) { const q = k * 20 + t, x = ax + (bx - ax) * t / n + (Math.abs(by - ay) > Math.abs(bx - ax) ? jit(q) : 0), y = ay + (by - ay) * t / n + (Math.abs(by - ay) > Math.abs(bx - ax) ? 0 : jit(q));
+      pts.push(`${((x - TORN_BOX.x) / TORN_BOX.w * 100).toFixed(1)}% ${((y - TORN_BOX.y) / TORN_BOX.h * 100).toFixed(1)}%`); }
+  }
+  const [lx, ly] = TORN_KEYS[TORN_KEYS.length - 1]; // posledný bod trhliny až na spodnú hranu strany (inak šikmý rez do rohu)
+  pts.push(`${((lx - TORN_BOX.x) / TORN_BOX.w * 100).toFixed(1)}% ${((ly - TORN_BOX.y) / TORN_BOX.h * 100).toFixed(1)}%`, "100% 100%", "100% 0%");
+  return `polygon(${pts.join(",")})`;
+}
+// strana pod trhlinou: zápisky mága ako runový kódex (Codex Runicus, umelecký pixel = 3 px) - runy písané rukou
+// čiernym atramentom bez liniek, slová oddelené dvojbodkou, fľakatý starý pergamen
+const RUNE_GLYPHS = [
+  ["#...", "##..", "#.#.", "##..", "#.#.", "#...", "#..."], ["###.", "#..#", "#..#", "#..#", "#..#", "#..#", "#..#"],
+  ["#...", "##..", "#.#.", "#.#.", "##..", "#...", "#..."], ["##..", "#.#.", "##..", "#.#.", "#..#", "#...", "#..."],
+  [".#..", ".#..", "####", ".#..", ".#..", ".#..", ".#.."], [".#..", ".#..", ".#..", ".#..", ".#..", ".#..", ".#.."],
+  [".#..", "##..", ".##.", ".#.#", ".#..", ".#..", ".#.."], ["..#.", ".#..", "#...", ".#..", "..#.", ".#..", "#..."],
+  [".#..", "###.", "#.##", ".#..", ".#..", ".#..", ".#.."], ["#...", "##..", "#.#.", "##..", "#.#.", "##..", "#..."],
+  ["#..#", "##.#", "#.##", "#..#", "#..#", "#..#", "#..#"], ["#...", "##..", "#.#.", "#...", "#...", "#...", "#..."],
+  ["#.#.", "#.#.", ".#..", ".#..", ".#..", ".#..", ".#.."], [".#..", "###.", ".#..", "###.", ".#..", ".#..", ".#.."],
+  ["#.#.", ".#..", "#.#.", ".#..", ".#..", ".#..", ".#.."], [".#..", ".##.", ".#.#", ".##.", ".#..", ".#..", ".#.."],
+];
+function drawUnderPage(cv) {
+  const W = 136, H = 174; cv.width = W; cv.height = H; const x = cv.getContext("2d"), px = (a, b, w, h, c) => { x.fillStyle = c; x.fillRect(a, b, w, h); };
+  const rnd = (k) => { const v = Math.sin(k * 12.9898 + 4.1) * 43758.5453; return v - Math.floor(v); };
+  // fľakatý pergamen: pomalé „mraky" svetlejších a tmavších miest + jemné zrno, tmavšie okraje
+  for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+    const cl = Math.sin(xx * .07 + yy * .03) + Math.sin(xx * .023 - yy * .061 + 2) + Math.cos(yy * .045 + xx * .015), g = (xx * 11 + yy * 7 + xx * yy * 3) % 19;
+    const e = Math.min(xx, yy, W - 1 - xx, H - 1 - yy), dark = Math.max(0, 8 - e) * 3;
+    const r = 182 + cl * 9 - dark - (g === 0 ? 8 : 0), gg = 150 + cl * 9 - dark * 1.1 - (g === 0 ? 8 : 0), b = 98 + cl * 8 - dark * 1.3;
+    px(xx, yy, 1, 1, `rgb(${r | 0},${gg | 0},${b | 0})`);
+  }
+  // pár fľakov (vlhkosť, sviečka)
+  for (const [sx, sy, sr] of [[34, 120, 7], [96, 60, 5], [70, 150, 9]]) for (let yy = -sr; yy <= sr; yy++) for (let xx = -sr; xx <= sr; xx++) { const d = Math.hypot(xx, yy) / sr; if (d < 1) px(sx + xx, sy + yy, 1, 1, `rgba(120,80,30,${((1 - d) * .18).toFixed(2)})`); }
+  // riadky runového písma čiernym atramentom, úhľadne: rovné riadky s pravidelným rozstupom, znaky na jednej
+  // základnej čiare, rovnaké medzery, rovnomerný atrament, slová oddelené dvojbodkou a zarovnané k pravému okraju
+  const ink = (a) => `rgba(18,12,10,${a.toFixed(2)})`, RIGHT = W - 7;
+  for (let row = 0, base = 10; base + 8 < H - 6; row++, base += 12) {
+    let xx = 6, k = row * 97;
+    while (true) {
+      const len = 2 + Math.floor(rnd(k++) * 4), word = [];
+      for (let q = 0; q < len; q++) word.push(RUNE_GLYPHS[Math.floor(rnd(k++) * RUNE_GLYPHS.length)]);
+      const gw = (g) => (g.some(rw => rw[3] === "#") ? 5 : 4);
+      while (word.length && xx + word.reduce((s, g) => s + gw(g), 0) > RIGHT) word.pop();             // posledné slovo skrátiť, nech riadok siaha k okraju
+      if (!word.length) break;
+      for (const g of word) { g.forEach((rw, yy) => [...rw].forEach((c, gx) => { if (c === "#") px(xx + gx, base + yy, 1, 1, ink(.82)); })); xx += g.some(rw => rw[3] === "#") ? 5 : 4; }
+      if (xx + 3 > RIGHT) break;
+      px(xx, base + 2, 1, 1, ink(.82)); px(xx, base + 5, 1, 1, ink(.82)); xx += 3;                     // dvojbodka
+    }
+  }
+}
+// symbol na spodku HIDDEN strany (umelecký pixel = 3 px): biela vs čierna, dobro vs zlo, svetlo vs tma -
+// jin-jang pečať (svetlá polovica so slnečnými lúčmi, tmavá s hviezdami a fialovou hmlou), po bokoch biela
+// sviečka so žltým plameňom a čierna sviečka s fialovým plameňom
+function drawSpill(cv) {
+  const W = 136, H = 76; cv.width = W; cv.height = H; const x = cv.getContext("2d"), px = (a, b, w, h, c) => { x.fillStyle = c; x.fillRect(a, b, w, h); };
+  const INK = "#1a120c", cx = 68, cy = 38, R = 24; // stred celej (neroztrhnutej) strany - pravú časť odtrhol list
+  // jemná žiara: svetlá vľavo, temná vpravo
+  for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+    const d = Math.hypot(xx - cx, yy - cy); if (d < R || d > R + 14) continue; const a = (1 - (d - R) / 14) * .35;
+    px(xx, yy, 1, 1, xx < cx ? `rgba(255,236,170,${a.toFixed(2)})` : `rgba(60,20,90,${a.toFixed(2)})`);
+  }
+  // slnečné lúče (svetlá strana) a hviezdy (tmavá strana)
+  for (let k = 0; k < 9; k++) { const ang = Math.PI / 2 + k * Math.PI / 8, l = k % 2 ? 6 : 9; for (let t = 2; t < l; t++) px(Math.round(cx + Math.cos(ang) * (R + t)), Math.round(cy + Math.sin(ang) * (R + t)), 1, 1, "#d8a83a"); }
+  [[cx + 30, cy - 18], [cx + 34, cy + 4], [cx + 26, cy + 22], [cx + 38, cy - 6]].forEach(([sx, sy], k) => { px(sx, sy, 1, 1, "#c9a0ff"); if (k % 2 === 0) { px(sx - 1, sy, 3, 1, "rgba(201,160,255,.6)"); px(sx, sy - 1, 1, 3, "rgba(201,160,255,.6)"); } });
+  // jin-jang: ľavá polovica svetlá, pravá tmavá, horná malá kružnica tmavá, dolná svetlá, opačné bodky
+  for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) {
+    const d = Math.hypot(xx, yy); if (d > R) continue;
+    let light = xx < 0;
+    if (Math.hypot(xx, yy + R / 2) < R / 2) light = false; else if (Math.hypot(xx, yy - R / 2) < R / 2) light = true;
+    if (Math.hypot(xx, yy + R / 2) < 3.2) light = true; if (Math.hypot(xx, yy - R / 2) < 3.2) light = false;
+    const n = ((xx + 40) * 7 + (yy + 40) * 13) % 11;
+    px(cx + xx, cy + yy, 1, 1, d > R - 1.3 ? INK : light ? (n === 0 ? "#f0dca0" : "#fbf0c8") : (n === 0 ? "#3a2450" : "#120c18"));
+  }
+  // sviečka: x = stred, svetlá / tmavá
+  const candle = (sx, light) => {
+    const body = light ? "#f4ecd8" : "#18121c", side = light ? "#c9bea0" : "#000", top = H - 30;
+    px(sx - 4, H - 6, 9, 3, INK); px(sx - 3, H - 7, 7, 1, light ? "#b8862b" : "#5a4a60");           // svietnik
+    px(sx - 2, top, 5, H - 7 - top, body); px(sx + 2, top, 1, H - 7 - top, side); px(sx - 2, top, 1, H - 7 - top, light ? "#fff" : "#2a2230");
+    px(sx - 2, top, 2, 3, body); px(sx - 3, top + 2, 1, 2, body);                                     // stekajúci vosk
+    px(sx, top - 2, 1, 2, INK);                                                                         // knôt
+    const f1 = light ? "#ffd36b" : "#c9a0ff", f2 = light ? "#fff1a8" : "#efe0ff", glow = light ? "rgba(255,210,110,.25)" : "rgba(160,80,255,.3)";
+    for (let yy = -7; yy <= 7; yy++) for (let xx = -7; xx <= 7; xx++) if (Math.hypot(xx, yy) < 7) px(sx + xx, top - 6 + yy, 1, 1, glow);
+    px(sx - 1, top - 5, 3, 3, f1); px(sx, top - 7, 1, 2, f1); px(sx, top - 4, 1, 2, f2);
+  };
+  candle(cx - 39, true); candle(cx + 39, false);
+}
+function renderContents() {
+  const style = ui.style, main = CHAR_LIST.filter(c => !c.side), white = CHAR_LIST.filter(c => c.side === "p1"), black = CHAR_LIST.filter(c => c.side === "p2");
+  const rowOf = (arr, off, side) => [...arr, null, null, null].slice(0, 3).map((c, k) => card(c, off + k, style).replace('class="card ', `class="card ${side} `)).join("");
+  document.getElementById("pl").innerHTML = `
+    <div class="cards s-${style}">${main.map((c, n) => card(c, n, style)).join("")}</div>`;
+  document.getElementById("pr").innerHTML = `
+    <div class="cards s-${style}">${rowOf(white, 9, "w")}${rowOf(black, 12, "b")}</div>`;
+  document.getElementById("seal").style.display = "none";
+  document.getElementById("nl").textContent = "i"; document.getElementById("nr").textContent = "ii";
+  document.getElementById("torn").classList.remove("hidden");
+  const spill = document.getElementById("spill"); spill.classList.remove("hidden"); if (!spill.width || spill.width === 300) drawSpill(spill);
+  const torn = document.getElementById("torn"); torn.style.setProperty("--tp", tornPolygon(3));
+  if (!torn.querySelector("canvas")) { torn.innerHTML = '<div class="fiber"></div><canvas class="under"></canvas>'; drawUnderPage(torn.querySelector("canvas")); }
+  document.querySelectorAll(".pg [data-i]").forEach(b => {
+    const c = CHAR_LIST[+b.dataset.i], pt = b.querySelector("canvas.pt") || b.querySelector("canvas"), bg = b.querySelector("canvas.bg");
+    if (bg) drawChart(bg);
+    drawHead(pt, c, style === "mugshot");
+  });
+}
+function renderEntry() {
+  const c = CHAR_LIST[ui.i], f = FILES[c.key] || { traits: [], passive: [], special: [] }, hide = sealed(c);
+  const hid = (txt, w) => (hide ? `<span class="scrawl">${"x".repeat(w)}</span>` : txt);
+  const row = (k, v) => `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+  const stars = "★".repeat(f.threat || 1) + "☆".repeat(5 - (f.threat || 1));
+  document.getElementById("pl").innerHTML = `<div class="top">
+      <div class="illu"><span class="orn a"></span><span class="orn b"></span><span class="orn c"></span><span class="orn d"></span><canvas width="64" height="64"></canvas></div>
+      <div><div class="name">${hide ? hid("", 9) : shortName(c)}</div><div class="epithet">${hide ? "a page sealed by the author" : "as written by the archmage"}</div>
+        <div class="facts">${row("CLASS", hid(f.cls || "-", 7))}${row("ATTACK", hid(f.attack || "-", 12))}${row("SIDE", f.side || "ANY")}${row("DANGER", `<b style="color:var(--red);font-weight:400">${stars}</b>`)}</div></div></div>
+    <div class="rule"></div>${sec("CHARACTERISTICS", f.traits, hide)}`;
+  document.getElementById("pr").innerHTML = `${sec("PASSIVE ABILITIES", f.passive, hide)}<div class="rule"></div>${sec("SPECIAL ACTIONS", f.special, hide)}`;
+  const seal = document.getElementById("seal"); seal.style.display = ""; seal.textContent = hide ? "?" : "✦";
+  document.getElementById("nl").textContent = ui.i * 2 + 3; document.getElementById("nr").textContent = ui.i * 2 + 4;
+  drawHead(document.querySelector(".illu canvas"), c, true);
+}
+function render() {
+  if (ui.i < 0) renderContents(); else renderEntry();
+  const entry = ui.i >= 0;
+  document.getElementById("torn").classList.toggle("hidden", entry); document.getElementById("spill").classList.toggle("hidden", entry);
+  ["back", "prev", "next"].forEach(id => document.getElementById(id).classList.toggle("hidden", !entry));
+  document.getElementById("prev").style.visibility = ui.i > 0 ? "" : "hidden";
+  document.getElementById("next").style.visibility = ui.i < CHAR_LIST.length - 1 ? "" : "hidden";
+  drawBook();
+}
+const go = (i) => { ui.i = Math.max(-1, Math.min(CHAR_LIST.length - 1, i)); render(); };
+document.getElementById("back").onclick = () => go(-1);
+document.getElementById("prev").onclick = () => go(ui.i - 1);
+document.getElementById("next").onclick = () => go(ui.i + 1);
+document.getElementById("codex").addEventListener("click", (e) => { const m = e.target.closest(".pg [data-i]"); if (m) go(+m.dataset.i); });
+document.addEventListener("keydown", (e) => { if (e.key === "ArrowRight") go(ui.i + 1); if (e.key === "ArrowLeft") go(ui.i - 1); if (e.key === "Escape") go(-1); });
+const stylesEl = document.getElementById("styles");
+const syncStyles = () => { stylesEl.innerHTML = STYLES.map(([k, n]) => `<button type="button" data-st="${k}" class="${ui.style === k ? "on" : ""}">${n}</button>`).join(""); };
+stylesEl.addEventListener("click", (e) => { const b = e.target.closest("[data-st]"); if (b) { ui.style = b.dataset.st; ui.i = -1; syncStyles(); render(); } });
+syncStyles();
+document.getElementById("t-hidden").onclick = (e) => { ui.sealed = !ui.sealed; e.target.textContent = `SKRYTÉ POSTAVY: ${ui.sealed ? "ZAPEČATENÉ" : "VIDITEĽNÉ"}`; render(); };
+const q = new URLSearchParams(location.search); if (q.get("file")) ui.i = +q.get("file");
+render();
+</script>
+</body>
+</html>

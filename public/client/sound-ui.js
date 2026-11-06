@@ -26,8 +26,16 @@ win.innerHTML = `
 document.body.appendChild(backdrop);
 document.body.appendChild(win);
 
-// menu hudba už od prihlásenia / room-browsera (rozbehne sa prvým klikom); v hre ju prepína syncMusic podľa fázy
-setMusic("music.menu");
+// menu hudba až po prihlásení (na prihlasovacej obrazovke ticho): hrá v room browseri (rozbehne sa prvým klikom);
+// v hre ju prepína syncMusic podľa fázy
+const loginEl = document.getElementById("login"), roomsEl = document.getElementById("rooms");
+const shown = (el) => !!el && !el.classList.contains("hidden");
+function syncLoginMusic() {
+  if (shown(loginEl)) setMusic(null);
+  else if (shown(roomsEl)) setMusic("music.menu");
+}
+for (const el of [loginEl, roomsEl]) if (el) new MutationObserver(syncLoginMusic).observe(el, { attributes: true, attributeFilter: ["class"] });
+syncLoginMusic();
 
 export function openSoundWindow() { backdrop.classList.remove("hidden"); win.classList.remove("hidden"); }
 export function closeSoundWindow() { backdrop.classList.add("hidden"); win.classList.add("hidden"); }
