@@ -74,6 +74,8 @@ document.addEventListener("pointermove", (e) => { pointer.x = e.clientX; pointer
 // Spí so zatvorenými očami a dýchajúcou fialovou aurou; pri prejdení myšou sa oči otvárajú jedno po druhom a sledujú
 // kurzor. Vracia tick(t).
 const AW = 48, AH = 56, OX = 2, OY = 3; // plátno knihy: miesto na vznášanie, kvapky a tieň
+// konce krvavých pramienkov na spodku spritu (x, y) - odtiaľ padajú kvapky (book.png 43×48)
+const BLOOD_ENDS = [[7, 40], [12, 42], [15, 44], [19, 47], [24, 44]];
 export function bookButton(canvas, host) {
   canvas.width = AW; canvas.height = AH;
   const ctx = canvas.getContext("2d"), sp = document.createElement("canvas"); sp.width = SW; sp.height = SH; const sctx = sp.getContext("2d");
@@ -103,7 +105,12 @@ export function bookButton(canvas, host) {
       e.lx = Math.abs(dx) > 3 ? Math.sign(dx) : 0; e.ly = Math.abs(dy) > 3 ? Math.sign(dy) : 0;
       e.glow = awake ? .8 : 0;
     });
-    if (t > st.nextDrip) { const s = [[14, 44], [15, 42], [19, 47], [16, 45]][Math.floor(rnd() * 4)]; st.drips.push({ x: s[0] + OX, y: s[1] + OY + bob, vy: 0 }); st.nextDrip = t + 4000 * (awake ? .4 : 1) * (.6 + rnd() * .8); }
+    // naraz odkvapnú 2-3 kvapky (s malým odstupom) z miest, kde na obrázku knihy dole naozaj visí krv
+    if (t > st.nextDrip) {
+      const from = BLOOD_ENDS.slice().sort(() => rnd() - .5).slice(0, 2 + Math.floor(rnd() * 2));
+      from.forEach(([x, y], k) => st.drips.push({ x: x + OX, y: y + 1 + OY + bob, vy: 0, wait: k * (180 + rnd() * 220) }));
+      st.nextDrip = t + 4000 * (awake ? .4 : 1) * (.6 + rnd() * .8);
+    }
     ctx.clearRect(0, 0, AW, AH);
     const sw = 13 + (bob > 0 ? 1 : 0);
     ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillRect(AW / 2 - sw, AH - 3, sw * 2, 2); ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fillRect(AW / 2 - sw + 3, AH - 4, sw * 2 - 6, 1);
@@ -112,7 +119,7 @@ export function bookButton(canvas, host) {
     ring.forEach((pts, i) => { ctx.fillStyle = `rgba(160,80,255,${Math.min(1, auraA * (i ? .6 : 1.1))})`; for (const [x, y] of pts) if ((x + y + Math.floor(t / 250)) % (i ? 2 : 1) === 0) ctx.fillRect(x + OX + shake, y + OY + bob, 1, 1); });
     sctx.putImageData(spriteFrame(st.eyes), 0, 0);
     ctx.drawImage(sp, OX + shake, OY + bob);
-    for (const d of st.drips) { d.vy += dt * .00012; d.y += d.vy * dt; }
+    for (const d of st.drips) { if (d.wait > 0) { d.wait -= dt; continue; } d.vy += dt * .00012; d.y += d.vy * dt; }
     st.drips = st.drips.filter(d => d.y < AH - 3 || (d.splat = (d.splat || 0) + dt) < 300);
     for (const d of st.drips) { if (d.y >= AH - 3) { ctx.fillStyle = "#7a0c18"; ctx.fillRect(Math.round(d.x) - 1, AH - 3, 3, 1); } else { ctx.fillStyle = "#7a0c18"; ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 2); ctx.fillStyle = "#c0283a"; ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); } }
   };
@@ -226,8 +233,17 @@ function tongueWrapWidget(c) {
 const GLYPHS = [[[1, 0], [1, 1], [1, 2], [0, 1], [2, 1]], [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], [[0, 0], [1, 0], [2, 0], [1, 1], [1, 2]],
   [[1, 0], [0, 1], [2, 1], [1, 2]], [[0, 0], [0, 1], [0, 2], [1, 1], [2, 0], [2, 2]], [[0, 2], [1, 1], [2, 0], [1, 0], [1, 2]]];
 
+// pixel písmená nápisu CODEX (stĺpce × 5 riadkov, "#" = pixel); kreslia sa otočené ako na chrbte knihy (čítanie zhora nadol)
+const CODEX_FONT = {
+  4: { C: [".###", "#...", "#...", "#...", ".###"], O: [".##.", "#..#", "#..#", "#..#", ".##."], D: ["###.", "#..#", "#..#", "#..#", "###."],
+       E: ["####", "#...", "###.", "#...", "####"], X: ["#..#", "#..#", ".##.", "#..#", "#..#"] },
+  3: { C: [".##", "#..", "#..", "#..", ".##"], O: [".#.", "#.#", "#.#", "#.#", ".#."], D: ["##.", "#.#", "#.#", "#.#", "##."],
+       E: ["###", "#..", "##.", "#..", "###"], X: ["#.#", "#.#", ".#.", "#.#", "#.#"] },
+};
+
 // chrbát CODEXU ako tajný grimoár: tmavá zrnitá koža, zlaté kovanie s nitmi, vypuklé pásy, zámok s kľúčovou dierkou,
-// po bokoch runy, ktoré tlejú fialovo (pri prejdení myšou sa rozžiaria); nápis na stred, ale medzi zámok a jazyk
+// zlatý pixel nápis CODEX presne v strede medzi zámkom a spodným pásom (rovnaká medzera nad C ako pod X; spodok môže
+// zakryť jazyk), po bokoch runy, ktoré tlejú fialovo (pri prejdení myšou sa rozžiaria)
 function grimoireWidget(c) {
   const book = c.parentElement, ctx = c.getContext("2d"); let W = 0, H = 0, img = null;
   const L0 = "#1e1519", L1 = "#271c21", L2 = "#30242a", LHI = "#46363e", IRON = "#b8862b", IHI = "#f2c14e", ILO = "#6a4a10", OUT = "#0a0708";
@@ -237,37 +253,37 @@ function grimoireWidget(c) {
     for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) { const e = Math.min(xx, W - 1 - xx), v = (xx * 7 + yy * 13 + xx * yy) % 17;
       px(xx, yy, 1, 1, e < 1 ? OUT : e < 3 ? L0 : v < 3 ? L0 : v > 14 ? L2 : L1); }
     const band = (yy) => { px(1, yy, W - 2, 1, LHI); px(1, yy + 1, W - 2, 1, L2); px(1, yy + 2, W - 2, 1, OUT); };
-    band(13); band(H - 16);
+    const bandY = H - 16;
+    band(13); band(bandY);
     const cap = (yy, down) => { for (let i = 0; i < 4; i++) { const w = 6 - i, ry = down ? yy - i : yy + i; px(0, ry, w, 1, IRON); px(W - w, ry, w, 1, IRON); }
       px(0, yy, W, 1, down ? ILO : IHI); px(1, down ? yy - 1 : yy + 1, 1, 1, IHI); px(W - 2, down ? yy - 1 : yy + 1, 1, 1, IHI); };
     cap(0, false); cap(H - 1, true);
-    const ky = 18, kx = Math.round((W - 6) / 2); // zámok
+    const ky = 18, kx = Math.round((W - 6) / 2); // zámok (riadky 17-26)
     px(kx - 1, ky - 1, 8, 10, OUT); px(kx, ky, 6, 8, IRON); px(kx, ky, 6, 1, IHI); px(kx, ky + 7, 6, 1, ILO);
     px(kx + 2, ky + 2, 2, 2, OUT); px(kx + 2, ky + 4, 2, 2, OUT); px(kx + 1, ky + 1, 1, 1, IHI); px(kx + 4, ky + 6, 1, 1, IHI);
+    // nápis: vysoká kniha (PC) = celý viditeľný, na stred medzi zámok a horný okraj jazyka; nízka kniha (telefón) =
+    // na stred medzi zámok a spodný pás (rovnaká medzera nad C ako pod X, spodok môže prekryť jazyk)
+    const top = ky + 9, tongueTop = H - TONGUE_WRAP - 3 + 2, big = 5 * 4 + 4;
+    const tall = tongueTop - top >= big + 6, end = tall ? tongueTop : bandY, room = end - top;
+    const cols = big + 4 <= room ? 4 : 3, font = CODEX_FONT[cols], len = 5 * cols + 4;
+    const y0 = Math.max(top + 1, top + Math.floor((room - len) / 2) - (tall ? 0 : 3)), x0 = Math.round((W - 5) / 2); // telefón: o kúsok vyššie
+    [..."CODEX"].forEach((ch, k) => {
+      const rows = font[ch], gy = y0 + k * (cols + 1);
+      // otočené o 90° v smere hodín: riadok r → stĺpec (4 - r), stĺpec c → riadok c
+      for (const pass of [0, 1]) rows.forEach((row, r) => [...row].forEach((p, col) => {
+        if (p !== "#") return;
+        const xx = x0 + 4 - r, yy = gy + col;
+        if (pass === 0) px(xx + 1, yy + 1, 1, 1, OUT);          // tieň (vyrazené písmo)
+        else px(xx, yy, 1, 1, (r + col) % 3 === 0 ? "#d8b060" : "#b8944a");
+      }));
+    });
     img = x.getImageData(0, 0, W, H);
   }
   let lastRune = -1e9;
   return (t) => {
     if (!c.isConnected) return;
-    const span = book.querySelector("span"), sk = book.clientWidth + "x" + book.clientHeight + "x" + span.offsetHeight; // aj po načítaní fontu
-    if (sk !== c.dataset.k) {
-      c.dataset.k = sk;
-      const lockBottom = (18 + 9) * 3, tongueTop = book.clientHeight - (TONGUE_WRAP + 3) * 3 + 6;
-      span.style.fontSize = ""; span.style.letterSpacing = "";
-      const tight = tongueTop - lockBottom < span.offsetHeight + 30;
-      if (tight) {
-        // nízka kniha (telefón): nápis na stred medzi zámok a horný okraj jazyka (celý viditeľný); keď sa nevojde, menšie písmo
-        const room = tongueTop - 6 - lockBottom;
-        for (const [fs, ls] of [["", ""], ["", "1px"], ["10px", "1px"], ["8px", "1px"]]) {
-          span.style.fontSize = fs; span.style.letterSpacing = ls;
-          if (span.offsetHeight + 8 <= room) break;
-        }
-        span.style.top = Math.round(lockBottom + (room - span.offsetHeight) / 2) + "px";
-      } else {
-        span.style.top = Math.max(lockBottom + 2, Math.min(Math.round((book.clientHeight - span.offsetHeight) / 2), tongueTop - span.offsetHeight - 2)) + "px";
-      }
-      build(); lastRune = -1e9;
-    }
+    const sk = book.clientWidth + "x" + book.clientHeight;
+    if (sk !== c.dataset.k) { c.dataset.k = sk; build(); lastRune = -1e9; }
     const hov = book.matches(":hover");
     if (t - lastRune < (perf.lite ? 120 : 50)) return; lastRune = t; // runy stačí prekresliť ~20× za sekundu
     ctx.putImageData(img, 0, 0);
