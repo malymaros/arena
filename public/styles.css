@@ -4032,7 +4032,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .codex-book .pk-row { display: flex; align-items: center; gap: 22px; }
 .codex-book .cx-picker { position: static; transform: none; font-family: var(--px-font); }
 .codex-book .cx-picker { gap: 3px; padding: 5px; }
-.codex-book .cx-picker .btn.arrow { background: #6a1b9a; cursor: default; padding: 3px 5px; font-size: 10px; }
+.codex-book .cx-picker .btn.arrow { background: #6a1b9a; cursor: default; padding: 3px 5px !important; font-size: 10px !important; width: auto !important; height: auto !important; }
 .codex-book .spp.fill { height: 100%; box-sizing: border-box; padding-top: 22px; padding-bottom: 8px; gap: 14px; }
 .codex-book .pk-bottom { margin-top: auto; align-self: stretch; display: flex; align-items: center; gap: 14px; padding: 0 12px; }
 .codex-book .pk-note { margin: 0; font-size: 10px; line-height: 19px; color: #1a0e06; }
@@ -4081,7 +4081,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .codex-book .warn-row { gap: 10px; }
 .codex-book .warn-row .ls-btn { position: relative; flex: none; width: 36px; height: 30px; padding: 0; display: grid; place-items: center; cursor: default; }
 .codex-book .warn-row .btn.act.demon.ls-btn { width: 36px !important; height: 30px !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; }
-.codex-book .warn-row .ls-btn .ls-ico { width: 22px; height: 22px; image-rendering: pixelated; }
+.codex-book .warn-row .ls-btn .ls-ico { width: 22px !important; height: 22px !important; min-height: 0 !important; object-fit: contain; image-rendering: pixelated; } /* !important: na dotyku .touch .btn.act.demon .ls-ico by ikonu roztiahol na 78 px */
 .codex-book.dark-page .pk-note { color: #e6dcc6; }
 .codex-book.dark-page .pk-note .warn { color: #ff6a7a; }
 .codex-book.dark-page .pk-note b { color: #e0a0ff; }
@@ -4122,8 +4122,8 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .codex-book .mut-h .vq { display: inline-flex; padding: 1px; background: #4a1a6a; box-shadow: 0 0 0 2px #000, 0 0 6px rgba(170,90,255,.7); }
 .codex-book .mut-h .vq .pix-ico { width: 18px; height: 18px; }
 .codex-book .swap-vis { position: absolute; left: 236px; top: 26px; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2; }
-.codex-book .swap-vis .btn { position: relative; width: 74px; height: 50px; padding: 0; display: grid; place-items: center; cursor: default; }
-.codex-book .swap-vis .btn .pix-ico { width: 30px; height: 30px; }
+.codex-book .swap-vis .btn { position: relative; width: 74px !important; height: 50px !important; padding: 0; display: grid; place-items: center; cursor: default; } /* !important: veľkosť tlačidiel v hre na dotyku (.touch .btn.act) sa sem nesmie dostať */
+.codex-book .swap-vis .btn .pix-ico { width: 30px !important; height: 30px !important; }
 .codex-book .swap-vis .x-out::before, .codex-book .swap-vis .x-out::after { content: ""; position: absolute; left: -6px; right: -6px; top: 50%; height: 4px; margin-top: -2px; background: #c0283a; box-shadow: 0 0 0 2px #000; }
 .codex-book .swap-vis .x-out::before { transform: rotate(34deg); }
 .codex-book .swap-vis .x-out::after { transform: rotate(-34deg); }
