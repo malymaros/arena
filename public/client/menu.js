@@ -1,9 +1,12 @@
-// public/client/menu.js - menu ☰ v ľavom dolnom rohu, dostupné vždy (aj nad char-selectom, lobby, zoznamom
-// roomiek a zaseknutými overlaymi): RELOAD GAME (= obnovenie stránky; server hráča vráti na jeho miesto),
-// celá obrazovka (kde to prehliadač vie), zvuk (okno zo sound-ui.js), REPORT BUG (okno z bug-report.js) a pre admina (prihlásený admin heslom)
-// stiahnutie zozbieraných herných dát (docs/TELEMETRY.md) a reset tejto roomky / všetkých roomiek - admin má hore
-// prepínač ADMIN (zapnutý = červený, admin položky namiesto bežných - menu sa tak vojde aj na telefón bez rolovania;
-// bežný hráč prepínač nevidí). Položky majú pixel ikonky (menu-icons.js); REPORT BUG je žltý, DOWNLOAD DATA zelený. GRAPHICS prepína úspornú grafiku LITE ↔ FULL (perf.js; kým hráč neklikne, platí auto). Na dotyku sa menu kreslí vo veľkosti displeja (--ui-k, viewport.js).
+// public/client/menu.js - menu v ľavom dolnom rohu, dostupné vždy (aj nad char-selectom, lobby, zoznamom roomiek
+// a zaseknutými overlaymi). Tlačidlo = „živá kniha" s očami (tome.js, schválený návrh public/dev/book-menu.html,
+// animácia PREBÚDZANIE): v hre malá (48×56), v room browseri veľká vľavo dole (oproti hlave bota). Okno = knihy pod
+// sebou: RELOAD GAME (= obnovenie stránky; server hráča vráti na jeho miesto), celá obrazovka (kde to prehliadač vie),
+// zvuk (okno zo sound-ui.js), GRAPHICS (úsporná grafika LITE ↔ FULL, perf.js; kým hráč neklikne, platí auto),
+// REPORT BUG (okno z bug-report.js); vpravo zvislá kniha CODEX (zatiaľ nič nerobí). Admin (prihlásený admin heslom)
+// má v hlavičke prepínač ADMIN: admin knihy (stiahnutie dát, MAINTENANCE, reset roomky / všetkých) namiesto bežných -
+// menu sa tak vojde aj na telefón bez rolovania; bežný hráč prepínač nevidí. Na dotyku sa menu kreslí vo veľkosti
+// displeja (--ui-k, viewport.js).
 import { socket } from "/client/net.js";
 import { isAdmin, onAdminChange, isMaintenance } from "/client/admin-state.js";
 import { canFullscreen, toggleFullscreen } from "/client/viewport.js";
@@ -11,69 +14,91 @@ import { openSoundWindow } from "/client/sound-ui.js";
 import { openBugWindow } from "/client/bug-report.js";
 import { perf, setPerfMode } from "/client/perf.js";
 import { menuIcon } from "/client/menu-icons.js";
-
-// pixel-art ☰ 12×12
-const ICON = ["............", "............", ".bbbbbbbbbb.", ".bbbbbbbbbb.", "............", ".bbbbbbbbbb.",
-              ".bbbbbbbbbb.", "............", ".bbbbbbbbbb.", ".bbbbbbbbbb.", "............", "............"];
-const iconSvg = `<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true">${
-  ICON.flatMap((r, y) => [...r].map((c, x) => c === "b" ? `<rect x="${x}" y="${y}" width="1" height="1"/>` : "")).join("")}</svg>`;
+import { tomeReady, bookButton, tomeWidgets } from "/client/tome.js";
 
 const btn = document.createElement("button");
 btn.id = "menu-btn";
 btn.type = "button";
 btn.title = "Menu";
 btn.setAttribute("aria-label", "Menu");
-btn.innerHTML = iconSvg;
+const btnCvs = document.createElement("canvas");
+btn.append(btnCvs);
 
 const backdrop = document.createElement("div");
 backdrop.className = "ui-backdrop hidden";
 const panel = document.createElement("div");
 panel.id = "menu-panel";
-panel.className = "ui-modal hidden";
+panel.className = "ui-modal tome menu hidden";
 panel.setAttribute("role", "dialog");
 panel.setAttribute("aria-label", "Menu");
 document.body.append(backdrop, panel, btn);
 
-const inRoom = () => document.getElementById("rooms")?.classList.contains("hidden") !== false
-  && document.getElementById("login")?.classList.contains("hidden") !== false && socket.connected;
+const roomsEl = document.getElementById("rooms"), loginEl = document.getElementById("login");
+const inRoom = () => roomsEl?.classList.contains("hidden") !== false && loginEl?.classList.contains("hidden") !== false && socket.connected;
 
-let adminOn = false; // admin: prepínač ADMIN zapnutý = admin položky namiesto bežného menu
+// v room browseri je kniha veľká (vľavo dole oproti hlave bota), inde malá
+function syncBig() { btn.classList.toggle("big", !!roomsEl && !roomsEl.classList.contains("hidden")); }
+if (roomsEl) new MutationObserver(syncBig).observe(roomsEl, { attributes: true, attributeFilter: ["class"] });
+syncBig();
 
-// položka = pixel ikonka (menu-icons.js) + text
-const item = (act, icon, label, cls = "") =>
-  `<button type="button" class="menu-item${cls ? " " + cls : ""}" data-act="${act}"><span class="ico-box">${menuIcon(icon)}</span><span class="menu-lbl">${label}</span></button>`;
+let adminOn = false; // admin: prepínač ADMIN zapnutý = admin knihy namiesto bežných
+
+// kniha-položka: koža (ib-art), pixel ikonka (menu-icons.js), text, oko vpravo (ieye) a krv (blood)
+const item = (act, icon, label, cls = "", right = '<canvas class="ieye"></canvas>') =>
+  `<button type="button" class="menu-item${cls ? " " + cls : ""}" data-act="${act}"><canvas class="ib-art"></canvas>`
+  + `<span class="ico-box">${menuIcon(icon)}</span><span class="menu-lbl">${label}</span>${right}<canvas class="blood"></canvas></button>`;
 
 function render() {
   const fsLabel = document.fullscreenElement ? "EXIT FULL SCREEN" : "FULL SCREEN";
   const admin = isAdmin();
   if (!admin) adminOn = false;
   // admin: prepínač ADMIN v hlavičke vedľa ✕ (nie samostatný riadok)
-  const head = `<div class="um-head"><span>MENU</span>${
-    admin ? `<button type="button" class="menu-admin${adminOn ? " on" : ""}" aria-pressed="${adminOn}">ADMIN</button>` : ""
+  const head = `<div class="um-head"><span class="ttl"><canvas class="eye"></canvas>MENU</span>${
+    admin ? `<button type="button" class="menu-admin${adminOn ? " on" : ""}" aria-pressed="${adminOn}"><canvas class="ib-art"></canvas><span>ADMIN</span></button>` : ""
   }<button type="button" class="um-close" aria-label="Close">✕</button></div>`;
   const main = item("reload", "reload", "RELOAD GAME")
     + (canFullscreen ? item("fullscreen", "fullscreen", fsLabel) : "")
     + item("sound", "sound", "SOUND")
     + item("graphics", "graphics", `GRAPHICS: ${perf.lite ? "LITE" : "FULL"}`)
     + item("bug", "bug", "REPORT BUG", "report");
-  if (!admin) { panel.innerHTML = head + main; return; }
-  // admin: obe strany v jednej bunke mriežky, neaktívna je neviditeľná - okno má stále rovnakú veľkosť a neskáče
-  // MAINTENANCE BREAK zap/vyp (zapnutie = RESET ALL ROOMS, ostatní vidia len obrazovku údržby)
-  const maint = isMaintenance();
-  const maintItem = `<button type="button" class="menu-item maint${maint ? " on" : ""}" data-act="maintenance"><span class="ico-box">${menuIcon(maint ? "lock" : "unlock")}</span>`
-    + `<span class="menu-lbl">MAINTENANCE</span><span class="maint-state">${maint ? "ON" : "OFF"}</span></button>`;
-  const adminItems = item("data", "download", "DOWNLOAD DATA", "menu-data")
-    + maintItem
-    + (inRoom() ? item("reset-room", "resetRoom", "RESET THIS ROOM", "danger") : "")
-    + item("reset-all", "resetAll", "RESET ALL ROOMS", "danger");
-  panel.innerHTML = `${head}<div class="menu-pages">
-    <div class="menu-page${adminOn ? " off" : ""}">${main}</div>
-    <div class="menu-page${adminOn ? "" : " off"}">${adminItems}</div></div>`;
+  let body = main;
+  if (admin) {
+    // MAINTENANCE BREAK zap/vyp (zapnutie = RESET ALL ROOMS, ostatní vidia len obrazovku údržby); stav ON/OFF
+    // v tom istom výreze ako oko na ostatných knihách
+    const maint = isMaintenance();
+    const adminItems = item("data", "download", "DOWNLOAD DATA", "menu-data")
+      + `<button type="button" class="menu-item maint" data-act="maintenance"><canvas class="ib-art"></canvas><span class="ico-box">${menuIcon(maint ? "lock" : "unlock")}</span>`
+      + `<span class="menu-lbl">MAINTENANCE</span><span class="maint-state${maint ? " on" : ""}">${maint ? "ON" : "OFF"}</span><canvas class="blood"></canvas></button>`
+      + (inRoom() ? item("reset-room", "resetRoom", "RESET THIS ROOM", "danger") : "")
+      + item("reset-all", "resetAll", "RESET ALL ROOMS", "danger");
+    // obe strany v jednej bunke mriežky, neaktívna je neviditeľná - okno má stále rovnakú veľkosť a neskáče
+    body = `<div class="menu-pages"><div class="menu-page${adminOn ? " off" : ""}">${main}</div>`
+      + `<div class="menu-page adm${adminOn ? "" : " off"}">${adminItems}</div></div>`;
+  }
+  panel.innerHTML = `${head}<div class="tm-body"><div class="tm-items">${body}</div>`
+    + `<button type="button" class="rbook" data-act="codex"><canvas class="rb-art"></canvas><canvas class="ieye"></canvas><span>CODEX</span></button></div>`
+    + `<canvas class="teeth"></canvas><canvas class="tongue2"></canvas>`;
+  widgets = tomeWidgets(panel);
 }
-export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
+
+// ---- animácia: kniha (tlačidlo) beží stále, kresby okna len kým je otvorené ----
+let widgets = [], bookTick = null, raf = 0;
+function loop(t) {
+  raf = 0;
+  if (bookTick && btn.offsetParent !== null) bookTick(t);
+  if (!panel.classList.contains("hidden")) for (const f of widgets) f(t);
+  raf = requestAnimationFrame(loop);
+}
+tomeReady.then(() => { bookTick = bookButton(btnCvs, btn); if (!panel.classList.contains("hidden")) render(); if (!raf) raf = requestAnimationFrame(loop); });
+
+export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); panel.classList.remove("opening"); void panel.offsetWidth; panel.classList.add("opening"); }
 export function closeMenu() { backdrop.classList.add("hidden"); panel.classList.add("hidden"); }
 
-btn.addEventListener("click", () => (panel.classList.contains("hidden") ? openMenu() : closeMenu()));
+btn.addEventListener("click", () => {
+  if (!panel.classList.contains("hidden")) { closeMenu(); return; }
+  bookTick?.poke(); // kniha sa strhne, okno sa otvorí hneď
+  openMenu();
+});
 backdrop.addEventListener("click", closeMenu);
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeMenu(); });
 document.addEventListener("fullscreenchange", () => { if (!panel.classList.contains("hidden")) render(); });
@@ -82,8 +107,9 @@ onAdminChange(() => { if (!panel.classList.contains("hidden")) render(); });
 panel.addEventListener("click", (ev) => {
   if (ev.target.closest(".um-close")) { closeMenu(); return; }
   if (ev.target.closest(".menu-admin")) { adminOn = !adminOn; render(); return; }
-  const act = ev.target.closest(".menu-item")?.dataset.act;
+  const act = ev.target.closest("[data-act]")?.dataset.act;
   if (!act) return;
+  if (act === "codex") return; // CODEX zatiaľ nič nerobí
   if (act === "reload") { location.reload(); return; }
   if (act === "fullscreen") { toggleFullscreen(); closeMenu(); return; }
   if (act === "sound") { closeMenu(); openSoundWindow(); return; }
@@ -103,9 +129,10 @@ panel.addEventListener("click", (ev) => {
     closeMenu(); return;
   }
   if (act === "maintenance") {
+    // menu ostane otvorené - nový stav ON/OFF prekreslí onAdminChange
     const on = !isMaintenance();
     if (on && !confirm("Zapnúť MAINTENANCE BREAK? Všetky roomky sa zrušia, hráči budú vyhodení a hrať budú môcť len admini.")) return;
-    socket.emit("admin_maintenance", on); closeMenu(); return;
+    socket.emit("admin_maintenance", on); return;
   }
   if (act === "reset-room") {
     if (!confirm("Zrušiť TÚTO roomku a odpojiť jej hráčov aj divákov?")) return;

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Kniha — návrh menu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* NÁVRHOVÁ stránka (nie je linkovaná z hry): menu ☰ → živá kniha s očami (sprite public/assets/book/book.png
+     z tools/sprites-book/build.mjs), animácia PREBÚDZANIE. Okno = dnešné menu (rovnaké triedy .ui-modal / .menu-item
+     zo styles.css, rovnaké rozmery), len v štýle knihy (téma .tome) + záložky (stužky) na pravom boku. */
+  html, body { overflow: auto !important; height: auto !important; min-height: 100%; position: static !important; touch-action: auto !important; }
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 700 18px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0; color: #8b92a0; max-width: 1100px; }
+  main { padding: 20px; display: grid; gap: 30px; max-width: 1600px; }
+  section > h2 { font: 700 15px system-ui, sans-serif; color: #ffb300; margin: 0 0 6px; }
+  section > p { margin: 0 0 14px; color: #9aa1ad; max-width: 1100px; }
+  .ctl { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+  .ctl button { padding: 8px 12px; border: 2px dashed #8b92a0; background: #101217; color: #dfe3ea; cursor: pointer; font: 9px "Press Start 2P", monospace; }
+  .ctl button.on { border-style: solid; border-color: #ffb300; color: #ffb300; }
+
+  .duo { display: grid; grid-template-columns: 640px 200px; gap: 12px; }
+  .scene { position: relative; height: 270px; background: #000; overflow: hidden; box-shadow: inset 0 0 0 1px #1d2027; }
+  .ingame { position: relative; height: 270px; background: url(/arenas/bridge/thumb.png) center/cover; box-shadow: inset 0 0 0 1px #1d2027; }
+  .tag { position: absolute; top: 6px; left: 8px; font: 7px "Press Start 2P", monospace; color: #5d6470; }
+  .ingame .tag { color: #fff; text-shadow: 1px 1px 0 #000; }
+  .tome-big, .tome-mini { position: absolute; border: none; padding: 0; background: none; cursor: pointer; }
+  .tome-big { left: 22px; bottom: 12px; }
+  .tome-big canvas { width: 192px; height: 224px; image-rendering: pixelated; display: block; }
+  .tome-mini { left: 14px; bottom: 14px; }
+  .tome-mini canvas { width: 48px; height: 56px; image-rendering: pixelated; display: block; }
+  .tome-mini.x2 canvas { width: 96px; height: 112px; }
+
+  /* porovnanie: dnešné menu vedľa knihy (statické, bez position: fixed) */
+  .compare { display: flex; gap: 60px 120px; align-items: flex-start; flex-wrap: wrap; padding: 30px 20px 70px; background: url(/arenas/bridge/thumb.png) center/cover; box-shadow: inset 0 0 0 1px #1d2027; }
+  .compare .ui-modal { position: relative; left: auto; top: auto; transform: none; z-index: auto; max-height: none; }
+  .compare figcaption { font: 9px "Press Start 2P", monospace; color: #fff; text-shadow: 2px 2px 0 #000; margin: 0 0 12px; }
+
+  /* ================= TÉMA KNIHY nad dnešným menu (.ui-modal.tome) ================= */
+  .ui-modal.tome { isolation: isolate; --bone: #e8dcc0; --leather: #2b2226; --lhi: #4a3c42; --llo: #171114; overflow: visible;
+    background-color: var(--leather); color: var(--bone);
+    /* zrnitá koža: 4×4 pixelový vzor */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%23241c20'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23302529'/%3E%3Crect x='6' y='2' width='2' height='2' fill='%23221a1e'/%3E%3C/svg%3E");
+    box-shadow: 0 0 0 2px #000, inset 0 0 0 2px var(--lhi), inset 0 0 0 4px var(--llo), 6px 6px 0 rgba(0,0,0,.45); }
+  /* fialový steh po obvode obalu */
+  .ui-modal.tome::before { content: ""; position: absolute; inset: 7px; border: 2px dashed #6a2c8a; opacity: .75; pointer-events: none; }
+  /* zuby z ľavého dolného rohu (spoza obalu, teethWidget) a jazyk obtočený okolo CODEXU (nad ním, tongueWrapWidget) */
+  .tome .teeth { position: absolute; left: -42px; top: calc(100% - 42px); width: 102px; height: 102px; image-rendering: pixelated; pointer-events: none; z-index: -1; }
+  .tome .tongue2 { position: absolute; image-rendering: pixelated; pointer-events: none; z-index: 3; }
+  .ui-modal.tome .um-head { color: var(--bone); text-shadow: 2px 2px 0 #5a0c18; position: relative; z-index: 1; }
+  .ui-modal.tome .um-head .ttl { display: flex; align-items: center; gap: 10px; }
+  .ui-modal.tome .um-head canvas { width: 32px; height: 24px; image-rendering: pixelated; display: block; }
+  .ui-modal.tome .um-close { background: #3d3036; color: var(--bone); box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a52, inset -2px -2px 0 var(--llo); }
+  .ui-modal.tome .menu-admin { position: relative; padding: 0 34px; background: #1e1519; color: var(--bone); box-shadow: 0 0 0 2px #000; text-shadow: 2px 2px 0 #000; }
+  .ui-modal.tome .menu-admin > span { position: relative; }
+  .ui-modal.tome .menu-admin .ib-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  /* zapnutý ADMIN: bez pulzovania, len nápis rubínovo červený (ako jeho kovanie) */
+  .ui-modal.tome .menu-admin.on { color: #e0405a; text-shadow: 2px 2px 0 #000, 0 0 6px rgba(224,64,90,.6); }
+  .tome .menu-item { position: relative; z-index: 1; background: #3a2e33; color: var(--bone); box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4850, inset -2px -2px 0 var(--llo); }
+  .tome .menu-item .menu-ico { fill: var(--bone); }
+  .tome .menu-item .menu-lbl { text-shadow: 2px 2px 0 #000; }
+  /* užšie okno; každá položka má vpravo oko - zatvorené, pri prejdení myšou sa otvorí a sleduje kurzor */
+  .ui-modal.tome.menu { width: 452px; padding: 18px 22px 14px; } /* ADMIN a ✕ nesmú siahať na steh (steh je 7 px od okraja) */
+  .tome .tm-body { display: flex; gap: 10px; position: relative; z-index: 1; margin-top: 6px; } /* 8 + 6 = 14 px ako pod poslednou knihou */
+  .tome .tm-items { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  /* položka = grimoár ako CODEX, len vodorovne (kožu, kovanie, pásy a runy kreslí itemArtWidget do .ib-art); písmo a farba textu ostávajú */
+  .tome .menu-item { padding: 6px 8px 6px 34px; gap: 12px; background: #1e1519; box-shadow: 0 0 0 2px #000; }
+  .tome .menu-item .menu-lbl { white-space: nowrap; }
+  .tome .menu-item:hover .ib-art, .ui-modal.tome .menu-admin:hover .ib-art { filter: brightness(1.18) saturate(1.25); }
+  .tome .menu-item .ib-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  .tome .menu-item > :not(.ib-art):not(.blood) { position: relative; }
+  .tome .menu-item .blood { position: absolute; left: 0; top: -6px; width: 100%; /* krv začína na hornej hrane (cez čierny obrys) */ image-rendering: pixelated; pointer-events: none; z-index: 2; }
+  /* ON/OFF v tom istom výreze ako oko na ostatných knihách (32×24, stála veľkosť) */
+  .tome .menu-item .maint-state { margin-left: auto; width: 32px; height: 24px; padding: 0; box-sizing: border-box; flex: none; display: flex; align-items: center; justify-content: center;
+    font-size: 8px; letter-spacing: 0; color: #e0405a; text-shadow: 0 0 6px rgba(224,64,90,.6); }
+  /* ovál v pixeloch (stupňovité rohy po 2 px, nie hladký border-radius) */
+  .tome .menu-item .maint-state { clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 2px, calc(100% - 4px) 2px, calc(100% - 4px) 4px, calc(100% - 2px) 4px, calc(100% - 2px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 2px) calc(100% - 6px), calc(100% - 2px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 2px), calc(100% - 6px) calc(100% - 2px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 2px), 4px calc(100% - 2px), 4px calc(100% - 4px), 2px calc(100% - 4px), 2px calc(100% - 6px), 0 calc(100% - 6px),
+    0 6px, 2px 6px, 2px 4px, 4px 4px, 4px 2px, 6px 2px); }
+  .tome .menu-item .maint-state.on { color: #3ee08a; text-shadow: 0 0 6px rgba(62,224,138,.6); } /* OFF/ON sa zmestí do priehradky za deliacou čiarou ako oko */
+  .tome .menu-item .ieye { margin-left: auto; width: 32px; height: 24px; image-rendering: pixelated; flex: none; }
+  /* CODEX - zvislý tajný grimoár (chrbát kreslí grimoireWidget do .rb-art); zatiaľ nič nerobí */
+  .tome .rbook { position: relative; flex: none; align-self: stretch; width: 56px; padding: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; padding-top: 0;
+    font-size: 12px; letter-spacing: 2px; color: #a8884a; text-shadow: -1px -1px 0 #000, 1px 1px 0 #4a3a1c;
+    background: #1e1519; box-shadow: 0 0 0 2px #000; }
+  .tome .rbook:hover { color: #d8b060; text-shadow: -1px -1px 0 #000, 1px 1px 0 #4a3a1c, 0 0 8px rgba(170,90,255,.8); }
+  .tome .rbook .rb-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  .tome .rbook .ieye { position: relative; width: 32px; height: 24px; image-rendering: pixelated; flex: none; margin-top: 14px; left: 2px; }
+  .tome .rbook span { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); writing-mode: vertical-rl; }
+  /* záložky - stužky vytŕčajúce spoza bloku strán */
+  .tome .marks { position: absolute; left: 100%; top: 70px; margin-left: 6px; display: flex; flex-direction: column; gap: 6px; z-index: -2; }
+  .tome .mark { --c: #6a3c9b; position: relative; display: flex; align-items: center; height: 36px; padding: 0 24px 0 24px; font-size: 9px; letter-spacing: 1px;
+    color: var(--bone); background: var(--c); text-shadow: 2px 2px 0 rgba(0,0,0,.6); white-space: nowrap;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%);
+    box-shadow: inset 0 3px 0 rgba(255,255,255,.18), inset 0 -4px 0 rgba(0,0,0,.35); transform: translateX(-6px); transition: transform .1s steps(2); }
+  .tome .mark:hover { transform: translateX(-2px); }
+  .tome .mark.on { transform: translateX(6px); }
+  /* strana rulebooku v okne (rovnaká bunka ako položky menu - okno nemení veľkosť) */
+  .tome .tpage { grid-area: 1 / 1; background: #e9d8ac; color: #2a1a10; padding: 14px 16px; overflow: auto; font-size: 9px; line-height: 16px; letter-spacing: 0;
+    box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #d4bd88; position: relative; z-index: 1; }
+  .tome .tpage.off { visibility: hidden; }
+  .tome .tpage h3 { margin: 0 0 10px; font-size: 12px; color: #7a1622; letter-spacing: 2px; }
+  .tome .tpage .soon { color: #8a7650; }
+  .tome .qr { width: 100%; border-collapse: collapse; }
+  .tome .qr td { padding: 4px 2px; border-bottom: 2px dotted rgba(42,26,16,.25); vertical-align: top; }
+  .tome .qr td:first-child { color: #7a1622; white-space: nowrap; }
+  .tome .qr td.c { white-space: nowrap; text-align: right; }
+  .tome .qr .pix-ico.mini { width: 12px; height: 12px; }
+  .tome .tnav { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: #8a7650; }
+  .tome .tnav button { background: #3a2e33; color: #e8dcc0; width: 34px; height: 28px; box-shadow: 0 0 0 2px #000; }
+  /* otvorenie: obal sa odklopí zľava (pixelové kroky) */
+  .tome-wrap { animation: tome-open .32s steps(5) both; transform-origin: 0 50%; }
+  @keyframes tome-open { from { transform: perspective(900px) rotateY(-80deg); opacity: .2; } to { transform: none; opacity: 1; } }
+  .tome-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.55); display: grid; place-items: center; }
+  .tome-overlay.hidden { display: none; }
+  .tome-overlay .ui-modal { position: relative; left: auto; top: auto; transform: none; z-index: auto; max-height: none; }
+  /* telefón: záložky ako rad nad oknom */
+  .phone-marks .tome .marks { left: 0; right: 0; top: auto; bottom: 100%; margin: 0 0 6px; flex-direction: row; justify-content: center; gap: 4px; z-index: 1; }
+  .phone-marks .tome .mark { height: 30px; padding: 0 8px; font-size: 7px; transform: none; clip-path: none; }
+  .phone-marks .tome .mark.on { outline: 2px solid var(--bone); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Živá kniha namiesto menu ☰ — PREBÚDZANIE</h1>
+  <p>Kniha spí so zatvorenými očami a dýcha fialovou aurou. Keď prejdeš myšou, oči sa otvárajú jedno po druhom a sledujú kurzor.
+    Klik otvorí <b>dnešné menu</b> oblečené do knihy: užšie, položky pod sebou, pri každej oko. Z ľavého dolného rohu trčia zuby, jazyk sa obtáča okolo CODEXU. V okne vedľa položiek je <b>CODEX</b> ako zvislá kniha (zatiaľ len tlačidlo).</p>
+</header>
+<main>
+  <section>
+    <h2>1. Kniha — veľká (room browser) a malá (hra)</h2>
+    <p>Malú verziu ukazujem v dvoch veľkostiach: 1:1 (48×56) a 2× (96×112). Vyber jednu.</p>
+    <div class="duo">
+      <div class="scene"><span class="tag">ROOM BROWSER</span><button class="tome-big" type="button"><canvas></canvas></button></div>
+      <div class="ingame"><span class="tag">V HRE 1:1 / 2×</span><button class="tome-mini" type="button" style="left:140px"><canvas></canvas></button><button class="tome-mini x2" type="button"><canvas></canvas></button></div>
+    </div>
+  </section>
+  <section>
+    <h2>2. Okno — dnešné menu vs. kniha</h2>
+    <p>Vľavo dnešné menu, vpravo menu ako kniha. Položky sú dizajnovo rovnaké, len užšie a pod sebou, pri každej je zatvorené oko, ktoré sa pri prejdení myšou otvorí a sleduje kurzor.
+      Z ľavého dolného rohu trčia zuby na obe strany (z ľavej aj spodnej hrany, jeden šikmo z rohu). Jazyk sa ako liana takmer dvakrát obtočí okolo CODEXU (vzadu schovaný za knihou) a potom visí pod okno; po ňom steká slina a odkvapne zo špičky. CODEX je vo vnútri okna vpravo vedľa položiek, v tom istom dizajne, len zvislý. Zatiaľ je to len tlačidlo, ktoré nič nerobí.
+      Naživo to vyskúšaš klikom na knihu hore.</p>
+    <div class="ctl">
+      <button type="button" id="t-admin">ADMIN ÚČET: VYP</button>
+    </div>
+    <div class="compare">
+      <figure style="margin:0"><figcaption>TERAZ</figcaption><div class="ui-modal" id="old-menu"></div></figure>
+      <figure style="margin:0"><figcaption>KNIHA</figcaption><div class="tome-host" id="tome-static"></div></figure>
+      <figure style="margin:0"><figcaption>KNIHA — APPKA NA TELEFÓNE (BEZ FULL SCREEN)</figcaption><div class="tome-host" id="tome-nofs"></div></figure>
+    </div>
+  </section>
+</main>
+<div class="tome-overlay hidden" id="overlay"></div>
+
+<script type="module">
+import { menuIcon } from "/client/menu-icons.js";
+import { BUTTON_TEXT, costMarkup } from "/client/balance-ui.js";
+import { hydratePix } from "/client/pix.js";
+import * as B from "/shared/balance.js";
+
+// ======================= sprite + oči =======================
+const img = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = "/assets/book/book.png"; });
+const SW = img.width, SH = img.height;
+const base = (() => { const c = document.createElement("canvas"); c.width = SW; c.height = SH; const x = c.getContext("2d"); x.drawImage(img, 0, 0); return x.getImageData(0, 0, SW, SH); })();
+const at = (x, y) => { const i = (y * SW + x) * 4; return base.data.slice(i, i + 4); };
+const isEye = ([r, g, b, a]) => a && r > 90 && (b > 60 || r > 150) && !(r > 90 && g > 70 && b < 60 && r < 150);
+// oči (rámčeky z mapy spritu): okolo každého sa spočíta farba viečka, dúhovka a jej stred
+const EYES = [[22, 3, 27, 7], [11, 9, 17, 12], [12, 15, 17, 18], [27, 18, 32, 21], [12, 26, 17, 27]].map(([x0, y0, x1, y1]) => {
+  const px = [], iris = []; let lid = [0, 0, 0], n = 0;
+  for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
+    const c = at(x, y); if (!c[3]) continue;
+    if (y >= y0 && y <= y1 && x >= x0 && x <= x1 && isEye(c)) { px.push([x, y]); if (c[0] > 150) iris.push([x, y]); }
+    else if (c[0] + c[1] + c[2] < 165) { lid[0] += c[0]; lid[1] += c[1]; lid[2] += c[2]; n++; }
+  }
+  lid = lid.map(v => Math.round(v / Math.max(1, n)));
+  const cx = iris.reduce((s, p) => s + p[0], 0) / iris.length, cy = iris.reduce((s, p) => s + p[1], 0) / iris.length;
+  return { x0, y0, x1, y1, px, iris, cx, cy, lid };
+});
+// obrys pre auru (vzdialenosť 1 a 2 od nepriehľadných pixelov)
+const ring = [[], []];
+for (let y = -2; y < SH + 2; y++) for (let x = -2; x < SW + 2; x++) {
+  const op = (xx, yy) => xx >= 0 && yy >= 0 && xx < SW && yy < SH && at(xx, yy)[3] > 0;
+  if (op(x, y)) continue;
+  let d = 9; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (op(x + dx, y + dy)) d = Math.min(d, Math.max(Math.abs(dx), Math.abs(dy)));
+  if (d <= 2) ring[d - 1].push([x, y]);
+}
+
+// nakreslí sprite s očami podľa stavu: eyes[i] = { open 0..1, lx, ly, glow }
+function spriteFrame(eyes) {
+  const im = new ImageData(new Uint8ClampedArray(base.data), SW, SH), d = im.data;
+  const set = (x, y, r, g, b) => { const i = (y * SW + x) * 4; d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255; };
+  EYES.forEach((E, k) => {
+    const s = eyes[k], h = E.y1 - E.y0 + 1;
+    if (s.glow) for (const [x, y] of E.px) { const i = (y * SW + x) * 4; d[i] = Math.min(255, d[i] + 50 * s.glow); d[i + 2] = Math.min(255, d[i + 2] + 35 * s.glow); }
+    // zrenička: tmavý pixel v dúhovke posunutý smerom pohľadu
+    if (s.open > .35 && E.iris.length) {
+      const tx = Math.round(E.cx + s.lx), ty = Math.round(E.cy + s.ly);
+      let best = E.iris[0], bd = 99; for (const [x, y] of E.iris) { const dd = Math.abs(x - tx) + Math.abs(y - ty); if (dd < bd) { bd = dd; best = [x, y]; } }
+      set(best[0], best[1], 24, 4, 10);
+    }
+    // viečka: zatvárajú sa zhora aj zdola k stredu
+    const cut = (1 - s.open) / 2;
+    for (const [x, y] of E.px) { const rel = (y - E.y0 + .5) / h; if (rel < cut || rel > 1 - cut) set(x, y, ...E.lid); }
+    if (s.open < .2) { const my = Math.round(E.y0 + (h - 1) / 2), row = E.px.filter(([, y]) => y === my); for (const [x, y] of row) set(x, y, 138, 64, 180);
+      // riasy pod zatvoreným okom
+      if (row.length > 2) { const xs = row.map(p => p[0]).sort((a, b) => a - b); for (const x of [xs[1], xs[xs.length - 2]]) if (my + 1 < SH) set(x, my + 1, 96, 40, 130); } }
+  });
+  return im;
+}
+
+// ======================= kniha: PREBÚDZANIE =======================
+const AW = 48, AH = 56, OX = 2, OY = 3; // plátno knihy: miesto na vznášanie, kvapky a tieň
+const rnd = Math.random;
+const loops = [];
+let gmx = 0, gmy = 0; document.addEventListener("mousemove", e => { gmx = e.clientX; gmy = e.clientY; });
+
+function makeBook(canvas, host) {
+  canvas.width = AW; canvas.height = AH;
+  const ctx = canvas.getContext("2d"), sp = document.createElement("canvas"); sp.width = SW; sp.height = SH; const sctx = sp.getContext("2d");
+  const st = { hover: false, hoverAt: 0, leaveAt: -1e9, mx: 0, my: 0, poke: -1e9, drips: [], nextDrip: 1500,
+    eyes: EYES.map(() => ({ open: 0, lx: 0, ly: 0, glow: 0, next: 2000 + rnd() * 3000, blinkT: -1 })) };
+  host.addEventListener("mouseenter", () => { st.hover = true; st.hoverAt = performance.now(); });
+  host.addEventListener("mouseleave", () => { st.hover = false; st.leaveAt = performance.now(); });
+  host.addEventListener("mousemove", (e) => { const r = canvas.getBoundingClientRect(); st.mx = (e.clientX - r.left) / r.width * AW; st.my = (e.clientY - r.top) / r.height * AH; });
+  host.addEventListener("click", () => { st.poke = performance.now(); setTimeout(openOverlay, 360); });
+  let last = 0;
+  return (t) => {
+    const dt = Math.min(50, t - last); last = t;
+    const poked = t - st.poke < 360, awake = st.hover || poked;
+    const bob = Math.round(Math.sin(t / 700));
+    const shake = poked ? (Math.floor(t / 45) % 2 ? 1 : -1) : 0;
+    st.eyes.forEach((e, k) => {
+      const E = EYES[k];
+      // oči sa otvárajú (a zatvárajú) jedno po druhom
+      const ref = awake ? st.hoverAt : st.leaveAt;
+      let target = awake ? 1 : 0; if (t - ref < k * 130 && !poked) target = awake ? 0 : 1;
+      if (target > .5 && t > e.next) { e.blinkT = t; e.next = t + 2200 + rnd() * 3500; }
+      const bt = t - e.blinkT, blink = e.blinkT >= 0 && bt >= 0 && bt < 180 ? 1 - Math.abs(bt - 90) / 90 : 0;
+      e.open += ((target * (1 - blink)) - e.open) * Math.min(1, dt / (blink ? 25 : 90));
+      const dx = st.mx - (OX + E.cx), dy = st.my - (OY + E.cy);
+      e.lx = Math.abs(dx) > 3 ? Math.sign(dx) : 0; e.ly = Math.abs(dy) > 3 ? Math.sign(dy) : 0;
+      e.glow = awake ? .8 : 0;
+    });
+    if (t > st.nextDrip) { const s = [[14, 44], [15, 42], [19, 47], [16, 45]][Math.floor(rnd() * 4)]; st.drips.push({ x: s[0] + OX, y: s[1] + OY + bob, vy: 0 }); st.nextDrip = t + 4000 * (awake ? .4 : 1) * (.6 + rnd() * .8); }
+    ctx.clearRect(0, 0, AW, AH);
+    const sw = 13 + (bob > 0 ? 1 : 0);
+    ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillRect(AW / 2 - sw, AH - 3, sw * 2, 2); ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fillRect(AW / 2 - sw + 3, AH - 4, sw * 2 - 6, 1);
+    // dýchajúca fialová aura (pri prebudení silnejšia)
+    const auraA = .35 + .25 * Math.sin(t / 600) + (awake ? .35 : 0);
+    ring.forEach((pts, i) => { ctx.fillStyle = `rgba(160,80,255,${Math.min(1, auraA * (i ? .6 : 1.1))})`; for (const [x, y] of pts) if ((x + y + Math.floor(t / 250)) % (i ? 2 : 1) === 0) ctx.fillRect(x + OX + shake, y + OY + bob, 1, 1); });
+    sctx.putImageData(spriteFrame(st.eyes), 0, 0);
+    ctx.drawImage(sp, OX + shake, OY + bob);
+    for (const d of st.drips) { d.vy += dt * .00012; d.y += d.vy * dt; }
+    st.drips = st.drips.filter(d => d.y < AH - 3 || (d.splat = (d.splat || 0) + dt) < 300);
+    for (const d of st.drips) { if (d.y >= AH - 3) { ctx.fillStyle = "#7a0c18"; ctx.fillRect(Math.round(d.x) - 1, AH - 3, 3, 1); } else { ctx.fillStyle = "#7a0c18"; ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 2); ctx.fillStyle = "#c0283a"; ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); } }
+  };
+}
+document.querySelectorAll(".tome-big, .tome-mini").forEach(b => loops.push(makeBook(b.querySelector("canvas"), b)));
+
+// oko z knihy (výrez oka E3 zo spritu, 4×): sleduje myš. host = null → stále otvorené a žmurká (nadpis);
+// host = prvok → zatvorené, pri prejdení myšou po ňom sa otvorí (položky menu, chrbát rulebooku)
+function eyeWidget(c, host = null) {
+  const E = EYES[2]; const w = E.x1 - E.x0 + 3, h = E.y1 - E.y0 + 3; c.width = w; c.height = h;
+  const ctx = c.getContext("2d"), tmp = document.createElement("canvas"); tmp.width = SW; tmp.height = SH; const tctx = tmp.getContext("2d");
+  const e = { next: 1200 + rnd() * 1500, blinkT: -1, open: host ? 0 : 1, last: 0 };
+  return (t) => {
+    if (!c.isConnected) return;
+    const dt = Math.min(50, t - e.last); e.last = t;
+    const hov = host ? host.matches(":hover") : true;
+    if (hov && t > e.next) { e.blinkT = t; e.next = t + 2500 + rnd() * 3500; }
+    const bt = t - e.blinkT, blink = bt >= 0 && bt < 160 ? 1 - Math.abs(bt - 80) / 80 : 0;
+    e.open += ((hov ? 1 - blink : 0) - e.open) * Math.min(1, dt / (blink ? 25 : 70));
+    const r = c.getBoundingClientRect(), dx = gmx - (r.left + r.width / 2), dy = gmy - (r.top + r.height / 2);
+    const eyes = EYES.map(() => ({ open: 1, lx: 0, ly: 0, glow: 0 }));
+    eyes[2] = { open: e.open, lx: Math.abs(dx) > 24 ? Math.sign(dx) : 0, ly: Math.abs(dy) > 16 ? Math.sign(dy) : 0, glow: host && hov ? .8 : .5 };
+    tctx.putImageData(spriteFrame(eyes), 0, 0); ctx.clearRect(0, 0, w, h); ctx.drawImage(tmp, E.x0 - 1, E.y0 - 1, w, h, 0, 0, w, h);
+  };
+}
+// jazyk knihy lemujúci okno sprava (farby z jazyka v sprite, umelecký pixel = 3 px): koreň za obalom hore,
+// visí pozdĺž pravej hrany, pomaly sa vlní, špička trochu pod spodnou hranou a občas sa natiahne (olizne)
+// zuby trčiace z ľavého dolného rohu okna - zo spodnej aj z ľavej hrany (umelecký pixel = 3 px, plátno je za obalom,
+// roh okna je v bode (C, C) plátna, korene zubov sú schované pod obalom)
+function teethWidget(c) {
+  const N = 34, C = 14, ctx = c.getContext("2d"); c.width = N; c.height = N;
+  const OUT = "#120d08", BONE = "#e8dcc0", BSH = "#b8a47a", GUM = "#5a0c18";
+  // tesák: koreň (x, y), smer (dx, dy), dĺžka, šírka koreňa
+  function fang(x, y, dx, dy, len, w) {
+    const px = dy !== 0 ? 1 : 0, py = dx !== 0 && dy === 0 ? 1 : 0; // os šírky (kolmo na smer)
+    for (let i = 0; i < len; i++) {
+      const ww = Math.max(1, Math.round(w * (1 - i / len))), off = Math.floor((w - ww) / 2);
+      const bx = x + dx * i + px * off, by = y + dy * i + py * off;
+      ctx.fillStyle = OUT; ctx.fillRect(bx - px, by - py, px ? ww + 2 : 1, py ? ww + 2 : 1);
+      ctx.fillStyle = BONE; ctx.fillRect(bx, by, px ? ww : 1, py ? ww : 1);
+      if (ww > 1) { ctx.fillStyle = BSH; ctx.fillRect(bx + px * (ww - 1), by + py * (ww - 1), 1, 1); }
+    }
+    ctx.fillStyle = OUT; ctx.fillRect(x + dx * len + px * Math.floor(w / 2), y + dy * len + py * Math.floor(w / 2), 1, 1);
+  }
+  return (t) => {
+    if (!c.isConnected || c.dataset.done) return; c.dataset.done = 1; // statické
+    ctx.clearRect(0, 0, N, N);
+        fang(C + 1, C, 0, 1, 11, 5); fang(C + 7, C, 0, 1, 8, 4); fang(C + 12, C, 0, 1, 5, 3);   // zo spodnej hrany dole
+    fang(C - 1, C - 7, -1, 0, 11, 5); fang(C - 1, C - 13, -1, 0, 7, 4);                     // z ľavej hrany doľava
+    // rohový tesák: koreň v samom rohu (pod ďasnom a obalom), rastie šikmo von dole-doľava
+    const row = (i) => { const ww = Math.max(1, Math.round(5 * (1 - i / 8))); return [C - 1 - i - Math.floor(ww / 2), C - 1 + i, ww]; };
+    for (let i = 0; i < 8; i++) { const [x, y, ww] = row(i); ctx.fillStyle = OUT; ctx.fillRect(x - 1, y - 1, ww + 2, 3); } // obrys
+    for (let i = 0; i < 8; i++) { const [x, y, ww] = row(i); ctx.fillStyle = BONE; ctx.fillRect(x, y, ww, 1); if (ww > 1) { ctx.fillStyle = BSH; ctx.fillRect(x + ww - 1, y, 1, 1); } }
+    ctx.fillStyle = OUT; const [tx, ty] = row(7); ctx.fillRect(tx - 1, ty + 1, 1, 1);
+    ctx.fillStyle = GUM; ctx.fillRect(C - 3, C - 2, 3, 2); ctx.fillRect(C - 1, C - 14, 1, 15); ctx.fillRect(C - 1, C, 15, 1); // ďasno len cez korene
+  };
+}
+
+// jazyk ako liana: vynorí sa spoza CODEXU pod nápisom, ~1,75× sa obtočí okolo knihy (vpredu šikmo cez chrbát,
+// vzadu schovaný za knihou, na hranách trochu vytŕča), potom pri pravej hrane visí pod okno so stočenou špičkou;
+// po visiacej časti steká slina a odkvapne. Plátno nad rulebookom, súradnice z DOM, tvar je statický.
+const TONGUE_WRAP = 30; // výška závitov jazyka v umeleckých px (rovnaká pri každej výške knihy)
+function tongueWrapWidget(c) {
+  const win = c.closest(".ui-modal"), book = win.querySelector(".rbook"), ctx = c.getContext("2d");
+  const TOUT = "#2a0508", BODY = "#8a2a30", MID = "#a83a3a", HI = "#d06050", GROOVE = "#5a1018", SHADE = "#6a1a22", BACK = "#4a1016";
+  let key = "", img = null, tail = [], W = 0, H = 0; const drops = []; let next = 900;
+  function build() {
+    const wr = win.getBoundingClientRect(), br = book.getBoundingClientRect(), k = wr.width / win.offsetWidth || 1;
+    const PAD = 4; // umelecké px vľavo od knihy
+    const topPx = (br.bottom - wr.top) / k - (TONGUE_WRAP + 6) * 3, leftPx = (br.left - wr.left) / k - PAD * 3;
+    W = Math.round(br.width / k / 3) + PAD * 2 + 6; H = Math.round(((wr.bottom - wr.top) / k - topPx + 66) / 3);
+    c.style.left = leftPx + "px"; c.style.top = topPx + "px"; c.style.width = W * 3 + "px"; c.style.height = H * 3 + "px"; c.width = W; c.height = H;
+    const sl = PAD, sw = Math.round(br.width / k / 3), sr = sl + sw, cx = sl + sw / 2, R = sw / 2 + 1.5;
+    const y0 = 3, y1 = Math.round((br.bottom - wr.top) / k / 3 - topPx / 3) - 3, winB = Math.round(((wr.bottom - wr.top) / k - topPx) / 3);
+    // stredová čiara: špirála (θ od π = vzadu) + visiaci chvost
+    const pts = [], A0 = Math.PI, A1 = 4.5 * Math.PI, thin = 1;
+    for (let a = A0; a <= A1; a += .02) pts.push({ x: cx + R * Math.sin(a), y: y0 + (y1 - y0) * (a - A0) / (A1 - A0), front: Math.cos(a) > 0, a });
+    const ex = cx + R, tl = [[ex, y1], [ex + .5, winB + 2], [ex - 1, winB + 6], [ex - 4, winB + 8]];
+    for (let i = 0; i < tl.length - 1; i++) { const [xa, ya] = tl[i], [xb, yb] = tl[i + 1], n = Math.ceil(Math.max(Math.abs(xb - xa), Math.abs(yb - ya)) * 2);
+      for (let j = 0; j < n; j++) pts.push({ x: xa + (xb - xa) * j / n, y: ya + (yb - ya) * j / n, front: true, tail: true }); }
+    // dve masky: zadná (kreslí sa len mimo knihy) a predná; špička sa zužuje
+    const back = new Uint8Array(W * H), front = new Uint8Array(W * H), n = pts.length;
+    pts.forEach((p, i) => { const r = p.tail ? (i > n - 6 ? 2 : i > n - 16 ? 2.6 : 3.2) : 3.2 * thin, msk = p.front ? front : back;
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (dx * dx + dy * dy <= r * r) { const xx = Math.round(p.x) + dx, yy = Math.round(p.y) + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H) msk[yy * W + xx] = 1; } });
+    for (let y = 0; y < H; y++) for (let x = sl; x < sr; x++) back[y * W + x] = 0; // zadná časť je za knihou
+    img = ctx.createImageData(W, H);
+    const put = (x, y, hex) => { const i = (y * W + x) * 4, v = parseInt(hex.slice(1), 16); img.data[i] = v >> 16; img.data[i + 1] = (v >> 8) & 255; img.data[i + 2] = v & 255; img.data[i + 3] = 255; };
+    const layer = (msk, dark) => { const m = (x, y) => x >= 0 && y >= 0 && x < W && y < H && msk[y * W + x];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (!m(x, y)) continue;
+        const edge = !m(x - 1, y) || !m(x + 1, y) || !m(x, y - 1) || !m(x, y + 1);
+        put(x, y, edge ? TOUT : dark ? BACK : !m(x, y - 2) ? HI : !m(x, y - 3) ? MID : !m(x, y + 2) ? SHADE : BODY); } };
+    layer(back, true); layer(front, false);
+    // ryha po strede prednej časti
+    pts.forEach((p, i) => { if (p.front && i % 5 && i < n - 18) { const x = Math.round(p.x), y = Math.round(p.y); if (front[y * W + x] && front[(y - 2) * W + x] && front[(y + 2) * W + x]) put(x, y, GROOVE); } });
+    tail = pts.filter(p => p.tail).map(p => [Math.round(p.x), Math.round(p.y)]);
+  }
+  return (t) => {
+    if (!c.isConnected) return;
+    const k2 = win.offsetWidth + "x" + win.offsetHeight + "x" + book.querySelector("span").style.top; if (k2 !== key) { key = k2; build(); }
+    ctx.putImageData(img, 0, 0);
+    if (t > next) { drops.push({ i: 0, v: 0, hang: 0, fy: 0 }); next = t + 1800 + rnd() * 2400; }
+    const last = tail.length - 1;
+    for (const d of drops) {
+      if (d.i < last) { d.v = Math.min(.12, d.v + .002); d.i += d.v * 14; }
+      else if (d.hang < 45) { d.hang++; d.i = last; }
+      else { d.v += .03; d.fy += d.v * 3; }
+      const [x, y0] = tail[Math.min(last, Math.round(d.i))], y = y0 + Math.round(d.fy) + (d.hang ? 2 : 0);
+      ctx.fillStyle = "#b8d8ea"; ctx.fillRect(x, y, 2, d.hang > 20 ? 3 : 2); ctx.fillStyle = "#ffffff"; ctx.fillRect(x, y, 1, 1);
+    }
+    while (drops.length && drops[0].fy > H) drops.shift();
+  };
+}
+
+// chrbát CODEXU ako tajný grimoár (umelecký pixel = 3 px): tmavá zrnitá koža, zlaté kovanie na rohoch s nitmi,
+// vypuklé pásy, po bokoch runy, ktoré tlejú fialovo (pri prejdení myšou sa rozžiaria), nad nápisom kovanie s kľúčovou dierkou
+function grimoireWidget(c) {
+  const book = c.parentElement, ctx = c.getContext("2d"); let W = 0, H = 0, base = null;
+  const L0 = "#1e1519", L1 = "#271c21", L2 = "#30242a", LHI = "#46363e", IRON = "#b8862b", IHI = "#f2c14e", ILO = "#6a4a10", OUT = "#0a0708"; // zlaté kovanie
+  const GLYPHS = [[[1, 0], [1, 1], [1, 2], [0, 1], [2, 1]], [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], [[0, 0], [1, 0], [2, 0], [1, 1], [1, 2]],
+    [[1, 0], [0, 1], [2, 1], [1, 2]], [[0, 0], [0, 1], [0, 2], [1, 1], [2, 0], [2, 2]], [[0, 2], [1, 1], [2, 0], [1, 0], [1, 2]]];
+  function build() {
+    W = Math.round(book.clientWidth / 3); H = Math.round(book.clientHeight / 3); c.width = W; c.height = H;
+    const g = document.createElement("canvas"); g.width = W; g.height = H; const x = g.getContext("2d"), px = (a, b, w, h, col) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    // koža so zrnom a zaobleným chrbtom (svetlejší stred, tmavé okraje)
+    for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) { const e = Math.min(xx, W - 1 - xx); const v = (xx * 7 + yy * 13 + xx * yy) % 17;
+      px(xx, yy, 1, 1, e < 1 ? OUT : e < 3 ? L0 : v < 3 ? L0 : v > 14 ? L2 : L1); }
+    // vypuklé pásy na chrbte
+    const band = (yy) => { px(1, yy, W - 2, 1, LHI); px(1, yy + 1, W - 2, 1, L2); px(1, yy + 2, W - 2, 1, OUT); };
+    band(13); band(H - 16);
+    // zlaté kovanie na rohoch + nity
+    const cap = (yy, down) => { for (let i = 0; i < 4; i++) { const w = 6 - i; const ry = down ? yy - i : yy + i; px(0, ry, w, 1, IRON); px(W - w, ry, w, 1, IRON); }
+      px(0, yy, W, 1, down ? ILO : IHI); px(1, down ? yy - 1 : yy + 1, 1, 1, IHI); px(W - 2, down ? yy - 1 : yy + 1, 1, 1, IHI); };
+    cap(0, false); cap(H - 1, true);
+    // kovanie s kľúčovou dierkou pod nápisom
+    const sp = book.querySelector("span"), ky = 18, kx = Math.round((W - 6) / 2);
+    px(kx - 1, ky - 1, 8, 10, OUT); px(kx, ky, 6, 8, IRON); px(kx, ky, 6, 1, IHI); px(kx, ky + 7, 6, 1, ILO);
+    px(kx + 2, ky + 2, 2, 2, OUT); px(kx + 2, ky + 4, 2, 2, OUT); px(kx + 1, ky + 1, 1, 1, IHI); px(kx + 4, ky + 6, 1, 1, IHI);
+    base = x.getImageData(0, 0, W, H);
+  }
+  return (t) => {
+    if (!c.isConnected) return;
+    const span = book.querySelector("span"), lockBottom = (18 + 9) * 3; // spodok zámku v px (zámok je na riadku 18, výška 8)
+    const tongueTop = book.clientHeight - (TONGUE_WRAP + 3) * 3 + 6; // odkiaľ je jazyk vidno
+    span.style.letterSpacing = tongueTop - lockBottom - 4 < span.scrollHeight + 4 && span.style.letterSpacing !== "1px" ? "1px" : span.style.letterSpacing;
+    // nízka kniha (telefón): nápis zarovnaný k jazyku - spodok X je kúsok schovaný za ním; inak na stred knihy
+    const tight = tongueTop - lockBottom < span.offsetHeight + 30;
+    span.style.top = (tight ? Math.max(lockBottom + 6, tongueTop - span.offsetHeight + 8)
+      : Math.max(lockBottom + 2, Math.min(Math.round((book.clientHeight - span.offsetHeight) / 2), tongueTop - span.offsetHeight - 2))) + "px";
+    const sk = book.clientWidth + "x" + book.clientHeight + "x" + span.offsetHeight; // aj po načítaní fontu (výška nápisu)
+    if (sk !== c.dataset.k) { c.dataset.k = sk; build(); }
+    ctx.putImageData(base, 0, 0);
+    // runy pozdĺž oboch okrajov, tlejú postupne (vlna), pri hoveri jasnejšie
+    const hov = book.matches(":hover");
+    for (let i = 0, yy = 17; yy + 3 <= H - 17; i++, yy += 5) for (const side of [0, 1]) { // runy až po spodný pás (medzi závitmi jazyka)
+      const gl = GLYPHS[(i * 3 + side * 2) % GLYPHS.length], xx = side ? W - 5 : 2;
+      const a = (hov ? .55 : .18) + (hov ? .45 : .32) * Math.max(0, Math.sin(t / 500 - i * .7 - side));
+      ctx.fillStyle = `rgba(170,90,255,${a.toFixed(2)})`; for (const [gx, gy] of gl) ctx.fillRect(xx + gx, yy + gy, 1, 1);
+    }
+  };
+}
+
+// krv na knihách menu (umelecký pixel = 3 px): na niektorých knihách nepravidelný pás krvi pozdĺž časti hornej hrany
+// (pri chrbte a/alebo nad okom), z neho visia stekajúce kvapky rôznej dĺžky; z najdlhšej občas odkvapne a padá pod knihu.
+// Rozloženie podľa poradia knihy (seed), statické.
+function bloodWidget(c, seed) {
+  const host = c.parentElement, ctx = c.getContext("2d"); let W = 0, H = 0, bands = [], longest = null;
+  const D = "#4a0810", M = "#7a0c18", L = "#a81c28";
+  const r = (n) => { const v = Math.sin(seed * 91.7 + n * 37.3) * 43758.5453; return v - Math.floor(v); };
+  const drops = []; let next = 1500 + r(9) * 3000;
+  return (t) => {
+    if (!c.isConnected) return;
+    const w = Math.round(host.clientWidth / 3), h = Math.round(host.clientHeight / 3);
+    if (w !== W || h !== H) { W = w; H = h; c.width = W; c.height = H + 9; c.style.height = (H + 9) * 3 + "px";
+      bands = []; let n = 20;
+      const band = (x0, len) => { const b = { x0, len, drips: [] }; for (let x = x0 + 1; x < x0 + len - 1; x++) if (r(n++) < .32) b.drips.push({ x, len: 1 + Math.floor(Math.pow(r(n++), 1.6) * (H * .55)), wide: false }); bands.push(b); };
+      if (seed % 3 !== 2) band(1, 6 + Math.floor(r(1) * 9));                  // pri chrbte
+      if (seed % 2 === 1) band(W - 33 + Math.floor(r(3) * 3), 6 + Math.floor(r(4) * 7)); // pred okom (nezakrýva ho)
+      longest = null; for (const b of bands) for (const d of b.drips) if (!longest || d.len > longest.len) longest = d;
+    }
+    ctx.clearRect(0, 0, W, c.height);
+    const P = (x, y, w2, h2, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w2, h2); };
+    for (const b of bands) {
+      // pás: hrubší v strede, nepravidelný spodný okraj
+      for (let x = b.x0; x < b.x0 + b.len; x++) { const edge = x === b.x0 || x === b.x0 + b.len - 1, th = edge ? 1 : 2 + (Math.sin(x * 1.7 + seed) > .3 ? 1 : 0);
+        P(x, 1, 1, th, M); P(x, 1 + th - 1, 1, 1, D); if (!edge && (x + seed) % 3 === 0) P(x, 1, 1, 1, L); }
+      for (const d of b.drips) {
+        const y0 = 3, y1 = y0 + d.len;
+        P(d.x, y0, d.wide ? 2 : 1, d.len, M); if (d.wide) P(d.x + 1, y0, 1, d.len, D);
+        P(d.x - (d.len > 2 ? 0 : 0), y1, 2, 2, M); P(d.x + 1, y1 + 1, 1, 1, D); P(d.x, y1, 1, 1, L); // guľka na konci
+      }
+    }
+    if (longest && t > next) { drops.push({ x: longest.x, y: longest.len + 6, v: 0 }); next = t + 2500 + r(t % 97) * 4000; }
+    for (const d of drops) { d.v += .025; d.y += d.v; P(d.x, Math.round(d.y), 2, 2, M); P(d.x + 1, Math.round(d.y) + 1, 1, 1, D); P(d.x, Math.round(d.y), 1, 1, L); }
+    while (drops.length && drops[0].y > c.height) drops.shift();
+  };
+}
+
+// položka menu = rovnaký grimoár ako CODEX, len položený vodorovne (umelecký pixel = 3 px): zrnitá koža s tmavými
+// okrajmi, vypuklé pásy pri oboch koncoch, železné kovanie na rohoch s nitmi
+// - bez rún. Farba kože podľa typu položky (REPORT BUG jantárová, reset krvavá…).
+const LEATHER = { "": ["#1e1519", "#271c21", "#30242a", "#46363e"], report: ["#5e440a", "#6e520e", "#7e5e12", "#a8841e"],
+  danger: ["#2a0a0e", "#36101a", "#421620", "#5e2430"], "menu-data": ["#121e0e", "#1a2a14", "#22341a", "#344a28"], maint: ["#24190a", "#2e2210", "#382a14", "#4e3c20"] };
+function itemArtWidget(c) {
+  const book = c.parentElement, ctx = c.getContext("2d"); let W = 0, H = 0, base = null;
+  const isAdm = book.classList.contains("menu-admin"), ruby = isAdm || !!book.closest(".menu-page.adm");
+  const kind = isAdm ? "" : ["report", "danger", "menu-data", "maint"].find(k => book.classList.contains(k)) || "";
+  const [L0, L1, L2, LHI] = LEATHER[kind], OUT = "#0a0708", admOn = isAdm && book.classList.contains("on");
+  // kovanie: železné; ADMIN tmavé rubínové (zapnutý jasnejší)
+  const [IRON, IHI, ILO] = !ruby ? ["#5a5e66", "#8a909a", "#2a2c31"] : admOn ? ["#b0203a", "#ff5a74", "#5a0816"] : ["#6a1424", "#9a2a40", "#34060e"];
+  const GLYPHS = [[[1, 0], [1, 1], [1, 2], [0, 1], [2, 1]], [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], [[0, 0], [1, 0], [2, 0], [1, 1], [1, 2]],
+    [[1, 0], [0, 1], [2, 1], [1, 2]], [[0, 0], [0, 1], [0, 2], [1, 1], [2, 0], [2, 2]], [[0, 2], [1, 1], [2, 0], [1, 0], [1, 2]]];
+  function build() {
+    W = Math.round(book.clientWidth / 3); H = Math.round(book.clientHeight / 3); c.width = W; c.height = H;
+    const g = document.createElement("canvas"); g.width = W; g.height = H; const x = g.getContext("2d"), px = (a, b, w, h, col) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) { const e = Math.min(yy, H - 1 - yy), v = (xx * 7 + yy * 13 + xx * yy) % 17;
+      px(xx, yy, 1, 1, e < 1 ? OUT : e < 3 ? L0 : v < 3 ? L0 : v > 14 ? L2 : L1); }
+    const band = (xx) => { px(xx, 1, 1, H - 2, LHI); px(xx + 1, 1, 1, H - 2, L2); px(xx + 2, 1, 1, H - 2, OUT); };
+    band(5); band(isAdm ? W - 8 : W - 17); // pravý pás = deliaca čiara pred okom (ADMIN oko nemá)
+    const cap = (xx, right) => { for (let i = 0; i < 4; i++) { const h = 6 - i, rx = right ? xx - i : xx + i; px(rx, 0, 1, h, IRON); px(rx, H - h, 1, h, IRON); }
+      px(xx, 0, 1, H, right ? ILO : IHI); px(right ? xx - 1 : xx + 1, 1, 1, 1, IHI); px(right ? xx - 1 : xx + 1, H - 2, 1, 1, IHI); };
+    cap(0, false); cap(W - 1, true);
+    base = x.getImageData(0, 0, W, H);
+  }
+  return (t) => {
+    if (!c.isConnected) return;
+    if (Math.round(book.clientWidth / 3) !== W || Math.round(book.clientHeight / 3) !== H) build();
+    ctx.putImageData(base, 0, 0);
+  };
+}
+
+// ======================= okno: dnešné menu (menu.js) + téma knihy =======================
+const ui = { admin: false, adminOn: false, view: "menu", tab: "qr", page: 0, gfx: "FULL", maint: false };
+const item = (act, icon, label, cls = "", extra = "") =>
+  `<button type="button" class="menu-item${cls ? " " + cls : ""}" data-act="${act}">${extra ? '<canvas class="ib-art"></canvas>' : ""}<span class="ico-box">${menuIcon(icon)}</span><span class="menu-lbl">${label}</span>${extra}</button>`;
+const mainItems = (eye = "", fsOk = true) => item("reload", "reload", "RELOAD GAME", "", eye) + (fsOk ? item("fullscreen", "fullscreen", "FULL SCREEN", "", eye) : "") + item("sound", "sound", "SOUND", "", eye)
+  + item("graphics", "graphics", `GRAPHICS: ${ui.gfx}`, "", eye) + item("bug", "bug", "REPORT BUG", "report", eye);
+const adminItems = (eye = "") => item("data", "download", "DOWNLOAD DATA", "menu-data", eye)
+  + `<button type="button" class="menu-item maint" data-act="maintenance">${eye ? '<canvas class="ib-art"></canvas>' : ""}<span class="ico-box">${menuIcon(ui.maint ? "lock" : "unlock")}</span><span class="menu-lbl">MAINTENANCE</span><span class="maint-state${ui.maint ? " on" : ""}">${ui.maint ? "ON" : "OFF"}</span></button>`
+  + item("reset-room", "resetRoom", "RESET THIS ROOM", "danger", eye) + item("reset-all", "resetAll", "RESET ALL ROOMS", "danger", eye);
+// presne ako render() v menu.js
+function oldMenuHtml() {
+  const head = `<div class="um-head"><span>MENU</span>${ui.admin ? `<button type="button" class="menu-admin${ui.adminOn ? " on" : ""}">ADMIN</button>` : ""}<button type="button" class="um-close">✕</button></div>`;
+  if (!ui.admin) return head + mainItems();
+  return `${head}<div class="menu-pages"><div class="menu-page${ui.adminOn ? " off" : ""}">${mainItems()}</div><div class="menu-page${ui.adminOn ? "" : " off"}">${adminItems()}</div></div>`;
+}
+const TABS = [["qr", "QUICK REF", "#8a6010"], ["basics", "BASICS", "#2c4a7a"], ["arenas", "ARENAS", "#2f6a3d"], ["chars", "CHARACTERS", "#7a1a2a"]];
+const fall = [1, 2, 3].map(d => Math.max(1, B.BASIC_DMG_MAX - d)).join("/");
+const QR = [["move", "Step 1 cell."], ["attack", `First foe in line. ${fall} by distance.`], ["dash", "Up to 2 cells."], ["melee", "Only a foe on your cell."], ["recharge", `Gain mana (max ${B.MAX_MANA}).`],
+  ["block", "Blocks the foe's next action."], ["reflect", "Sends its damage back."], ["shieldBreaker", "Breaks a raised shield."], ["mirrorBreaker", "Breaks a raised mirror."]];
+const qrRows = (rows) => `<table class="qr">${rows.map(([k, s]) => { const t = BUTTON_TEXT[k]; return `<tr><td>${t.info.name.split(" / ")[0]}</td><td>${s}</td><td class="c">${costMarkup(t.info.cost || "")}</td></tr>`; }).join("")}</table>`;
+function rulePages(tab) {
+  if (tab === "qr") return [`<h3>ACTIONS</h3>${qrRows(QR.slice(0, 5))}<h3 style="margin-top:18px">DEFENSE</h3>${qrRows(QR.slice(5))}`, `<h3>QUICK REF</h3><p class="soon">Strana 2.</p>`];
+  const n = TABS.find(x => x[0] === tab)[1];
+  return [`<h3>${n}</h3><p class="soon">Obsah doplníme v ďalšom kroku.</p>`, `<h3>${n}</h3><p class="soon">Strana 2.</p>`];
+}
+const EYE = `<canvas class="ieye"></canvas><canvas class="blood"></canvas>`;
+// menu: užšie, položky pod sebou s okom; vedľa stojí zvislá kniha CODEX
+function menuHtml(fsOk = true) {
+  const head = `<div class="um-head"><span class="ttl"><canvas class="eye"></canvas>MENU</span>${ui.admin ? `<button type="button" class="menu-admin${ui.adminOn ? " on" : ""}"><canvas class="ib-art"></canvas><span>ADMIN</span></button>` : ""}<button type="button" class="um-close">✕</button></div>`;
+  const body = !ui.admin ? mainItems(EYE, fsOk) : `<div class="menu-pages"><div class="menu-page${ui.adminOn ? " off" : ""}">${mainItems(EYE, fsOk)}</div><div class="menu-page adm${ui.adminOn ? "" : " off"}">${adminItems(EYE)}</div></div>`;
+  return `<div class="ui-modal tome menu">${head}<div class="tm-body"><div class="tm-items">${body}</div><button type="button" class="rbook" data-act="rules"><canvas class="rb-art"></canvas><canvas class="ieye"></canvas><span>CODEX</span></button></div><canvas class="teeth"></canvas><canvas class="tongue2"></canvas></div>`;
+}
+const oldEl = document.getElementById("old-menu"), menuEl = document.getElementById("tome-static"), overlay = document.getElementById("overlay");
+let widgets = [];
+function render() {
+  oldEl.innerHTML = oldMenuHtml();
+  menuEl.innerHTML = menuHtml();
+  document.getElementById("tome-nofs").innerHTML = menuHtml(false);
+  if (!overlay.classList.contains("hidden")) overlay.querySelector(".tome-wrap").innerHTML = menuHtml();
+  hydratePix(document);
+  widgets = [...document.querySelectorAll(".tome canvas.eye")].map(c => eyeWidget(c))
+    .concat([...document.querySelectorAll(".tome canvas.ieye")].map(c => eyeWidget(c, c.closest("button"))))
+    .concat([...document.querySelectorAll(".tome canvas.teeth")].map(teethWidget)).concat([...document.querySelectorAll(".tome canvas.tongue2")].map(tongueWrapWidget)).concat([...document.querySelectorAll(".tome canvas.rb-art")].map(grimoireWidget)).concat([...document.querySelectorAll(".tome canvas.ib-art")].map(itemArtWidget)).concat([...document.querySelectorAll(".tome canvas.blood")].map(c => bloodWidget(c, [...c.closest(".tome").querySelectorAll("canvas.blood")].indexOf(c) + 1)));
+}
+// otvorenie (aj prepnutie menu ↔ rulebook) = obal sa odklopí
+function show(view) { ui.view = view; overlay.innerHTML = `<div class="tome-wrap"></div>`; overlay.classList.remove("hidden"); render(); }
+function openOverlay() { show("menu"); }
+function onClick(ev) {
+  const t = ev.target, inOverlay = !!t.closest("#overlay");
+  if (t === overlay) { overlay.classList.add("hidden"); return; }
+  if (t.closest(".um-close")) { if (inOverlay) overlay.classList.add("hidden"); return; }
+  if (t.closest(".menu-admin")) { ui.adminOn = !ui.adminOn; render(); return; }
+  const tab = t.closest("[data-tab]"); if (tab) { ui.tab = tab.dataset.tab; ui.page = 0; render(); return; }
+  const act = t.closest("[data-act]")?.dataset.act;
+  if (act === "rules") return; // zatiaľ nič
+  if (act === "maintenance") { ui.maint = !ui.maint; render(); return; } // menu sa nezatvára (v hre: bez closeMenu, prekreslí ho onAdminChange)
+  if (act === "graphics") { ui.gfx = ui.gfx === "FULL" ? "LITE" : "FULL"; render(); }
+  if (act === "prev") { ui.page--; render(); } if (act === "next") { ui.page++; render(); }
+}
+document.addEventListener("click", onClick);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") overlay.classList.add("hidden"); });
+document.getElementById("t-admin").onclick = (e) => { ui.admin = !ui.admin; ui.adminOn = false; e.target.textContent = `ADMIN ÚČET: ${ui.admin ? "ZAP" : "VYP"}`; e.target.classList.toggle("on", ui.admin); render(); };
+const q = new URLSearchParams(location.search);
+if (q.get("admin")) { ui.admin = true; ui.adminOn = q.get("admin") === "on"; }
+if (q.get("tab")) ui.tab = q.get("tab");
+render();
+
+(function loop(t) { for (const f of loops) f(t); for (const f of widgets) f(t); requestAnimationFrame(loop); })(0);
+</script>
+</body>
+</html>

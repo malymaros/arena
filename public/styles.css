@@ -3627,18 +3627,17 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 }
   
 
-/* ========== Menu ☰, zvukové okno, oko divákov (client/menu.js, sound-ui.js, spectators.js) ========== */
-/* tlačidlo ☰ vľavo dole - retro pixel štýl (tvrdé 2px okraje, bevel z inset tieňov); nad všetkými obrazovkami,
-   aby sa dalo vždy obnoviť (aj nad zaseknutým overlayom, char-selectom, lobby, zoznamom roomiek) */
+/* ========== Menu (živá kniha), zvukové okno, oko divákov (client/menu.js + tome.js, sound-ui.js, spectators.js) ========== */
+/* tlačidlo menu = pixel-art kniha s očami (tome.js, schválený návrh public/dev/book-menu.html) vľavo dole; nad všetkými
+   obrazovkami, aby sa dalo vždy obnoviť (aj nad zaseknutým overlayom, char-selectom, lobby, zoznamom roomiek).
+   V hre malá (48×56 = sprite 1:1), v room browseri veľká vľavo dole oproti hlave bota (.big, 4×) */
 #menu-btn {
   position: fixed; left: 14px; bottom: 14px; z-index: 100002;
-  width: 44px; height: 44px; padding: 8px; border: none; border-radius: 0; cursor: pointer;
-  background: #3a2f25; fill: #f2e6c9; transform-origin: 0 100%;
-  box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #6b5843, inset -2px -2px 0 #1c1610, 4px 4px 0 rgba(0,0,0,.45);
+  width: 48px; height: 56px; padding: 0; border: none; border-radius: 0; cursor: pointer; background: none; transform-origin: 0 100%;
 }
-#menu-btn svg { display: block; width: 100%; height: 100%; }
-#menu-btn:hover { background: #4a3c2f; }
-#menu-btn:active { box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #1c1610, inset -2px -2px 0 #6b5843, 2px 2px 0 rgba(0,0,0,.45); }
+#menu-btn canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+#menu-btn:active canvas { transform: translateY(2px); }
+#menu-btn.big { left: 28px; bottom: 20px; width: 192px; height: 224px; }
 
 /* okná (menu, zvuk): na stred, nad všetkým; --ui-k = na dotyku skutočná veľkosť displeja (viewport.js) */
 .ui-backdrop { position: fixed; inset: 0; z-index: 100003; background: rgba(0,0,0,.55); }
@@ -3717,6 +3716,66 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .menu-page { grid-area: 1 / 1; display: flex; flex-direction: column; gap: 8px; }
 .menu-page.off { visibility: hidden; }
 
+/* ---------- okno menu ako kniha (.ui-modal.tome, menu.js + tome.js; schválený návrh public/dev/book-menu.html) ----------
+   Rozloženie a správanie dnešného menu, oblečené do knihy: tmavá zrnitá koža s fialovým stehom, oko pri nadpise,
+   položky = grimoárové knihy (kožu/kovanie kreslí tome.js do .ib-art) s okom vpravo a krvou, vpravo zvislý CODEX,
+   z ľavého dolného rohu trčia zuby (.teeth), okolo CODEXU sa obtáča jazyk (.tongue2). Písmo a farba textu ako predtým. */
+.ui-modal.tome { --bone: #e8dcc0; --llo: #171114; isolation: isolate; overflow: visible; width: 452px; padding: 18px 22px 14px;
+  background-color: #2b2226; color: var(--bone);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%23241c20'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23302529'/%3E%3Crect x='6' y='2' width='2' height='2' fill='%23221a1e'/%3E%3C/svg%3E");
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #4a3c42, inset 0 0 0 4px var(--llo), 6px 6px 0 rgba(0,0,0,.45); }
+/* fialový steh po obvode obalu (ADMIN a ✕ ho nesmú dotýkať - preto väčší vnútorný okraj) */
+.ui-modal.tome::before { content: ""; position: absolute; inset: 7px; border: 2px dashed #6a2c8a; opacity: .75; pointer-events: none; }
+/* otvorenie: obal sa odklopí (pixelové kroky) */
+.ui-modal.tome.opening { animation: tome-open .32s steps(5) both; }
+@keyframes tome-open { from { transform: translate(-50%, -50%) scale(var(--ui-k, 1)) perspective(900px) rotateY(-80deg); opacity: .2; }
+  to { transform: translate(-50%, -50%) scale(var(--ui-k, 1)); opacity: 1; } }
+.ui-modal.tome .teeth { position: absolute; left: -42px; top: calc(100% - 42px); width: 102px; height: 102px; image-rendering: pixelated; pointer-events: none; z-index: -1; }
+.ui-modal.tome .tongue2 { position: absolute; image-rendering: pixelated; pointer-events: none; z-index: 3; }
+.ui-modal.tome .um-head { color: var(--bone); text-shadow: 2px 2px 0 #5a0c18; position: relative; z-index: 1; }
+.ui-modal.tome .um-head .ttl { display: flex; align-items: center; gap: 10px; }
+.ui-modal.tome .um-head canvas { width: 32px; height: 24px; image-rendering: pixelated; display: block; }
+.ui-modal.tome .um-close { background: #3d3036; color: var(--bone); box-shadow: 0 0 0 2px #000, inset 2px 2px 0 #5a4a52, inset -2px -2px 0 var(--llo); }
+/* ADMIN = malá grimoárová knižka s rubínovým kovaním; zapnutý = rubínovo červený nápis */
+.ui-modal.tome .menu-admin { position: relative; padding: 0 34px; background: #1e1519; color: var(--bone); box-shadow: 0 0 0 2px #000; text-shadow: 2px 2px 0 #000; }
+.ui-modal.tome .menu-admin > span { position: relative; }
+.ui-modal.tome .menu-admin .ib-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+.ui-modal.tome .menu-admin.on { color: #e0405a; box-shadow: 0 0 0 2px #000; text-shadow: 2px 2px 0 #000, 0 0 6px rgba(224,64,90,.6); }
+/* telo: knihy pod sebou + vpravo CODEX; medzera pod hlavičkou = medzera pod poslednou knihou (14 px) */
+.ui-modal.tome .tm-body { display: flex; gap: 10px; position: relative; z-index: 1; margin-top: 6px; }
+.ui-modal.tome .tm-items { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* kniha-položka: koža a kovanie v .ib-art, písmo a farba textu ako predtým */
+.tome .menu-item { position: relative; z-index: 1; padding: 6px 8px 6px 34px; gap: 12px; /* ikona s odstupom od ľavého pásu (chrbta) knihy */ color: var(--bone); background: #1e1519; box-shadow: 0 0 0 2px #000; }
+.tome .menu-item:hover { background: #1e1519; }
+.tome .menu-item .menu-ico { fill: var(--bone); }
+.tome .menu-item .menu-lbl { white-space: nowrap; }
+.tome .menu-item > :not(.ib-art):not(.blood) { position: relative; }
+.tome .menu-item .ib-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+/* prejdenie myšou: len jemne svetlejšie a sýtejšie farby knihy (oko sa otvorí) */
+.tome .menu-item:hover .ib-art, .ui-modal.tome .menu-admin:hover .ib-art { filter: brightness(1.18) saturate(1.25); }
+.tome .menu-item .ieye { margin-left: auto; width: 32px; height: 24px; image-rendering: pixelated; flex: none; }
+.tome .menu-item .blood { position: absolute; left: 0; top: -6px; width: 100%; image-rendering: pixelated; pointer-events: none; z-index: 2; }
+/* knihy menu sú farebné cez kožu - pôvodné pozadia tlačidiel nahradí .ib-art */
+.tome .menu-item.report, .tome .menu-item.danger, .tome .menu-item.menu-data, .tome .menu-item.maint,
+.tome .menu-item.report:hover, .tome .menu-item.danger:hover, .tome .menu-item.menu-data:hover, .tome .menu-item.maint:hover,
+.tome .menu-item.maint.on { background: #1e1519; box-shadow: 0 0 0 2px #000; }
+/* MAINTENANCE: ON/OFF v tom istom výreze ako oko (32×24, ovál v pixeloch); OFF rubínovo červený, ON smaragdovo zelený */
+.tome .menu-item .maint-state { margin-left: auto; width: 32px; height: 24px; padding: 0; box-sizing: border-box; flex: none; display: flex; align-items: center; justify-content: center;
+  font-size: 8px; letter-spacing: 0; background: #000; color: #e0405a; text-shadow: 0 0 6px rgba(224,64,90,.6);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 2px, calc(100% - 4px) 2px, calc(100% - 4px) 4px, calc(100% - 2px) 4px, calc(100% - 2px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 2px) calc(100% - 6px), calc(100% - 2px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 2px), calc(100% - 6px) calc(100% - 2px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 2px), 4px calc(100% - 2px), 4px calc(100% - 4px), 2px calc(100% - 4px), 2px calc(100% - 6px), 0 calc(100% - 6px),
+    0 6px, 2px 6px, 2px 4px, 4px 4px, 4px 2px, 6px 2px); }
+.tome .menu-item.maint.on .maint-state { color: #3ee08a; text-shadow: 0 0 6px rgba(62,224,138,.6); }
+/* CODEX - zvislý tajný grimoár (chrbát kreslí tome.js do .rb-art); zatiaľ nič nerobí */
+.ui-modal.tome .rbook { position: relative; flex: none; align-self: stretch; width: 56px; padding: 0;
+  display: flex; flex-direction: column; align-items: center; font-size: 12px; letter-spacing: 2px; color: #a8884a;
+  text-shadow: -1px -1px 0 #000, 1px 1px 0 #4a3a1c; background: #1e1519; box-shadow: 0 0 0 2px #000; }
+.ui-modal.tome .rbook:hover { color: #d8b060; text-shadow: -1px -1px 0 #000, 1px 1px 0 #4a3a1c, 0 0 8px rgba(170,90,255,.8); }
+.ui-modal.tome .rbook .rb-art { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+.ui-modal.tome .rbook .ieye { position: relative; width: 32px; height: 24px; image-rendering: pixelated; flex: none; margin-top: 14px; left: 2px; }
+.ui-modal.tome .rbook span { position: absolute; left: 50%; top: 50%; transform: translateX(-50%); writing-mode: vertical-rl; }
+
 /* zvukové okno: MUTE + 3 riadky [label][−][posuvník][+][%] */
 #sound-win .snd-mute { display: flex; align-items: center; gap: 12px; min-height: 40px; cursor: pointer; text-shadow: 2px 2px 0 #000; }
 #sound-win .snd-mute input {
@@ -3750,7 +3809,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 
 /* oko s počtom divákov hneď vpravo od menu ☰ (spectators.js) - rovnaký pixel štýl, skryté pri 0 divákoch */
 #spec-eye {
-  position: fixed; left: 70px; bottom: 14px; z-index: 100001; height: 44px; box-sizing: border-box;
+  position: fixed; left: 74px; bottom: 14px; z-index: 100001; height: 44px; box-sizing: border-box; /* vpravo od knihy menu (48 px) */
   display: flex; align-items: center; gap: 8px; padding: 0 12px; transform-origin: 0 100%;
   background: #3a2f25; color: #f2e6c9; font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 14px;
   text-shadow: 2px 2px 0 #000;
