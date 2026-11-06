@@ -3630,14 +3630,14 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 /* ========== Menu (živá kniha), zvukové okno, oko divákov (client/menu.js + tome.js, sound-ui.js, spectators.js) ========== */
 /* tlačidlo menu = pixel-art kniha s očami (tome.js, schválený návrh public/dev/book-menu.html) vľavo dole; nad všetkými
    obrazovkami, aby sa dalo vždy obnoviť (aj nad zaseknutým overlayom, char-selectom, lobby, zoznamom roomiek).
-   V hre malá (48×56 = sprite 1:1), v room browseri veľká vľavo dole oproti hlave bota (.big, 4×) */
+   V hre 96×112 (sprite 2×), v room browseri vľavo dole oproti hlave bota (.big, 144×168 = 3×) */
 #menu-btn {
   position: fixed; left: 14px; bottom: 14px; z-index: 100002;
-  width: 48px; height: 56px; padding: 0; border: none; border-radius: 0; cursor: pointer; background: none; transform-origin: 0 100%;
+  width: 96px; height: 112px; padding: 0; border: none; border-radius: 0; cursor: pointer; background: none; transform-origin: 0 100%;
 }
 #menu-btn canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 #menu-btn:active canvas { transform: translateY(2px); }
-#menu-btn.big { left: 28px; bottom: 20px; width: 192px; height: 224px; }
+#menu-btn.big { left: 28px; bottom: 20px; width: 144px; height: 168px; }
 
 /* okná (menu, zvuk): na stred, nad všetkým; --ui-k = na dotyku skutočná veľkosť displeja (viewport.js) */
 .ui-backdrop { position: fixed; inset: 0; z-index: 100003; background: rgba(0,0,0,.55); }
@@ -3726,10 +3726,6 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
   box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #4a3c42, inset 0 0 0 4px var(--llo), 6px 6px 0 rgba(0,0,0,.45); }
 /* fialový steh po obvode obalu (ADMIN a ✕ ho nesmú dotýkať - preto väčší vnútorný okraj) */
 .ui-modal.tome::before { content: ""; position: absolute; inset: 7px; border: 2px dashed #6a2c8a; opacity: .75; pointer-events: none; }
-/* otvorenie: obal sa odklopí (pixelové kroky) */
-.ui-modal.tome.opening { animation: tome-open .32s steps(5) both; }
-@keyframes tome-open { from { transform: translate(-50%, -50%) scale(var(--ui-k, 1)) perspective(900px) rotateY(-80deg); opacity: .2; }
-  to { transform: translate(-50%, -50%) scale(var(--ui-k, 1)); opacity: 1; } }
 .ui-modal.tome .teeth { position: absolute; left: -42px; top: calc(100% - 42px); width: 102px; height: 102px; image-rendering: pixelated; pointer-events: none; z-index: -1; }
 .ui-modal.tome .tongue2 { position: absolute; image-rendering: pixelated; pointer-events: none; z-index: 3; }
 .ui-modal.tome .um-head { color: var(--bone); text-shadow: 2px 2px 0 #5a0c18; position: relative; z-index: 1; }
@@ -3766,7 +3762,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
     100% calc(100% - 6px), calc(100% - 2px) calc(100% - 6px), calc(100% - 2px) calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) calc(100% - 2px), calc(100% - 6px) calc(100% - 2px), calc(100% - 6px) 100%,
     6px 100%, 6px calc(100% - 2px), 4px calc(100% - 2px), 4px calc(100% - 4px), 2px calc(100% - 4px), 2px calc(100% - 6px), 0 calc(100% - 6px),
     0 6px, 2px 6px, 2px 4px, 4px 4px, 4px 2px, 6px 2px); }
-.tome .menu-item.maint.on .maint-state { color: #3ee08a; text-shadow: 0 0 6px rgba(62,224,138,.6); }
+.tome .menu-item .maint-state.on { color: #3ee08a; text-shadow: 0 0 6px rgba(62,224,138,.6); }
 /* CODEX - zvislý tajný grimoár (chrbát kreslí tome.js do .rb-art); zatiaľ nič nerobí */
 .ui-modal.tome .rbook { position: relative; flex: none; align-self: stretch; width: 56px; padding: 0;
   display: flex; flex-direction: column; align-items: center; font-size: 12px; letter-spacing: 2px; color: #a8884a;
@@ -3809,7 +3805,7 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 
 /* oko s počtom divákov hneď vpravo od menu ☰ (spectators.js) - rovnaký pixel štýl, skryté pri 0 divákoch */
 #spec-eye {
-  position: fixed; left: 74px; bottom: 14px; z-index: 100001; height: 44px; box-sizing: border-box; /* vpravo od knihy menu (48 px) */
+  position: fixed; left: 122px; bottom: 14px; z-index: 100001; height: 44px; box-sizing: border-box; /* vpravo od knihy menu (96 px) */
   display: flex; align-items: center; gap: 8px; padding: 0 12px; transform-origin: 0 100%;
   background: #3a2f25; color: #f2e6c9; font-family: "Press Start 2P", Impact, "Arial Black", sans-serif; font-size: 14px;
   text-shadow: 2px 2px 0 #000;

@@ -43,17 +43,19 @@
 /* obrázky (Last Stand, Last Hope, démon, portréty) nejdú ťahať - dlhé podržanie by inak spustilo drag a prehliadač
    by dotyk zrušil (okno „čo to robí" by sa ukázalo a hneď zmizlo) */
 .touch img { -webkit-user-drag: none; user-drag: none; }
-/* menu (malá kniha): ~43 skutočných px bez ohľadu na zmenšenie hry; veľká kniha v room browseri patrí k jeho
+/* menu (kniha v hre): ~86 skutočných px bez ohľadu na zmenšenie hry; veľká kniha v room browseri patrí k jeho
    virtuálnej obrazovke (ako hlava bota) - na telefóne je väčšia ako hlava bota (.phone .lobby-bot-figure) */
 .touch #menu-btn:not(.big) { transform: scale(calc(var(--ui-k, 1) * .9)); }
-.phone #menu-btn.big { left: 40px; bottom: 30px; width: 240px; height: 280px; }
+.phone #menu-btn.big { left: 40px; bottom: 30px; width: 180px; height: 210px; }
+/* telefón: kniha v hre ostáva 48×56 (väčšia by zakryla zlaté tlačidlá vľavo dole) */
+.phone #menu-btn:not(.big) { width: 48px; height: 56px; }
 /* telefón: admin DOWNLOAD DATA skrytý (dáta sa sťahujú na PC a do menu sa nevojde) */
 .phone #menu-panel .menu-data { display: none; }
 /* telefón: knihy menu nižšie, aby sa okno aj so zubami a jazykom zmestilo na nízky displej */
 .phone #menu-panel.tome .menu-item { min-height: 44px; padding-top: 4px; padding-bottom: 4px; }
 .phone #menu-panel.tome { padding-top: 14px; padding-bottom: 12px; }
 /* oko divákov rovnako veľké ako menu, hneď vpravo od neho; telefón: nad menu (vpravo začína lišta akcií) */
-.touch #spec-eye { transform: scale(calc(var(--ui-k, 1) * .9)); left: calc(14px + 48px * var(--ui-k, 1) * .9 + 10px); }
+.touch #spec-eye { transform: scale(calc(var(--ui-k, 1) * .9)); left: calc(14px + 96px * var(--ui-k, 1) * .9 + 10px); }
 .phone #spec-eye { left: 14px; bottom: calc(14px + 56px * var(--ui-k, 1) * .9 + 10px); }
 /* pruh diváka v skutočnej veľkosti displeja (prst) */
 .touch .spectator { transform: translateX(-50%) scale(calc(var(--ui-k, 1) * .8)); transform-origin: 50% 100%; }

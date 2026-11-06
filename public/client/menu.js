@@ -1,6 +1,6 @@
 // public/client/menu.js - menu v ľavom dolnom rohu, dostupné vždy (aj nad char-selectom, lobby, zoznamom roomiek
 // a zaseknutými overlaymi). Tlačidlo = „živá kniha" s očami (tome.js, schválený návrh public/dev/book-menu.html,
-// animácia PREBÚDZANIE): v hre malá (48×56), v room browseri veľká vľavo dole (oproti hlave bota). Okno = knihy pod
+// animácia PREBÚDZANIE): v hre 96×112, v room browseri vľavo dole 144×168 (oproti hlave bota). Okno = knihy pod
 // sebou: RELOAD GAME (= obnovenie stránky; server hráča vráti na jeho miesto), celá obrazovka (kde to prehliadač vie),
 // zvuk (okno zo sound-ui.js), GRAPHICS (úsporná grafika LITE ↔ FULL, perf.js; kým hráč neklikne, platí auto),
 // REPORT BUG (okno z bug-report.js); vpravo zvislá kniha CODEX (zatiaľ nič nerobí). Admin (prihlásený admin heslom)
@@ -91,12 +91,11 @@ function loop(t) {
 }
 tomeReady.then(() => { bookTick = bookButton(btnCvs, btn); if (!panel.classList.contains("hidden")) render(); if (!raf) raf = requestAnimationFrame(loop); });
 
-export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); panel.classList.remove("opening"); void panel.offsetWidth; panel.classList.add("opening"); }
+export function openMenu() { render(); backdrop.classList.remove("hidden"); panel.classList.remove("hidden"); }
 export function closeMenu() { backdrop.classList.add("hidden"); panel.classList.add("hidden"); }
 
 btn.addEventListener("click", () => {
   if (!panel.classList.contains("hidden")) { closeMenu(); return; }
-  bookTick?.poke(); // kniha sa strhne, okno sa otvorí hneď
   openMenu();
 });
 backdrop.addEventListener("click", closeMenu);

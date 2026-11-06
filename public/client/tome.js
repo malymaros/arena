@@ -72,12 +72,12 @@ document.addEventListener("pointermove", (e) => { pointer.x = e.clientX; pointer
 
 // ======================= kniha - tlačidlo menu (animácia PREBÚDZANIE) =======================
 // Spí so zatvorenými očami a dýchajúcou fialovou aurou; pri prejdení myšou sa oči otvárajú jedno po druhom a sledujú
-// kurzor; klik = strhne sa (poke). Vracia tick(t).
+// kurzor. Vracia tick(t).
 const AW = 48, AH = 56, OX = 2, OY = 3; // plátno knihy: miesto na vznášanie, kvapky a tieň
 export function bookButton(canvas, host) {
   canvas.width = AW; canvas.height = AH;
   const ctx = canvas.getContext("2d"), sp = document.createElement("canvas"); sp.width = SW; sp.height = SH; const sctx = sp.getContext("2d");
-  const st = { hover: false, hoverAt: 0, leaveAt: -1e9, mx: 0, my: 0, poke: -1e9, drips: [], nextDrip: 1500, lastDraw: 0,
+  const st = { hover: false, hoverAt: 0, leaveAt: -1e9, mx: 0, my: 0, drips: [], nextDrip: 1500, lastDraw: 0,
     eyes: EYES.map(() => ({ open: 0, lx: 0, ly: 0, glow: 0, next: 2000 + rnd() * 3000, blinkT: -1 })) };
   host.addEventListener("mouseenter", () => { st.hover = true; st.hoverAt = performance.now(); });
   host.addEventListener("mouseleave", () => { st.hover = false; st.leaveAt = performance.now(); });
@@ -85,17 +85,17 @@ export function bookButton(canvas, host) {
   let last = 0;
   const tick = (t) => {
     if (!base) return;
-    const poked = t - st.poke < 360, awake = st.hover || poked;
+    const awake = st.hover;
     // v pokoji stačí pár snímok za sekundu (dýchanie aury), prebudená / úsporná grafika podľa toho
     const every = awake ? 33 : perf.lite ? 200 : 100;
     if (t - st.lastDraw < every && st.drips.length === 0) return;
     st.lastDraw = t;
     const dt = Math.min(120, t - last); last = t;
     const bob = Math.round(Math.sin(t / 700));
-    const shake = poked ? (Math.floor(t / 45) % 2 ? 1 : -1) : 0;
+    const shake = 0;
     st.eyes.forEach((e, k) => {
       const E = EYES[k], ref = awake ? st.hoverAt : st.leaveAt;
-      let target = awake ? 1 : 0; if (t - ref < k * 130 && !poked) target = awake ? 0 : 1; // jedno po druhom
+      let target = awake ? 1 : 0; if (t - ref < k * 130) target = awake ? 0 : 1; // jedno po druhom
       if (target > .5 && t > e.next) { e.blinkT = t; e.next = t + 2200 + rnd() * 3500; }
       const bt = t - e.blinkT, blink = e.blinkT >= 0 && bt >= 0 && bt < 180 ? 1 - Math.abs(bt - 90) / 90 : 0;
       e.open += ((target * (1 - blink)) - e.open) * Math.min(1, dt / (blink ? 25 : 90));
@@ -116,7 +116,6 @@ export function bookButton(canvas, host) {
     st.drips = st.drips.filter(d => d.y < AH - 3 || (d.splat = (d.splat || 0) + dt) < 300);
     for (const d of st.drips) { if (d.y >= AH - 3) { ctx.fillStyle = "#7a0c18"; ctx.fillRect(Math.round(d.x) - 1, AH - 3, 3, 1); } else { ctx.fillStyle = "#7a0c18"; ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 2); ctx.fillStyle = "#c0283a"; ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); } }
   };
-  tick.poke = () => { st.poke = performance.now(); };
   return tick;
 }
 
@@ -254,11 +253,19 @@ function grimoireWidget(c) {
     if (sk !== c.dataset.k) {
       c.dataset.k = sk;
       const lockBottom = (18 + 9) * 3, tongueTop = book.clientHeight - (TONGUE_WRAP + 3) * 3 + 6;
-      if (tongueTop - lockBottom - 4 < span.scrollHeight + 4) span.style.letterSpacing = "1px";
-      // nízka kniha (bez FULL SCREEN): nápis zarovnaný k jazyku (spodok X kúsok za ním); inak na stred knihy
+      span.style.fontSize = ""; span.style.letterSpacing = "";
       const tight = tongueTop - lockBottom < span.offsetHeight + 30;
-      span.style.top = (tight ? Math.max(lockBottom + 6, tongueTop - span.offsetHeight + 8)
-        : Math.max(lockBottom + 2, Math.min(Math.round((book.clientHeight - span.offsetHeight) / 2), tongueTop - span.offsetHeight - 2))) + "px";
+      if (tight) {
+        // nízka kniha (telefón): nápis na stred medzi zámok a horný okraj jazyka (celý viditeľný); keď sa nevojde, menšie písmo
+        const room = tongueTop - 6 - lockBottom;
+        for (const [fs, ls] of [["", ""], ["", "1px"], ["10px", "1px"], ["8px", "1px"]]) {
+          span.style.fontSize = fs; span.style.letterSpacing = ls;
+          if (span.offsetHeight + 8 <= room) break;
+        }
+        span.style.top = Math.round(lockBottom + (room - span.offsetHeight) / 2) + "px";
+      } else {
+        span.style.top = Math.max(lockBottom + 2, Math.min(Math.round((book.clientHeight - span.offsetHeight) / 2), tongueTop - span.offsetHeight - 2)) + "px";
+      }
       build(); lastRune = -1e9;
     }
     const hov = book.matches(":hover");
