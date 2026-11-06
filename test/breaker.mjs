@@ -148,12 +148,12 @@ const P2_IDLE = [R, M("up"), ML];
   check(fx(tl, "mirror").length === 1, "Naruto stacknutý: nezhodný mirror - jeden lúč", JSON.stringify(fx(tl, "mirror")));
 }
 {
-  // Naruto útočí: breaker castuje aj klon (každá figúra 1× dmg) - rozbitý štít = 2× dmg v jednom údere
+  // Naruto útočí: breaker castuje aj klon, ale rozbitý štít dostane dmg breakera len raz (vlastník 2026-11-06)
   const sc = scenario("naruto", "fire", (g) => { g.players.p1.clone = { x: 0, y: 0 }; g.players.p2.shield = true; g.players.p1.mana = 5; });
   const tl = sc.round([SB, R, M("up")], P2_IDLE);
   const h = hitsOn(tl, "p2")[0];
-  check(h?.dmg === 2 * SHIELD_BREAKER_DMG && h?.parts?.length === 2 && sc.game.players.p1.mana === 5 - SHIELD_COST + 4,
-    "Naruto + klon: Shield Breaker do štítu = 2× dmg, mana raz", JSON.stringify([h, sc.game.players.p1.mana]));
+  check(h?.dmg === SHIELD_BREAKER_DMG && hitsOn(tl, "p2").length === 1 && sc.game.players.p1.mana === 5 - SHIELD_COST + 4,
+    "Naruto + klon: Shield Breaker do štítu = 1× dmg, mana raz", JSON.stringify([h, sc.game.players.p1.mana]));
 }
 {
   // nezhodný mirror: odraz každej figúre zvlášť - Naruto dostane 1× dmg, klon zanikne

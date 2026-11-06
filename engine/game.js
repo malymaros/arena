@@ -1263,13 +1263,14 @@ function doBreaker(slot, kind, tl) {
   pushStateFrame(tl, [{ kind: "breaker", from: slot, target: defSlot, what: kind, result, gold, ...cloneCell }],
     result === "break" ? BREAKER_BREAK_MS : BREAKER_SHORT_MS);
   if (result === "none") return;
-  // Naruto: breaker castuje aj jeho klon (vlastník 2026-11-03, ako basic strela) - každá figúra dá 1× dmg, spolu 2×;
-  // mana sa platí raz. Odraz od nezhodného mirroru sa vracia každej figúre zvlášť (Naruto 1× dmg, klon zanikne).
+  // Naruto: breaker castuje aj jeho klon (vlastník 2026-11-03, mana sa platí raz), ale rozbitie dá súperovi dmg
+  // breakera LEN RAZ bez ohľadu na počet casterov (vlastník 2026-11-06: dmg pochádza z rozbitia obrany, nie z útoku).
+  // Odraz od nezhodného mirroru sa vracia každej figúre zvlášť (Naruto 1× dmg, klon zanikne).
   const casters = me.clone ? 2 : 1;
-  // rozbitá obrana už nekryje nikoho → zásah(y) zasiahnu majiteľa aj klona (klon zásahom zaniká); nezhodná
+  // rozbitá obrana už nekryje nikoho → zásah zasiahne majiteľa aj klona (klon zásahom zaniká); nezhodná
   // obrana kryje obe figúry - reaguje majiteľ, klon len vizuálne (echo)
   const figs = result === "break"
-    ? [...Array.from({ length: casters }, () => ({ fig: "owner", raw })), ...(o.clone ? [{ fig: "clone", raw }] : [])]
+    ? [{ fig: "owner", raw }, ...(o.clone ? [{ fig: "clone", raw }] : [])]
     : [{ fig: "owner", raw }];
   if (result === "break") {
     if (kind === "shield") { o.shield = false; o.shieldGold = false; } else { o.mirror = false; o.mirrorGold = false; }
