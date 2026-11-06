@@ -439,7 +439,7 @@ html.phone:has(#lobby:not(.hidden)) #menu-btn, html.phone:has(#lobby:not(.hidden
 .touch .btn.act > .pix-ico:not(.charge-mark), .touch .golden-half > .g-ico { width: 54px; height: 54px; }
 .touch .btn.act > .brk-ico > .pix-ico { width: 54px; height: 54px; } /* breaker (voľba aj zvolený na tlačidle) = rovnako veľký ako obrana */
 /* skryté postavy (Vampire/Onryō charge, Special 1 Jotara a Luffyho): fialové „???" cez celé tlačidlo */
-.touch .controls-row .btn.act > .pix-ico.charge-mark { width: 100%; height: 100%; font-size: 40px; letter-spacing: -2px; }
+.touch .controls-row .btn.act > .pix-ico.charge-mark { width: 100%; height: 100%; font-size: 26px; letter-spacing: -2px; } /* Press Start 2P: 1 znak = 1em → 3× 26px sa zmestí do 98px */
 .touch .btn.golden { width: 196px; }
 .touch .golden-half { font-size: 40px; padding: 10px 4px; }
 .touch .golden-half .cost { display: none; }
