@@ -1,7 +1,8 @@
 // public/client/room-tiles.js - pevné dlaždice roomiek v room browseri (net.js) - čistá funkcia bez socketu, aby ju
 // mohla použiť aj dev stránka so všetkými stavmi (public/dev/rooms.html).
-// Dlaždica (pixel-art, vo všetkých stavoch rovnako veľká): badge arény (náhodná = rovnako široký s kockou; kým host
-// nastavuje „SETTING UP…"), tabuľka MANUAL | RANDOM - COLOR (farba, ktorú dostaneš, keď sa pripojíš), CHARACTER (výber /
+// Dlaždica (pixel-art, vo všetkých stavoch rovnako veľká): horný riadok = štvorček formátu zápasu (1 korunka = SINGLE,
+// 3 korunky ako vo švédskom erbe = BEST OF 3, pohár = TOURNAMENT; schválené na public/dev/room-format.html) + badge
+// arény (náhodná = rovnako široký s kockou; kým host nastavuje, celý riadok = „SETTING UP…"), tabuľka MANUAL | RANDOM - COLOR (farba, ktorú dostaneš, keď sa pripojíš), CHARACTER (výber /
 // losovanie postáv), TIMER (hodiny + hodnota) - a tlačidlo: prázdna → CREATE (oranžový rám), čaká na súpera → JOIN
 // (zelený), plná → SPECTATE (sivý). Tlačidlo nesie triedy room-btn create|join|spectate (tools/*-smoke, screens,
 // perf-probe na ne klikajú).
@@ -11,7 +12,7 @@ import { isBeginner } from "/client/beginner.js";
 
 // pixelové ikonky: riadky znakov → SVG (crispEdges), ako pix.js
 const PAL = { "#": "#000", g: "#3ddc84", G: "#1f8f52", w: "#f4f1e8", W: "#b9b5a8", b: "#2b2e36", B: "#5c606b", h: "#8a8f9a",
-  y: "#ffcf66", Y: "#b58a2a", x: "#4a4e57" };
+  y: "#ffcf66", Y: "#b58a2a", x: "#4a4e57", r: "#ff5a5a", s: "#5ec8ff" };
 const pix = (rows, cls) => {
   let r = "";
   rows.forEach((row, y) => [...row].forEach((c, x) => { if (PAL[c]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${PAL[c]}"/>`; }));
@@ -25,6 +26,32 @@ const WHITE = token("w", "W", "w"), BLACK = token("b", "B", "h");
 const CLOCK = pix(["..####..", ".#yyyy#.", "#yy#yyY#", "#yy#yyY#", "#yy##yY#", "#yyyyYY#", ".#YYYY#.", "..####.."], "clock");
 const DASH = `<i class="rt-dash"></i>`;
 
+// formát zápasu: korunka (3 hroty, drahokamy) s čiernym obrysom; tri korunky = 2 hore + 1 dole (Tre Kronor)
+const CROWN_IN = ["y...y...y", "y..yyy..y", "yy.yyy.yy", "yyyyyyyyy", "yryysyyry", "yyyyyyyyy", "YYYYYYYYY"];
+function outline(rows) {
+  const w = rows[0].length + 2, h = rows.length + 2;
+  const g = Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => rows[y - 1]?.[x - 1] ?? "."));
+  const full = (x, y) => !!g[y]?.[x] && g[y][x] !== "." && g[y][x] !== "#";
+  return g.map((r, y) => r.map((c, x) => c !== "." ? c : full(x - 1, y) || full(x + 1, y) || full(x, y - 1) || full(x, y + 1) ? "#" : ".").join(""));
+}
+// viac ikon do jednej mriežky (obrys neprekryje farbu susednej ikony)
+function compose(w, h, parts) {
+  const g = Array.from({ length: h }, () => Array(w).fill("."));
+  for (const [rows, ox, oy] of parts) rows.forEach((r, y) => [...r].forEach((c, x) => {
+    if (c === "." || (c === "#" && g[oy + y][ox + x] !== "." && g[oy + y][ox + x] !== "#")) return;
+    g[oy + y][ox + x] = c;
+  }));
+  return g.map(r => r.join(""));
+}
+const CROWN1 = outline(CROWN_IN); // 11×9
+const FORMAT_ICO = {
+  single: pix(CROWN1, "fmt one"),
+  bo3: pix(compose(21, 16, [[CROWN1, 0, 0], [CROWN1, 10, 0], [CROWN1, 5, 7]]), "fmt three"),
+  tournament: pix(["..########..", "##yyyyyyyY##", "#.#yyyyyY#.#", "#.#yyyyyY#.#", ".##yyyyyY##.", "...#yyyY#...",
+    "....#yY#....", "....#yY#....", "...######...", "..#YYYYYY#..", "..########.."], "fmt cup"),
+};
+const FORMAT_NAME = { single: "Single", bo3: "Best of 3", tournament: "Tournament" };
+
 const timerText = (t) => (t === "off" ? "OFF" : t === "quickdraw" ? "60s AFTER LOCK" : `${Number(t) || 0}s`);
 
 // aréna so zmenenými ADVANCED SETTINGS (info.custom - hocičo, aj zákazy postáv): oranžový štvorček v rohu badge
@@ -33,8 +60,11 @@ function badge(info, setting) {
   if (setting) return `<span class="rt-badge none setting"><span class="rt-bname">SETTING UP…</span></span>`;
   if (!info) return `<span class="rt-badge none"><span class="rt-bname">• • •</span></span>`;
   const dot = info.custom ? `<i class="rt-custom" title="Custom settings"></i>` : "";
-  if (info.arena === "random") return `<span class="rt-badge random"><span class="rt-dice">${DICE_SVG}</span>${dot}</span>`;
-  return `<span class="rt-badge" data-arena="${info.arena}"><canvas width="160" height="20"></canvas><span class="rt-bname">${ARENA_NAMES[info.arena] || ""}</span>${dot}</span>`;
+  const arena = info.arena === "random" ? `<span class="rt-badge random"><span class="rt-dice">${DICE_SVG}</span>${dot}</span>`
+    // canvas v pomere šírky badge vedľa štvorčeka formátu (190×40 → 129×20 lowres, nech sa obrázok nedeformuje)
+    : `<span class="rt-badge" data-arena="${info.arena}"><canvas width="129" height="20"></canvas><span class="rt-bname">${ARENA_NAMES[info.arena] || ""}</span>${dot}</span>`;
+  const f = FORMAT_ICO[info.format] ? info.format : "single";
+  return `<span class="rt-top"><span class="rt-fmt" data-f="${f}" title="${FORMAT_NAME[f]}">${FORMAT_ICO[f]}</span>${arena}</span>`;
 }
 
 // info = payload „rooms" ({ rooms: [{ id, slot, players, canJoin, phase, info }], slots }); pick(kind, slot, room)

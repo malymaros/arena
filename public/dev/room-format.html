@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<title>Room tile — formát zápasu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  /* Návrhová stránka: dlaždica roomky s formátom zápasu (SINGLE / BEST OF 3 / TOURNAMENT). Dlaždice kreslí
+     ten istý modul ako hra (client/room-tiles.js); horný badge sa tu prestavia na dva (vľavo formát, vpravo aréna). */
+  html, body { overflow: auto !important; height: auto !important; min-height: 100%; position: static !important; transform: none !important; width: auto !important; overscroll-behavior: auto; touch-action: auto; }
+  html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid #262a33; }
+  header h1 { font: 15px "Press Start 2P", monospace; color: #ffb300; margin: 0 0 6px; }
+  header p { margin: 0; color: #8b92a0; }
+  section { padding: 18px 20px 6px; border-bottom: 1px solid #1b1e25; }
+  section h2 { font: 12px "Press Start 2P", monospace; color: #ffcf66; margin: 0 0 4px; }
+  section > p { margin: 0 0 12px; color: #8b92a0; max-width: 1100px; }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(640px, 1fr)); gap: 18px; }
+  figure { margin: 0 0 12px; }
+  figcaption { margin: 0 0 6px; color: #8b92a0; }
+  .screen { position: relative; width: 100%; aspect-ratio: 1000 / 520; overflow: hidden; border: 1px solid #262a33; border-radius: 6px; background: #000; }
+  .screen .inner { position: absolute; left: 0; top: 0; width: 1000px; height: 520px; transform-origin: 0 0; display: flex; align-items: center; justify-content: center; }
+  .screen .rooms-card { margin: 0; }
+
+  /* ---- návrh: dva badge vedľa seba ---- */
+  .room-tile .rt-badges { display: flex; gap: 6px; flex: none; }
+  .room-tile .rt-badges .rt-badge { flex: 1 1 0; min-width: 0; }
+  .room-tile .rt-badges .rt-badge .rt-bname { font-size: 8px; letter-spacing: 1px; }
+  .room-tile .rt-fmt { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    height: 40px; flex: none; background: #101114; color: #fff; }
+  .room-tile .rt-fmt::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px rgba(255,255,255,.18), inset 0 -6px 0 2px rgba(0,0,0,.25); }
+  .room-tile .rt-fmt svg { display: block; height: 14px; width: auto; image-rendering: pixelated; position: relative; z-index: 1; }
+  .room-tile .rt-fmt .rt-fname { font-size: 6px; letter-spacing: 1px; position: relative; z-index: 1;
+    text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000; }
+  .room-tile .rt-fmt, .room-tile .rt-badges .rt-badge { --n: 4px; clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0,
+    calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n), 100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)),
+    calc(100% - var(--n)) 100%, var(--n) 100%, var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
+
+  /* farby formátov (variant B ich má výrazné, A/C tlmené) */
+  .rt-fmt[data-f="single"] { --fa: #3b4250; --fb: #23272f; }
+  .rt-fmt[data-f="bo3"]    { --fa: #5a3d22; --fb: #33220f; }
+  .rt-fmt[data-f="tournament"] { --fa: #4b2d6b; --fb: #2a1840; }
+  .v-C .rt-fmt, .v-P .rt-fmt { width: 40px; gap: 0; background: linear-gradient(var(--fa), var(--fb)); }
+  .v-C .rt-fmt svg, .v-P .rt-fmt svg { height: auto; width: auto; }
+  .rt-fmt svg.w8 { width: 24px !important; }   /* 1 korunka */
+  .rt-fmt svg.w24 { width: 34px !important; }  /* 3 korunky v rade */
+  .rt-fmt svg.w16 { width: 32px !important; }  /* 3 korunky pyramída */
+  .rt-fmt svg.w12 { width: 24px !important; }  /* pohár */
+  .v-C .rt-badges .rt-badge .rt-bname, .v-P .rt-badges .rt-badge .rt-bname { font-size: 9px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ROOM TILE · FORMÁT ZÁPASU</h1>
+  <p>Dlaždica roomky s formátom zápasu - schválený variant C2, kreslí ho priamo client/room-tiles.js.</p>
+</header>
+<div id="root"></div>
+<div id="grid" hidden></div><!-- dom.js (cez beginner.js) číta gap mriežky -->
+
+<script type="module">
+  import { buildRoomGrid } from "/client/room-tiles.js";
+  import { drawArenaThumb } from "/client/arena-thumbs.js";
+
+  // pixelové ikony (rovnaký spôsob ako room-tiles.js)
+  const PAL = { "#": "#000", w: "#f4f1e8", W: "#b9b5a8", y: "#ffcf66", Y: "#b58a2a", s: "#c9d3e0", S: "#7d8796", p: "#c99bff", r: "#ff5a5a", b: "#5ec8ff" };
+  const pix = (rows) => {
+    let r = "";
+    rows.forEach((row, y) => [...row].forEach((c, x) => { if (PAL[c]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${PAL[c]}"/>`; }));
+    return `<svg viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges">${r}</svg>`;
+  };
+  // korunka = tá istá ako výhra série v HUD (pix.js "crown"), sem s čiernym obrysom (na farebnom podklade)
+  const CROWN_IN = ["y...y...y", "y..yyy..y", "yy.yyy.yy", "yyyyyyyyy", "yryybyyry", "yyyyyyyyy", "YYYYYYYYY"];
+  const outline = (rows) => {
+    const w = rows[0].length + 2, h = rows.length + 2;
+    const g = Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => rows[y - 1]?.[x - 1] ?? "."));
+    const full = (x, y) => g[y]?.[x] && g[y][x] !== "." && g[y][x] !== "#";
+    return g.map((r, y) => r.map((c, x) => c !== "." ? c : (full(x - 1, y) || full(x + 1, y) || full(x, y - 1) || full(x, y + 1)) ? "#" : ".").join(""));
+  };
+  const CROWN = outline(CROWN_IN); // 11×9
+  // poskladaj viac ikon do jednej mriežky (obrys neprepíše farbu)
+  const compose = (w, h, parts) => {
+    const g = Array.from({ length: h }, () => Array(w).fill("."));
+    for (const [rows, ox, oy] of parts) rows.forEach((r, y) => [...r].forEach((c, x) => {
+      if (c === ".") return; const cur = g[oy + y][ox + x];
+      if (c === "#" && cur !== "." && cur !== "#") return; g[oy + y][ox + x] = c; }));
+    return g.map(r => r.join(""));
+  };
+  const svgW = (rows, cls) => pix(rows).replace("<svg ", `<svg class="${cls}" `);
+  const ONE = svgW(CROWN, "w8");
+  const ROW3 = svgW(compose(31, 9, [[CROWN, 0, 0], [CROWN, 10, 0], [CROWN, 20, 0]]), "w24");
+  const PYR3 = svgW(compose(21, 16, [[CROWN, 0, 0], [CROWN, 10, 0], [CROWN, 5, 7]]), "w16");
+  const CUP = svgW(["..########..", "##yyyyyyyY##", "#.#yyyyyY#.#", "#.#yyyyyY#.#", ".##yyyyyY##.", "...#yyyY#...",
+    "....#yY#....", "....#yY#....", "...######...", "..#YYYYYY#..", "..########.."], "w12");
+  const FMT_BY = {
+    C: { single: ONE, bo3: ROW3, tournament: CUP },
+    P: { single: ONE, bo3: PYR3, tournament: CUP },
+  };
+
+  // schválený variant C2 je už v hre (room-tiles.js + styles.css) - stránka kreslí len dlaždice z hry
+  const VARIANTS = [{ id: "0", t: "SCHVÁLENÉ · C2 (kód hry)", d: "SINGLE = 1 korunka, BEST OF 3 = 3 korunky (2 hore, 1 dole - ako Tre Kronor), TOURNAMENT = pohár." }];
+
+  const R = (slot, players, phase, info) => ({ id: slot, slot, players, max: 2, canJoin: players < 2, phase, info });
+  const I = (format, arena, color, chars, timer, custom) => ({ format, arena, color, chars, timer, ...(custom ? { custom: true } : {}) });
+  const SCENES = [
+    { d: "SINGLE na moste čaká (JOIN) · TOURNAMENT v portáloch beží (SPECTATE)",
+      rooms: [R(1, 1, "lobby", I("single", "bridge", "black", "manual", 60)), R(2, 2, "playing", I("tournament", "portal", "random", "manual", 30))] },
+    { d: "BEST OF 3 s kockou (JOIN) · BEST OF 3 v močiari s vlastnými nastaveniami (SPECTATE)",
+      rooms: [R(1, 1, "lobby", I("bo3", "random", "random", "random", "off")), R(2, 2, "playing", I("bo3", "swamp", "white", "random", "quickdraw", true))] },
+    { d: "Host nastavuje (formát ešte nevieme - badge ostáva celý) · voľný slot (CREATE)",
+      rooms: [R(1, 1, "lobby", null)], onlyNow: true },
+  ];
+
+  const FMT_NAME = { single: "SINGLE", bo3: "BEST OF 3", tournament: "TOURNAMENT" };
+  const fmtBadge = (f, v) => `<span class="rt-fmt" data-f="${f}" title="${FMT_NAME[f]}">${FMT_BY[v][f]}</span>`;
+
+  // prestav horný badge dlaždice: [formát][aréna] (canvas arény prekreslený na novú šírku, aby sa nezdeformoval)
+  function split(tile, info, v) {
+    if (v === "0" || !info) return;
+    const badge = tile.querySelector(".rt-badge");
+    const row = document.createElement("span");
+    row.className = "rt-badges";
+    row.innerHTML = fmtBadge(info.format, v);
+    badge.replaceWith(row);
+    row.appendChild(badge);
+    requestAnimationFrame(() => {
+      const c = badge.querySelector("canvas");
+      if (!c) return;
+      c.width = Math.round(160 * badge.clientWidth / 236);
+      c.height = Math.round(20 * badge.clientHeight / 40);
+      drawArenaThumb(c, badge.dataset.arena);
+    });
+  }
+
+  const root = document.getElementById("root");
+  for (const v of VARIANTS) {
+    const sec = document.createElement("section");
+    sec.className = `v-${v.id}`;
+    sec.innerHTML = `<h2>${v.t}</h2><p>${v.d}</p><div class="scenes"></div>`;
+    for (const sc of SCENES.filter(s => v.id === "0" || !s.onlyNow)) {
+      const fig = document.createElement("figure");
+      fig.innerHTML = `<figcaption>${sc.d}</figcaption>`;
+      const screen = document.createElement("div"); screen.className = "screen";
+      const inner = document.createElement("div"); inner.className = "inner";
+      inner.innerHTML = `<div class="rooms-card"><h1 class="rooms-title">ARENA</h1><div class="rooms-list"></div></div>`;
+      const grid = buildRoomGrid({ rooms: sc.rooms, slots: 2 }, () => {});
+      inner.querySelector(".rooms-list").appendChild(grid);
+      screen.appendChild(inner); fig.appendChild(screen);
+      sec.querySelector(".scenes").appendChild(fig);
+      [...grid.children].forEach((tile, i) => split(tile, sc.rooms.find(r => r.slot === i + 1)?.info, v.id));
+      const fit = () => { inner.style.transform = `scale(${screen.clientWidth / 1000})`; };
+      new ResizeObserver(fit).observe(screen); fit();
+    }
+    root.appendChild(sec);
+  }
+</script>
+</body>
+</html>

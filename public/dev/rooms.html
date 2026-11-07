@@ -11,6 +11,7 @@
 <style>
   /* Návrhová stránka (nie je linkovaná z hry): všetky stavy room browsera naraz. Dlaždice kreslí ten istý
      modul ako hra (client/room-tiles.js), hlavu bota bot-face.js, štýly sú z /styles.css - čo je tu, je aj v hre. */
+  html, body { overflow: auto !important; height: auto !important; position: static !important; transform: none !important; width: auto !important; }
   html, body { margin: 0; background: #0b0c10; color: #dfe3ea; font: 13px/1.5 system-ui, sans-serif; }
   header { padding: 14px 20px; border-bottom: 1px solid #262a33; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
   header h1 { font: 15px "Press Start 2P", monospace; color: #ffb300; margin: 0; }
@@ -32,21 +33,22 @@
   <p>Všetky stavy naraz (PC). Mobil: <a href="/dev/devices.html" style="color:#5ef2ff">/dev/devices.html</a>. Dlaždice a hlava bota sú ten istý kód ako v hre; klik tu nič nerobí.</p>
 </header>
 <div class="scenes" id="scenes"></div>
+<div id="grid" hidden></div><!-- dom.js (cez beginner.js) číta gap mriežky -->
 <script type="module">
   import { buildRoomGrid } from "/client/room-tiles.js";
   import { drawBotFigure, FIGURE_W, FIGURE_H } from "/client/bot-face.js";
 
   // info = nastavenia zápasu (server roomInfo); null = host ešte nastavuje (SETTING UP…)
   const R = (slot, players, phase, info) => ({ id: slot, slot, players, max: 2, canJoin: players < 2, phase, info });
-  const I = (arena, color, chars, timer) => ({ arena, color, chars, timer });
+  const I = (arena, color, chars, timer, format = "single") => ({ format, arena, color, chars, timer });
   const AI_FREE = { players: 0, max: 1, canJoin: true }, AI_BUSY = { players: 1, max: 1, canJoin: false };
   const SCENES = [
     { t: "Prázdny server", d: "nikto nehrá - obe roomky voľné (CREATE), bot voľný", rooms: [], ai: AI_FREE },
     { t: "Host nastavuje zápas", d: "vľavo je host v lobby - SETTING UP…, pripojiť sa dá", rooms: [R(1, 1, "lobby", null)], ai: AI_FREE },
     { t: "Host čaká na súpera", d: "stone bridge, pripojený bude čierny, postavy sa vyberajú, 60s", rooms: [R(1, 1, "lobby", I("bridge", "black", "manual", 60))], ai: AI_FREE },
-    { t: "Čaká + hrá sa", d: "vľavo náhodná aréna a farba, vpravo beží zápas v portáloch", rooms: [R(1, 1, "lobby", I("random", "random", "random", "off")), R(2, 2, "playing", I("portal", "white", "random", "quickdraw"))], ai: AI_FREE },
-    { t: "Obe roomky hrajú", d: "dá sa len sledovať (divák vidí ✓ zvolená / losovaná farba)", rooms: [R(1, 2, "playing", I("swamp", "black", "manual", 30)), R(2, 2, "playing", I("bridge", "random", "manual", 120))], ai: AI_FREE },
-    { t: "Všetko obsadené", d: "obe roomky hrajú a niekto hrá s botom", rooms: [R(1, 2, "playing", I("swamp", "black", "manual", 30)), R(2, 2, "playing", I("bridge", "random", "manual", 120))], ai: AI_BUSY },
+    { t: "Čaká + hrá sa", d: "vľavo náhodná aréna a farba, vpravo beží zápas v portáloch", rooms: [R(1, 1, "lobby", I("random", "random", "random", "off")), R(2, 2, "playing", I("portal", "white", "random", "quickdraw", "tournament"))], ai: AI_FREE },
+    { t: "Obe roomky hrajú", d: "dá sa len sledovať (divák vidí ✓ zvolená / losovaná farba)", rooms: [R(1, 2, "playing", I("swamp", "black", "manual", 30, "bo3")), R(2, 2, "playing", I("bridge", "random", "manual", 120))], ai: AI_FREE },
+    { t: "Všetko obsadené", d: "obe roomky hrajú a niekto hrá s botom", rooms: [R(1, 2, "playing", I("swamp", "black", "manual", 30, "bo3")), R(2, 2, "playing", I("bridge", "random", "manual", 120))], ai: AI_BUSY },
     { t: "Dvaja v lobby", d: "druhý hráč sa pripojil, host ešte nastavuje - SPECTATE", rooms: [R(2, 2, "lobby", null)], ai: AI_FREE },
     { t: "Po zápase ostal jeden hráč", d: "druhý odišiel z game over - JOIN", rooms: [R(1, 1, "match_over", I("portal", "white", "manual", "off"))], ai: AI_FREE },
     { t: "Hover na bota (voľný)", d: "po najazdení myšou: úsmev, poskakuje, LET'S DUEL!", rooms: [], ai: AI_FREE, hover: true },

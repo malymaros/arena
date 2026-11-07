@@ -3363,6 +3363,24 @@ html:not(.phone) .rooms-card:has(.room-grid){ zoom: 1.5; }
 .room-tile .rt-badge.none .rt-bname{ color: #3a3d45; text-shadow: none; }
 .room-tile .rt-custom{ position: absolute; right: 6px; top: 6px; z-index: 2; width: 8px; height: 8px; background: #ffb300; box-shadow: 0 0 0 2px #000; }
 .room-tile .rt-badge.setting .rt-bname{ color: #8af0b5; font-size: 8px; text-shadow: 2px 2px 0 #000; }
+/* horný riadok: štvorček formátu zápasu (1 korunka / 3 korunky / pohár) + badge arény (public/dev/room-format.html) */
+.room-tile .rt-top{ display: flex; gap: 6px; flex: none; }
+.room-tile .rt-top .rt-badge{ flex: 1 1 0; min-width: 0; }
+.room-tile .rt-top .rt-bname{ font-size: 9px; letter-spacing: 1px; }
+.room-tile .rt-fmt{ --n: 4px; position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: none;
+  background: linear-gradient(var(--fa), var(--fb));
+  clip-path: polygon(0 var(--n), var(--n) var(--n), var(--n) 0, calc(100% - var(--n)) 0, calc(100% - var(--n)) var(--n), 100% var(--n),
+    100% calc(100% - var(--n)), calc(100% - var(--n)) calc(100% - var(--n)), calc(100% - var(--n)) 100%, var(--n) 100%,
+    var(--n) calc(100% - var(--n)), 0 calc(100% - var(--n))); }
+.room-tile .rt-fmt::after{ content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px rgba(255,255,255,.18), inset 0 -6px 0 2px rgba(0,0,0,.25); }
+.room-tile .rt-fmt[data-f="single"]{ --fa: #3b4250; --fb: #23272f; }
+.room-tile .rt-fmt[data-f="bo3"]{ --fa: #5a3d22; --fb: #33220f; }
+.room-tile .rt-fmt[data-f="tournament"]{ --fa: #4b2d6b; --fb: #2a1840; }
+.room-tile .rt-ico.fmt{ position: relative; z-index: 1; height: auto; }
+.room-tile .rt-ico.fmt.one{ width: 24px; }
+.room-tile .rt-ico.fmt.three{ width: 32px; }
+.room-tile .rt-ico.fmt.cup{ width: 24px; }
 /* tabuľka */
 .room-tile .rt-tbl{ display: grid; grid-template-columns: 1fr 60px 60px; gap: 5px 4px; align-items: center; font-size: 8px; }
 .room-tile .rt-h{ color: #8b92a0; text-align: center; font-size: 6px; letter-spacing: 1px; }

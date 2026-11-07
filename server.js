@@ -396,13 +396,13 @@ function onTurnTimeout() {
   }
   // nastavenia zápasu pre dlaždicu v room-browseri (public/client/room-tiles.js): známe, keď host stlačil START
   // (čaká na súpera - pendingMatchConfig) alebo zápas beží (game.config); kým host nastavuje, null = SETTING UP…
-  // color = farba, ktorú dostane ten, kto sa pripojí (host si vybral bielu → pripájajúci čierna)
+  // color = farba, ktorú dostane ten, kto sa pripojí (host si vybral bielu → pripájajúci čierna); format = single | bo3 | tournament
   function roomInfo() {
     const cfg = engine.game.phase === "lobby" ? pendingMatchConfig : engine.game.config;
     if (!cfg) return null;
     const color = cfg.colorPref === "white" ? "black" : cfg.colorPref === "black" ? "white" : "random";
     // custom = aréna má zmenené ADVANCED SETTINGS (hocičo, aj zákazy postáv) → oranžový štvorček na badge arény
-    return { arena: cfg.arena === "random" ? "random" : cfg.arena || "bridge", color, chars: cfg.randomChars ? "random" : "manual", timer: cfg.timer ?? "off",
+    return { format: cfg.format || "single", arena: cfg.arena === "random" ? "random" : cfg.arena || "bridge", color, chars: cfg.randomChars ? "random" : "manual", timer: cfg.timer ?? "off",
       ...(matchConfigCustom(cfg) && !cfg.beginner ? { custom: true } : {}) }; // beginner zákazy nie sú „custom"
   }
   // voľné miesto (nie je obsadené živým socketom ani grace-held tokenom)
